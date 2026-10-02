@@ -33,7 +33,7 @@ export function HighlightFeedbackRow(props: HighlightFeedbackRowProps) {
         )}
         style={{ height: 44 }}
       >
-        <Text className="font-heading text-[12px] uppercase tracking-caps text-ink">
+        <Text className="font-heading text-small uppercase tracking-caps text-ink">
           {HIGHLIGHT_COPY.improve}
         </Text>
       </Pressable>

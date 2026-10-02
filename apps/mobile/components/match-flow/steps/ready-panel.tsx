@@ -42,14 +42,14 @@ export function ReadyPanel({ label, ready, testID, accessibilityName }: ReadyPan
       )}
       <Text
         className={cn(
-          "font-heading text-[12px] uppercase tracking-caps",
+          "font-heading text-small uppercase tracking-caps",
           ready ? "text-ink" : "text-ink-2",
         )}
         numberOfLines={1}
       >
         {label}
       </Text>
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
         {ready ? "Ready" : "Waiting"}
       </Text>
     </View>

@@ -10,7 +10,7 @@ export function WeightTile({ name, weight }: { name: string; weight: number | nu
   return (
     <View className="flex-1 items-center gap-2">
       <Text
-        className="font-heading text-[11px] text-ink-2 uppercase tracking-caps text-center"
+        className="font-heading text-caption text-ink-2 uppercase tracking-caps text-center"
         numberOfLines={1}
       >
         {name}

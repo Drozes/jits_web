@@ -400,7 +400,7 @@ export function WizardStepHeader({
         <Text
           testID={`match-step-${step}`}
           accessibilityLabel={`Step ${currentIdx + 1} of ${total}, ${label}`}
-          className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl"
+          className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl"
         >
           Step {currentIdx + 1} / {total}
         </Text>
@@ -409,7 +409,7 @@ export function WizardStepHeader({
         <Text
           accessibilityElementsHidden
           importantForAccessibility="no"
-          className="font-mono text-[10px] text-ink-2 uppercase tracking-caps-l"
+          className="font-mono tabular-nums text-micro text-ink-2 uppercase tracking-caps-l"
         >
           {label}
         </Text>

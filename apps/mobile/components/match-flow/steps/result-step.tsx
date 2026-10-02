@@ -9,6 +9,7 @@ import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import { usePalette } from "@/lib/theme/palette";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { FightButton, Mono, shortName } from "../fight/fight-ui";
 import {
   DrawPlate,
@@ -108,14 +109,14 @@ export function ResultStep(props: ResultStepProps) {
         {endedAt ? <Mono>{endedAt}</Mono> : null}
         {/* A plain text element on purpose: the match-loop harness taps the
             StaticText "Record result" to drop the numeric keyboard. */}
-        <Text className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: p.text }}>
+        <Text className="font-heading uppercase" style={[typeStep("headline-2xl"), { letterSpacing: TRACKING.loose, color: p.text }]}>
           Record result
         </Text>
       </View>
 
       {outcome === null ? (
         <>
-          <Mono bold size={11}>
+          <Mono bold size="caption">
             TAP THE WINNER
           </Mono>
           <WinnerTiles me={me} opponent={opponent} onPick={pickWinner} />
@@ -150,7 +151,7 @@ export function ResultStep(props: ResultStepProps) {
       {claim.state === "mine" ? (
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.text }} />
-          <Mono size={11} spacing={0.4}>
+          <Mono size="caption" spacing="loose">
             {`You're recording for both of you. ${shortName(opponent.displayName)} sees this live.`}
           </Mono>
         </View>

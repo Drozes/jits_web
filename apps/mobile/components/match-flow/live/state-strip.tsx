@@ -5,6 +5,7 @@ import { easing } from "@/lib/motion";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import { FINAL_SECONDS, type StripVariant } from "@/lib/match-flow/live-view-state";
 import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 
 interface StripCopy {
   left: string;
@@ -130,7 +131,7 @@ export function StateStrip({ variant, remaining }: { variant: StripVariant; rema
       <Text
         className="font-mono-bold"
         numberOfLines={1}
-        style={[{ flexShrink: 1, fontSize: 12, lineHeight: 14, letterSpacing: 2.52, color: copy.leftColor }, TABULAR]}
+        style={[typeStep("small"), { flexShrink: 1, lineHeight: 14, letterSpacing: TRACKING["caps-xl"], color: copy.leftColor }, TABULAR]}
       >
         {copy.left}
       </Text>
@@ -140,7 +141,7 @@ export function StateStrip({ variant, remaining }: { variant: StripVariant; rema
         <Text
           className="font-mono-medium"
           numberOfLines={1}
-          style={{ fontSize: 10, lineHeight: 12, letterSpacing: 1.68, color: copy.rightColor }}
+          style={[typeStep("micro"), { lineHeight: 12, letterSpacing: TRACKING["caps-l"], color: copy.rightColor }, TABULAR]}
         >
           {copy.right}
         </Text>

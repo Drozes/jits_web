@@ -16,7 +16,7 @@ export function HighlightProgressSteps({ activeStep }: { activeStep: 1 | 2 }) {
   return (
     <View testID="highlight-progress" className="gap-3">
       <View className={cn("self-start px-2 py-1 border rounded-xs", amber.border)}>
-        <Text className={cn("font-mono-bold text-[10px] uppercase tracking-caps-l", amber.text)}>
+        <Text className={cn("font-mono-bold text-micro uppercase tracking-caps-l tabular-nums", amber.text)}>
           {HIGHLIGHT_COPY.generatingChip}
         </Text>
       </View>
@@ -40,7 +40,7 @@ export function HighlightProgressSteps({ activeStep }: { activeStep: 1 | 2 }) {
                 style={{ width: 8, height: 8 }}
               />
               <Text
-                className={cn("font-body text-[13px]", active ? "text-ink" : "text-ink-3")}
+                className={cn("font-body text-body", active ? "text-ink" : "text-ink-3")}
               >
                 {label}
               </Text>
@@ -48,7 +48,7 @@ export function HighlightProgressSteps({ activeStep }: { activeStep: 1 | 2 }) {
           );
         })}
       </View>
-      <Text className="font-body text-[12px] text-ink-3">{HIGHLIGHT_COPY.eta}</Text>
+      <Text className="font-body text-small text-ink-3">{HIGHLIGHT_COPY.eta}</Text>
     </View>
   );
 }

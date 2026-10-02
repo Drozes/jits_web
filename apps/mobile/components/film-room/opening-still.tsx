@@ -2,7 +2,8 @@ import * as React from "react";
 import { Text, View } from "react-native";
 import { Image } from "expo-image";
 import { usePalette } from "@/lib/theme/palette";
-import { AthleteTile } from "./athlete-tile";
+import { AthleteTile, nearestStep } from "./athlete-tile";
+import { TABULAR, TRACKING, typeSize, typeStep } from "@/lib/typography";
 
 export interface StillAthlete {
   name: string;
@@ -63,7 +64,7 @@ export function OpeningStill({
     >
       <View className="flex-row items-center" style={{ gap: Math.round(tileSize * 0.2) }}>
         <AthleteTile name={me.name} photoUrl={me.photoUrl} size={tileSize} />
-        <Text className="font-display" style={{ color: p.red, fontSize: Math.round(tileSize * 0.3) }}>
+        <Text className="font-display" style={[typeSize(nearestStep(tileSize * 0.3)), { color: p.red }]}>
           VS
         </Text>
         <AthleteTile name={opponent?.name ?? "Opponent"} photoUrl={opponent?.photoUrl} size={tileSize} />
@@ -71,7 +72,7 @@ export function OpeningStill({
       <Text
         numberOfLines={2}
         className="font-mono-medium text-center"
-        style={{ marginTop: 12, paddingHorizontal: 12, fontSize: 10, letterSpacing: 2, color: p.text2 }}
+        style={[typeStep("micro"), { marginTop: 12, paddingHorizontal: 12, letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}
       >
         {fallbackLabel}
       </Text>

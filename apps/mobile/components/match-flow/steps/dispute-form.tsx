@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
+import { typeSize } from "@/lib/typography";
 import { AlertTriangle } from "lucide-react-native";
 import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -57,10 +58,10 @@ export function DisputeForm({ matchId, onCancel, onSubmitted, onWindowClosed }: 
     <View className="gap-4 px-1 py-4">
       <View className="items-center gap-2">
         <AlertTriangle size={28} color={amberIcon} />
-        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
           Dispute Result
         </Text>
-        <Text className="text-center font-body text-[13px] text-ink-2">
+        <Text className="text-center font-body text-body text-ink-2">
           Wrong winner, wrong submission, or it never happened? Tell us. An admin reviews
           every dispute; ratings stay as recorded until then, and your opponent will see it
           was disputed.
@@ -76,7 +77,8 @@ export function DisputeForm({ matchId, onCancel, onSubmitted, onWindowClosed }: 
         onChangeText={setReason}
         multiline
         textAlignVertical="top"
-        className="h-24 rounded-sm border border-hairline-strong bg-surface-3 px-3 py-2 font-body text-[13px] text-ink"
+        className="h-24 rounded-sm border border-hairline-strong bg-surface-3 px-3 py-2 font-body text-ink"
+        style={typeSize("body")}
       />
 
       <Button
@@ -95,7 +97,7 @@ export function DisputeForm({ matchId, onCancel, onSubmitted, onWindowClosed }: 
         className="items-center py-2 active:opacity-70"
         hitSlop={8}
       >
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l underline">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l underline">
           Back
         </Text>
       </Pressable>

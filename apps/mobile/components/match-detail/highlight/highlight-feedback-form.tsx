@@ -25,7 +25,7 @@ export interface HighlightFeedbackFormProps {
 
 function Label({ children }: { children: string }) {
   return (
-    <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+    <Text className="font-mono-bold text-micro text-ink-3 uppercase tracking-caps-xl tabular-nums">
       {children}
     </Text>
   );
@@ -36,7 +36,7 @@ export function HighlightFeedbackForm(props: HighlightFeedbackFormProps) {
   const form = useHighlightFeedbackForm(props);
   return (
     <View testID="highlight-feedback-form" className="px-4 pb-8 pt-2 gap-4">
-      <Text className="font-heading text-[20px] text-ink">{HIGHLIGHT_COPY.sheetTitle}</Text>
+      <Text className="font-heading text-title-l text-ink">{HIGHLIGHT_COPY.sheetTitle}</Text>
       <View className="gap-2">
         <Label>{HIGHLIGHT_COPY.howWasIt}</Label>
         <View className="flex-row gap-2">

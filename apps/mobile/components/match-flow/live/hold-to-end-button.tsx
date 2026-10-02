@@ -5,6 +5,7 @@ import { Square } from "lucide-react-native";
 import { HOLD_TO_END_MS } from "@/lib/match-flow/live-view-state";
 import { duration, easing } from "@/lib/motion";
 import { BROADCAST, BROADCAST_LANDSCAPE, BROADCAST_RADIUS, BROADCAST_SIZE } from "./broadcast-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 
 /** The fill retracts to empty on an early release (`duration.fast`, brand ease-out). */
 export const RETRACT_MS = duration.fast;
@@ -198,7 +199,8 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = 
           className="font-heading"
           numberOfLines={tile ? 2 : 1}
           style={[
-            { fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.ink },
+            typeStep("callout"),
+            { lineHeight: 16, letterSpacing: TRACKING.caps, color: BROADCAST.ink },
             tile ? { lineHeight: 15.4, textAlign: "center" } : null,
           ]}
         >

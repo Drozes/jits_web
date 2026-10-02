@@ -38,7 +38,7 @@ export function ShareSheetBody({ share, onHandoff, iosReels, onCopy, onDone }: S
   }
   return (
     <View testID={`share-stage-${stage}`} className="gap-4">
-      <Text accessibilityRole="header" className="font-heading text-[16px] text-ink">
+      <Text accessibilityRole="header" className="font-heading text-subhead text-ink">
         {SHARE_COPY.sheetTitle}
       </Text>
       {stage === "failed" && error ? (
@@ -52,8 +52,8 @@ export function ShareSheetBody({ share, onHandoff, iosReels, onCopy, onDone }: S
           {DOWNLOADING.has(stage) ? <ShareProgress progress={share.progress} /> : null}
           {!showCaption ? (
             <View testID="share-ios-reels-note" className="gap-1">
-              <Text className="font-body text-[13px] text-ink">{SHARE_COPY.iosReelsNote[0]}</Text>
-              <Text className="font-body text-[12px] text-ink-2">{SHARE_COPY.iosReelsNote[1]}</Text>
+              <Text className="font-body text-body text-ink">{SHARE_COPY.iosReelsNote[0]}</Text>
+              <Text className="font-body text-small text-ink-2">{SHARE_COPY.iosReelsNote[1]}</Text>
             </View>
           ) : (
             <CaptionCard caption={share.caption} clipboard={clipboard} showCopyButton onCopy={onCopy} />

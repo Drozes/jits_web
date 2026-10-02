@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { Pause, Play } from "lucide-react-native";
 import { BROADCAST, BROADCAST_LANDSCAPE, BROADCAST_SIZE, glassButtonStyle } from "./broadcast-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { PressableScale } from "@/components/ui/pressable-scale";
 
 /**
@@ -46,7 +47,7 @@ export function PauseButton({
           <Pause size={22} color={BROADCAST.white} strokeWidth={2} />
         )}
       </View>
-      <Text className="font-heading" style={{ fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.white }}>
+      <Text className="font-heading" style={[typeStep("callout"), { lineHeight: 16, letterSpacing: TRACKING.caps, color: BROADCAST.white }]}>
         {paused ? "RESUME" : "PAUSE"}
       </Text>
     </PressableScale>

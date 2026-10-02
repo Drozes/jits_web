@@ -3,7 +3,8 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { Pause, Play, RotateCcw, RotateCw } from "lucide-react-native";
 import { formatClock, type KeyMoment } from "@jits/shared/utils";
-import { ON_MEDIA, TABULAR } from "@/lib/theme/palette";
+import { ON_MEDIA } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 
 /** Playback speeds the speed button cycles through (slow motion for study). */
 export const SPEEDS = [1, 0.5, 0.25, 2] as const;
@@ -25,9 +26,13 @@ function SkipButton({ dir, onPress }: { dir: "back" | "forward"; onPress: () => 
       style={{ width: 56, height: 56 }}
     >
       <Icon size={28} color={ON_MEDIA.white} strokeWidth={2} />
-      <Text className="font-mono-bold" style={{ position: "absolute", fontSize: 8, color: ON_MEDIA.white, top: 23 }}>
-        10
-      </Text>
+      {/* The "10" sits in the icon's open center: a full-box centered layer so
+          the 10px floor glyph (was 8px at top: 23) stays centered on the icon. */}
+      <View pointerEvents="none" style={{ position: "absolute", left: 0, top: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center" }}>
+        <Text className="font-mono-bold" style={[typeStep("micro"), { color: ON_MEDIA.white, textAlign: "center" }, TABULAR]}>
+          10
+        </Text>
+      </View>
     </Pressable>
   );
 }
@@ -70,7 +75,7 @@ export function Transport({ playing, speed, onToggle, onSkip, onSpeed }: Transpo
         className="items-center justify-center active:opacity-70"
         style={{ height: 44, minWidth: 56, paddingHorizontal: 12, borderRadius: 3, borderWidth: 1, borderColor: ON_MEDIA.strong, backgroundColor: ON_MEDIA.glass }}
       >
-        <Text className="font-mono-bold" style={[{ fontSize: 13, color: ON_MEDIA.white }, TABULAR]}>
+        <Text className="font-mono-bold" style={[typeStep("body"), { color: ON_MEDIA.white }, TABULAR]}>
           {`${speed}x`}
         </Text>
       </Pressable>
@@ -103,7 +108,7 @@ export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[
             onPress={() => onJump(m.t)}
             style={{ height: 44, paddingHorizontal: 12, borderRadius: 2, borderWidth: 1, justifyContent: "center", borderColor: on ? ON_MEDIA.text : ON_MEDIA.strong, backgroundColor: on ? ON_MEDIA.text : ON_MEDIA.tag }}
           >
-            <Text className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 1.2, color: on ? ON_MEDIA.ink : ON_MEDIA.white }, TABULAR]}>
+            <Text className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING.caps, color: on ? ON_MEDIA.ink : ON_MEDIA.white }, TABULAR]}>
               {label}
             </Text>
           </StatePressable>
@@ -117,11 +122,11 @@ export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[
 export function MomentCaption({ t, text }: { t: number; text: string }) {
   return (
     <View testID="player-caption" className="flex-row items-center self-start" style={{ gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 2, backgroundColor: ON_MEDIA.chip, maxWidth: "100%" }}>
-      <Text className="font-mono-bold" style={[{ fontSize: 11, color: ON_MEDIA.ink }, TABULAR]}>
+      <Text className="font-mono-bold" style={[typeStep("caption"), { color: ON_MEDIA.ink }, TABULAR]}>
         {formatClock(t)}
       </Text>
       <View style={{ width: 1, height: 12, backgroundColor: ON_MEDIA.chipBorder }} />
-      <Text numberOfLines={2} className="font-body-medium flex-shrink" style={{ fontSize: 13, lineHeight: 16, color: ON_MEDIA.ink }}>
+      <Text numberOfLines={2} className="font-body-medium flex-shrink" style={[typeStep("body"), { lineHeight: 16, color: ON_MEDIA.ink }]}>
         {text}
       </Text>
     </View>

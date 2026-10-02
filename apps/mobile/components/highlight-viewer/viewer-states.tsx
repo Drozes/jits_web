@@ -29,7 +29,7 @@ interface ViewerMessageProps {
 export function ViewerMessage({ testID, message, action }: ViewerMessageProps) {
   return (
     <View testID={testID} className="flex-1 items-center justify-center gap-4 px-6">
-      <Text className="font-body text-[14px] text-ink text-center">{message}</Text>
+      <Text className="font-body text-callout text-ink text-center">{message}</Text>
       {action ? (
         <Button height={44} testID={action.testID} label={action.label} variant={action.variant} onPress={action.onPress} />
       ) : null}

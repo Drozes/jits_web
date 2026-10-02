@@ -5,6 +5,7 @@ import { ChevronLeft, Pencil } from "lucide-react-native";
 import { isValidAthleteWeight } from "@jits/shared/api/athlete-weight";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
+import { TRACKING, typeSize, typeStep } from "@/lib/typography";
 import { InitialsBlock, Mono, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 import { StatePressable } from "@/components/ui/state-pressable";
@@ -93,7 +94,7 @@ export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
                   numberOfLines={1}
                   maxFontSizeMultiplier={TOP_BAR_FONT_CAP}
                   className="font-heading uppercase"
-                  style={{ fontSize: 13, letterSpacing: 1.12, color: p.text }}
+                  style={[typeStep("body"), { letterSpacing: TRACKING.caps, color: p.text }]}
                 >
                   Leave
                 </Text>
@@ -127,30 +128,30 @@ function FightCard({ me, opponent }: { me: FaceoffAthlete; opponent: FaceoffAthl
   return (
     <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
       <View style={{ flex: 1, gap: 10, minWidth: 0 }}>
-        <InitialsBlock name={me.display_name} size="fill" fontSize={64} display accent={p.cta} style={{ height: 176 }} />
-        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 16, letterSpacing: 0.6, color: p.text }}>
+        <InitialsBlock name={me.display_name} size="fill" fontSize="display-64" display accent={p.cta} style={{ height: 176 }} />
+        <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: p.text }]}>
           {shortName(me.display_name)}
         </Text>
-        <Mono size={12} spacing={0} color={p.text2}>
+        <Mono size="small" spacing="normal" color={p.text2}>
           {me.current_elo != null ? `ELO ${me.current_elo}` : "UNRATED"}
         </Mono>
         <MyWeight />
       </View>
       <View style={{ width: 40, height: 176, alignItems: "center", justifyContent: "center" }}>
-        <Text className="font-display" style={{ fontSize: 30, color: p.red }}>
+        <Text className="font-display" style={[typeStep("headline-2xl"), { color: p.red }]}>
           VS
         </Text>
       </View>
       <View style={{ flex: 1, gap: 10, alignItems: "flex-end", minWidth: 0 }}>
-        <InitialsBlock name={opponent.display_name} size="fill" fontSize={64} display style={{ height: 176 }} />
-        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 16, letterSpacing: 0.6, color: p.text }}>
+        <InitialsBlock name={opponent.display_name} size="fill" fontSize="display-64" display style={{ height: 176 }} />
+        <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: p.text }]}>
           {shortName(opponent.display_name)}
         </Text>
-        <Mono size={12} spacing={0} color={p.text2}>
+        <Mono size="small" spacing="normal" color={p.text2}>
           {opponent.current_elo != null ? `ELO ${opponent.current_elo}` : "UNRATED"}
         </Mono>
         <View style={{ height: 44, justifyContent: "center" }}>
-          <Text testID="faceoff-opponent-weight" className="font-display" style={[{ fontSize: 36, color: p.text }, TABULAR]}>
+          <Text testID="faceoff-opponent-weight" className="font-display" style={[typeSize("display-36"), { color: p.text }, TABULAR]}>
             {weightText(f.opponentWeight)}
           </Text>
         </View>
@@ -177,7 +178,7 @@ function MyWeight() {
     return (
       <View style={{ gap: 4 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text testID="faceoff-my-weight" className="font-display" style={[{ fontSize: 36, color: p.text }, TABULAR]}>
+          <Text testID="faceoff-my-weight" className="font-display" style={[typeSize("display-36"), { color: p.text }, TABULAR]}>
             {weightText(f.myWeight)}
           </Text>
           {f.myWeighed ? null : (
@@ -197,7 +198,7 @@ function MyWeight() {
           )}
         </View>
         {f.profileWeightSaved != null ? (
-          <Text testID="faceoff-profile-weight-saved" className="font-body" style={{ fontSize: 12, color: p.text2 }}>
+          <Text testID="faceoff-profile-weight-saved" className="font-body" style={[typeStep("small"), { color: p.text2 }]}>
             {`Profile weight saved: ${Number(f.profileWeightSaved.toFixed(1))} lbs, for future matches.`}
           </Text>
         ) : null}
@@ -220,7 +221,8 @@ function MyWeight() {
             width: 84,
             height: 44,
             paddingHorizontal: 8,
-            fontSize: 18,
+            ...typeSize("title"),
+            ...TABULAR,
             color: p.text,
             backgroundColor: p.plate,
             borderWidth: 1,
@@ -239,7 +241,7 @@ function MyWeight() {
           }}
           style={{ minWidth: 64, height: 44, paddingHorizontal: 10, alignItems: "center", justifyContent: "center", opacity: valid && !f.savingWeight ? 1 : 0.5 }}
         >
-          <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.text }}>
+          <Text className="font-heading uppercase" style={[typeStep("body"), { letterSpacing: TRACKING.caps, color: p.text }]}>
             {f.savingWeight ? "Saving" : "Save"}
           </Text>
         </PressableScale>
@@ -250,12 +252,12 @@ function MyWeight() {
           onPress={() => f.setWeightEditorOpen(false)}
           style={{ minWidth: 44, height: 44, alignItems: "center", justifyContent: "center" }}
         >
-          <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.text2 }}>
+          <Text className="font-heading uppercase" style={[typeStep("body"), { letterSpacing: TRACKING.caps, color: p.text2 }]}>
             Cancel
           </Text>
         </PressableScale>
       </View>
-      <Text testID="faceoff-weight-edit-note" className="font-body" style={{ fontSize: 12, color: p.text2 }}>
+      <Text testID="faceoff-weight-edit-note" className="font-body" style={[typeStep("small"), { color: p.text2 }]}>
         Updates your profile weight for future matches. This match keeps its weigh-in.
       </Text>
     </View>
@@ -299,24 +301,24 @@ export function FaceoffChip({
       <View style={{ flex: 1, paddingLeft: 12, justifyContent: "center", gap: 5, minWidth: 0 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
           <View style={{ width: 4, height: 4, backgroundColor: c.dot }} />
-          <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 15, letterSpacing: 0.6, color: c.ink }}>
+          <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: c.ink }]}>
             {shortName(me.display_name)}
           </Text>
         </View>
-        <Text className="font-mono" style={[{ paddingLeft: 11, fontSize: 11, color: c.ink3 }, TABULAR]}>
+        <Text className="font-mono" style={[typeStep("caption"), { paddingLeft: 11, color: c.ink3 }, TABULAR]}>
           {meta(me, myWeight)}
         </Text>
       </View>
       <View style={{ width: 44, alignItems: "center", justifyContent: "center" }}>
-        <Text className="font-display" style={{ fontSize: 22, color: c.vs }}>
+        <Text className="font-display" style={[typeStep("title-xl"), { color: c.vs }]}>
           VS
         </Text>
       </View>
       <View style={{ flex: 1, paddingRight: 12, justifyContent: "center", alignItems: "flex-end", gap: 5, minWidth: 0 }}>
-        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 15, letterSpacing: 0.6, color: c.ink }}>
+        <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: c.ink }]}>
           {shortName(opponent.display_name)}
         </Text>
-        <Text className="font-mono" style={[{ fontSize: 11, color: c.ink3 }, TABULAR]}>
+        <Text className="font-mono" style={[typeStep("caption"), { color: c.ink3 }, TABULAR]}>
           {meta(opponent, opponentWeight)}
         </Text>
       </View>

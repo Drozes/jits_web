@@ -48,14 +48,14 @@ export function VideoStatePanel({ kind, onRetry, onBack }: VideoStatePanelProps)
     <View testID={panel.testID} className="flex-1 items-center justify-center px-8 gap-2">
       <Text
         className={cn(
-          "font-mono text-[11px] uppercase tracking-caps-l text-center",
+          "font-mono text-caption uppercase tracking-caps-l text-center tabular-nums",
           // Red only for a real failure; "not yet" and "not yours" are neutral.
           kind === "failed" || kind === "missing" ? "text-negative" : "text-ink",
         )}
       >
         {panel.title}
       </Text>
-      <Text className="font-body text-[12px] text-ink-3 text-center">{panel.body}</Text>
+      <Text className="font-body text-small text-ink-3 text-center">{panel.body}</Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={retry ? "Retry loading video" : "Back"}
@@ -63,7 +63,7 @@ export function VideoStatePanel({ kind, onRetry, onBack }: VideoStatePanelProps)
         hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
         className="active:opacity-70"
       >
-        <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l">
+        <Text className="font-mono-bold text-micro text-cta uppercase tracking-caps-l tabular-nums">
           {retry ? "Try again" : "Back"}
         </Text>
       </Pressable>

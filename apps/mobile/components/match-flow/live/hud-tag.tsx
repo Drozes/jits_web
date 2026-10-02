@@ -1,5 +1,6 @@
 import { Text, View } from "react-native";
 import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE } from "./broadcast-tokens";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { StatePressable } from "@/components/ui/state-pressable";
 
 const TAG_STYLE = {
@@ -17,7 +18,7 @@ function TagLabel({ children }: { children: string }) {
   return (
     <Text
       className="font-mono-medium"
-      style={{ fontSize: 10, lineHeight: 12, letterSpacing: 2.52, color: BROADCAST.tagText }}
+      style={[typeStep("micro"), { lineHeight: 12, letterSpacing: TRACKING["caps-xl"], color: BROADCAST.tagText }, TABULAR]}
     >
       {children}
     </Text>

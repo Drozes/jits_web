@@ -9,6 +9,7 @@ import { duration, easing, moment, useReduceMotion } from "@/lib/motion";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { ON_MEDIA } from "@/lib/theme/palette";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
+import { TYPE_SCALE, typeSize } from "@/lib/typography";
 import { Mono } from "../fight/fight-ui";
 import { FaceoffChip, type FaceoffAthlete } from "../faceoff/faceoff-top";
 
@@ -43,9 +44,14 @@ interface CountdownProps {
   opponentWeight: number | null;
 }
 
-/** Numeral size: 240 in portrait, scaled to the window height when short. */
+/**
+ * Numeral size: `display-240` in portrait, scaled to the window height when
+ * short, never below `display-96` (the scale's countdown minimum).
+ */
 export function numeralSize(windowHeight: number): number {
-  return Math.max(96, Math.min(240, Math.round(windowHeight * 0.55)));
+  const max = TYPE_SCALE["display-240"].fontSize;
+  const min = TYPE_SCALE["display-96"].fontSize;
+  return Math.max(min, Math.min(max, Math.round(windowHeight * 0.55)));
 }
 
 /**
@@ -160,7 +166,7 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
           style={{ height: 28, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 7, borderWidth: 1, borderColor: recording ? ON_MEDIA.cta : ON_MEDIA.strong, borderRadius: FIGHT_RADIUS.tag, backgroundColor: ON_MEDIA.tag }}
         >
           <View style={{ width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: recording ? ON_MEDIA.red : ON_MEDIA.text3 }} />
-          <Mono bold spacing={1.68} color={recording ? ON_MEDIA.red : ON_MEDIA.text2}>
+          <Mono bold spacing="caps-l" color={recording ? ON_MEDIA.red : ON_MEDIA.text2}>
             {recording ? "REC ARMS AT GO" : "NOT RECORDING"}
           </Mono>
         </View>
@@ -233,7 +239,7 @@ export function GoFlash() {
           testID="countdown-go"
           accessibilityLiveRegion="assertive"
           className="font-display"
-          style={{ fontSize: 116, letterSpacing: 2, color: ON_MEDIA.red }}
+          style={[typeSize("display-116"), { letterSpacing: 2, color: ON_MEDIA.red }]}
         >
           GRAPPLE
         </Text>

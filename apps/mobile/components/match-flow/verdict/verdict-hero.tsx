@@ -5,6 +5,7 @@ import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { InitialsBlock, Mono, shortName } from "../fight/fight-ui";
+import { TRACKING, typeStep } from "@/lib/typography";
 
 export const HERO_HEIGHT = 360;
 
@@ -68,8 +69,8 @@ export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExp
       <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20, paddingTop: topInset }}>
         {[left, right].map((name, i) => (
           <View key={`${name}-${i}`} style={{ alignItems: "center", gap: 10 }}>
-            <InitialsBlock name={name} size={104} fontSize={34} />
-            <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.text }}>
+            <InitialsBlock name={name} size={104} fontSize="display-36" />
+            <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("body"), { letterSpacing: TRACKING.caps, color: p.text }]}>
               {shortName(name)}
             </Text>
           </View>
@@ -86,7 +87,7 @@ export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExp
             <View style={{ height: 3, width: uploading as `${number}%`, backgroundColor: p.amber }} />
           </View>
         ) : null}
-        <Text className="font-mono-medium" style={[{ fontSize: 10, letterSpacing: 2.2, color: p.text2 }, TABULAR]}>
+        <Text className="font-mono-medium" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-xl"], color: p.text2 }, TABULAR]}>
           {label}
         </Text>
       </View>

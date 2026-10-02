@@ -13,7 +13,7 @@ export function ShareProgress({ progress }: { progress: number | null }) {
     <View testID="share-progress" className="gap-2">
       <Text
         accessibilityLiveRegion="polite"
-        className="font-body text-[12px] text-ink-2"
+        className="font-body text-small text-ink-2"
       >
         {`${SHARE_COPY.downloadProgressPrefix} `}
         <Text testID="share-progress-pct" className="font-mono text-ink" style={{ fontVariant: ["tabular-nums"] }}>

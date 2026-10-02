@@ -21,7 +21,7 @@ interface CaptionCardProps {
 export function CaptionCard({ caption, clipboard, showCopyButton, onCopy }: CaptionCardProps) {
   return (
     <View testID="share-caption" className="gap-2">
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold text-micro text-ink-3 uppercase tracking-caps-xl tabular-nums">
         {SHARE_COPY.captionLabel}
       </Text>
       <View className="bg-surface-3 border border-hairline rounded-md px-3 py-3">
@@ -29,7 +29,7 @@ export function CaptionCard({ caption, clipboard, showCopyButton, onCopy }: Capt
           testID="share-caption-text"
           selectable
           onLongPress={clipboard ? undefined : onCopy}
-          className="font-body text-[13px] text-ink"
+          className="font-body text-body text-ink"
         >
           {caption}
         </Text>
@@ -39,7 +39,7 @@ export function CaptionCard({ caption, clipboard, showCopyButton, onCopy }: Capt
           <Button height={44} testID="share-copy-caption" label={SHARE_COPY.copyCaption} variant="secondary" onPress={onCopy} />
         ) : null
       ) : (
-        <Text testID="share-press-hold" className="font-body text-[12px] text-ink-3">
+        <Text testID="share-press-hold" className="font-body text-small text-ink-3">
           {SHARE_COPY.pressAndHoldToCopy}
         </Text>
       )}
