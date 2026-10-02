@@ -100,4 +100,15 @@ describe("CriticalUpdateModal", () => {
       jest.useRealTimers();
     }
   });
+
+  it("draws on the ELO surfaces, not the legacy tokens (R3 SC-2)", () => {
+    const { getByText } = setup(null, false, "Couldn't restart. Close and reopen the app.");
+    const legacy = /(bg|text)-(background|foreground|muted-foreground)\b/;
+    expect(getByText("Update ready").props.className).toContain("text-ink");
+    expect(getByText(CRITICAL_UPDATE_DEFAULT_BODY).props.className).toContain("text-ink-2");
+    expect(getByText("Couldn't restart. Close and reopen the app.").props.className).toContain("text-ink-2");
+    for (const t of ["Update ready", CRITICAL_UPDATE_DEFAULT_BODY]) {
+      expect(getByText(t).props.className).not.toMatch(legacy);
+    }
+  });
 });

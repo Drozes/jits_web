@@ -31,7 +31,7 @@ None. Plates appear with their screen; the Rankings, Arena roster and Profile li
 
 ## Do and don't
 
-- Do use Plate for every card-like container; the shadcn `Card` is dead and must not be used.
+- Do use Plate for every card-like container; the shadcn `Card` was deleted (WP4).
 - Do keep one red CTA per surface. A Home screen that shows the practice offer gives it Home's red CTA.
 - Don't add shadows or a second border color; hierarchy comes from the surface step (`void` to `panel` to `plate` to `plate-bright`).
 - Don't use the `accent` rail as decoration: it marks the plate that holds the surface's primary action or the athlete's own active thing.

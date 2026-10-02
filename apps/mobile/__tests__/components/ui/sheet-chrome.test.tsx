@@ -99,10 +99,12 @@ describe("shared sheet background and handle (SH-1, SH-2)", () => {
     expect(handle).toMatchObject({ width: 30, height: 4, backgroundColor: darkTokens.textTertiary });
   });
 
-  it("never uses the legacy card / mutedForeground tokens", () => {
-    const style = sheetBackgroundStyle(darkTokens);
-    expect(style.backgroundColor).not.toBe(darkTokens.card);
-    expect(sheetHandleIndicatorStyle(darkTokens).backgroundColor).not.toBe(darkTokens.mutedForeground);
+  it("never uses the legacy card / mutedForeground colors (deleted from the token map by WP4)", () => {
+    expect("card" in darkTokens).toBe(false);
+    expect("mutedForeground" in darkTokens).toBe(false);
+    // The retired dark card and muted-foreground values.
+    expect(sheetBackgroundStyle(darkTokens).backgroundColor).not.toBe("hsl(222, 16%, 12%)");
+    expect(sheetHandleIndicatorStyle(darkTokens).backgroundColor).not.toBe("hsl(218, 11%, 65%)");
   });
 
   it("the background view is purely visual (no 'Bottom Sheet' VoiceOver stop)", () => {

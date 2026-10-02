@@ -23,7 +23,7 @@ import { HudTagButton } from "@/components/match-flow/live/hud-tag";
 import { PauseButton } from "@/components/match-flow/live/pause-button";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { PressableScale } from "@/components/ui/pressable-scale";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/elo-system/button";
 import { registerCSS } from "react-native-css-interop/dist/test";
 
 type Styled = { props: { style?: unknown } };
@@ -184,12 +184,8 @@ describe("className survives PressableScale (the animated Pressable behind every
     expect(flat(s.getByTestId("ps")).opacity).toBeUndefined();
   });
 
-  it("a Button keeps its className fill and height alongside the press scale", () => {
-    const s = render(
-      <Button testID="btn-cls" className="tst-h tst-fill" onPress={jest.fn()}>
-        Go
-      </Button>,
-    );
+  it("a Button keeps its placement className and its variant fill alongside the press scale", () => {
+    const s = render(<Button testID="btn-cls" className="tst-h" label="Go" onPress={jest.fn()} />);
     const st = flat(s.getByTestId("btn-cls"));
     expect(st.height).toBe(40);
     expect(String(st.backgroundColor).toLowerCase()).toBe("#e63946");

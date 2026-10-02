@@ -15,7 +15,7 @@ Size: `w-8 h-8`, which renders at **28px** on device (rem 14), despite the name.
 
 **InitialsBlock** (match flow, `components/match-flow/fight/fight-ui.tsx`): initials without a dot ("MP") on a `plate-bright` square (or `plate` when `size="fill"`), `hairline-strong` border, 2px corners; DM Sans 700, or Bebas Neue with `display`; optional 3px bottom `accent` rule (Signal Red marks "you" on the face-off card). Real sizes: 40/14 (confirm step), 88 (challenge prompt), 96/32 (waiting), 104/34 (verdict), 112/36 (result form), fill x 176 with Bebas 64 (face-off).
 
-Planned (R2 recommendation): one square `Avatar` with sizes and initials generalized from Avatar32, replacing InitialsBlock and the round shadcn `Avatar` (no real users).
+Planned (R2 recommendation): one square `Avatar` with sizes and initials generalized from Avatar32, replacing InitialsBlock (the round shadcn `Avatar` was deleted by WP4).
 
 **Open decision.** The kit spec's radius rule says "avatars round", but every avatar in the shipped code is square (Avatar32 and InitialsBlock at 2px; the skeleton notes "app avatars are sharp, never circular"), and the circular-element rule is still an open DESIGN.md item (WP7, D-items). This card draws the code. The owner should confirm square or round before the Avatar consolidation lands.
 
@@ -39,5 +39,5 @@ None.
 
 - Do show initials when there is no photo; never an empty box or a generic silhouette.
 - Do keep avatars square with the 2px tag radius until the open decision says otherwise.
-- Don't use the shadcn round `Avatar`.
+- Don't draw a round avatar (the shadcn round `Avatar` was deleted by WP4).
 - Don't color the initials; the red bottom rule on the face-off is the only accent.

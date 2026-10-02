@@ -1205,7 +1205,6 @@
         "apps/mobile/components/match-detail/use-amber.ts",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/offline-banner.tsx",
-        "apps/mobile/components/ui/button.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
         "apps/mobile/components/ui/elo-system/chip.tsx",
         "apps/mobile/components/ui/elo-system/elo-tile.tsx",
@@ -1243,7 +1242,6 @@
         "apps/mobile/components/layout/app-header.tsx",
         "apps/mobile/components/layout/header-live-dot.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/ui/button.tsx",
         "apps/mobile/components/ui/elo-system/plate.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -1578,21 +1576,13 @@
     "apps/mobile/components/invite/PasteInviteButton.tsx",
     "apps/mobile/components/match-flow/steps/end-step.tsx",
     "apps/mobile/components/match-flow/steps/wait-step.tsx",
-    "apps/mobile/components/online-indicator.tsx",
     "apps/mobile/components/share-profile-sheet.tsx",
-    "apps/mobile/components/ui/avatar.tsx",
     "apps/mobile/components/ui/badge.tsx",
-    "apps/mobile/components/ui/card.tsx",
     "apps/mobile/components/ui/elo-system/data-row.tsx",
     "apps/mobile/components/ui/elo-system/index.ts",
     "apps/mobile/components/ui/elo-system/splash-statement.tsx",
     "apps/mobile/components/ui/index.ts",
-    "apps/mobile/components/ui/input.tsx",
-    "apps/mobile/components/ui/label.tsx",
-    "apps/mobile/components/ui/select.tsx",
-    "apps/mobile/components/ui/separator.tsx",
     "apps/mobile/components/ui/sheet.tsx",
-    "apps/mobile/components/ui/skeleton/index.ts",
-    "apps/mobile/components/ui/tabs.tsx"
+    "apps/mobile/components/ui/skeleton/index.ts"
   ]
 }

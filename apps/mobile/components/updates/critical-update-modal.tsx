@@ -42,14 +42,14 @@ export function CriticalUpdateModal({
     >
       <View
         accessibilityViewIsModal
-        className="flex-1 bg-background items-center justify-center px-6"
+        className="flex-1 bg-surface items-center justify-center px-6"
       >
         <View className="w-full max-w-md items-center gap-4">
           <Wordmark size="sm" />
-          <Text className="font-heading text-xl text-foreground text-center">
+          <Text className="font-heading text-xl text-ink text-center">
             Update ready
           </Text>
-          <Text className="font-body text-base text-muted-foreground text-center">
+          <Text className="font-body text-base text-ink-2 text-center">
             {notice ?? CRITICAL_UPDATE_DEFAULT_BODY}
           </Text>
           <Button
@@ -61,7 +61,7 @@ export function CriticalUpdateModal({
           />
           {error ? (
             <Text
-              className="font-body text-sm text-muted-foreground text-center"
+              className="font-body text-sm text-ink-2 text-center"
               accessibilityLiveRegion="polite"
             >
               {error}
