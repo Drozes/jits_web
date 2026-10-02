@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## OTA "Design system conformance" (runtime 0.5.0), 2026-10-02
+
+Production OTA group `c54b2861-51a0-44ce-9362-1a9c2377c1b0` from `main` `f0b8d11` (PRs #37 CI fix, #38 design kit, #39 conformance, #40 promotion). JS-only. Brings `apps/mobile` in line with the ELO RATED Design System (https://claude.ai/artifact/NkvxzxKo3R7acP5j6aRTTe, mirrored in `design/system/project/`, kit version `1790970770-1f18`). Design canvas synced to version `1790970841-9c7a` (54 boards). Adding Flare animations, timings and haptics are unchanged.
+
+### Mobile: design system conformance (jits-3eeg)
+
+**Added**
+- `apps/mobile/components/ui/elo-system/button.tsx`: one brand `Button` on `PressableScale` (primary, secondary, ghost, destructive outline, glass; disabled 0.5, busy, Dynamic Type safe), replacing the auth, practice, viewer and hand-rolled CTAs.
+- `apps/mobile/lib/typography.ts`, `components/ui/elo-system/mono.tsx`, `label.tsx`: the type scale (text and display steps, tracking steps, `typeStep` / `typeSize`), tabular numbers everywhere, tracked caps labels, a 10px floor.
+- `components/ui/elo-system/selection.tsx`: one selected state (plate-bright fill, strong hairline, ink check).
+- `lib/motion/use-modal-animation.ts`, shared sheet chrome in `components/ui/sheet.tsx`: 8px sheet corners, brand titles, one `on-media-scrim`, Reduce-Motion-aware modals.
+- Tokens: `attention` (amber), heat (`heatOrange`, `heatRed`) and one `onMediaTokens` source; labels on every input and switch.
+- Guard tests: color semantics, one Button, legacy shadcn, modal chrome, typography ratchet, kit `tokens.json` drift.
+
+**Changed**
+- Signal Red only on CTAs and negatives, Gain Green only on gains, wins and live; neutral spinners, Switch and input focus edge; amber draw headlines.
+- Hold-to-end fill and time-up drain on the UI thread; splash odometer via `RollingNumber`; skeleton bars visible at rest.
+- Offline banner, update banner and critical update modal restyled on ELO tokens.
+
+**Removed**
+- The legacy shadcn primitives (card, input, label, avatar, separator, tabs, select, button, online-indicator) and the legacy color tokens.
+
+### CI
+- **Fixed** the Test job hang (jits-psyv): a fake-timer handle passed to Node 22's real `clearImmediate` stalled jest; test-only guard in `apps/mobile/jest.setup.js`, `TZ` set in `jest.config.js`, `timeout-minutes: 20` on every job.
+
 ## OTA "Adding Flare" (runtime 0.5.0), 2026-10-01
 
 Production OTA group `e74e62b0-ae9a-4f90-a46d-dd755adbf19c` from `main` `02157d3` (PRs #33, #34). Design canvas synced to version `1790908046-09bc` (boards 13, 14, 15, 23, 27, 29, 57, 59).
