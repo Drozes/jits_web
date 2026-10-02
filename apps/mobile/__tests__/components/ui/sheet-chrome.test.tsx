@@ -269,4 +269,18 @@ describe("brand typography and ELO surfaces (SH-3)", () => {
     fireEvent.press(backdrop);
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("VoiceOver: the backdrop's accessibility tap and the escape gesture both close", () => {
+    const tap = renderDialog();
+    const backdrop = tap.screen.getByTestId("dialog-backdrop");
+    expect(typeof backdrop.props.onAccessibilityTap).toBe("function");
+    act(() => backdrop.props.onAccessibilityTap());
+    expect(tap.onOpenChange).toHaveBeenCalledWith(false);
+
+    const escape = renderDialog();
+    const scrim = escape.screen.getByTestId("dialog-scrim");
+    expect(typeof scrim.props.onAccessibilityEscape).toBe("function");
+    act(() => scrim.props.onAccessibilityEscape());
+    expect(escape.onOpenChange).toHaveBeenCalledWith(false);
+  });
 });

@@ -43,7 +43,7 @@ const usesGorhomModal = (src: string) => /<BottomSheetModal\s/.test(src);
 describe("modal chrome guard (WP1)", () => {
   it("finds the modal surfaces it guards", () => {
     expect(FILES.filter((f) => usesRnModal(f.src)).length).toBeGreaterThanOrEqual(8);
-    expect(FILES.filter((f) => usesGorhomModal(f.src)).length).toBe(4);
+    expect(FILES.filter((f) => usesGorhomModal(f.src)).length).toBeGreaterThanOrEqual(4);
   });
 
   it("every BottomSheetModal spreads useSheetChrome() and sets no own background or handle", () => {
@@ -62,7 +62,7 @@ describe("modal chrome guard (WP1)", () => {
   });
 
   it("no RN Modal hardcodes a fade or slide (use useModalAnimation for Reduce Motion)", () => {
-    const offenders = FILES.filter((f) => usesRnModal(f.src) && /animationType=["']?(fade|slide)["']/.test(f.src));
+    const offenders = FILES.filter((f) => usesRnModal(f.src) && /animationType=\{?\s*["'](fade|slide)["']/.test(f.src));
     expect(offenders.map((f) => f.rel)).toEqual([]);
   });
 

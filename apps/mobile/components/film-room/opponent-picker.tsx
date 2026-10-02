@@ -47,7 +47,7 @@ export function OpponentPicker({ visible, opponents, selectedId, onSelect, onClo
   const animationType = useModalAnimation("slide");
   return (
     <Modal visible={visible} transparent animationType={animationType} onRequestClose={onClose}>
-      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+      <View style={{ flex: 1, justifyContent: "flex-end" }} onAccessibilityEscape={onClose}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close opponent filter" onPress={onClose} style={{ flex: 1, backgroundColor: ON_MEDIA.scrim }} />
         <View
           testID="film-opponent-sheet"

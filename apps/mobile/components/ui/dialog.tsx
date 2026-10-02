@@ -71,7 +71,12 @@ export function DialogContent({
       animationType={animationType}
       onRequestClose={() => setOpen(false)}
     >
-      <View testID="dialog-scrim" className="flex-1 items-center justify-center bg-on-media-scrim px-6">
+      <View
+        testID="dialog-scrim"
+        // The VoiceOver escape gesture (two-finger Z) closes the dialog.
+        onAccessibilityEscape={() => setOpen(false)}
+        className="flex-1 items-center justify-center bg-on-media-scrim px-6"
+      >
         {/* The scrim closes the dialog. It is a sibling of the card, not its
             parent, so VoiceOver reaches the card's own controls instead of
             reading the whole dialog as one "Close" button. The card is not
@@ -82,6 +87,9 @@ export function DialogContent({
           onPress={() => setOpen(false)}
           accessibilityRole="button"
           accessibilityLabel="Close"
+          // A VoiceOver double-tap activates the frame's center, which sits
+          // under the centered card; close on the accessibility tap itself.
+          onAccessibilityTap={() => setOpen(false)}
           className="absolute inset-0"
         />
         <View

@@ -135,7 +135,10 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
           onRequestClose={() => setIosOpen(false)}
           statusBarTranslucent
         >
-          <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: ON_MEDIA.scrim }}>
+          <View
+            style={{ flex: 1, justifyContent: "flex-end", backgroundColor: ON_MEDIA.scrim }}
+            onAccessibilityEscape={() => setIosOpen(false)}
+          >
             {/* The scrim above the sheet closes it; a sibling of the sheet so
                 VoiceOver still reaches Done and the date wheels. */}
             <Pressable

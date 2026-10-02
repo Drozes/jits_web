@@ -58,6 +58,7 @@ export function SheetBackground({ style, pointerEvents }: BottomSheetBackgroundP
  */
 export function SheetBackdrop(props: BottomSheetBackdropProps & { pressBehavior?: "none" | "close" }) {
   const { style, pressBehavior = "close", ...rest } = props;
+  const scrimStyle = React.useMemo(() => [style, { backgroundColor: ON_MEDIA.scrim }], [style]);
   return (
     <BottomSheetBackdrop
       {...rest}
@@ -65,7 +66,7 @@ export function SheetBackdrop(props: BottomSheetBackdropProps & { pressBehavior?
       disappearsOnIndex={-1}
       opacity={1}
       pressBehavior={pressBehavior}
-      style={[style, { backgroundColor: ON_MEDIA.scrim }]}
+      style={scrimStyle}
     />
   );
 }
