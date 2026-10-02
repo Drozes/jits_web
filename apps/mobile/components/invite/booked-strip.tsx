@@ -120,7 +120,7 @@ export function BookedStrip({
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-mono-bold tabular-nums text-caption text-ink uppercase tracking-caps-l"
+            className="font-mono-bold tabular-nums text-caption text-ink uppercase"
           >
             {`Booked · ${name}`}
           </Text>

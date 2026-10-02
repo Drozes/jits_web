@@ -8,7 +8,8 @@
  *   (Wordmark, DeltaNumber, EloTile).
  * - The hero ELO on the profile and competitor pages is mono, tabular, with
  *   numeral tracking (R3 PR-3).
- * - Every caps label in the 5a areas is tracked (R3 TY-3, AR-1, AR-6, ST-5).
+ * - Every caps label in the 5a areas carries a caps tracking step (R3 TY-3,
+ *   AR-1, AR-6, ST-5); 11px mono data lines in strips stay untracked.
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -96,6 +97,7 @@ describe("hero ELO numerals (R3 PR-3)", () => {
   );
 });
 
+
 describe("caps labels are tracked in the WP5a areas (R3 TY-3)", () => {
   const ROOT = path.resolve(__dirname, "../../..");
   const DIRS = [
@@ -113,14 +115,32 @@ describe("caps labels are tracked in the WP5a areas (R3 TY-3)", () => {
     "components/auth",
     "components/profile-setup",
     "components/notifications",
+    "components/ui",
   ];
-  const OWNED_ELSEWHERE = /^app\/\(app\)\/(match|video)\//;
+  /** WP5b and the protected Adding Flare moments are out of 5a scope. */
+  const OWNED_ELSEWHERE =
+    /^app\/\(app\)\/(match|video)\/|^components\/ui\/(elo-system\/)?(rolling-number|delta-chip|splash-|live-pill|er-mark|steel-sheen|pressable-scale)/;
+  /** Whole files that are genuine exceptions, with the reason. */
+  const ALLOWED_FILES: Record<string, string> = {
+    // The chip's width budget (lib/arena/header-chip-model.ts estimateChipWidth)
+    // assumes untracked JetBrains Mono advances; tracking it needs a fit-model
+    // change (deferred to its own bead).
+    "components/layout/header-status-chip.tsx": "header chip fit model",
+    // Mono's opt-in `caps`: the caller picks the tracking with the `tracking` prop.
+    "components/ui/elo-system/mono.tsx": "tracking comes from the tracking prop",
+  };
   /**
-   * The header status chip's copy: its width budget (lib/arena/header-chip-model.ts
-   * estimateChipWidth) assumes untracked JetBrains Mono advances, so tracking it
-   * needs a fit-model change (reported as deferred).
+   * 11px mono data lines in strips stay untracked (Typography.md "Rules": caps
+   * tracking is for labels; a data line carries a name or figures that must not
+   * truncate), matching the kit ChallengeStrip card. Pinned to exact counts.
    */
-  const ALLOWED = new Set(["components/layout/header-status-chip.tsx"]);
+  const DATA_LINE = /\bfont-mono(-medium|-bold)?\b.*\btext-caption\b.*\buppercase\b/;
+  const DATA_LINES: Record<string, number> = {
+    "components/arena/mat-board.tsx": 7,
+    "components/invite/booked-strip.tsx": 1,
+  };
+  /** A caps tracking step (CAPS_TRACKING in lib/typography.ts), not just any tracking. */
+  const CAPS_STEP = /\btracking-caps(-l|-xl|-xxl)?\b/;
 
   function files(dir: string): string[] {
     const abs = path.join(ROOT, dir);
@@ -132,20 +152,32 @@ describe("caps labels are tracked in the WP5a areas (R3 TY-3)", () => {
     });
   }
 
-  it("every class string with `uppercase` also sets a tracking step", () => {
+  /** Root components/*.tsx (share sheet, compare stats, match card, banners). */
+  function rootComponents(): string[] {
+    return fs
+      .readdirSync(path.join(ROOT, "components"), { withFileTypes: true })
+      .filter((e) => e.isFile() && /\.tsx?$/.test(e.name))
+      .map((e) => path.join("components", e.name));
+  }
+
+  it("every caps class string sets a caps tracking step (caps to caps-xxl)", () => {
     const offenders: string[] = [];
-    for (const file of DIRS.flatMap(files)) {
-      if (OWNED_ELSEWHERE.test(file) || ALLOWED.has(file)) continue;
+    const dataLines: Record<string, number> = {};
+    for (const file of [...DIRS.flatMap(files), ...rootComponents()]) {
+      if (OWNED_ELSEWHERE.test(file) || file in ALLOWED_FILES) continue;
       fs.readFileSync(path.join(ROOT, file), "utf8")
         .split("\n")
         .forEach((line, i) => {
           // A class string: `uppercase` next to a font or size class (multi-line cn() strings too).
-          if (/\buppercase\b/.test(line) && /\b(font|text)-/.test(line) && !/\btracking-/.test(line)) {
-            offenders.push(`${file}:${i + 1}`);
+          if (!/\buppercase\b/.test(line) || !/\b(font|text)-/.test(line) || CAPS_STEP.test(line)) return;
+          if (file in DATA_LINES && DATA_LINE.test(line)) {
+            dataLines[file] = (dataLines[file] ?? 0) + 1;
+            return;
           }
+          offenders.push(`${file}:${i + 1}`);
         });
     }
     expect(offenders).toEqual([]);
+    expect(dataLines).toEqual(DATA_LINES);
   });
 });
-

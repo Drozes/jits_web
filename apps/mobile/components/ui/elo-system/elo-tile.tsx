@@ -3,7 +3,7 @@ import { View, Text } from "react-native";
 import { cn } from "@/lib/cn";
 import { useAmber } from "@/components/match-detail/use-amber";
 import { haptics } from "@/lib/motion";
-import { TRACKING, TYPE_SCALE, numeralTracking, type DisplayStep } from "@/lib/typography";
+import { TYPE_SCALE, numeralTracking, type DisplayStep } from "@/lib/typography";
 import { RollingNumber, usePlayOnce } from "./rolling-number";
 
 type EloTileSize = "hero" | "large" | "medium" | "small";
@@ -95,7 +95,6 @@ function numberStyle(size: EloTileSize) {
 /** The meta line's box: 18 line height plus 4 above and 4 below. */
 const META_STYLE = {
   lineHeight: 18,
-  letterSpacing: TRACKING.caps,
   marginTop: 4,
   marginBottom: 4,
   fontVariant: ["tabular-nums" as const],
@@ -164,7 +163,7 @@ function SingleTile({
           testID="elo-tile-meta"
           accessibilityLabel={metaLabel}
           // P-Home draws the record in #9CA3AF, which is ink-2 (textSecondary).
-          className="font-mono-bold tabular-nums text-callout text-ink-2 uppercase"
+          className="font-mono-bold tabular-nums text-callout text-ink-2 uppercase tracking-caps"
           style={META_STYLE}
         >
           {meta}

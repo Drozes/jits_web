@@ -258,7 +258,7 @@ function StripLine({
         numberOfLines={1}
         accessibilityLabel={headAccessibilityLabel}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="shrink font-mono-bold text-caption text-ink uppercase tracking-caps-l"
+        className="shrink font-mono-bold text-caption text-ink uppercase"
         style={TABULAR}
       >
         {head}
@@ -268,7 +268,7 @@ function StripLine({
         source={source}
         active={active}
         format={(c) => (c ? ` · ${c}` : null)}
-        className="font-mono-bold text-caption text-ink uppercase tracking-caps-l"
+        className="font-mono-bold text-caption text-ink uppercase"
       />
       {more > 0 ? (
         <Text
@@ -276,7 +276,7 @@ function StripLine({
           numberOfLines={1}
           accessibilityLabel={`plus ${more} more`}
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-mono-bold text-caption text-ink uppercase tracking-caps-l"
+          className="font-mono-bold text-caption text-ink uppercase"
           style={TABULAR}
         >
           {` · +${more}`}
@@ -472,7 +472,7 @@ export function ConfirmStrip({
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="flex-1 font-mono-bold text-caption text-ink uppercase tracking-caps-l"
+        className="flex-1 font-mono-bold text-caption text-ink uppercase"
         style={TABULAR}
       >
         {opponentName ? `Result to confirm · vs ${opponentName}` : "Result to confirm"}
@@ -540,7 +540,7 @@ export function ClosestMatchCard({
         {emptyText ? (
           <Text
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-mono-bold tabular-nums text-caption text-ink-3 uppercase tracking-caps-l"
+            className="font-mono-bold tabular-nums text-caption text-ink-3 uppercase"
           >
             {emptyText}
           </Text>
@@ -600,7 +600,7 @@ export function ClosestMatchCard({
               testID="arena-closest-stakes"
               numberOfLines={1}
               maxFontSizeMultiplier={MAX_SCALE}
-              className="mt-0.5 font-mono-bold text-caption text-ink-2 uppercase tracking-caps-l"
+              className="mt-0.5 font-mono-bold text-caption text-ink-2 uppercase"
               style={TABULAR}
             >
               {`Win ${formatGap(stakes.challenger_win)} · Loss ${formatGap(stakes.challenger_loss)}`}
@@ -819,7 +819,7 @@ export function MatRow({
             source={action.source}
             active={action.active}
             format={(c) => (c ? `Sent ${c}` : "Sent")}
-            className="font-mono-bold text-caption text-ink-3 uppercase tracking-caps-l"
+            className="font-mono-bold text-caption text-ink-3 uppercase"
           />
         ) : null}
         {action.kind === "pending" ? <MetaTag>Pending</MetaTag> : null}
