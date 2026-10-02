@@ -2201,3 +2201,34 @@ describe("Arena nearby: On the mat by proximity and Online & close (016 addendum
     expect(r.getByTestId("arena-invite-actions")).toBeTruthy();
   });
 });
+
+describe("Arena: Adding Flare live surfaces (jits-pddd.6)", () => {
+  it("ON AIR shows in the body while live, never while offline", () => {
+    const r = render(<ArenaScreen />);
+    expect(r.queryByTestId("arena-on-air")).toBeNull();
+    mockIsLive = true;
+    r.rerender(<ArenaScreen />);
+    expect(r.getByTestId("arena-on-air")).toBeTruthy();
+    // Exactly one Go live / Go offline action stays on screen (the harness).
+    expect(r.getAllByLabelText(/^Go (live|offline)$/)).toHaveLength(1);
+  });
+
+  it("the incoming strip carries the challenge afterglow edge", () => {
+    mockIsLive = true;
+    mockChallenge.incoming = INCOMING;
+    mockChallenge.incomingCount = 1;
+    const r = render(<ArenaScreen />);
+    const strip = r.getByTestId("arena-strip-incoming");
+    expect(within(strip).getByTestId("arena-afterglow", { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it("the Challenge tap on a row buzzes once, through the press haptic", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [competitor({ id: "a-1", displayName: "Alpha" })];
+    mockLobbyIds = new Set(["a-1"]);
+    const r = render(<ArenaScreen />);
+    fireEvent.press(rowButton(r, "a-1", "Challenge Alpha") as never);
+    expect(mockImpact).toHaveBeenCalledTimes(1);
+    expect(mockImpact).toHaveBeenCalledWith("light");
+  });
+});

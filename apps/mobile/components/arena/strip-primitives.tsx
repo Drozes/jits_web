@@ -63,11 +63,14 @@ export function StripShell({
   rail,
   testID,
   children,
+  edge,
 }: {
   /** `red` only for "someone wants you" (a rail, never a CTA). */
   rail: "red" | "neutral";
   testID: string;
   children: React.ReactNode;
+  /** Drawn over the strip's bottom edge (the challenge afterglow). */
+  edge?: React.ReactNode;
 }) {
   return (
     <View
@@ -79,6 +82,7 @@ export function StripShell({
       )}
     >
       {children}
+      {edge}
     </View>
   );
 }
