@@ -1,8 +1,10 @@
 import * as React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { TOS_TEXT } from "@jits/shared/utils";
 import { Plate } from "@/components/ui/elo-system";
-import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
+import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
 import { cn } from "@/lib/cn";
 
 interface TosStepProps {
@@ -71,7 +73,7 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
               return (
                 <Text
                   key={i}
-                  className="font-heading text-[14px] text-ink uppercase tracking-caps mb-3"
+                  className="font-heading text-callout text-ink uppercase tracking-caps mb-3"
                 >
                   {block.body.toUpperCase()}
                 </Text>
@@ -80,11 +82,11 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
             if (block.type === "section") {
               return (
                 <View key={i} className="mb-3">
-                  <Text className="font-heading-medium text-[13px] text-ink leading-6">
+                  <Text className="font-heading-medium text-body text-ink leading-6">
                     {block.label}
                   </Text>
                   {block.body ? (
-                    <Text className="font-body text-[13px] text-ink-2 leading-6">
+                    <Text className="font-body text-body text-ink-2 leading-6">
                       {block.body}
                     </Text>
                   ) : null}
@@ -94,7 +96,7 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
             return (
               <Text
                 key={i}
-                className="font-body text-[13px] text-ink-2 leading-6 mb-3"
+                className="font-body text-body text-ink-2 leading-6 mb-3"
               >
                 {block.body}
               </Text>
@@ -103,7 +105,8 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
         </ScrollView>
       </Plate>
 
-      <Pressable
+      <StatePressable
+        dim
         accessibilityRole="checkbox"
         accessibilityState={{ checked: agreed }}
         onPress={() => setAgreed((v) => !v)}
@@ -112,27 +115,23 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
         <View
           className={cn(
             "h-5 w-5 items-center justify-center rounded-xs border",
-            agreed ? "bg-cta border-cta" : "border-hairline-strong",
+            selectionSurface(agreed),
           )}
         >
-          {agreed && (
-            <Text className="text-[11px] font-mono-bold text-ink-on-cta leading-none">
-              {"✓"}
-            </Text>
-          )}
+          {agreed ? <SelectCheck size={13} /> : null}
         </View>
-        <Text className="font-body text-[14px] text-ink flex-1">
+        <Text className="font-body text-callout text-ink flex-1">
           I agree to the End User Agreement
         </Text>
-      </Pressable>
+      </StatePressable>
 
-      <CtaButton
+      <Button
         label={isBusy ? "Saving..." : "I Acknowledge"}
         onPress={handleContinue}
         disabled={!agreed || isBusy}
       />
       {onExit ? (
-        <TertiaryButton label="Exit" onPress={onExit} disabled={isBusy} />
+        <Button variant="ghost" height={44} label="Exit" onPress={onExit} disabled={isBusy} />
       ) : null}
     </View>
   );

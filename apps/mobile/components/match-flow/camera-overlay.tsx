@@ -1,11 +1,13 @@
 import * as React from "react";
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { CameraView } from "expo-camera";
 import { Camera, CameraOff } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
 import { fitRecordedFrame, readyPreviewWidth } from "@/lib/video/recorded-frame";
 import { BROADCAST } from "./live/broadcast-tokens";
+import { onMediaTokens } from "@/lib/tokens";
+import { Button } from "@/components/ui/elo-system/button";
 
 interface CameraOverlayProps {
   cameraRef: React.MutableRefObject<CameraView | null>;
@@ -75,10 +77,10 @@ export function CameraOverlay({
         <View className="flex-row items-center gap-3">
           <CameraOff size={20} color={tokens.textSecondary} />
           <View className="flex-1">
-            <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+            <Text className="font-heading text-small text-ink uppercase tracking-caps">
               {permissionCanAskAgain ? "Camera access needed" : "Camera access denied"}
             </Text>
-            <Text className="mt-1 font-body text-[12px] text-ink-2">
+            <Text className="mt-1 font-body text-small text-ink-2">
               {permissionCanAskAgain
                 ? "Grant access to record this match. The match will run regardless."
                 : "This match will not be recorded and runs as normal. To record your next match, enable camera and microphone access in Settings after this one. Changing them restarts the app."}
@@ -86,17 +88,15 @@ export function CameraOverlay({
           </View>
         </View>
         {permissionCanAskAgain ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onRequestPermission}
+          <Button
+            variant="secondary"
+            label="Grant Access"
+            height={36}
             hitSlop={10}
-            className="mt-3 self-start flex-row items-center gap-2 border border-hairline-strong rounded-xs bg-surface-3 px-3 py-2 active:bg-surface-4"
-          >
-            <Camera size={14} color={tokens.textPrimary} />
-            <Text className="font-heading text-[10px] text-ink uppercase tracking-caps">
-              Grant Access
-            </Text>
-          </Pressable>
+            className="mt-3 self-start"
+            onPress={onRequestPermission}
+            icon={(color) => <Camera size={14} color={color} />}
+          />
         ) : null}
       </View>
     );
@@ -112,14 +112,14 @@ export function CameraOverlay({
       className={
         fullscreen
           ? undefined
-          : cn(cardWidth == null && "w-full", "overflow-hidden rounded-md border border-hairline-strong bg-black")
+          : cn(cardWidth == null && "w-full", "overflow-hidden rounded-md border border-hairline-strong")
       }
       style={
         fullscreen
           ? [StyleSheet.absoluteFill, { backgroundColor: BROADCAST.black, overflow: "hidden" }]
           : cardWidth != null
-            ? { width: cardWidth, maxWidth: "100%", alignSelf: "center" }
-            : undefined
+            ? { width: cardWidth, maxWidth: "100%", alignSelf: "center", backgroundColor: BROADCAST.black }
+            : { backgroundColor: BROADCAST.black }
       }
     >
       <View
@@ -140,9 +140,13 @@ export function CameraOverlay({
           onCameraReady={onCameraReady}
         />
         {recording && !fullscreen ? (
-          <View className="absolute right-2 top-2 flex-row items-center gap-1.5 rounded-xs bg-black/60 px-2 py-1">
+          // On-media text sits on the badge fill (the on-media contrast rule).
+          <View
+            className="absolute right-2 top-2 flex-row items-center gap-1.5 rounded-xs px-2 py-1"
+            style={{ backgroundColor: onMediaTokens.badge }}
+          >
             <View className={cn("h-2 w-2 rounded-full bg-cta")} />
-            <Text className="font-mono-bold text-[10px] uppercase tracking-caps-l text-white">
+            <Text className="font-mono-bold tabular-nums text-micro uppercase tracking-caps-l" style={{ color: BROADCAST.white }}>
               REC
             </Text>
           </View>

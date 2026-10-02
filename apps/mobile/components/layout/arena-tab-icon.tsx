@@ -3,7 +3,7 @@
  * carry Arena heat (Motion Rule, DESIGN.md "Motion"; Adding Flare, jits-pddd.2).
  *
  * - Ember rise [10.1], Ambient: while live and nothing is pending, three 2px
- *   embers (two `brandOrange`, one Signal Red) drift up off the blades and
+ *   embers (two `heatOrange`, one Signal Red) drift up off the blades and
  *   fade on one 2400ms clock (`duration.ember`), one launching every 800ms.
  *   Silent. Reduce Motion: one static ember above the crossing.
  * - Countable embers [09.2], Ambient: while 1 to 3 incoming challenges are
@@ -53,6 +53,7 @@ import { isAthleteGoLiveFlip } from "@/lib/arena/arena-store";
 import { duration, easing, haptics, useAppActive, useReduceMotion } from "@/lib/motion";
 import { countableEmbers } from "@/lib/navigation/tab-badge";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { darkTokens } from "@/lib/tokens";
 
 // ---------------------------------------------------------------------------
 // The glyph
@@ -132,10 +133,12 @@ const SPARK_DELAY_MS = CLASH_SPREAD_MS + 100;
 const SPARK_IN_MS = 80;
 const SPARK_OUT_MS = 300;
 /**
- * The countable ember's heat color, the same in both themes (Arena heat, not
- * the text-only Signal Red token).
+ * The countable ember's heat color: the `heatRed` token, the same in both
+ * themes (Arena heat, not the text-only Signal Red token).
  */
-export const HEAT_EMBER_RED = "#EC6A74";
+export const HEAT_EMBER_RED = darkTokens.heatRed;
+/** The live embers' orange: the `heatOrange` token, the same in both themes. */
+const HEAT_ORANGE = darkTokens.heatOrange;
 /**
  * Countable embers never fade below this, so 2 or 3 of them can be counted at
  * a glance at any moment of the cycle. Live embers keep the full fade.
@@ -257,7 +260,7 @@ function StillEmber({
 function LiveEmbers({ unit, still, run }: { unit: number; still: boolean; run: boolean }) {
   const tokens = useThemedTokens();
   const clock = useEmberClock(run && !still);
-  const orange = tokens.brandOrange;
+  const orange = HEAT_ORANGE;
   const red = tokens.accentCta;
   const specs = React.useMemo<EmberSpec[]>(() => {
     const base = {

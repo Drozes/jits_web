@@ -43,7 +43,7 @@ export default function AdminFlagsScreen() {
           </View>
         ) : flags.length === 0 ? (
           <Plate>
-            <Text className="font-body text-[13px] text-ink-3 leading-relaxed">
+            <Text className="font-body text-body text-ink-3 leading-relaxed">
               No feature flags defined.
             </Text>
           </Plate>
@@ -83,13 +83,15 @@ function FlagRow({
     <Pressable
       onPress={() => onToggle(!value)}
       accessibilityRole="switch"
+      accessibilityLabel={flagKey}
+      accessibilityHint={description ?? undefined}
       accessibilityState={{ checked: value }}
       className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-4"
     >
       <View className="flex-1 min-w-0">
-        <Text className="font-mono text-[11px] text-ink mb-1">{flagKey}</Text>
+        <Text className="font-mono tabular-nums text-caption text-ink mb-1">{flagKey}</Text>
         {description ? (
-          <Text className="font-body text-[12px] text-ink-3 leading-snug">
+          <Text className="font-body text-small text-ink-3 leading-snug">
             {description}
           </Text>
         ) : null}
@@ -97,7 +99,7 @@ function FlagRow({
       {/* Presentational only: the wrapping Pressable is the sole toggle driver,
           so the Switch ignores touches (pointerEvents="none") and has no
           onValueChange. This prevents one tap firing setFeatureFlag twice. */}
-      <Switch value={value} pointerEvents="none" />
+      <Switch importantForAccessibility="no-hide-descendants" label={flagKey} value={value} pointerEvents="none" />
     </Pressable>
   );
 }
@@ -136,8 +138,8 @@ function ShareDiagnosticsRow() {
   }, []);
   return (
     <Plate>
-      <Text className="font-mono text-[11px] text-ink mb-1">Highlight share diagnostics</Text>
-      <Text testID="share-diagnostics" className="font-body text-[12px] text-ink-3 leading-snug">
+      <Text className="font-mono tabular-nums text-caption text-ink mb-1">Highlight share diagnostics</Text>
+      <Text testID="share-diagnostics" className="font-body text-small text-ink-3 leading-snug">
         {caps ? formatShareDiagnostics(caps) : "Checking…"}
       </Text>
     </Plate>

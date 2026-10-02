@@ -1,7 +1,9 @@
 import * as React from "react";
-import { Alert, Pressable, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { Alert, Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
+import { Button } from "@/components/ui/elo-system/button";
 import { Plate } from "@/components/ui/elo-system";
+import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
 import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/hooks";
 import { supabase } from "@/lib/supabase/client";
@@ -80,10 +82,10 @@ export function MemberRoleSection({
   if (!isFounder) {
     return (
       <Plate className="gap-2">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           PLATFORM ROLE
         </Text>
-        <Text className="font-body text-[13px] text-ink-2 leading-relaxed">
+        <Text className="font-body text-body text-ink-2 leading-relaxed">
           Only a founder can change platform roles. You can still manage gym
           ownership below.
         </Text>
@@ -94,42 +96,41 @@ export function MemberRoleSection({
   return (
     <Plate className="gap-4">
       <View className="gap-2">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           SET PLATFORM ROLE
         </Text>
         <View className="flex-row gap-2">
           {ROLE_OPTIONS.map(({ role, label }) => {
             const active = targetRole === role;
             return (
-              <Pressable
+              <StatePressable
+                dim
                 key={role}
                 onPress={() => setTargetRole(role)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
-                className={`flex-1 items-center rounded-md border px-2 py-2 ${
-                  active
-                    ? "border-cta bg-surface-4"
-                    : "border-hairline bg-transparent"
-                }`}
+                className={`flex-1 flex-row items-center justify-center gap-1 rounded-md border px-2 py-2 ${selectionSurface(active)}`}
               >
+                {active ? <SelectCheck size={11} /> : null}
                 <Text
-                  className={`font-mono text-[10px] uppercase tracking-caps-l ${
+                  className={`font-mono tabular-nums text-micro uppercase tracking-caps-l ${
                     active ? "text-ink" : "text-ink-3"
                   }`}
                 >
                   {label}
                 </Text>
-              </Pressable>
+              </StatePressable>
             );
           })}
         </View>
       </View>
       <Button
-        onPress={handleSubmit}
+        variant="secondary"
+        label={submitting ? "Saving…" : "Update Role"}
+        height={44}
         disabled={submitting || targetRole === member.platform_role}
-      >
-        {submitting ? "Saving…" : "Update Role"}
-      </Button>
+        onPress={handleSubmit}
+      />
     </Plate>
   );
 }

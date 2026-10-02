@@ -59,10 +59,10 @@ export function columnOpacity(v: number, k: number): number {
   return Math.min(1, Math.max(0, v - (Math.pow(10, k) - 1)));
 }
 
-/** Where the roll starts: `from`, but never more than ROLL_MAX_SPAN away. */
-export function rollStart(from: number, to: number): number {
-  if (Math.abs(to - from) <= ROLL_MAX_SPAN) return from;
-  return from < to ? to - ROLL_MAX_SPAN : to + ROLL_MAX_SPAN;
+/** Where the roll starts: `from`, but never more than `maxSpan` (default ROLL_MAX_SPAN) away. */
+export function rollStart(from: number, to: number, maxSpan: number = ROLL_MAX_SPAN): number {
+  if (Math.abs(to - from) <= maxSpan) return from;
+  return from < to ? to - maxSpan : to + maxSpan;
 }
 
 function rollable(from: number | null, to: number): from is number {
@@ -104,6 +104,15 @@ export interface RollingNumberProps {
   fit?: boolean;
   /** Extra props for the static (landed) Text, e.g. numberOfLines. */
   staticTextProps?: Partial<React.ComponentProps<typeof Text>>;
+  /**
+   * Roll length, ms. Defaults to ROLL_MS; only the launch splash's odometer
+   * (its own registered Moment) passes a different length.
+   */
+  durationMs?: number;
+  /** Largest span rolled; defaults to ROLL_MAX_SPAN (the splash rolls its whole climb). */
+  maxSpan?: number;
+  /** Roll curve; defaults to `easing.brandOut` (the splash keeps `easing.outCubic`). */
+  curve?: (typeof easing)[keyof typeof easing];
 }
 
 /**
@@ -129,6 +138,9 @@ export function RollingNumber({
   testID,
   fit = false,
   staticTextProps,
+  durationMs = ROLL_MS,
+  maxSpan = ROLL_MAX_SPAN,
+  curve = easing.brandOut,
 }: RollingNumberProps) {
   const reduceMotion = useReduceMotion();
   const { fontScale } = useWindowDimensions();
@@ -136,7 +148,7 @@ export function RollingNumber({
   // Decided on mount: a later `to` never starts a new roll.
   const [rolling, setRolling] = React.useState(() => play && !reduceMotion && rollable(from, to));
   const firstTo = React.useRef(to).current;
-  const startFrom = React.useRef(rolling && from != null ? rollStart(from, to) : null).current;
+  const startFrom = React.useRef(rolling && from != null ? rollStart(from, to, maxSpan) : null).current;
   const v = useSharedValue(startFrom ?? to);
   const onLandedRef = React.useRef(onLanded);
   onLandedRef.current = onLanded;
@@ -162,11 +174,11 @@ export function RollingNumber({
     if (rolling) {
       v.value = withDelay(
         delayMs,
-        withTiming(firstTo, { duration: ROLL_MS, easing: easing.brandOut }, (finished) => {
+        withTiming(firstTo, { duration: durationMs, easing: curve }, (finished) => {
           if (finished) runOnJS(land)();
         }),
       );
-      timerRef.current = setTimeout(land, delayMs + ROLL_MS + ROLL_LAND_FALLBACK_MS);
+      timerRef.current = setTimeout(land, delayMs + durationMs + ROLL_LAND_FALLBACK_MS);
     } else if (delayMs <= 0) {
       land();
     } else {

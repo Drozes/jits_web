@@ -1,5 +1,6 @@
 import { Text, View } from "react-native";
 import { BROADCAST, BROADCAST_RADIUS, TABULAR } from "./broadcast-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 
 /**
  * R-P8: the opponent ended the match; shown briefly before the END step.
@@ -32,20 +33,20 @@ export function OpponentEndedPlate({
         gap: 6,
       }}
     >
-      <Text className="font-mono-bold" style={{ fontSize: 10, lineHeight: 12, letterSpacing: 2.52, color: BROADCAST.ink3 }}>
+      <Text className="font-mono-bold" style={[typeStep("micro"), { lineHeight: 12, letterSpacing: TRACKING["caps-xl"], color: BROADCAST.ink3 }, TABULAR]}>
         MATCH OVER
       </Text>
       <Text
         testID="live-opponent-ended-headline"
         className="font-display"
         numberOfLines={headlineLines}
-        style={{ fontSize: 40, lineHeight: 38, color: BROADCAST.ink }}
+        style={[typeStep("display-40"), { lineHeight: 38, color: BROADCAST.ink }]}
       >
         {`${name.toUpperCase()} ENDED THE MATCH`}
       </Text>
       <Text
         className="font-mono-medium"
-        style={[{ fontSize: 11, lineHeight: 13, letterSpacing: 0.56, color: BROADCAST.ink3 }, TABULAR]}
+        style={[typeStep("caption"), { lineHeight: 13, letterSpacing: TRACKING.loose, color: BROADCAST.ink3 }, TABULAR]}
       >
         {`FINAL CLOCK ${finalFormatted} OF ${durationFormatted}`}
       </Text>

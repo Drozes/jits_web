@@ -15,6 +15,7 @@ import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { buildShareText, buildShareUrl } from "@jits/shared/utils";
 import { UploadProgressBanner } from "../upload-progress-banner";
 import { usePalette } from "@/lib/theme/palette";
+import { typeSize, typeStep } from "@/lib/typography";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, Mono, shortName } from "../fight/fight-ui";
 import { Confetti, RiseIn, SlamIn } from "./celebration";
@@ -188,18 +189,22 @@ export function VerdictStep(props: VerdictStepProps) {
       <View style={{ paddingHorizontal: 16, marginTop: videos.posterUrl ? -72 : 24, gap: 16 }}>
         <View style={{ gap: 8 }}>
           <SlamIn animate={win && play}>
-            <Text testID="summary-verdict" className="font-display" style={{ fontSize: win ? 96 : 80, lineHeight: win ? 88 : 72, letterSpacing: 1, color: verdictColor }}>
+            <Text testID="summary-verdict" className="font-display" style={[
+                typeSize(win ? "display-96" : "display-80"),
+                // The SlamIn verdict (Adding Flare) keeps its tuned line box and 1px tracking.
+                { lineHeight: win ? 88 : 72, letterSpacing: 1, color: verdictColor },
+              ]}>
               {verdict}
             </Text>
           </SlamIn>
           {how ? (
-            <Text className="font-body-medium" style={{ fontSize: 16, color: win ? p.text : p.text2 }}>
+            <Text className="font-body-medium" style={[typeStep("subhead"), { color: win ? p.text : p.text2 }]}>
               {loss ? `${how} · vs ${oppShort}` : how}
             </Text>
           ) : null}
-          {loss && how ? null : <Mono size={11} spacing={1.68}>{`VS ${oppShort.toUpperCase()}`}</Mono>}
+          {loss && how ? null : <Mono size="caption" spacing="caps-l">{`VS ${oppShort.toUpperCase()}`}</Mono>}
           {disputed ? (
-            <Text testID="summary-disputed-note" className="font-body" style={{ fontSize: 14, color: p.text2 }}>
+            <Text testID="summary-disputed-note" className="font-body" style={[typeStep("callout"), { color: p.text2 }]}>
               An admin will review it. Your rating change stands until they do.
             </Text>
           ) : null}
@@ -224,7 +229,7 @@ export function VerdictStep(props: VerdictStepProps) {
               style={{ height: 40, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: p.winRule, borderRadius: FIGHT_RADIUS.plate }}
             >
               <TrendingUp size={16} color={p.win} />
-              <Mono size={11} spacing={1.68} color={p.text}>
+              <Mono size="caption" spacing="caps-l" color={p.text}>
                 {rankText}
               </Mono>
             </View>
@@ -232,7 +237,7 @@ export function VerdictStep(props: VerdictStepProps) {
         ) : null}
 
         {gap > 0 ? (
-          <Mono size={10} spacing={1.2}>{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. Heavier athlete’s ELO was adjusted.`}</Mono>
+          <Mono size="micro" spacing="caps">{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. Heavier athlete’s ELO was adjusted.`}</Mono>
         ) : null}
 
         {upload.kind !== "hidden" ? <UploadProgressBanner {...upload} /> : null}

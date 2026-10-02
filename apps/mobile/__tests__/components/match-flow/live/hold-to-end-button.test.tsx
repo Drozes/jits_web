@@ -4,6 +4,8 @@
  */
 import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
+import { getAnimatedStyle } from "react-native-reanimated";
 
 jest.mock("lucide-react-native", () => {
   const RN = require("react-native");
@@ -164,4 +166,52 @@ it("exposes End match actions and a hold label to screen readers", () => {
 it("reads ENDING while an end is pending", () => {
   const s = renderButton({ ending: true, disabled: true });
   expect(s.button()).toHaveTextContent("ENDING");
+});
+
+describe("hold-to-end fill on the UI thread (R3 MF-2, WP6)", () => {
+  type Styled = { transform?: Array<Record<string, number>> };
+  const scaleOf = (el: unknown, key: "scaleX" | "scaleY") =>
+    (getAnimatedStyle(el as never) as Styled).transform?.find((t) => key in t)?.[key];
+  function advance(ms: number) {
+    for (let t = 0; t < ms; t += 16) {
+      act(() => {
+        jest.advanceTimersByTime(Math.min(16, ms - t));
+      });
+    }
+  }
+
+  it("scales a full-width fill from the left and never animates width", () => {
+    const s = renderButton();
+    const fill = () => s.getByTestId("live-end-fill");
+    const rule = () => s.getByTestId("live-end-rule");
+    expect(StyleSheet.flatten(fill().props.style)).toEqual(
+      expect.objectContaining({ position: "absolute", width: "100%", transformOrigin: "left" }),
+    );
+    expect(StyleSheet.flatten(rule().props.style)).toEqual(expect.objectContaining({ width: "100%", transformOrigin: "left" }));
+    expect(scaleOf(fill(), "scaleX")).toBeCloseTo(0);
+
+    fireEvent(s.button(), "pressIn");
+    advance(HOLD_TO_END_MS / 2);
+    expect(scaleOf(fill(), "scaleX")).toBeGreaterThan(0.4);
+    expect(scaleOf(fill(), "scaleX")).toBeLessThan(0.6);
+    expect(scaleOf(rule(), "scaleX")).toBeCloseTo(scaleOf(fill(), "scaleX") as number);
+
+    // An early release retracts the fill to empty (RETRACT_MS, duration.fast).
+    fireEvent(s.button(), "pressOut");
+    advance(400);
+    expect(scaleOf(fill(), "scaleX")).toBeCloseTo(0);
+    expect(s.onEnd).not.toHaveBeenCalled();
+  });
+
+  it("the landscape tile scales its fill up from the bottom", () => {
+    const s = renderButton({ tile: true });
+    const fill = () => s.getByTestId("live-end-fill");
+    expect(StyleSheet.flatten(fill().props.style)).toEqual(
+      expect.objectContaining({ height: "100%", transformOrigin: "bottom" }),
+    );
+    fireEvent(s.button(), "pressIn");
+    advance(HOLD_TO_END_MS);
+    expect(scaleOf(fill(), "scaleY")).toBeCloseTo(1);
+    expect(s.onEnd).toHaveBeenCalledTimes(1);
+  });
 });

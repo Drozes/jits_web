@@ -5,6 +5,7 @@
  */
 import * as React from "react";
 import { Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 import { cn } from "@/lib/cn";
 import { PressableScale } from "@/components/ui/pressable-scale";
 
@@ -49,12 +50,12 @@ export function OutlineAction({
         "h-8 justify-center rounded-xs border px-3 active:bg-surface-4",
         dim ? "border-hairline" : "border-hairline-strong",
       )}
-      style={disabled ? { opacity: 0.5 } : undefined}
+      style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
     >
       <Text
         maxFontSizeMultiplier={MAX_SCALE}
         className={cn(
-          "font-heading text-[11px] uppercase tracking-caps",
+          "font-heading text-caption uppercase tracking-caps",
           dim ? "text-ink-3" : "text-ink",
         )}
       >

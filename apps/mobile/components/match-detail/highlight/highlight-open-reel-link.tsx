@@ -16,7 +16,7 @@ export function HighlightOpenReelLink({ highlightId }: { highlightId: string }) 
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       className="items-center py-1 active:opacity-70"
     >
-      <Text className="font-heading text-[12px] text-ink-2 uppercase tracking-caps">
+      <Text className="font-heading text-small text-ink-2 uppercase tracking-caps">
         {DISCOVERY_COPY.openReel}
       </Text>
     </Pressable>

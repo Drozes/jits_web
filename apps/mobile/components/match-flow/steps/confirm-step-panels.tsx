@@ -30,11 +30,14 @@ export function ResultBanner({
   const isDraw = resultData?.result === "draw";
 
   const variant = isWinner ? "win" : isLoser ? "loss" : "default";
+  // A draw headline is amber (`attention`), like the verdict step's DRAW.
   const verdictColor = isWinner
     ? "text-positive"
     : isLoser
       ? "text-negative"
-      : "text-ink";
+      : isDraw
+        ? "text-attention"
+        : "text-ink";
   const verdictText = isWinner
     ? "YOU WON"
     : isLoser
@@ -45,16 +48,16 @@ export function ResultBanner({
 
   return (
     <Plate variant={variant} className="items-center gap-2">
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
         {kicker}
       </Text>
       <Text
         testID="confirm-verdict"
-        className={cn("font-display text-[36px] tracking-mark", verdictColor)}
+        className={cn("font-display text-display-36 tracking-mark", verdictColor)}
       >
         {verdictText}
       </Text>
-      <Text className="text-center font-body text-[12px] text-ink-2">
+      <Text className="text-center font-body text-small text-ink-2">
         {subtitle ??
           "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review."}
       </Text>
@@ -100,13 +103,14 @@ export function ConfirmPanel({
     <View
       testID={`confirm-panel-${side}-${state}`}
       className={cn(
-        "flex-1 items-center gap-2 rounded-md bg-surface-3 border px-3 py-4",
-        confirmed ? "border-positive" : "border-hairline-strong",
+        "flex-1 items-center gap-2 rounded-md border border-hairline-strong px-3 py-4",
+        // Confirmed is a surface step plus an ink check, never Gain Green (WP2).
+        confirmed ? "bg-surface-4" : "bg-surface-3",
       )}
     >
       {confirmed ? (
-        <View className="h-8 w-8 items-center justify-center rounded-full border border-positive">
-          <Check size={16} color={tokens.statePositive} />
+        <View className="h-8 w-8 items-center justify-center rounded-full border border-ink">
+          <Check size={16} color={tokens.textPrimary} />
         </View>
       ) : state === "your-call" ? (
         <View className="h-8 w-8 rounded-full border border-hairline-strong" />
@@ -117,14 +121,14 @@ export function ConfirmPanel({
       )}
       <Text
         className={cn(
-          "w-full text-center font-heading text-[11px] uppercase tracking-caps",
-          confirmed ? "text-positive" : "text-ink-2",
+          "w-full text-center font-heading text-caption uppercase tracking-caps",
+          confirmed ? "text-ink" : "text-ink-2",
         )}
         numberOfLines={1}
       >
         {label}
       </Text>
-      <Text className="font-body text-[12px] text-ink-3" numberOfLines={1}>
+      <Text className="font-body text-small text-ink-3" numberOfLines={1}>
         {STATUS_COPY[state]}
       </Text>
     </View>

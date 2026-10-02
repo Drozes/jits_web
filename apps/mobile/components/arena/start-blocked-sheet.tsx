@@ -5,11 +5,15 @@
  * message, with Retry and Cancel. The challenge stays `accepted`
  * until one of them answers, so neither athlete is stranded: Retry sends a
  * fresh reading and starts it, Cancel withdraws it (the challenger's plate
- * then clears). Not dismissable by back or backdrop, like the prompt.
+ * then clears). Not dismissable by back or backdrop, like the prompt. A
+ * centered alert by design (DESIGN.md, "Inputs and overlays"): it blocks
+ * until answered, so it is not a bottom sheet. Fades in, or appears in place
+ * under Reduce Motion.
  */
 import { Modal, Text, View } from "react-native";
-import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import type { StartBlocked } from "@/lib/arena/use-arena-challenge";
+import { useModalAnimation } from "@/lib/motion";
 
 export function StartBlockedSheet({
   blocked,
@@ -22,9 +26,10 @@ export function StartBlockedSheet({
   onRetry: () => void;
   onCancel: () => void;
 }) {
+  const animationType = useModalAnimation("fade");
   return (
-    <Modal visible={blocked !== null} transparent animationType="fade" onRequestClose={() => undefined}>
-      <View className="flex-1 items-center justify-center bg-black/60 px-6">
+    <Modal visible={blocked !== null} transparent animationType={animationType} onRequestClose={() => undefined}>
+      <View className="flex-1 items-center justify-center bg-on-media-scrim px-6">
         {blocked ? (
           <View
             testID="arena-start-blocked"
@@ -34,19 +39,19 @@ export function StartBlockedSheet({
             <Text
               testID="arena-start-blocked-title"
               accessibilityRole="header"
-              className="font-heading text-[18px] uppercase text-ink"
+              className="font-heading text-title uppercase tracking-caps text-ink"
             >
               {blocked.title}
             </Text>
             <Text
               testID="arena-start-blocked-message"
               accessibilityRole="alert"
-              className="font-body text-[14px] leading-6 text-ink"
+              className="font-body text-callout leading-6 text-ink"
             >
               {blocked.message}
             </Text>
-            <CtaButton testID="arena-start-blocked-retry" label="Retry" disabled={busy} onPress={onRetry} />
-            <SecondaryButton label="Cancel challenge" disabled={busy} onPress={onCancel} />
+            <Button testID="arena-start-blocked-retry" label="Retry" disabled={busy} onPress={onRetry} />
+            <Button variant="secondary" label="Cancel challenge" disabled={busy} onPress={onCancel} />
           </View>
         ) : null}
       </View>

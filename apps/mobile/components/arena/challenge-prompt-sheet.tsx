@@ -64,12 +64,13 @@ import { useViewerStakes, viewerStakesKey } from "@/lib/match-flow/use-viewer-st
 import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
 import type { EloStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
-import { usePalette } from "@/lib/theme/palette";
+import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
+import { TABULAR, TYPE_SCALE, typeStep } from "@/lib/typography";
 import { InitialsBlock, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { SteelSheen } from "@/components/ui/steel-sheen";
-import { duration, easing, haptics, useReduceMotion } from "@/lib/motion";
+import { duration, easing, haptics, useModalAnimation, useReduceMotion } from "@/lib/motion";
 import { ModalToaster } from "@/components/ui/toast";
 import { OfflineBanner } from "@/components/offline-banner";
 
@@ -87,8 +88,8 @@ export const PROMPT_HEIGHT_RATIO = 0.75;
 export const PROMPT_SIDE_INSET = 16;
 /** The card's corner radius: the brand cap for modals. */
 export const PROMPT_RADIUS = 8;
-/** The backdrop: the board's dim, the same in both themes. */
-export const PROMPT_BACKDROP = "rgba(0,0,0,0.55)";
+/** The backdrop: the one modal scrim (`on-media-scrim`), the same in both themes. */
+export const PROMPT_BACKDROP = ON_MEDIA.scrim;
 /**
  * Room kept clear above and below the card inside the safe area, so on a
  * short window (landscape iPad split view, a very large inset) the 75% card
@@ -203,6 +204,8 @@ export function ChallengePromptSheet({
   viewer,
 }: ChallengePromptSheetProps) {
   const p = usePalette();
+  // "Sheet / modal present": fades in, appears in place under Reduce Motion.
+  const animationType = useModalAnimation("fade");
   const { height: windowHeight } = useWindowDimensions();
   // Read the context directly rather than useSafeAreaInsets(), which throws
   // without a provider; the app mounts one, so this is only a safety net.
@@ -394,7 +397,7 @@ export function ChallengePromptSheet({
       key={modalKey}
       visible={visible}
       transparent
-      animationType="fade"
+      animationType={animationType}
       statusBarTranslucent
       // Never dismissed by the system: Android back and the iOS close
       // request both do nothing (AC-S7).
@@ -476,7 +479,7 @@ export function ChallengePromptSheet({
                     numberOfLines={2}
                     maxFontSizeMultiplier={MAX_FONT_SCALE}
                     className="font-body"
-                    style={{ fontSize: 13, color: p.text2 }}
+                    style={[typeStep("body"), { color: p.text2 }]}
                   >
                     Accept and you both drop straight into the match.
                   </Text>
@@ -488,7 +491,7 @@ export function ChallengePromptSheet({
                     numberOfLines={1}
                     maxFontSizeMultiplier={MAX_FONT_SCALE}
                     className="font-body"
-                    style={{ fontSize: 13, color: p.text }}
+                    style={[typeStep("body"), { color: p.text }]}
                   >
                     {`+${shown.moreCount} more`}
                   </Text>
@@ -566,7 +569,7 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
       <InitialsBlock
         name={challenge.challengerName}
         size={88}
-        fontSize={30}
+        fontSize={TYPE_SCALE["headline-2xl"].fontSize}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
       />
       <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
@@ -575,7 +578,7 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
           numberOfLines={1}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           className="font-display"
-          style={{ fontSize: 44, lineHeight: 42, color: p.text }}
+          style={[typeStep("display-44"), { lineHeight: 42, color: p.text }]}
         >
           {shortName(challenge.challengerName)}
         </Text>
@@ -585,7 +588,7 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             className="font-mono"
-            style={{ fontSize: 13, color: p.text2, fontVariant: ["tabular-nums"] }}
+            style={[typeStep("body"), { color: p.text2 }, TABULAR]}
           >
             {meta}
           </Text>
@@ -595,7 +598,7 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
           numberOfLines={1}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           className="font-body"
-          style={{ fontSize: 13, color: p.text2 }}
+          style={[typeStep("body"), { color: p.text2 }]}
         >
           {`${shortName(challenge.challengerName)} is live in the Arena`}
         </Text>
@@ -650,8 +653,8 @@ function PromptActions({
             testID="challenge-prompt-decline-text"
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            className="font-heading uppercase"
-            style={{ fontSize: 14, letterSpacing: 1.12, color: p.text }}
+            className="font-heading uppercase tracking-caps"
+            style={[typeStep("callout"), { color: p.text }]}
           >
             Decline
           </Text>
@@ -689,8 +692,8 @@ function PromptActions({
             testID="challenge-prompt-accept-text"
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            className="font-heading uppercase"
-            style={{ fontSize: 14, letterSpacing: 1.12, color: p.onCta }}
+            className="font-heading uppercase tracking-caps"
+            style={[typeStep("callout"), { color: p.onCta }]}
           >
             {accepted ? "Accepted" : "Accept"}
           </Text>
@@ -716,11 +719,13 @@ function PromptActions({
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             className="font-heading"
-            style={{
-              fontSize: 14,
-              color: p.text2,
-              textDecorationLine: "underline",
-            }}
+            style={[
+              typeStep("callout"),
+              {
+                color: p.text2,
+                textDecorationLine: "underline",
+              },
+            ]}
           >
             Later
           </Text>

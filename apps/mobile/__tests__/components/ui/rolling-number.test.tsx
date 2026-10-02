@@ -82,6 +82,11 @@ describe("leading columns and large changes", () => {
     expect(rollStart(1000, 1200)).toBe(1200 - ROLL_MAX_SPAN);
     expect(rollStart(1200, 1000)).toBe(1000 + ROLL_MAX_SPAN);
   });
+
+  it("takes an explicit span for the launch splash's whole-climb roll (WP6), default unchanged", () => {
+    expect(rollStart(1001, 1481, Number.MAX_SAFE_INTEGER)).toBe(1001);
+    expect(rollStart(1001, 1481)).toBe(1481 - ROLL_MAX_SPAN);
+  });
 });
 
 describe("RollingNumber", () => {
@@ -118,6 +123,24 @@ describe("RollingNumber", () => {
       jest.advanceTimersByTime(LAND);
     });
     expect(big.getByTestId("b")).toHaveTextContent("120");
+  });
+
+  it("rolls for a given length when asked (the splash odometer, WP6) and lands after it", () => {
+    const onLanded = jest.fn();
+    const s = render(
+      <RollingNumber testID="splash" from={1001} to={1481} play durationMs={900} maxSpan={Number.MAX_SAFE_INTEGER} onLanded={onLanded} style={STYLE} />,
+    );
+    // The whole climb rolls: four columns, starting from 1001.
+    expect(s.UNSAFE_getAllByType(Text)).toHaveLength(4 * 11);
+    act(() => {
+      jest.advanceTimersByTime(ROLL_MS + 120);
+    });
+    expect(onLanded).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(900);
+    });
+    expect(onLanded).toHaveBeenCalledTimes(1);
+    expect(s.getByTestId("splash")).toHaveTextContent("1481");
   });
 
   it("follows Dynamic Type itself (clamped at 2x) so the digits match the landed Text", () => {

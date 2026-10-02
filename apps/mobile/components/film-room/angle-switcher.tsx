@@ -1,6 +1,8 @@
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { shortName } from "@/lib/film-room/format";
 
 export interface AngleOption {
@@ -49,7 +51,8 @@ export function AngleSwitcher({ angles, activeId, opponentName, onSelect, varian
         const on = a.id === activeId;
         const label = angleName(a, opponentName);
         return (
-          <Pressable
+          <StatePressable
+            dim
             key={a.id}
             testID={`angle-${a.id}`}
             accessibilityRole="tab"
@@ -65,10 +68,10 @@ export function AngleSwitcher({ angles, activeId, opponentName, onSelect, varian
               backgroundColor: on ? c.on : c.fill,
             }}
           >
-            <Text numberOfLines={1} className="font-mono-bold" style={{ fontSize: 11, letterSpacing: 1.2, color: on ? c.onLabel : c.label }}>
+            <Text numberOfLines={1} className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING.caps, color: on ? c.onLabel : c.label }, TABULAR]}>
               {label}
             </Text>
-          </Pressable>
+          </StatePressable>
         );
       })}
     </View>

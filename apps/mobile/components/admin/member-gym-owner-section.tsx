@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Alert, Pressable, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/elo-system/button";
 import { Plate } from "@/components/ui/elo-system";
 import { NativeSelect } from "@/components/ui/native-select";
 import { toast } from "@/components/ui/toast";
@@ -96,7 +96,7 @@ export function MemberGymOwnerSection({
 
   return (
     <Plate className="gap-4">
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
         GYM OWNERSHIP
       </Text>
 
@@ -109,14 +109,14 @@ export function MemberGymOwnerSection({
             >
               <View className="flex-1 min-w-0">
                 <Text
-                  className="font-body text-[13px] text-ink"
+                  className="font-body text-body text-ink"
                   numberOfLines={1}
                 >
                   {g.gym_name}
                 </Text>
                 {g.city ? (
                   <Text
-                    className="font-mono text-[10px] text-ink-3"
+                    className="font-mono tabular-nums text-micro text-ink-3"
                     numberOfLines={1}
                   >
                     {g.city}
@@ -128,7 +128,7 @@ export function MemberGymOwnerSection({
                 accessibilityRole="button"
                 className="px-3 py-2 rounded-md border border-hairline active:bg-surface-4"
               >
-                <Text className="font-mono text-[10px] text-primary uppercase tracking-caps-l">
+                <Text className="font-mono tabular-nums text-micro text-negative uppercase tracking-caps-l">
                   REMOVE
                 </Text>
               </Pressable>
@@ -136,13 +136,13 @@ export function MemberGymOwnerSection({
           ))}
         </View>
       ) : (
-        <Text className="font-body text-[13px] text-ink-3">
+        <Text className="font-body text-body text-ink-3">
           Not a gym owner yet.
         </Text>
       )}
 
       <View className="gap-2">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           ADD GYM
         </Text>
         <NativeSelect
@@ -153,9 +153,13 @@ export function MemberGymOwnerSection({
           title="Gyms"
           searchPlaceholder="Search gyms"
         />
-        <Button onPress={handleAdd} disabled={busy || !pendingGymId}>
-          {busy ? "Saving…" : "Make Gym Owner"}
-        </Button>
+        <Button
+          variant="secondary"
+          label={busy ? "Saving…" : "Make Gym Owner"}
+          height={44}
+          disabled={busy || !pendingGymId}
+          onPress={handleAdd}
+        />
       </View>
     </Plate>
   );

@@ -3,6 +3,7 @@ import { ActivityIndicator, Text, TextInput, View } from "react-native";
 import { isValidReweigh } from "@/lib/match-flow/use-faceoff";
 import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
+import { TABULAR, typeSize, typeStep } from "@/lib/typography";
 import { FightButton, Mono, StatusPlate, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 
@@ -85,7 +86,7 @@ export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName:
       >
         {w.mine?.status === "flagged" ? <Notice text={`You flagged ${opp}'s weight. Match is on hold.`} alert /> : null}
         <View style={{ alignItems: "center" }}>
-          <Mono testID="weight-check-line" size={11} bold spacing={1.68} color={p.text}>
+          <Mono testID="weight-check-line" size="caption" bold spacing="caps-l" color={p.text}>
             {f.opponentWeight != null ? `${OPP} ${verb} ${lbs(f.opponentWeight)}` : `${OPP} HAS NO WEIGH-IN ON RECORD`}
           </Mono>
         </View>
@@ -134,7 +135,7 @@ function Notice({ text, alert = false, testID }: { text: string; alert?: boolean
       }}
     >
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.amber }} />
-      <Text className="font-body" style={{ flex: 1, fontSize: 13, color: p.amber }}>
+      <Text className="font-body" style={[typeStep("body"), { flex: 1, color: p.amber }]}>
         {text}
       </Text>
     </View>
@@ -164,11 +165,12 @@ function ReweighPrompt({ opp }: { opp: string }) {
             width: 96,
             height: 56,
             paddingHorizontal: 10,
-            fontSize: 18,
+            ...typeSize("title"),
+            ...TABULAR,
             color: p.text,
             backgroundColor: p.plate,
             borderWidth: 1,
-            borderColor: valid ? p.strong : p.red,
+            borderColor: valid ? p.strong : p.loss,
             borderRadius: FIGHT_RADIUS.button,
           }}
         />

@@ -9,10 +9,10 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Plate, Wordmark } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { toast } from "@/components/ui";
 import { AppHeader } from "@/components/layout/app-header";
 import { AuthFormField } from "@/components/auth/auth-form-field";
-import { CtaButton } from "@/components/auth/auth-buttons";
 import { AppleSignInButton } from "@/components/auth/AppleSignInButton";
 import { APPLE_SIGN_IN_ENABLED } from "@/lib/env";
 import { useAuth } from "@/lib/auth/hooks";
@@ -99,7 +99,7 @@ export default function SignupScreen() {
             <>
               <View className="items-center gap-2">
                 <Wordmark size="lg" />
-                <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-l">
+                <Text className="font-mono tabular-nums text-caption text-ink-3 uppercase tracking-caps-l">
                   Step 1 of 2 / Account
                 </Text>
               </View>
@@ -152,7 +152,7 @@ export default function SignupScreen() {
                   showError={touched.confirm}
                 />
                 )}
-                <CtaButton
+                <Button
                   label={submitting ? "Creating account..." : "Continue"}
                   onPress={onSubmit}
                   disabled={submitting || (allTouched && formInvalid)}
@@ -166,7 +166,7 @@ export default function SignupScreen() {
                 accessibilityRole="button"
                 className="active:opacity-70"
               >
-                <Text className="text-center font-mono text-[11px] text-ink-2 uppercase tracking-caps-l">
+                <Text className="text-center font-mono tabular-nums text-caption text-ink-2 uppercase tracking-caps-l">
                   Already have an account?{" "}
                   <Text className="text-cta">Sign in</Text>
                 </Text>
@@ -179,7 +179,7 @@ export default function SignupScreen() {
                 accessibilityRole="button"
                 className="active:opacity-70"
               >
-                <Text className="text-center font-mono text-[11px] text-ink-2 uppercase tracking-caps-l">
+                <Text className="text-center font-mono tabular-nums text-caption text-ink-2 uppercase tracking-caps-l">
                   Got a challenge code?
                 </Text>
               </Pressable>
@@ -204,18 +204,18 @@ function ConfirmEmailContent({
     <>
       <View className="items-center gap-2">
         <Wordmark size="lg" />
-        <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-caption text-ink-3 uppercase tracking-caps-l">
           {needsConfirmation ? "Check Your Email" : "Account Created"}
         </Text>
       </View>
 
       <Plate className="gap-4">
-        <Text className="font-body text-[14px] text-ink leading-6">
+        <Text className="font-body text-callout text-ink leading-6">
           {needsConfirmation
             ? `We sent a confirmation link to ${email}. Tap it to activate your account, then sign in.`
             : `Your account for ${email} is ready. Sign in to set up your profile.`}
         </Text>
-        <CtaButton
+        <Button
           label={needsConfirmation ? "Back to Sign In" : "Sign In"}
           onPress={onBack}
         />

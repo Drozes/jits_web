@@ -8,13 +8,15 @@
  * profile and returns to `app/index.tsx`, which runs the claim.
  */
 import * as React from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { Redirect, useRouter, type Href } from "expo-router";
 import { recordInviteAttribution } from "@jits/shared/api/invites";
 import { TOS_TEXT, claimFailureView, inviteSetupBanner } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
+import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
 import { IdentityStep } from "@/components/profile-setup/identity-step";
 import { FREE_AGENT_OPTION, type WizardValues } from "@/components/profile-setup/types";
 import { useAuth } from "@/lib/auth/hooks";
@@ -119,8 +121,8 @@ export default function InviteSetupScreen() {
       <View className="flex-1 items-center justify-center bg-surface gap-4 px-6">
         {setup.error ? (
           <>
-            <Text className="font-body text-[14px] text-ink-2 text-center">{setup.error}</Text>
-            <CtaButton label="Try Again" onPress={() => void setup.reload()} />
+            <Text className="font-body text-callout text-ink-2 text-center">{setup.error}</Text>
+            <Button label="Try Again" onPress={() => void setup.reload()} />
           </>
         ) : (
           <ActivityIndicator color={tokens.textSecondary} accessibilityLabel="Loading setup" />
@@ -141,14 +143,15 @@ export default function InviteSetupScreen() {
             accessibilityRole="summary"
             className="rounded-sm border border-hairline-strong bg-surface-2 px-4 py-3"
           >
-            <Text className="font-heading text-[14px] text-ink">
+            <Text className="font-heading text-callout text-ink">
               {inviteSetupBanner(pending.code ? "challenge" : null)}
             </Text>
           </View>
         ) : null}
 
         <Plate className="gap-3">
-          <Pressable
+          <StatePressable
+            dim
             testID="invite-setup-waiver"
             accessibilityRole="checkbox"
             accessibilityState={{ checked: waiverAccepted }}
@@ -158,33 +161,33 @@ export default function InviteSetupScreen() {
             <View
               className={cn(
                 "h-5 w-5 items-center justify-center rounded-xs border",
-                waiverAccepted ? "bg-cta border-cta" : "border-hairline-strong bg-surface-3",
+                selectionSurface(waiverAccepted),
               )}
             >
-              {waiverAccepted ? <Text className="font-heading text-[12px] text-ink-on-cta">✓</Text> : null}
+              {waiverAccepted ? <SelectCheck size={13} /> : null}
             </View>
-            <Text className="flex-1 font-body text-[14px] text-ink">
+            <Text className="flex-1 font-body text-callout text-ink">
               I accept the ELO RATED terms and liability waiver.
             </Text>
-          </Pressable>
-          <TertiaryButton label={showWaiver ? "Hide terms" : "Read terms"} onPress={() => setShowWaiver((v) => !v)} />
+          </StatePressable>
+          <Button variant="ghost" height={44} label={showWaiver ? "Hide terms" : "Read terms"} onPress={() => setShowWaiver((v) => !v)} />
           {showWaiver ? (
             <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled className="rounded-sm bg-surface-2 p-3">
-              <Text className="font-body text-[12px] text-ink-2 leading-5">{TOS_TEXT}</Text>
+              <Text className="font-body text-small text-ink-2 leading-5">{TOS_TEXT}</Text>
             </ScrollView>
           ) : null}
         </Plate>
 
         {underage ? (
-          <Text testID="invite-setup-underage" accessibilityRole="alert" className="font-body text-[14px] text-cta">
+          <Text testID="invite-setup-underage" accessibilityRole="alert" className="font-body text-callout text-negative">
             {UNDERAGE_COPY}
           </Text>
         ) : null}
         {!waiverAccepted ? (
-          <Text className="font-body text-[12px] text-ink-3">Accept the waiver to continue.</Text>
+          <Text className="font-body text-small text-ink-3">Accept the waiver to continue.</Text>
         ) : null}
         {error ? (
-          <Text accessibilityRole="alert" className="font-body text-[14px] text-cta">
+          <Text accessibilityRole="alert" className="font-body text-callout text-negative">
             {error}
           </Text>
         ) : null}
@@ -199,7 +202,7 @@ export default function InviteSetupScreen() {
         />
         {loading ? <ActivityIndicator color={tokens.textSecondary} accessibilityLabel="Saving profile" /> : null}
 
-        <TertiaryButton label="Sign out" onPress={() => void signOut()} />
+        <Button variant="ghost" height={44} label="Sign out" onPress={() => void signOut()} />
       </ScrollView>
     </KeyboardAvoidingView>
   );

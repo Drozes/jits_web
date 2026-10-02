@@ -1,5 +1,6 @@
 import { Text, View } from "react-native";
 import { Image } from "expo-image";
+import { Mono } from "@/components/ui/elo-system";
 import { buildPhotoUrl } from "@/lib/photo-url";
 import { getInitials } from "@jits/shared/utils";
 import type { Athlete } from "@jits/shared/types/athlete";
@@ -42,37 +43,34 @@ export function CompetitorHeader({ athlete, gymName, stats, rank }: CompetitorHe
             contentFit="cover"
           />
         ) : (
-          <Text className="font-mono-bold text-[24px] text-ink tracking-caps">
+          <Text className="font-mono-bold tabular-nums text-headline text-ink tracking-caps">
             {getInitials(athlete.display_name ?? "")}
           </Text>
         )}
       </View>
 
       <View className="items-center gap-1">
-        <Text className="font-heading text-[24px] text-ink" numberOfLines={1}>
+        <Text className="font-heading text-headline text-ink" numberOfLines={1}>
           {athlete.display_name}
         </Text>
         {metaParts.length > 0 ? (
-          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-xl text-center">
+          <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl text-center">
             {metaParts.join("  ·  ")}
           </Text>
         ) : null}
       </View>
 
       <View className="bg-surface-3 border border-hairline rounded-md px-6 py-5 items-center w-full">
-        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
           ELO Rating
         </Text>
-        <Text
-          className="font-mono-bold text-ink mt-2"
-          style={{ fontSize: 72, lineHeight: 86, letterSpacing: -2.8 }}
-        >
+        <Mono size="display-72" weight="bold" tracking="numeral" className="text-ink mt-2" style={{ lineHeight: 86 }}>
           {athlete.current_elo}
-        </Text>
+        </Mono>
         {rank != null ? (
           <Text
             testID="competitor-rank"
-            className="font-mono-bold text-ink text-[12px] uppercase tracking-caps-l tabular-nums mt-2"
+            className="font-mono-bold text-ink text-small uppercase tracking-caps-l tabular-nums mt-2"
           >
             #{rank}
             <Text className="text-ink-3">  ·  Global</Text>
@@ -82,18 +80,18 @@ export function CompetitorHeader({ athlete, gymName, stats, rank }: CompetitorHe
 
       <View className="flex-row gap-3 w-full">
         <View className="flex-1 bg-surface-3 border border-hairline rounded-md px-4 py-4 items-center">
-          <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+          <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
             Record
           </Text>
-          <Text className="font-mono-bold text-ink mt-2" style={{ fontSize: 22, lineHeight: 26 }}>
+          <Text className="font-mono-bold tabular-nums text-title-xl text-ink mt-2">
             {record}
           </Text>
         </View>
         <View className="flex-1 bg-surface-3 border border-hairline rounded-md px-4 py-4 items-center">
-          <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+          <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
             Win Rate
           </Text>
-          <Text className="font-mono-bold text-ink mt-2" style={{ fontSize: 28, lineHeight: 34 }}>
+          <Text className="font-mono-bold tabular-nums text-headline-xl text-ink mt-2">
             {winRate}
           </Text>
         </View>

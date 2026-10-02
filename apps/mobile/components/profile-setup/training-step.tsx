@@ -1,7 +1,7 @@
 import * as React from "react";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Plate } from "@/components/ui/elo-system";
-import { CtaButton } from "@/components/auth/auth-buttons";
+import { Button } from "@/components/ui/elo-system/button";
 import type { GymOption } from "@/lib/profile-setup/use-setup-data";
 import { formatInstagramHandle } from "@jits/shared/utils";
 import type { GymInstagramField } from "@/lib/profile-setup/gym-instagram";
@@ -112,7 +112,7 @@ export function TrainingStep({
         />
       </EloField>
 
-      <CtaButton
+      <Button
         label={loading ? "Saving..." : isEditing ? "Save Changes" : "Get Started"}
         onPress={() => onSubmit(values)}
         disabled={!canSubmit}

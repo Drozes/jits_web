@@ -1,6 +1,6 @@
 import { Modal, Text, View } from "react-native";
-import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
 
 export const CRITICAL_UPDATE_DEFAULT_BODY =
@@ -42,29 +42,26 @@ export function CriticalUpdateModal({
     >
       <View
         accessibilityViewIsModal
-        className="flex-1 bg-background items-center justify-center px-6"
+        className="flex-1 bg-surface items-center justify-center px-6"
       >
         <View className="w-full max-w-md items-center gap-4">
           <Wordmark size="sm" />
-          <Text className="font-heading text-xl text-foreground text-center">
+          <Text className="font-heading text-title text-ink text-center">
             Update ready
           </Text>
-          <Text className="font-body text-base text-muted-foreground text-center">
+          <Text className="font-body text-callout text-ink-2 text-center">
             {notice ?? CRITICAL_UPDATE_DEFAULT_BODY}
           </Text>
           <Button
             testID="critical-update-restart"
-            size="lg"
+            label={restarting ? "Restarting..." : "Restart"}
             className="w-full mt-2"
-            textClassName="font-heading text-[14px] uppercase tracking-caps-l"
-            disabled={restarting}
+            busy={restarting}
             onPress={onRestart}
-          >
-            {restarting ? "Restarting..." : "Restart"}
-          </Button>
+          />
           {error ? (
             <Text
-              className="font-body text-sm text-muted-foreground text-center"
+              className="font-body text-small text-ink-2 text-center"
               accessibilityLiveRegion="polite"
             >
               {error}

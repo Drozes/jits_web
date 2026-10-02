@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Text, TextInput, View } from "react-native";
+import { typeSize } from "@/lib/typography";
 import { SearchSelect, type SearchSelectOption } from "@/components/ui/search-select";
 import {
   OTHER_SUBMISSION_CODE,
@@ -62,7 +63,7 @@ export function SubmissionFields({
   return (
     <View className="gap-4">
       <View className="gap-2">
-        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
           Submission
         </Text>
         <SearchSelect
@@ -82,11 +83,12 @@ export function SubmissionFields({
       </View>
 
       <View className="gap-2">
-        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
           Finish Time
         </Text>
         <TextInput
           testID="result-finish-time"
+          accessibilityLabel="Finish Time"
           placeholder="mm:ss or seconds"
           placeholderTextColor={tokens.textTertiary}
           value={finishTimeStr}
@@ -94,19 +96,20 @@ export function SubmissionFields({
           keyboardType="numeric"
           maxLength={5}
           className={cn(
-            "h-11 rounded-sm border bg-surface-3 px-3 font-mono text-[14px] text-ink",
+            "h-11 rounded-sm border bg-surface-3 px-3 font-mono tabular-nums text-ink",
             finishTimeInvalid ? "border-negative" : "border-hairline-strong",
           )}
+          style={typeSize("callout")}
         />
         {finishTimeInvalid ? (
-          <Text className="font-mono text-[10px] text-negative uppercase tracking-caps-l">
+          <Text className="font-mono tabular-nums text-micro text-negative uppercase tracking-caps-l">
             Must be within match length (
             <Text className="tabular-nums">{formatElapsed(durationSeconds)}</Text>)
           </Text>
         ) : finishTimeFromClock ? (
           <Text
             testID="result-finish-time-hint"
-            className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l"
+            className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l"
           >
             From match clock
           </Text>

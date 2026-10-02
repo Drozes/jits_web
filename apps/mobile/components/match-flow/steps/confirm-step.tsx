@@ -15,6 +15,7 @@ import { LEAVE_COUNTS_AS_CONFIRMING, disputeLockNote, isDisputeWindowClosed } fr
 import { useDisputeLocksAt } from "@/lib/match-flow/use-dispute-locks-at";
 import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { FightButton, InitialsBlock, Mono, RatingBlock, shortName } from "../fight/fight-ui";
 import { DisputeForm } from "./dispute-form";
 import { TapMarks } from "../verdict/rating-moment";
@@ -171,7 +172,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
     <View style={{ gap: 20 }}>
       <View style={{ gap: 10 }}>
         <Mono>{opponentConfirmed ? `RESULT RECORDED BY ${oppShort.toUpperCase()}` : "RESULT RECORDED"}</Mono>
-        <Text accessibilityRole="header" className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: p.text }}>
+        <Text accessibilityRole="header" className="font-heading uppercase" style={[typeStep("headline-2xl"), { letterSpacing: TRACKING.loose, color: p.text }]}>
           Confirm result
         </Text>
       </View>
@@ -179,20 +180,20 @@ export function ConfirmStep(props: ConfirmStepProps) {
       <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}>
         <View style={{ paddingVertical: 20, paddingHorizontal: 16, gap: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {winner ? <InitialsBlock name={winner.display_name} size={40} fontSize={14} /> : null}
+            {winner ? <InitialsBlock name={winner.display_name} size={40} fontSize="callout" /> : null}
             <View style={{ flex: 1 }}>
               <Mono color={p.text3}>{isDraw ? "RESULT" : "WINNER"}</Mono>
             </View>
-            <Text testID="confirm-verdict" className="font-mono-bold" style={{ fontSize: 11, letterSpacing: 1.68, color: p.text2 }}>
+            <Text testID="confirm-verdict" className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}>
               {confirmVerdict(resultData, me.athlete_id)}
             </Text>
           </View>
-          <Text className="font-display" style={{ fontSize: 60, lineHeight: 56, color: p.text }}>
+          <Text className="font-display" style={[typeStep("display-60"), { lineHeight: 56, color: p.text }]}>
             {isDraw ? "Draw" : winner ? `${shortName(winner.display_name)} won` : "Result in"}
           </Text>
           {how ? (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text className="font-body" style={{ fontSize: 16, color: p.text2 }}>
+              <Text className="font-body" style={[typeStep("subhead"), { color: p.text2 }]}>
                 {how}
               </Text>
               {/* "The tap", drawn still and silent here: the moment itself
@@ -238,12 +239,12 @@ export function ConfirmStep(props: ConfirmStepProps) {
           )}
           <View testID="confirm-lock-notes" style={{ gap: 6, alignItems: "center" }}>
             {windowClosed ? null : (
-              <Text className="font-mono-bold" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text }}>
+              <Text className="font-mono-bold" style={[typeStep("caption"), { textAlign: "center", letterSpacing: TRACKING.loose, color: p.text }, TABULAR]}>
                 {LEAVE_COUNTS_AS_CONFIRMING}
               </Text>
             )}
             {lockNote ? (
-              <Text className="font-mono" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text2 }}>
+              <Text className="font-mono" style={[typeStep("caption"), { textAlign: "center", letterSpacing: TRACKING.loose, color: p.text2 }, TABULAR]}>
                 {lockNote}
               </Text>
             ) : null}
@@ -261,10 +262,10 @@ function StatusRow({ name, status, done, divider = false, testID }: { name: stri
       testID={testID}
       style={{ height: 48, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: divider ? 1 : 0, borderColor: p.hairline }}
     >
-      <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: p.text }}>
+      <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("body"), { flex: 1, letterSpacing: TRACKING.loose, color: p.text }]}>
         {name}
       </Text>
-      <Mono bold size={11} spacing={1.68} color={done ? p.win : p.amber}>
+      <Mono bold size="caption" spacing="caps-l" color={done ? p.text : p.amber}>
         {status}
       </Mono>
     </View>

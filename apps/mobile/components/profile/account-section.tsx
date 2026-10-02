@@ -29,8 +29,8 @@ function SettingsRow({
       {icon ? <View className="mr-3">{icon}</View> : null}
       <Text
         className={cn(
-          "font-heading text-[12px] uppercase tracking-caps",
-          destructive ? "text-cta" : "text-ink",
+          "font-heading text-small uppercase tracking-caps",
+          destructive ? "text-negative" : "text-ink",
         )}
       >
         {label}
@@ -64,7 +64,7 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
         <View className="mr-3">
           <Palette size={16} color={tokens.textPrimary} />
         </View>
-        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">Theme</Text>
+        <Text className="font-heading text-small text-ink uppercase tracking-caps">Theme</Text>
       </View>
       <View className="flex-row rounded-xs overflow-hidden border border-hairline-strong">
         {THEME_OPTIONS.map(({ value, icon: Icon, label }) => {
@@ -90,7 +90,7 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
               </View>
               <Text
                 className={cn(
-                  "font-mono-bold text-[10px] ml-1 uppercase tracking-caps-l",
+                  "font-mono-bold tabular-nums text-micro ml-1 uppercase tracking-caps-l",
                   active ? "text-ink" : "text-ink-3",
                 )}
               >

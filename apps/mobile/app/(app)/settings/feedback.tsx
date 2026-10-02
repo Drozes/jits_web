@@ -10,11 +10,13 @@ import {
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Plate, Chip } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
+import { typeSize } from "@/lib/typography";
 
 type Category = "bug" | "feature" | "general";
 
@@ -90,7 +92,7 @@ export default function SettingsFeedbackScreen() {
           <SuccessPlate onReset={reset} />
         ) : (
           <>
-            <Text className="font-body text-[12px] text-ink-2 leading-relaxed">
+            <Text className="font-body text-small text-ink-2 leading-relaxed">
               Found a bug or have an idea? We read every submission.
             </Text>
 
@@ -112,6 +114,7 @@ export default function SettingsFeedbackScreen() {
             <View className="gap-2">
               <FieldLabel>MESSAGE</FieldLabel>
               <TextInput
+                accessibilityLabel="Message"
                 value={message}
                 onChangeText={setMessage}
                 placeholder="Tell us what you think..."
@@ -119,12 +122,12 @@ export default function SettingsFeedbackScreen() {
                 multiline
                 maxLength={MAX_LEN}
                 textAlignVertical="top"
-                className="font-mono text-[12px] text-ink bg-surface-3 border border-hairline rounded-xs p-3"
-                style={{ minHeight: 144 }}
+                className="font-mono text-ink bg-surface-3 border border-hairline rounded-xs p-3"
+                style={[typeSize("small"), { minHeight: 144 }]}
               />
               <Text
                 className={cn(
-                  "font-mono text-[10px] text-right uppercase tracking-caps-l",
+                  "font-mono tabular-nums text-micro text-right uppercase tracking-caps-l",
                   charCount > MAX_LEN ? "text-negative" : "text-ink-3",
                 )}
               >
@@ -148,10 +151,10 @@ function SuccessPlate({ onReset }: { onReset: () => void }) {
   return (
     <Plate>
       <View className="items-center gap-4 py-6">
-        <Text className="font-heading text-[24px] text-ink uppercase tracking-caps">
+        <Text className="font-heading text-headline text-ink uppercase tracking-caps">
           THANK YOU
         </Text>
-        <Text className="font-body text-[12px] text-ink-2 text-center leading-relaxed">
+        <Text className="font-body text-small text-ink-2 text-center leading-relaxed">
           Your feedback helps us improve ELO RATED.
         </Text>
         <Pressable
@@ -160,7 +163,7 @@ function SuccessPlate({ onReset }: { onReset: () => void }) {
           hitSlop={10}
           className="px-4 py-2 rounded-sm border border-hairline-strong active:bg-surface-4"
         >
-          <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+          <Text className="font-heading text-small text-ink uppercase tracking-caps">
             SUBMIT MORE FEEDBACK
           </Text>
         </Pressable>
@@ -171,7 +174,7 @@ function SuccessPlate({ onReset }: { onReset: () => void }) {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+    <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
       {children}
     </Text>
   );
@@ -187,19 +190,6 @@ function SubmitButton({
   label: string;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      className={cn(
-        "w-full items-center justify-center rounded-sm px-4 py-3",
-        disabled ? "bg-cta opacity-50" : "bg-cta active:bg-cta-hover",
-      )}
-    >
-      <Text className="font-heading text-[14px] text-ink-on-cta uppercase tracking-caps">
-        {label}
-      </Text>
-    </Pressable>
+    <Button label={label} height={44} className="w-full" disabled={disabled} onPress={onPress} />
   );
 }

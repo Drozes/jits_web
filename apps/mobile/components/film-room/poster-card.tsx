@@ -1,7 +1,8 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import type { MatchLibraryItem } from "@jits/shared/api/film-room";
-import { ON_MEDIA, TABULAR, usePalette, type Palette } from "@/lib/theme/palette";
+import { ON_MEDIA, usePalette, type Palette } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { cardLine, outcomeLetter, outcomeWord, shortDate, shortName } from "@/lib/film-room/format";
 import { statusBadgeLabel, uploadingLabel, type CardStatus } from "@/lib/film-room/card-status";
 import { OpeningStill, type StillAthlete } from "./opening-still";
@@ -145,20 +146,20 @@ export const PosterCard = React.memo(function PosterCard({ item, status, viewer,
             <View
               style={{ height: 20, minWidth: 20, paddingHorizontal: 5, borderRadius: 2, borderWidth: 1, borderColor: c.tagBorder[letter], backgroundColor: c.tagFill, alignItems: "center", justifyContent: "center" }}
             >
-              <Text className="font-mono-bold" style={{ fontSize: 11, color: c.outcome[letter] }}>
+              <Text className="font-mono-bold" style={[typeStep("caption"), { color: c.outcome[letter] }, TABULAR]}>
                 {letter}
               </Text>
             </View>
           ) : null}
-          <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.52, color: c.name }}>
+          <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={[typeStep("body"), { letterSpacing: TRACKING.loose, color: c.name }]}>
             {opp}
           </Text>
         </View>
         <View className="flex-row items-center justify-between" style={{ gap: 6 }}>
-          <Text numberOfLines={1} className="font-mono-bold" style={[{ fontSize: 11, letterSpacing: 0.4, color: letter ? c.outcome[letter] : c.text }, TABULAR]}>
+          <Text numberOfLines={1} className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING.loose, color: letter ? c.outcome[letter] : c.text }, TABULAR]}>
             {line}
           </Text>
-          <Text className="font-mono-medium" style={[{ fontSize: 10, letterSpacing: 1.2, color: c.text2 }, TABULAR]}>
+          <Text className="font-mono-medium" style={[typeStep("micro"), { letterSpacing: TRACKING.caps, color: c.text2 }, TABULAR]}>
             {date}
           </Text>
         </View>

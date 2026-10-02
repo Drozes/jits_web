@@ -1,6 +1,6 @@
 /**
  * Challenge afterglow (Adding Flare [01.4]; Motion Rule, Moment). A 2 px
- * bottom edge on an incoming challenge strip that starts hot (brandOrange
+ * bottom edge on an incoming challenge strip that starts hot (heat-orange
  * over Signal Red, Arena heat colors) and cools to the plate-bright hairline
  * over `AFTERGLOW_MS`, ONCE per challenge id.
  *
@@ -140,7 +140,7 @@ export function AfterglowEdge({
       />
       <Animated.View
         testID={`${AFTERGLOW_TEST_ID}-orange`}
-        className="absolute inset-0 bg-brand-orange"
+        className="absolute inset-0 bg-heat-orange"
         style={orangeStyle}
       />
     </View>

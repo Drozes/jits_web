@@ -131,6 +131,8 @@ describe("ResultBanner subtitle", () => {
       />,
     );
     expect(getByTestId("confirm-verdict").props.children).toBe("DRAW");
+    // WP2 draw decision: the draw headline is amber (attention).
+    expect(getByTestId("confirm-verdict").props.className).toMatch(/\btext-attention\b/);
   });
 });
 

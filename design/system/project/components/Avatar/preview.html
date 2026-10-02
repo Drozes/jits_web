@@ -1,0 +1,59 @@
+<!-- @dsCard group="Identity" height=491 subtitle="Square athlete avatar and initials" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avatar preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.a28{width:28px;height:28px;border-radius:var(--radius-tag);border:1px solid var(--hairline-strong);background:var(--plate-bright);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
+.ini{font-family:var(--font-mono);font-weight:700;font-size:10px;line-height:13px;letter-spacing:1.68px;color:var(--ink)}
+.photo{background:repeating-linear-gradient(135deg,var(--plate) 0 4px,var(--plate-bright) 4px 8px)}
+.ib{display:flex;align-items:center;justify-content:center;background:var(--plate-bright);border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);color:var(--ink);flex:none}
+.ib.fill{background:var(--plate)}
+.ib.acc{border-bottom:3px solid var(--signal-red)}
+.hd{font-family:var(--font-heading);font-weight:700;letter-spacing:1px}
+.dp{font-family:var(--font-display);letter-spacing:1px}
+.nm{font-family:var(--font-heading);font-weight:700;text-transform:uppercase;color:var(--ink)}
+.pair{display:flex;gap:10px;width:358px;max-width:100%}
+.pair .cell{flex:1}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="cell"><p class="cap">Avatar32 (w-8 = 28px at rem 14): initials, photo slot</p>
+    <div class="row" style="align-items:center">
+      <span class="a28"><span class="ini">M&middot;P</span></span>
+      <span class="a28"><span class="ini">A</span></span>
+      <span class="a28 photo" title="photo, cover-fit"></span>
+    </div>
+  </div>
+  <div class="cell"><p class="cap">InitialsBlock (match flow): 40/14 confirm, 104/34 verdict</p>
+    <div class="row" style="align-items:flex-end">
+      <span class="ib" style="width:40px;height:40px"><span class="hd" style="font-size:14px">MP</span></span>
+      <span class="ib" style="width:104px;height:104px"><span class="hd" style="font-size:34px">MP</span></span>
+    </div>
+  </div>
+  <div class="cell"><p class="cap">Face-off: fill, Bebas 64, red bottom rule for you</p>
+    <div class="pair">
+      <div class="cell"><span class="ib fill acc" style="width:100%;height:176px"><span class="dp" style="font-size:64px;line-height:64px">MP</span></span><span class="nm" style="font-size:16px;letter-spacing:0.6px">M. Park</span></div>
+      <div class="cell"><span class="ib fill" style="width:100%;height:176px"><span class="dp" style="font-size:64px;line-height:64px">A</span></span><span class="nm" style="font-size:16px;letter-spacing:0.6px">Alex</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

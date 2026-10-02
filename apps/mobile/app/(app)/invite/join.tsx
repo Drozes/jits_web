@@ -15,8 +15,8 @@ import {
 } from "@jits/shared/api/invites";
 import { createInviteErrorMessage } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton, SecondaryButton } from "@/components/auth/auth-buttons";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { InviteQr } from "@/components/invite/invite-qr";
 import { InviteShareRow } from "@/components/invite/share-row";
 import { supabase } from "@/lib/supabase/client";
@@ -53,10 +53,10 @@ export default function JoinInviteScreen() {
       <ScrollView contentContainerStyle={{ padding: 24, gap: 20 }}>
         {error ? (
           <Plate className="gap-4">
-            <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+            <Text accessibilityRole="alert" className="font-body text-callout text-ink leading-6">
               {error}
             </Text>
-            <SecondaryButton label="Try again" onPress={() => void load()} />
+            <Button variant="secondary" label="Try again" onPress={() => void load()} />
           </Plate>
         ) : !invite ? (
           <View className="items-center py-16">
@@ -64,22 +64,22 @@ export default function JoinInviteScreen() {
           </View>
         ) : (
           <>
-            <Text className="font-body text-[14px] text-ink-2 text-center leading-6">
+            <Text className="font-body text-callout text-ink-2 text-center leading-6">
               Your personal link. Anyone who joins through it becomes your friend on ELO RATED.
             </Text>
             <View className="items-center">
               <InviteQr value={invite.url} />
             </View>
-            <Text selectable className="font-mono text-[12px] text-ink-2 text-center" testID="join-url">
+            <Text selectable className="font-mono tabular-nums text-small text-ink-2 text-center" testID="join-url">
               {invite.url}
             </Text>
             {joined > 0 ? (
-              <Text className="font-heading text-[13px] uppercase tracking-caps-l text-ink text-center">
+              <Text className="font-heading text-body uppercase tracking-caps-l text-ink text-center">
                 <Text className="font-mono tabular-nums">{joined}</Text> {joined === 1 ? "friend" : "friends"} joined
               </Text>
             ) : null}
             <InviteShareRow invite={{ inviteId: invite.invite_id, kind: "join", url: invite.url }} />
-            <CtaButton label="Challenge a friend" onPress={() => router.push("/invite?from=profile" as Href)} />
+            <Button label="Challenge a friend" onPress={() => router.push("/invite?from=profile" as Href)} />
           </>
         )}
       </ScrollView>

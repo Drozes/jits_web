@@ -36,18 +36,18 @@ export function StatRow({
     <View className="flex-row items-center py-3 border-b border-hairline-faint">
       <Text
         className={cn(
-          "flex-1 text-center font-mono-bold text-[20px] tabular-nums",
+          "flex-1 text-center font-mono-bold text-title-l tabular-nums",
           leftWins ? "text-ink" : "text-ink-3",
         )}
       >
         {fmt(left)}
       </Text>
-      <Text className="flex-1 text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      <Text className="flex-1 text-center font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
         {label}
       </Text>
       <Text
         className={cn(
-          "flex-1 text-center font-mono-bold text-[20px] tabular-nums",
+          "flex-1 text-center font-mono-bold text-title-l tabular-nums",
           rightWins ? "text-ink" : "text-ink-3",
         )}
       >

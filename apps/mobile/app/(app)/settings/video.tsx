@@ -16,7 +16,7 @@ export default function SettingsVideoScreen() {
         contentContainerStyle={{ paddingTop: 24, gap: 16 }}
       >
         <Plate>
-          <Text className="font-body text-[12px] text-ink-2 leading-relaxed">
+          <Text className="font-body text-small text-ink-2 leading-relaxed">
             Video recording settings will be available here. Match recordings
             can be configured for automatic or manual capture.
           </Text>

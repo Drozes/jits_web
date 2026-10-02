@@ -32,19 +32,19 @@ export function RepeatDisputerRowCard({ row }: { row: RepeatDisputerRow }) {
         onPress={() => router.push(`/(app)/athlete/${row.athlete_id}`)}
         className="flex-row items-center justify-between min-h-11 active:opacity-70"
       >
-        <Text numberOfLines={1} className="font-heading text-[14px] text-ink flex-1 pr-3">
+        <Text numberOfLines={1} className="font-heading text-callout text-ink flex-1 pr-3">
           {name}
         </Text>
-        <Text className="font-mono text-[14px] text-ink-3" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Text className="font-mono tabular-nums text-callout text-ink-3" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {"›"}
         </Text>
       </Pressable>
       <View className="flex-row items-center justify-between">
-        <Text testID="disputer-counts" className="font-mono tabular-nums text-[10px] text-ink-2 uppercase tracking-caps-l">
+        <Text testID="disputer-counts" className="font-mono tabular-nums text-micro text-ink-2 uppercase tracking-caps-l">
           {disputeCountsLabel(row)}
         </Text>
         {row.last_lost_at ? (
-          <Text testID="disputer-last-lost" className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+          <Text testID="disputer-last-lost" className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
             {`Last lost ${formatRelativeDate(row.last_lost_at)}`}
           </Text>
         ) : null}
@@ -58,7 +58,7 @@ export function RepeatDisputerRowCard({ row }: { row: RepeatDisputerRow }) {
               accessibilityLabel={`Lost dispute ${idx + 1}, match ${matchId.slice(0, 8)}`}
               className="flex-row items-center min-h-8 px-3 rounded-md border border-hairline"
             >
-              <Text numberOfLines={1} className="font-mono text-[11px] text-ink-2 flex-1">
+              <Text numberOfLines={1} className="font-mono tabular-nums text-caption text-ink-2 flex-1">
                 {`Lost dispute · match ${matchId.slice(0, 8)}`}
               </Text>
             </View>

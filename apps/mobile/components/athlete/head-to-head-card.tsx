@@ -24,12 +24,11 @@ function StatColumn({
   return (
     <View className="items-center flex-1">
       <Text
-        className={`font-mono-bold ${tone_} tabular-nums`}
-        style={{ fontSize: 24, lineHeight: 29 }}
+        className={`font-mono-bold text-headline ${tone_} tabular-nums`}
       >
         {value}
       </Text>
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l mt-1">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l mt-1">
         {label}
       </Text>
     </View>
@@ -45,17 +44,17 @@ export function HeadToHeadCard({ matches }: { matches: HeadToHeadMatch[] }) {
   return (
     <Plate>
       <View className="flex-row items-center gap-2 mb-3">
-        <Swords size={14} color={tokens.accentCta} />
-        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+        <Swords size={14} color={tokens.textTertiary} />
+        <Text className="font-heading text-small text-ink uppercase tracking-caps">
           Head-to-Head
         </Text>
       </View>
       {matches.length === 0 ? (
         <View className="items-center py-4 gap-1">
-          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+          <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
             No History Yet
           </Text>
-          <Text className="font-body text-[11px] text-ink-3">
+          <Text className="font-body text-caption text-ink-3">
             Challenge them to your first match
           </Text>
         </View>

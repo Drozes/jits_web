@@ -1,0 +1,8 @@
+{
+ "_note": "WP5 typography ratchet (jits-3eeg.6): per-file counts at WP5-core. Lower only; see __tests__/components/ui/typography-guard.test.ts.",
+ "files": {
+  "components/ui/elo-system/splash-glow-statement.tsx": {"inlineFontSize": 1},
+  "components/ui/elo-system/splash-reveal.tsx": {"inlineFontSize": 2},
+  "components/ui/elo-system/splash-statement.tsx": {"inlineFontSize": 1}
+ }
+}

@@ -11,13 +11,13 @@ export function ViewerMeta({ progress }: { progress: HighlightProgress | null })
     <>
       {progress?.phase === "regenerating" ? (
         <View testID="viewer-regenerating" className="bg-surface-4 rounded-md px-3 py-2">
-          <Text className="font-body text-[12px] text-ink">
+          <Text className="font-body text-small text-ink">
             <MonoNumbers text={regeneratingBanner(progress.renderTotal)} />
           </Text>
         </View>
       ) : null}
       {playback ? (
-        <Text testID="viewer-meta" className="font-mono text-[12px] text-ink-3" style={{ fontVariant: ["tabular-nums"] }}>
+        <Text testID="viewer-meta" className="font-mono text-small text-ink-3" style={{ fontVariant: ["tabular-nums"] }}>
           {metaLine(playback.durationS, playback.version)}
         </Text>
       ) : null}

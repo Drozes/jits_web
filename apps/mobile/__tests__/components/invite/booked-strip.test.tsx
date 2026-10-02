@@ -144,7 +144,7 @@ it("sits on the shared strip shell at the challenge strips' size", () => {
   expect(screen.getByText("Booked · Alex")).toBeTruthy();
   // Status is one short line at strip size, never a block of body copy.
   expect(screen.getByTestId("booked-message").props.numberOfLines).toBe(2);
-  expect(String(screen.getByTestId("booked-message").props.className)).toMatch(/text-\[11px\]/);
+  expect(String(screen.getByTestId("booked-message").props.className)).toMatch(/\btext-caption\b/);
 });
 
 describe("match_location_required off: Start match", () => {

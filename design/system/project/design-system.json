@@ -1,0 +1,94 @@
+{
+  "v": 3,
+  "layout": "files",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-02T14:13:58Z"
+  },
+  "title": "ELO RATED Design System",
+  "namespace": "EloRated",
+  "libraries": [],
+  "sections": {},
+  "groups": [
+    "Logos",
+    "Icons"
+  ],
+  "assetGroups": {
+    "Logos": {
+      "name": "Logos",
+      "tile": "l",
+      "order": [
+        "er-lettermark-icon.svg",
+        "er-lettermark-splash.svg",
+        "er-lettermark-adaptive-foreground.svg",
+        "app-icon-1024.png"
+      ],
+      "files": {
+        "er-lettermark-icon.svg": {
+          "name": "er-lettermark-icon.svg",
+          "blob": "eb60c45354d3280661b4d1986e40f7c5",
+          "size": 968,
+          "type": "image/svg+xml"
+        },
+        "er-lettermark-splash.svg": {
+          "name": "er-lettermark-splash.svg",
+          "blob": "995d0dea3b781de013afede59c8bd32b",
+          "size": 903,
+          "type": "image/svg+xml"
+        },
+        "er-lettermark-adaptive-foreground.svg": {
+          "name": "er-lettermark-adaptive-foreground.svg",
+          "blob": "6dad11b8efd589d8bc3afb4f9b378d19",
+          "size": 903,
+          "type": "image/svg+xml"
+        },
+        "app-icon-1024.png": {
+          "name": "app-icon-1024.png",
+          "blob": "580022c608a046d20e7fd2cf256db25e",
+          "size": 12861,
+          "type": "image/png"
+        }
+      }
+    },
+    "Icons": {
+      "name": "Icons",
+      "tile": "s",
+      "order": [
+        "arena-swords.svg",
+        "arena-swords-blade-a.svg",
+        "arena-swords-blade-b.svg"
+      ],
+      "files": {
+        "arena-swords.svg": {
+          "name": "arena-swords.svg",
+          "blob": "f0bf538226da7fa9d875f496998eb46a",
+          "size": 580,
+          "type": "image/svg+xml"
+        },
+        "arena-swords-blade-a.svg": {
+          "name": "arena-swords-blade-a.svg",
+          "blob": "319d2b9b758d2334de7e12fc17f6fe79",
+          "size": 384,
+          "type": "image/svg+xml"
+        },
+        "arena-swords-blade-b.svg": {
+          "name": "arena-swords-blade-b.svg",
+          "blob": "0dbbb7a2bc8d5fc35654453ae52aeac9",
+          "size": 379,
+          "type": "image/svg+xml"
+        }
+      }
+    }
+  },
+  "blobs": {},
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "lastChange": {
+    "by": "Matthew",
+    "at": "2026-10-02T14:13:58Z",
+    "via": "Claude Code",
+    "note": "Initial consolidated kit from jits_web development@69e2e7f: brand book, tokens (dark/light), 20 component cards, cover, logos, icons, fonts."
+  }
+}

@@ -1,9 +1,13 @@
 import * as React from "react";
 import { FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "lucide-react-native";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { typeSize } from "@/lib/typography";
+import { useModalAnimation } from "@/lib/motion";
+import { SelectCheck } from "@/components/ui/elo-system/selection";
 
 export interface SearchSelectOption {
   label: string;
@@ -96,6 +100,7 @@ export function SearchSelect({
   noMatchesOptions,
 }: SearchSelectProps) {
   const tokens = useThemedTokens();
+  const animationType = useModalAnimation("slide");
   const insets = useSafeAreaInsets();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -139,18 +144,23 @@ export function SearchSelect({
         accessibilityRole="button"
         accessibilityLabel={item.kind === "free" ? `Use ${item.label}` : item.label}
         accessibilityState={{ selected }}
-        className="px-4 min-h-11 flex-row items-center justify-between border-b border-hairline active:bg-surface-3"
+        // Selected = the plate-bright step + an ink check, never red (WP2, R3 ST-2).
+        className={cn(
+          "px-4 min-h-11 flex-row items-center justify-between border-b border-hairline",
+          selected ? "bg-surface-4 active:bg-surface-3" : "active:bg-surface-3",
+        )}
       >
         <Text
-          className={cn(
-            "text-[14px] font-body flex-1 py-3",
-            selected ? "text-cta" : "text-ink",
-          )}
+          className="text-callout font-body flex-1 py-3 text-ink"
           numberOfLines={1}
         >
           {item.kind === "free" ? `Use "${item.label}"` : item.label}
         </Text>
-        {selected ? <Text className="text-cta text-[14px] ml-2">{"✓"}</Text> : null}
+        {selected ? (
+          <View className="ml-2">
+            <SelectCheck size={16} />
+          </View>
+        ) : null}
       </Pressable>
     );
   };
@@ -184,21 +194,21 @@ export function SearchSelect({
         >
           <Text
             className={cn(
-              "text-[14px] font-body flex-1",
+              "text-callout font-body flex-1",
               shown ? "text-ink" : "text-ink-3",
             )}
             numberOfLines={1}
           >
             {shown || placeholder}
           </Text>
-          <Text className="text-[14px] text-ink-3 ml-2">{"⌕"}</Text>
+          <Text className="text-callout text-ink-3 ml-2">{"⌕"}</Text>
         </View>
       </Pressable>
 
       <Modal
         visible={open}
         transparent
-        animationType="slide"
+        animationType={animationType}
         onRequestClose={close}
         statusBarTranslucent
       >
@@ -211,20 +221,20 @@ export function SearchSelect({
         >
           <View className="px-4 pt-2 pb-3 gap-3 border-b border-hairline">
             <View className="flex-row items-center justify-between">
-              <Text className="font-heading text-[12px] text-ink uppercase tracking-caps-l">
+              <Text className="font-heading text-small text-ink uppercase tracking-caps-l">
                 {title}
               </Text>
-              <Pressable
+              <PressableScale
                 testID={tid("close")}
                 onPress={close}
                 accessibilityLabel="Close"
                 hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
                 accessibilityRole="button"
               >
-                <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
+                <Text className="font-heading text-callout text-cta uppercase tracking-caps-l">
                   Done
                 </Text>
-              </Pressable>
+              </PressableScale>
             </View>
             <View className="justify-center">
               <TextInput
@@ -241,7 +251,8 @@ export function SearchSelect({
                 onSubmitEditing={() => {
                   if (allowFreeText && trimmed) select(trimmed);
                 }}
-                className="bg-surface-3 border border-hairline-strong rounded-xs pl-4 pr-11 py-3 text-[14px] font-body text-ink"
+                className="bg-surface-3 border border-hairline-strong rounded-xs pl-4 pr-11 py-3 font-body text-ink"
+                style={typeSize("callout")}
               />
               {query.length > 0 ? (
                 <Pressable
@@ -272,7 +283,7 @@ export function SearchSelect({
               ListEmptyComponent={
                 <View>
                   <View className="px-4 py-6">
-                    <Text testID={tid("empty")} className="font-body text-[13px] text-ink-3">
+                    <Text testID={tid("empty")} className="font-body text-body text-ink-3">
                       {trimmed.length === 0
                         ? emptyHint
                         : allowFreeText

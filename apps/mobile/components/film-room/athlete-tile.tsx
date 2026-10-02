@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import { getInitials } from "@jits/shared/utils";
 import { athletePhotoSource } from "@/lib/athlete-photo";
 import { usePalette } from "@/lib/theme/palette";
+import { TRACKING, nearestStep, typeSize } from "@/lib/typography";
 
 interface AthleteTileProps {
   name: string;
@@ -36,7 +37,7 @@ export function AthleteTile({ name, photoUrl, size }: AthleteTileProps) {
       {src ? (
         <Image source={{ uri: src }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
       ) : (
-        <Text className="font-heading text-ink" style={{ fontSize: Math.round(size * 0.33), letterSpacing: 1 }}>
+        <Text className="font-heading text-ink" style={[typeSize(nearestStep(size * 0.33)), { letterSpacing: TRACKING.caps }]}>
           {getInitials(name || "?")}
         </Text>
       )}

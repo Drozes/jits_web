@@ -94,20 +94,26 @@ Not discoverable from frontend code. Full reference: `research/005-backend-refer
 
 **Main design artifact:** the team's canonical mobile screen set is the Claude Design canvas "ELO RATED Native Screens", https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D. Its "Current app" page must mirror the shipped `apps/mobile` code, so update the affected boards whenever a mobile UI change ships. Its proposed pages hold review items and redesigns. Always update it in place, reading `project/canvas.json` first. Full rules are in `~/code/EloRated/CLAUDE.md` section 5. The old `apps/web/public/design/native-screen-inventory.html` and `wireframe.html` are stale; don't use them as a source. Drift is tracked, not synced per commit: a husky post-commit hook tags every commit that touches a drawn screen onto one open `canvas-drift` bead (`design/native-screens/board-map.json` maps boards to source files), and after each mobile release (OTA or TestFlight) `/canvas-sync` redraws only the affected boards and records the synced commit in `design/native-screens/last-sync.json`. See `design/native-screens/README.md`. **Design canvas at session end:** if `node design/native-screens/drift.mjs --to <released sha>` exits 2 after a release, run `/canvas-sync`.
 
+**Design source:** [DESIGN.md](DESIGN.md) is the consolidated brand book, the same text as the live "ELO RATED Design System" artifact (https://claude.ai/artifact/NkvxzxKo3R7acP5j6aRTTe), mirrored file for file in `design/system/project/` (update both together, see `design/system/README.md`). Values come from `apps/mobile/lib/tokens.ts`; code wins.
+
 ### Color and token semantics (no decorative color)
-- **Signal Red** (`text-primary`, `#E63946` / hsl(355 78% 56%)): CTAs and state-negative (losses, destructive) only.
-- **Gain Green** (`text-success`): rating increases only.
-- **Draws/pressure:** `text-amber-500`. **Metadata:** `text-muted-foreground`.
-- **Numeric data values:** default foreground + `font-mono tabular-nums`. NEVER `text-primary` for data.
-- **Dual token encoding (keep in sync):** web `apps/web/app/globals.css` is HSL (shadcn slots), mobile `apps/mobile/lib/tokens.ts` is hex (brand precision). This dual representation is by design, do not unify it.
+- **Signal Red** (`#E63946`, `bg-cta` / `border-cta`): the one primary CTA fill per surface, labelled `text-ink-on-cta` (Void, never white), plus rules that mean "act" (active tab edge, accent rail). Never text and never data. Red TEXT for losses, errors and destructive copy is `text-negative` (or `text-cta`, which resolves to the AA-tuned `--accent-cta-text`).
+- **Gain Green** (`text-positive` / `bg-positive` / `border-positive`): rating increases, wins and LIVE only, never generic success (ready, confirmed, uploaded).
+- **Draw headlines (the verdict DRAW and the draw delta; a D letter in a list stays neutral), pressure, pending/processing/paused/disputed:** the `attention` (amber) token: `text-attention` / `border-attention` / `border-attention-rule`, or `usePalette().amber` / `useAmber().icon` for color props (amber-500 dark, amber-800 light). Never a Tailwind `amber-*` class.
+- **Arena heat only:** `heatOrange` / `heatRed` (`bg-heat-orange`, `bg-heat-red`), fixed in both themes (the legacy `brandOrange` was deleted by WP4).
+- **Over camera, video or photos:** `ON_MEDIA` (= `onMediaTokens` in `lib/tokens.ts`, also behind the live screen's `BROADCAST`); never a new literal, `bg-black` or `text-white`. On-media text sits only on `ON_MEDIA.badge` or (dark inks) `ON_MEDIA.chip`.
+- **New color tokens** go in `lib/tokens.ts` + `tailwind.config.js` + `theme-provider.tsx` AND `design/system/project/tokens.json` + DESIGN.md; `tokens-mirror-drift.test.ts` fails when the kit JSON and `lib/tokens.ts` disagree.
+- **Text:** `text-ink` default and ALL data values, `text-ink-2` secondary, `text-ink-3` metadata and mono labels (10px and up). Surfaces: `bg-surface`, `bg-surface-2`, `bg-surface-3` (Plate), `bg-surface-4` (pressed/selected); borders `border-hairline(-faint|-strong)`.
+- **Numeric data values:** `text-ink` + `font-mono tabular-nums`. NEVER red for data.
+- **Legacy shadcn classes were removed from mobile (WP4):** `text-primary`, `text-success`, `text-muted-foreground`, `bg-background`, `bg-card`, `bg-muted`, `border-border` and friends no longer resolve to a color, and `__tests__/components/legacy-shadcn-guard.test.ts` fails if one is written. Use the ELO classes (`text-ink`, `text-ink-2`, `bg-surface-3`, `border-hairline`, ...). Web keeps shadcn HSL slots in `apps/web/app/globals.css`; its ELO values live in `apps/web/app/design-system/tokens.css`, a mirror of `apps/mobile/lib/tokens.ts` (gated by `tokens-mirror-drift.test.ts`).
 
 ### Typography (4 purpose-bound fonts)
-Bebas Neue (`font-display`, wordmarks/taglines, all caps) · DM Sans Bold (`font-heading`, headings/labels/buttons) · Inter (`font-body`, prose, default) · JetBrains Mono (`font-mono`, ALL numeric data, always tabular-nums).
+Bebas Neue (`font-display`, the wordmark and display numerals 40px and up such as the countdown, all caps) · DM Sans Bold (`font-heading`, headings/labels/buttons, caps labels with `tracking-caps`+) · Inter (`font-body`, prose) · JetBrains Mono (`font-mono`, `font-mono-bold`, ALL numeric data, always tabular-nums, and caps meta labels). 10px minimum text. Mobile rem is 14px (`p-4` = 14px). Weight is shown in **lbs** (`LBS` in mono data strips, `lbs` in prose), never kg.
 
 ### Brand hard rules (easy to violate)
 - **No drop shadows.** Hierarchy via background-color shifts, not elevation.
-- **Sharp corners:** default radius 4px (`--radius: 0.25rem`); max 8px for modals; avatars stay circular.
-- **One primary (Signal Red) CTA per surface.**
+- **Sharp corners:** 2px tags/chips (`rounded-xs`), 3px buttons (`rounded-sm`), 4px plates (`rounded-md`, default), 8px max for sheets and modals (`rounded-lg`); only dots are round.
+- **One primary (Signal Red) CTA per surface.** A selected state is `bg-surface-4` + `border-hairline-strong` + an `ink` check (`selectionSurface()` / `SelectCheck` in `components/ui/elo-system/selection.tsx`), never a red fill, edge or check. A focused input's edge is `border-ink-2` (never red; red edges are errors). Spinners and pull-to-refresh are `textTertiary`, switches use `switchColors()` (neutral track), icons are ink steps. `__tests__/components/ui/color-semantics-guard.test.ts` allowlists every remaining red and green line with its reason: a new one fails until reviewed.
 - **Motion Rule (motion with meaning):** every animation is Reactive (touch), a Moment (one shot on a real state change, never on mount or refetch) or Ambient (a loop only while an ongoing state such as live, loading or waiting on you is true, paused in background), on the UI thread, with a still Reduce Motion state, and listed in the DESIGN.md Motion registry; tokens and the one haptics vocabulary live in `apps/mobile/lib/motion` (never a haptic on a loss or for ambient motion; heat colors only for Arena heat).
 
 ## UI Kit Rules
@@ -116,7 +122,7 @@ Bebas Neue (`font-display`, wordmarks/taglines, all caps) · DM Sans Bold (`font
 - **Mobile `apps/mobile/components/ui/`** are hand-written RN primitives (NativeWind v4 + class-variance-authority); edit directly. Mobile `badge` also has a custom `success` variant.
 - A shared **`elo-system/`** brand-primitive set exists under `components/ui/elo-system/` on both web and mobile; keep the two in parity when touching either.
 - Components that can't take a `className` (RN `Switch`, gorhom `BottomSheet`) read `useThemedTokens()` for the right runtime token map.
-- `MatchCard` accepts optional `matchType: "ranked" | "casual"`, rendered inline with the date ("2d ago, Ranked"). Mobile mirrors the API.
+- `MatchCard`: casual matches are retired and every new match is ranked; `MATCH_TYPE.CASUAL` survives in `packages/shared/src/constants.ts` only for legacy rows the server wrote before retirement (jr_be-ahn.1), so never branch UI or copy on it. Mobile `MatchCard` has no `matchType` prop and its subtitle is just the relative date, with no "Ranked" suffix (`apps/mobile/components/match-card.tsx:55-56`); web still accepts an optional `matchType` prop but does not render it.
 
 ## Routes
 
@@ -132,7 +138,7 @@ Bebas Neue (`font-display`, wordmarks/taglines, all caps) · DM Sans Bold (`font
 ## Mobile Specifics
 
 - **Routing:** file-based under `apps/mobile/app/`. `(app)/` is a Stack; inside it `(tabs)/` is the 4-tab navigator; `athlete/[id]`, `match/[matchId]`, `settings` push on top.
-- **Theming:** `apps/mobile/tailwind.config.js` declares semantic tokens as CSS vars; `<ThemeProvider>` applies `vars()` overrides from `apps/mobile/lib/tokens.ts` by system color scheme.
+- **Theming:** `apps/mobile/tailwind.config.js` declares semantic tokens as CSS vars and sets `darkMode: "class"` (needed for NativeWind's `setColorScheme()`); `<ThemeProvider>` applies `vars()` overrides from `apps/mobile/lib/tokens.ts` on a root View. The app forces dark before first paint (`app/_layout.tsx`), restores a stored preference, and has an in-app Light / Dark / System toggle (`ThemeSwitcherRow` in the Profile tab's Account section, `apps/mobile/components/profile/account-section.tsx`).
 - **Match-flow state machine (8 steps):** `wait, weight, ready, live, end, result, confirm, summary`, driven by `apps/mobile/lib/match-flow/step-router.ts`. The live step mounts the camera overlay, keeps awake, fires haptics, and auto-stops recording on end. Recording is best-effort; permission-denied users still progress.
 - **Match exits:** every exit from `match/[matchId]` goes through `exitMatchTo()` (`router.dismissTo`) in `apps/mobile/lib/match-flow/exit-to.ts`. Never `router.replace` out of a match: it stacks a duplicate `(tabs)` navigator (stale screens, duplicate subscriptions). Exits pop back without refocusing, so post-match refreshes key off `useMatchExitCount()` (`lib/arena/arena-store.ts`), not focus alone.
 - **Getting back into a match:** Home's "Resume your match" card (`getMyActiveMatch()`, `lib/match-flow/use-my-active-match.ts`) only offers; resuming is the athlete's tap. The only auto-navigation is the accepter rejoin (`rejoinStartedMatch` in `use-arena-challenge.ts`, AsyncStorage record): an accepter whose app died right after accepting is put into the match the challenger started, only within the 10 min window and only if it never entered it. Do not add other auto-navigation into matches.

@@ -7,6 +7,7 @@
  */
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 import { Plate, LivePill } from "@/components/ui/elo-system";
 
 function OutlineButton({
@@ -28,9 +29,9 @@ function OutlineButton({
       onPress={onPress}
       disabled={disabled}
       className="mt-4 min-h-[44px] items-center justify-center rounded-sm border border-hairline-strong px-5 active:bg-surface-4"
-      style={disabled ? { opacity: 0.6 } : undefined}
+      style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
     >
-      <Text className="font-heading text-[12px] text-ink-2 uppercase tracking-caps">
+      <Text className="font-heading text-small text-ink-2 uppercase tracking-caps">
         {label}
       </Text>
     </Pressable>
@@ -47,11 +48,11 @@ export function SectionLabel({
 }) {
   return (
     <View className="flex-row items-baseline justify-between">
-      <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-2 uppercase tracking-caps-xl">
         {label}
       </Text>
       <Text
-        className="font-mono-bold text-[10px] text-ink uppercase tracking-caps-xl"
+        className="font-mono-bold text-micro text-ink uppercase tracking-caps-xl"
         style={{ fontVariant: ["tabular-nums"] }}
       >
         {count}
@@ -74,10 +75,10 @@ export function WaitingPlate({
     <Plate variant="live" testID="arena-waiting-plate">
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1">
-          <Text className="font-heading text-[16px] text-ink">
+          <Text className="font-heading text-subhead text-ink">
             Waiting for {name}
           </Text>
-          <Text className="mt-1 font-body text-[13px] text-ink-2">
+          <Text className="mt-1 font-body text-body text-ink-2">
             You&apos;ll both drop into the match the moment they accept.
           </Text>
         </View>
@@ -115,13 +116,13 @@ export function CapPlate({ onDismiss }: { onDismiss: () => void }) {
     // Neutral ink-3 rail, not Signal Red: red is only for "someone wants
     // you" and the one CTA (spec 3); a notice is a degraded state.
     <Plate testID="arena-cap-plate" className={DEGRADED_RAIL}>
-      <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-2 uppercase tracking-caps-xl">
         Challenge limit
       </Text>
-      <Text className="mt-1 font-heading text-[16px] text-ink">
+      <Text className="mt-1 font-heading text-subhead text-ink">
         You have 3 challenges out
       </Text>
-      <Text className="mt-1 font-body text-[13px] text-ink-2">
+      <Text className="mt-1 font-body text-body text-ink-2">
         That is the limit. Unanswered challenges clear automatically after 10
         minutes, so try again shortly.
       </Text>
@@ -134,10 +135,10 @@ export function CapPlate({ onDismiss }: { onDismiss: () => void }) {
 export function RosterErrorPlate({ onRetry }: { onRetry: () => void }) {
   return (
     <Plate testID="arena-roster-error-plate" className={DEGRADED_RAIL}>
-      <Text className="font-mono-bold text-[10px] text-ink-2 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-2 uppercase tracking-caps-xl">
         Couldn&apos;t load
       </Text>
-      <Text className="mt-1 font-body text-[13px] text-ink">
+      <Text className="mt-1 font-body text-body text-ink">
         We couldn&apos;t reach the lobby, so this list is not showing who is
         actually here.
       </Text>
