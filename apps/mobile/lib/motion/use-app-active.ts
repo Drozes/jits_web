@@ -11,18 +11,29 @@ import { AppState, type AppStateStatus } from "react-native";
  * active so a loop is not suppressed by a state that never arrives.
  * `inactive` (iOS app switcher, Control Center) counts as not active.
  */
+// The last state a listener saw. Only trusted while at least one hook is
+// subscribed: with no listener nothing keeps it current, so it is dropped
+// when the last subscriber leaves and the next mount reads
+// `AppState.currentState` afresh (otherwise a loop that unmounted while the
+// app was in the background would stay frozen after a later foreground).
 let latest: AppStateStatus | null = null;
+let subscribers = 0;
 
 function isActive(state: AppStateStatus | null | undefined): boolean {
   return state == null || state === "active" || state === "unknown";
 }
 
 function subscribe(cb: () => void): () => void {
+  subscribers += 1;
   const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
     latest = next;
     cb();
   });
-  return () => sub?.remove?.();
+  return () => {
+    sub?.remove?.();
+    subscribers = Math.max(0, subscribers - 1);
+    if (subscribers === 0) latest = null;
+  };
 }
 
 const snapshot = () => isActive(latest ?? AppState.currentState);
@@ -34,4 +45,5 @@ export function useAppActive(): boolean {
 /** Tests only: forget the last reported state. */
 export function __resetAppActiveForTests(): void {
   latest = null;
+  subscribers = 0;
 }

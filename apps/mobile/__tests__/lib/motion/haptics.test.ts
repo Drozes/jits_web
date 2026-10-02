@@ -64,6 +64,15 @@ describe("haptics vocabulary", () => {
     await expect(haptics.select()).resolves.toBeUndefined();
   });
 
+  it("never throws when expo-haptics throws synchronously or is partially mocked", async () => {
+    mockImpact.mockImplementationOnce(() => {
+      throw new Error("native module missing");
+    });
+    await expect(haptics.accept()).resolves.toBeUndefined();
+    mockNotify.mockImplementationOnce(() => undefined as unknown as Promise<void>);
+    await expect(haptics.ratingGain()).resolves.toBeUndefined();
+  });
+
   it("keeps matchHaptics as the same vocabulary under its old name", () => {
     expect(matchHaptics).toBe(haptics);
   });

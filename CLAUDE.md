@@ -108,7 +108,7 @@ Bebas Neue (`font-display`, wordmarks/taglines, all caps) · DM Sans Bold (`font
 - **No drop shadows.** Hierarchy via background-color shifts, not elevation.
 - **Sharp corners:** default radius 4px (`--radius: 0.25rem`); max 8px for modals; avatars stay circular.
 - **One primary (Signal Red) CTA per surface.**
-- **Motion Rule (motion with meaning):** every animation is Reactive (touch), a Moment (one shot on a real state change, never on mount or refetch) or Ambient (a loop only while a live state is true, paused in background), on the UI thread, with a still Reduce Motion state, and listed in the DESIGN.md Motion registry; tokens and the one haptics vocabulary live in `apps/mobile/lib/motion` (never a haptic on a loss or for ambient motion; heat colors only for Arena heat).
+- **Motion Rule (motion with meaning):** every animation is Reactive (touch), a Moment (one shot on a real state change, never on mount or refetch) or Ambient (a loop only while an ongoing state such as live, loading or waiting on you is true, paused in background), on the UI thread, with a still Reduce Motion state, and listed in the DESIGN.md Motion registry; tokens and the one haptics vocabulary live in `apps/mobile/lib/motion` (never a haptic on a loss or for ambient motion; heat colors only for Arena heat).
 
 ## UI Kit Rules
 

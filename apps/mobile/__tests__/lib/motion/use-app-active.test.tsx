@@ -73,6 +73,18 @@ describe("useAppActive", () => {
     expect(result.current).toBe(true);
   });
 
+  it("reads the current state afresh after every subscriber has unmounted", () => {
+    setCurrent("active");
+    const first = renderHook(() => useAppActive());
+    emit("background");
+    expect(first.result.current).toBe(false);
+    // The loop unmounts while backgrounded; the app then returns to the
+    // foreground with no listener attached to report it.
+    first.unmount();
+    setCurrent("active");
+    expect(renderHook(() => useAppActive()).result.current).toBe(true);
+  });
+
   it("removes its AppState listener on unmount", () => {
     setCurrent("active");
     const { unmount } = renderHook(() => useAppActive());

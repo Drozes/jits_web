@@ -3,8 +3,9 @@ import { AccessibilityInfo } from "react-native";
 
 /**
  * The OS "Reduce Motion" setting, read once per app run and cached at module
- * level, so every animation in the Motion Rule registry (DESIGN.md) knows it on their FIRST frame instead of animating
- * for one frame before the async read lands. Kept current by one listener.
+ * level, so every animation in the Motion Rule registry (DESIGN.md) knows
+ * it on its FIRST frame instead of animating for one frame before the async
+ * read lands. Kept current by one listener.
  */
 let reduceMotion = false;
 let started = false;

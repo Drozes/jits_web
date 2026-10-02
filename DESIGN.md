@@ -93,7 +93,7 @@ The **Motion Rule** (Adding Flare, 2026-10-01) replaces the old "minimal motion"
 
 ### Tokens
 
-Mobile tokens live in [apps/mobile/lib/motion/tokens.ts](apps/mobile/lib/motion/tokens.ts) and are imported from `@/lib/motion`; the first four durations mirror the web `--duration-*` tokens.
+Mobile tokens live in [apps/mobile/lib/motion/tokens.ts](apps/mobile/lib/motion/tokens.ts) and are imported from `@/lib/motion`; `instant`, `fast`, `base`, `slow` and `pulse` mirror the web `--duration-*` tokens in `apps/web/app/design-system/tokens.css`.
 
 - **Durations:** `instant` 100ms (reactive feedback), `fast` 240ms, `base` 480ms (rating tick), `slow` 720ms, `pulse` 1400ms (fixed LIVE pulse cycle), `ember` 2400ms (Arena ember cycle), `shimmer` 1400ms (skeleton sweep).
 - **LIVE pulse tempo:** `tempo.quiet` 3000ms, `tempo.normal` 1600ms, `tempo.busy` 800ms, chosen by how many athletes are live in the lobby. One shared clock drives every live dot so they never beat out of step.
@@ -107,7 +107,7 @@ Mobile tokens live in [apps/mobile/lib/motion/tokens.ts](apps/mobile/lib/motion/
 |---|---|---|
 | **Reactive** | A direct response to the user's touch (press scale, tab select bounce). | Starts on the touch, settles in `instant` to `fast` (spring to rest). Never runs without a touch. |
 | **Moment** | A one-shot animation on a real state transition (a result landing, a challenge arriving, going live). | Plays once per transition, then rests in its final state. Short: about `fast` to `slow`; a cool-down or celebration may run up to about 2000ms. Never loops. |
-| **Ambient** | A loop that shows a live state (LIVE pulse, Arena embers, heartbeat trace, skeleton shimmer). | Mounted only while its state is true. Slow and low contrast, on a shared clock. Never has a haptic. |
+| **Ambient** | A loop that shows an ongoing state: live (LIVE pulse, Arena embers, heartbeat trace), loading (skeleton shimmer) or waiting on you (steel sheen). | Mounted only while its state is true. Slow and low contrast, on a shared clock. Never has a haptic. |
 
 ### Rules
 
@@ -143,6 +143,7 @@ Mobile haptics use ONE semantic vocabulary, `haptics` from `@/lib/motion` ([apps
 - **Never a haptic on a loss.** There is deliberately no loss event, and a draw is silent too; the loser of a submission sees the tap marks still and silent.
 - **Never a haptic for ambient motion** (pulse, embers, heartbeat, shimmer, sheen).
 - **One haptic per event.** Check what already buzzes before adding a call, and replace rather than stack.
+- **Existing direct calls.** Some surfaces predate the vocabulary and still call `expo-haptics` directly: a Light impact on the Challenge tap (`components/arena/competitor-row.tsx`, `components/arena/mat-board.tsx`), on a successful Confirm result (`components/match-flow/steps/confirm-step.tsx`) and on a queued offline result (`lib/match-flow/use-record-result.ts`), the Warning on a new challenge (`components/arena/challenge-prompt-sheet.tsx`, which is `challengeArrived`), the Light impact when the legacy rating tick lands (`EloTile`), and a Heavy impact in the launch splash. These already buzz: a new `press` opt-in on the same action replaces the direct call instead of adding a second haptic, and a surface that is touched should move to the semantic event.
 
 ### Registry
 
@@ -150,7 +151,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 
 | Animation | Tier | Where | Trigger | Haptic | Reduce Motion |
 |---|---|---|---|---|---|
-| Rating tick (count-up; becoming the odometer roll) | Moment | `EloTile`, verdict celebration | A confirmed rating change, once | `ratingGain` on a gain only | Final value shown at once |
+| Rating tick (legacy count-up, replaced by the odometer roll this release) | Moment | `EloTile`, verdict celebration | A confirmed rating change, once, 480ms | Today a Light impact on landing in `EloTile` in either direction; the odometer moves it to `ratingGain` on a gain only | Final value shown at once |
 | Odometer ELO roll | Moment | `RollingNumber` (replaces the count-up tick) | A confirmed rating change, once; only changed digits roll, under 720ms | `ratingGain` on a gain only | Final value shown at once |
 | ELO delta chip | Moment | Result and verdict | After the roll lands; pops in with sign and arrow glyph | none | Shown in place |
 | The tap | Moment | Submission result card | A submission win: three tick marks fill (180ms apart) | `tapTick` x3, winner only | Ticks shown filled (winner haptics kept); loser sees them filled, silent |
@@ -158,7 +159,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | LIVE pulse tempo | Ambient | Every live dot | Lobby activity picks `tempo` quiet / normal / busy; period eases between buckets | none | Static dots |
 | Match countdown | Moment | Face-off countdown | The countdown starts | `countdownTick` per numeral | Numbers crossfade |
 | Countdown slam | Moment | Face-off countdown | Each numeral drops from 1.6x and lands; a red bar drains to GO; total length unchanged | `countdownTick` per numeral, `countdownGo` on GO | Numbers crossfade, haptics kept |
-| Verdict confetti / SlamIn / RiseIn | Moment | Verdict step | A win verdict, once | per the match-flow events | None (static verdict) |
+| Verdict confetti / SlamIn / RiseIn | Moment | Verdict step | Confetti and the SlamIn of "YOU WON" on a win verdict only; RiseIn (the rank strip) on every verdict; each once | none | None (static verdict) |
 | Arena ember | Ambient | Arena tab icon | While live and no challenge is pending; 2400ms cycle | none | One static ember above the crossing |
 | Countable embers | Ambient | Arena tab icon | 1 to 3 pending incoming challenges, one ember each in place of the red count pill (pill returns above 3); stops while the Arena tab is focused | none | N static embers |
 | Blade clash | Moment | Arena tab icon | Live false to true, or the pending incoming count increases | `goLive`; `challengeArrived` only if nothing else buzzes for it | No clash, no spark |
@@ -170,7 +171,11 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | ON AIR heartbeat | Ambient | Arena screen body | While live: the ON AIR tally fills, the heartbeat trace blips on the tempo clock | none | Static full trace |
 | List enter stagger | Moment | Rankings, Arena roster, Profile recent matches | FIRST load only: rows rise 8px and fade, 60ms apart, first 8 rows; never on refetch, refresh, pagination or recycling | none | None |
 | Rank-up swap flare | Moment | Rankings | First open after the athlete's rank improved: old order swaps (about 450ms), a Signal Red flare sweeps the row (500ms); once per climb | none | New order, no transition |
-| Skeleton shimmer | Ambient | Skeletons | While loading: one module-level 1400ms clock drives a faint band across every bar, in phase | none | Plain static bars |
+| Skeleton shimmer | Ambient | Skeletons | While loading: one module-level 1400ms clock drives a faint band across every bar, in phase (replaces the current 1400ms opacity breath) | none | Plain static bars |
+| Launch splash reveal | Moment | `SplashReveal` / `SplashStatement` / `SplashGlowStatement` with `ErMark` | Once per cold start, handing off from the native splash (the one sanctioned on-mount moment) | Heavy impact at the lock beat | Resting frame, still dismisses |
+| Hold-to-end fill | Reactive | Live match, End match button | While the finger holds; retracts on release | `matchEnd` when the hold completes | Unchanged (it tracks the touch) |
+| Time-up drain bar | Moment | Live match state strip | Time is up: a 2px bar empties over the auto-end delay | none | Unchanged (it is a timer, not decoration) |
+| Offline banner | Moment | Root layout, challenge prompt | Connectivity changes: slides in when offline, out when back (220ms) | none | Unchanged |
 
 ### Other
 
