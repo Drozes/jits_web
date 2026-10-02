@@ -285,7 +285,7 @@ function TabButton({
       </TabIcon>
       <Text
         className={cn(
-          "font-heading text-[10px] uppercase tracking-caps-l",
+          "font-heading text-micro uppercase tracking-caps-l",
           isActive ? "text-ink" : "text-ink-3",
         )}
       >

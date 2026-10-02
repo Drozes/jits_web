@@ -67,10 +67,10 @@ export function NewHighlightCard({
             </View>
           </Pressable>
         </View>
-        <Text className="font-heading text-[16px] text-ink" numberOfLines={1}>
+        <Text className="font-heading text-subhead text-ink" numberOfLines={1}>
           {DISCOVERY_COPY.homeTitle}
         </Text>
-        <Text testID="new-highlight-line" className="font-body text-[13px] text-ink-2" numberOfLines={1}>
+        <Text testID="new-highlight-line" className="font-body text-body text-ink-2" numberOfLines={1}>
           {opponent ? `vs ${opponent} · ` : ""}
           <Text className="font-mono tabular-nums">{seconds}s</Text>
         </Text>

@@ -94,7 +94,7 @@ describe("UpdateBanner", () => {
     const body = getByText(UPDATE_BANNER_BODY, { includeHiddenElements: true }).props
       .className as string;
     expect(body).toContain("font-body");
-    expect(body).toContain("text-base");
+    expect(body).toContain("text-callout");
     expect(body).toContain("text-ink-2");
   });
 

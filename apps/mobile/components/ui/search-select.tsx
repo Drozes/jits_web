@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "lucide-react-native";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { typeSize } from "@/lib/typography";
 import { useModalAnimation } from "@/lib/motion";
 import { SelectCheck } from "@/components/ui/elo-system/selection";
 
@@ -150,7 +151,7 @@ export function SearchSelect({
         )}
       >
         <Text
-          className="text-[14px] font-body flex-1 py-3 text-ink"
+          className="text-callout font-body flex-1 py-3 text-ink"
           numberOfLines={1}
         >
           {item.kind === "free" ? `Use "${item.label}"` : item.label}
@@ -193,14 +194,14 @@ export function SearchSelect({
         >
           <Text
             className={cn(
-              "text-[14px] font-body flex-1",
+              "text-callout font-body flex-1",
               shown ? "text-ink" : "text-ink-3",
             )}
             numberOfLines={1}
           >
             {shown || placeholder}
           </Text>
-          <Text className="text-[14px] text-ink-3 ml-2">{"⌕"}</Text>
+          <Text className="text-callout text-ink-3 ml-2">{"⌕"}</Text>
         </View>
       </Pressable>
 
@@ -220,7 +221,7 @@ export function SearchSelect({
         >
           <View className="px-4 pt-2 pb-3 gap-3 border-b border-hairline">
             <View className="flex-row items-center justify-between">
-              <Text className="font-heading text-[12px] text-ink uppercase tracking-caps-l">
+              <Text className="font-heading text-small text-ink uppercase tracking-caps-l">
                 {title}
               </Text>
               <PressableScale
@@ -230,7 +231,7 @@ export function SearchSelect({
                 hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
                 accessibilityRole="button"
               >
-                <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
+                <Text className="font-heading text-callout text-cta uppercase tracking-caps-l">
                   Done
                 </Text>
               </PressableScale>
@@ -250,7 +251,8 @@ export function SearchSelect({
                 onSubmitEditing={() => {
                   if (allowFreeText && trimmed) select(trimmed);
                 }}
-                className="bg-surface-3 border border-hairline-strong rounded-xs pl-4 pr-11 py-3 text-[14px] font-body text-ink"
+                className="bg-surface-3 border border-hairline-strong rounded-xs pl-4 pr-11 py-3 font-body text-ink"
+                style={typeSize("callout")}
               />
               {query.length > 0 ? (
                 <Pressable
@@ -281,7 +283,7 @@ export function SearchSelect({
               ListEmptyComponent={
                 <View>
                   <View className="px-4 py-6">
-                    <Text testID={tid("empty")} className="font-body text-[13px] text-ink-3">
+                    <Text testID={tid("empty")} className="font-body text-body text-ink-3">
                       {trimmed.length === 0
                         ? emptyHint
                         : allowFreeText

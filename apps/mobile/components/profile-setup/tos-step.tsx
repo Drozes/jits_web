@@ -73,7 +73,7 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
               return (
                 <Text
                   key={i}
-                  className="font-heading text-[14px] text-ink uppercase tracking-caps mb-3"
+                  className="font-heading text-callout text-ink uppercase tracking-caps mb-3"
                 >
                   {block.body.toUpperCase()}
                 </Text>
@@ -82,11 +82,11 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
             if (block.type === "section") {
               return (
                 <View key={i} className="mb-3">
-                  <Text className="font-heading-medium text-[13px] text-ink leading-6">
+                  <Text className="font-heading-medium text-body text-ink leading-6">
                     {block.label}
                   </Text>
                   {block.body ? (
-                    <Text className="font-body text-[13px] text-ink-2 leading-6">
+                    <Text className="font-body text-body text-ink-2 leading-6">
                       {block.body}
                     </Text>
                   ) : null}
@@ -96,7 +96,7 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
             return (
               <Text
                 key={i}
-                className="font-body text-[13px] text-ink-2 leading-6 mb-3"
+                className="font-body text-body text-ink-2 leading-6 mb-3"
               >
                 {block.body}
               </Text>
@@ -120,7 +120,7 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
         >
           {agreed ? <SelectCheck size={13} /> : null}
         </View>
-        <Text className="font-body text-[14px] text-ink flex-1">
+        <Text className="font-body text-callout text-ink flex-1">
           I agree to the End User Agreement
         </Text>
       </StatePressable>

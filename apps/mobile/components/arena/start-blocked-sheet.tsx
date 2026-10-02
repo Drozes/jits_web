@@ -39,14 +39,14 @@ export function StartBlockedSheet({
             <Text
               testID="arena-start-blocked-title"
               accessibilityRole="header"
-              className="font-heading text-[18px] uppercase text-ink"
+              className="font-heading text-title uppercase tracking-caps text-ink"
             >
               {blocked.title}
             </Text>
             <Text
               testID="arena-start-blocked-message"
               accessibilityRole="alert"
-              className="font-body text-[14px] leading-6 text-ink"
+              className="font-body text-callout leading-6 text-ink"
             >
               {blocked.message}
             </Text>

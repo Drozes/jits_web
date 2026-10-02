@@ -42,8 +42,8 @@ export function ClaimDobStep({ message, error, busy = false, onSubmit, onNotNow 
 
   return (
     <Plate className="gap-4" testID="claim-dob">
-      <Text className="font-heading text-[18px] text-ink uppercase">{DOB_REQUIRED_TITLE}</Text>
-      <Text className="font-body text-[14px] text-ink leading-6">{message}</Text>
+      <Text className="font-heading text-title text-ink uppercase tracking-caps">{DOB_REQUIRED_TITLE}</Text>
+      <Text className="font-body text-callout text-ink leading-6">{message}</Text>
       <DateOfBirthPicker
         value={value}
         onChange={(dob) => {
@@ -52,7 +52,7 @@ export function ClaimDobStep({ message, error, busy = false, onSubmit, onNotNow 
         }}
       />
       {shown && !busy ? (
-        <Text testID="claim-dob-error" accessibilityRole="alert" className="font-body text-[14px] text-negative">
+        <Text testID="claim-dob-error" accessibilityRole="alert" className="font-body text-callout text-negative">
           {shown}
         </Text>
       ) : null}

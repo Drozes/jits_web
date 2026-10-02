@@ -69,7 +69,7 @@ export function OfflineBanner() {
           className="bg-surface-2 border-b border-hairline-strong flex-row items-center justify-center gap-2 px-4 py-2"
         >
           <WifiOff size={14} color={tokens.textPrimary} />
-          <Text className="font-mono text-[11px] uppercase tracking-caps-l text-ink">
+          <Text className="font-mono tabular-nums text-caption uppercase tracking-caps-l text-ink">
             You&apos;re offline. Some features may not work.
           </Text>
         </View>

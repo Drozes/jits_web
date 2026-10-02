@@ -34,6 +34,7 @@ import {
 } from "react-native";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase/client";
+import { TRACKING, typeStep } from "@/lib/typography";
 
 type Status = "idle" | "running" | "success" | "error";
 
@@ -234,10 +235,10 @@ export default function RealtimeSmokeTestScreen() {
       contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 48 }}
     >
       <View>
-        <Text style={{ fontSize: 18, fontWeight: "700" }}>
+        <Text style={{ ...typeStep("title"), fontWeight: "700" }}>
           Realtime smoke test
         </Text>
-        <Text style={{ marginTop: 4, color: "#737373", fontSize: 12 }}>
+        <Text style={{ marginTop: 4, color: "#737373", ...typeStep("small") }}>
           Manual harness for verifying Supabase realtime on RN. Run each test;
           the status pill turns green on success.
         </Text>
@@ -273,21 +274,21 @@ export default function RealtimeSmokeTestScreen() {
           borderColor: "#e5e5e5",
         }}
       >
-        <Text style={{ fontSize: 13, fontWeight: "600" }}>AppState log</Text>
-        <Text style={{ fontSize: 11, color: "#737373", marginTop: 2 }}>
+        <Text style={{ ...typeStep("body"), fontWeight: "600" }}>AppState log</Text>
+        <Text style={{ ...typeStep("caption"), color: "#737373", marginTop: 2 }}>
           Background the app and bring it back to foreground; entries should
           appear here.
         </Text>
         <View style={{ marginTop: 8, gap: 2 }}>
           {appStateLog.length === 0 ? (
-            <Text style={{ fontSize: 11, color: "#a3a3a3" }}>
+            <Text style={{ ...typeStep("caption"), color: "#a3a3a3" }}>
               (no transitions yet)
             </Text>
           ) : (
             appStateLog.slice(-10).map((line, i) => (
               <Text
                 key={i}
-                style={{ fontSize: 11, fontFamily: "Courier", color: "#404040" }}
+                style={{ ...typeStep("caption"), fontFamily: "Courier", color: "#404040" }}
               >
                 {line}
               </Text>
@@ -339,13 +340,14 @@ function TestRow({
           justifyContent: "space-between",
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: "600" }}>{label}</Text>
+        <Text style={{ ...typeStep("callout"), fontWeight: "600" }}>{label}</Text>
         <Text
           style={{
-            fontSize: 11,
+            ...typeStep("caption"),
             fontWeight: "700",
             color: statusColor(state.status),
             textTransform: "uppercase",
+            letterSpacing: TRACKING.caps,
           }}
         >
           {state.status}
@@ -361,7 +363,7 @@ function TestRow({
           borderRadius: 6,
         }}
       >
-        <Text style={{ color: "#fff", fontWeight: "600", fontSize: 13 }}>
+        <Text style={{ color: "#fff", fontWeight: "600", ...typeStep("body") }}>
           {state.status === "idle" ? "Start" : "Restart"}
         </Text>
       </Pressable>
@@ -377,7 +379,7 @@ function TestRow({
           {state.log.slice(-8).map((line, i) => (
             <Text
               key={i}
-              style={{ fontSize: 11, fontFamily: "Courier", color: "#404040" }}
+              style={{ ...typeStep("caption"), fontFamily: "Courier", color: "#404040" }}
             >
               {line}
             </Text>

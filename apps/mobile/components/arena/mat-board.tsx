@@ -30,8 +30,7 @@ import {
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
 import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
-
-const TABULAR = { fontVariant: ["tabular-nums" as const] };
+import { TABULAR } from "@/lib/typography";
 
 /** What a countdown counts down to: a challenge's live window. */
 export interface CountdownSource {
@@ -117,14 +116,14 @@ export function MatSectionLabel({ label, right }: { label: string; right?: strin
     <View className="mb-1 flex-row items-baseline justify-between">
       <Text
         maxFontSizeMultiplier={MAX_SCALE}
-        className="font-heading text-[10px] text-ink-3 uppercase tracking-caps-xl"
+        className="font-heading text-micro text-ink-3 uppercase tracking-caps-xl"
       >
         {label}
       </Text>
       {right ? (
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-mono-bold text-[10px] text-ink-2 uppercase"
+          className="font-mono-bold text-micro text-ink-2 uppercase tracking-caps-l"
           style={TABULAR}
         >
           {right}
@@ -193,7 +192,7 @@ export function MatControlBar({
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
           className={cn(
-            "font-heading text-[10px] uppercase tracking-caps",
+            "font-heading text-micro uppercase tracking-caps",
             selected ? (live ? "text-positive" : "text-ink") : "text-ink-3",
           )}
         >
@@ -216,7 +215,7 @@ export function MatControlBar({
         testID="arena-mat-counts"
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="ml-auto shrink font-mono-bold text-[10px] text-ink-2 uppercase"
+        className="ml-auto shrink font-mono-bold text-micro text-ink-2 uppercase tracking-caps-l"
         style={TABULAR}
       >
         {counts}
@@ -259,7 +258,7 @@ function StripLine({
         numberOfLines={1}
         accessibilityLabel={headAccessibilityLabel}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="shrink font-mono-bold text-[11px] text-ink uppercase"
+        className="shrink font-mono-bold text-caption text-ink uppercase tracking-caps-l"
         style={TABULAR}
       >
         {head}
@@ -269,7 +268,7 @@ function StripLine({
         source={source}
         active={active}
         format={(c) => (c ? ` · ${c}` : null)}
-        className="font-mono-bold text-[11px] text-ink uppercase"
+        className="font-mono-bold text-caption text-ink uppercase tracking-caps-l"
       />
       {more > 0 ? (
         <Text
@@ -277,7 +276,7 @@ function StripLine({
           numberOfLines={1}
           accessibilityLabel={`plus ${more} more`}
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-mono-bold text-[11px] text-ink uppercase"
+          className="font-mono-bold text-caption text-ink uppercase tracking-caps-l"
           style={TABULAR}
         >
           {` · +${more}`}
@@ -416,7 +415,7 @@ export function OfferStrip({
       >
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-heading text-[11px] text-ink-on-cta uppercase tracking-caps"
+          className="font-heading text-caption text-ink-on-cta uppercase tracking-caps"
         >
           Go live
         </Text>
@@ -452,7 +451,7 @@ export function AwayStrip({
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="font-mono-bold text-[10px] text-ink-3 uppercase"
+        className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-l"
       >
         Not on the mat
       </Text>
@@ -473,7 +472,7 @@ export function ConfirmStrip({
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="flex-1 font-mono-bold text-[11px] text-ink uppercase"
+        className="flex-1 font-mono-bold text-caption text-ink uppercase tracking-caps-l"
         style={TABULAR}
       >
         {opponentName ? `Result to confirm · vs ${opponentName}` : "Result to confirm"}
@@ -541,7 +540,7 @@ export function ClosestMatchCard({
         {emptyText ? (
           <Text
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-mono-bold text-[11px] text-ink-3 uppercase"
+            className="font-mono-bold tabular-nums text-caption text-ink-3 uppercase tracking-caps-l"
           >
             {emptyText}
           </Text>
@@ -584,14 +583,14 @@ export function ClosestMatchCard({
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-heading text-[14px] text-ink"
+            className="font-heading text-callout text-ink"
           >
             {name}
           </Text>
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="mt-0.5 font-mono text-[11px] text-ink-2"
+            className="mt-0.5 font-mono text-caption text-ink-2"
             style={TABULAR}
           >
             {facts}
@@ -601,7 +600,7 @@ export function ClosestMatchCard({
               testID="arena-closest-stakes"
               numberOfLines={1}
               maxFontSizeMultiplier={MAX_SCALE}
-              className="mt-0.5 font-mono-bold text-[11px] text-ink-2 uppercase"
+              className="mt-0.5 font-mono-bold text-caption text-ink-2 uppercase tracking-caps-l"
               style={TABULAR}
             >
               {`Win ${formatGap(stakes.challenger_win)} · Loss ${formatGap(stakes.challenger_loss)}`}
@@ -665,7 +664,7 @@ function ClosestCtaButton({
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
         className={cn(
-          "font-heading text-[12px] uppercase tracking-caps",
+          "font-heading text-small uppercase tracking-caps",
           red ? "text-ink-on-cta" : "text-ink",
         )}
       >
@@ -746,7 +745,7 @@ export function MatRow({
             <Text
               numberOfLines={1}
               maxFontSizeMultiplier={MAX_SCALE}
-              className="shrink font-heading text-[13px] text-ink"
+              className="shrink font-heading text-body text-ink"
             >
               {displayName}
             </Text>
@@ -754,7 +753,7 @@ export function MatRow({
               <Text
                 testID={`arena-friend-badge-${competitor.id}`}
                 maxFontSizeMultiplier={MAX_SCALE}
-                className="rounded-xs border border-hairline-strong px-1 font-heading text-[9px] uppercase tracking-caps-l text-ink-2"
+                className="rounded-xs border border-hairline-strong px-1 font-heading text-micro uppercase tracking-caps-l text-ink-2"
               >
                 Friend
               </Text>
@@ -763,7 +762,7 @@ export function MatRow({
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="mt-0.5 font-mono text-[11px] text-ink-2"
+            className="mt-0.5 font-mono text-caption text-ink-2"
             style={TABULAR}
           >
             {`${currentElo} · `}
@@ -771,7 +770,7 @@ export function MatRow({
               testID={`arena-mat-gap-${competitor.id}`}
               // Data, not state: never red (spec 3, "Red never decorates
               // data"), nor green (green means live). Ink, like the mockup.
-              className="font-mono-bold text-ink-2"
+              className="font-mono-bold tabular-nums text-ink-2"
             >
               {formatGap(eloDiff)}
             </Text>
@@ -785,7 +784,7 @@ export function MatRow({
           <Text
             testID={`arena-close-band-${competitor.id}`}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-mono-bold text-[11px] text-ink-2"
+            className="font-mono-bold text-caption text-ink-2"
             style={TABULAR}
             // Already part of the row's label.
             accessibilityElementsHidden
@@ -820,7 +819,7 @@ export function MatRow({
             source={action.source}
             active={action.active}
             format={(c) => (c ? `Sent ${c}` : "Sent")}
-            className="font-mono-bold text-[11px] text-ink-3 uppercase"
+            className="font-mono-bold text-caption text-ink-3 uppercase tracking-caps-l"
           />
         ) : null}
         {action.kind === "pending" ? <MetaTag>Pending</MetaTag> : null}
@@ -829,7 +828,7 @@ export function MatRow({
           <Text
             testID={`arena-not-on-mat-${competitor.id}`}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-heading text-[9px] uppercase tracking-caps-l text-ink-3"
+            className="font-heading text-micro uppercase tracking-caps-l text-ink-3"
           >
             Not on your mat
           </Text>

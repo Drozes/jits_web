@@ -117,7 +117,7 @@ export function OnAirStrip({ isLive }: { isLive: boolean }) {
         />
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-mono-bold text-[10px] text-positive uppercase tracking-caps-xl"
+          className="font-mono-bold tabular-nums text-micro text-positive uppercase tracking-caps-xl"
         >
           On air
         </Text>

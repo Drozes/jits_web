@@ -3,6 +3,7 @@ import { View, Text } from "react-native";
 import { cn } from "@/lib/cn";
 import { useAmber } from "@/components/match-detail/use-amber";
 import { haptics } from "@/lib/motion";
+import { TRACKING, TYPE_SCALE, numeralTracking, type DisplayStep } from "@/lib/typography";
 import { RollingNumber, usePlayOnce } from "./rolling-number";
 
 type EloTileSize = "hero" | "large" | "medium" | "small";
@@ -10,11 +11,19 @@ type EloTileSize = "hero" | "large" | "medium" | "small";
 /** Border tone for the after tile: gain, loss or draw. Never Signal Red CTA. */
 export type EloTileTone = "positive" | "negative" | "amber";
 
+const SIZE_STEP: Record<EloTileSize, DisplayStep> = {
+  hero: "display-96",
+  large: "display-64",
+  medium: "display-44",
+  small: "display-36",
+};
+
+/** The tile number size in px, from its display step. */
 const SIZE_PX: Record<EloTileSize, number> = {
-  hero: 96,
-  large: 64,
-  medium: 44,
-  small: 36,
+  hero: TYPE_SCALE[SIZE_STEP.hero].fontSize,
+  large: TYPE_SCALE[SIZE_STEP.large].fontSize,
+  medium: TYPE_SCALE[SIZE_STEP.medium].fontSize,
+  small: TYPE_SCALE[SIZE_STEP.small].fontSize,
 };
 
 interface EloTileProps {
@@ -78,7 +87,7 @@ function numberStyle(size: EloTileSize) {
     // RN crops/centers the glyph tightly when lineHeight == fontSize; give
     // ~10% breathing room so the hero number isn't vertically clipped.
     lineHeight: px * 1.1,
-    letterSpacing: -px * 0.04,
+    letterSpacing: numeralTracking(px),
     fontVariant: ["tabular-nums" as const],
   };
 }
@@ -86,7 +95,7 @@ function numberStyle(size: EloTileSize) {
 /** The meta line's box: 18 line height plus 4 above and 4 below. */
 const META_STYLE = {
   lineHeight: 18,
-  letterSpacing: 1.12,
+  letterSpacing: TRACKING.caps,
   marginTop: 4,
   marginBottom: 4,
   fontVariant: ["tabular-nums" as const],
@@ -121,7 +130,7 @@ function SingleTile({
     >
       {hasLabel ? (
         <Text
-          className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl"
+          className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl"
           numberOfLines={compact ? 1 : undefined}
         >
           {label}
@@ -142,7 +151,7 @@ function SingleTile({
             // RN crops/centers the glyph tightly when lineHeight == fontSize; give
             // ~10% breathing room so the hero number isn't vertically clipped.
             lineHeight: SIZE_PX[size] * 1.1,
-            letterSpacing: -SIZE_PX[size] * 0.04,
+            letterSpacing: numeralTracking(SIZE_PX[size]),
             marginTop: hasLabel ? 8 : 0,
             fontVariant: ["tabular-nums"],
           }}
@@ -155,7 +164,7 @@ function SingleTile({
           testID="elo-tile-meta"
           accessibilityLabel={metaLabel}
           // P-Home draws the record in #9CA3AF, which is ink-2 (textSecondary).
-          className="font-mono-bold text-[14px] text-ink-2 uppercase"
+          className="font-mono-bold tabular-nums text-callout text-ink-2 uppercase"
           style={META_STYLE}
         >
           {meta}
@@ -236,7 +245,7 @@ function BeforeAfter({
   return (
     <View className={cn("flex-row items-center gap-3 self-stretch", className)}>
       <SingleTile label={label} value={before} size={size} compact />
-      <Text className="font-mono text-ink-3 text-[28px]">→</Text>
+      <Text className="font-mono tabular-nums text-ink-3 text-headline-xl">→</Text>
       {tone === "amber" ? <AmberAfterTile {...afterProps} /> : <SingleTile {...afterProps} />}
     </View>
   );

@@ -59,11 +59,11 @@ function AdminRow({ href, label }: { href: AdminRoute; label: string }) {
         accessibilityRole="link"
         className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
       >
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           {label}
         </Text>
         <Text
-          className="font-mono text-[14px] text-ink-3"
+          className="font-mono tabular-nums text-callout text-ink-3"
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >

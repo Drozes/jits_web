@@ -14,7 +14,7 @@ describe("Badge", () => {
   it.each(variants)("renders the %s variant on ELO tokens only", (variant) => {
     const { getByText } = render(<Badge testID="b" variant={variant}>Label</Badge>);
     const text = getByText("Label");
-    expect(String(text.props.className)).toMatch(/font-mono.*text-\[10px\].*uppercase.*tracking-caps-l/);
+    expect(String(text.props.className)).toMatch(/font-mono.*text-micro.*uppercase.*tracking-caps-l/);
     expect(String(text.props.className)).not.toMatch(LEGACY);
   });
 

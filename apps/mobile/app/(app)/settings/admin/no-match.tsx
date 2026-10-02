@@ -28,7 +28,7 @@ export default function AdminNoMatchVideosScreen() {
     <>
       <AppHeader title="No-match videos" back />
       <PageContainer noTabBar contentContainerStyle={{ paddingTop: 24, gap: 12 }}>
-        <Text className="font-body text-[12px] text-ink-3 px-1">
+        <Text className="font-body text-small text-ink-3 px-1">
           Videos from the last 30 days where the analysis found no match. A signal only: nothing is changed
           automatically.
         </Text>
@@ -38,7 +38,7 @@ export default function AdminNoMatchVideosScreen() {
           </View>
         ) : error ? (
           <Plate variant="loss" className="gap-3">
-            <Text testID="no-match-error" className="font-body text-[13px] text-ink leading-relaxed">
+            <Text testID="no-match-error" className="font-body text-body text-ink leading-relaxed">
               {error}
             </Text>
             <Button variant="secondary" label="Retry" height={36} className="self-start" onPress={reload} />
@@ -47,7 +47,7 @@ export default function AdminNoMatchVideosScreen() {
           <>
             {rows.length === 0 ? (
               <Plate>
-                <Text testID="no-match-empty" className="font-body text-[13px] text-ink-2">
+                <Text testID="no-match-empty" className="font-body text-body text-ink-2">
                   No no-match videos in this window.
                 </Text>
               </Plate>

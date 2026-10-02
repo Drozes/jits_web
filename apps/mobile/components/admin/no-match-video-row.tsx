@@ -9,13 +9,13 @@ function ParticipantLine({ p }: { p: NoMatchVideoParticipant }) {
   const delta = p.elo_delta;
   return (
     <View className="flex-row items-center justify-between">
-      <Text numberOfLines={1} className="font-body text-[13px] text-ink-2 flex-1 pr-3">
+      <Text numberOfLines={1} className="font-body text-body text-ink-2 flex-1 pr-3">
         {`${p.display_name ?? "Unknown"}${p.outcome ? ` · ${p.outcome}` : ""}`}
       </Text>
       {delta != null ? (
         <DeltaNumber value={delta} size="s" showSign />
       ) : (
-        <Text className="font-mono text-[12px] text-ink-3">NO CHANGE</Text>
+        <Text className="font-mono tabular-nums text-small text-ink-3">NO CHANGE</Text>
       )}
     </View>
   );
@@ -52,18 +52,18 @@ function VerdictHistory({ row }: { row: NoMatchVideoRow }) {
     <View className="flex-row flex-wrap items-center gap-2">
       {row.superseded ? (
         <View testID="no-match-superseded" className="rounded-sm px-2 py-0.5" style={{ borderWidth: 1, borderColor: p.amberRule }}>
-          <Text className="font-mono text-[10px] uppercase tracking-caps-l" style={{ color: p.amber }}>
+          <Text className="font-mono tabular-nums text-micro uppercase tracking-caps-l" style={{ color: p.amber }}>
             {row.video_id ? "Re-uploaded since" : "Video deleted since"}
           </Text>
         </View>
       ) : null}
       {now ? (
-        <Text testID="no-match-now" className="font-mono text-[11px] text-ink-2">
+        <Text testID="no-match-now" className="font-mono tabular-nums text-caption text-ink-2">
           {now}
         </Text>
       ) : null}
       {counts ? (
-        <Text testID="no-match-counts" className="font-mono tabular-nums text-[11px] text-ink-2">
+        <Text testID="no-match-counts" className="font-mono tabular-nums text-caption text-ink-2">
           {counts}
         </Text>
       ) : null}
@@ -82,14 +82,14 @@ export function NoMatchVideoRowCard({ row }: { row: NoMatchVideoRow }) {
   return (
     <Plate testID={`no-match-row-${row.key}`} className="gap-2">
       <View className="flex-row items-center justify-between">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           {matchLine || "match"}
         </Text>
         {when ? (
-          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">{formatRelativeDate(when)}</Text>
+          <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">{formatRelativeDate(when)}</Text>
         ) : null}
       </View>
-      <Text numberOfLines={1} className="font-heading text-[14px] text-ink">
+      <Text numberOfLines={1} className="font-heading text-callout text-ink">
         {`Uploaded by ${row.uploader_name ?? "unknown"}`}
       </Text>
       <VerdictHistory row={row} />
@@ -97,9 +97,9 @@ export function NoMatchVideoRowCard({ row }: { row: NoMatchVideoRow }) {
         <ParticipantLine key={p.athlete_id} p={p} />
       ))}
       {row.no_match_reason ? (
-        <Text className="font-body text-[13px] text-ink-2 leading-relaxed">{row.no_match_reason}</Text>
+        <Text className="font-body text-body text-ink-2 leading-relaxed">{row.no_match_reason}</Text>
       ) : null}
-      <Text selectable numberOfLines={1} className="font-mono text-[10px] text-ink-3">
+      <Text selectable numberOfLines={1} className="font-mono tabular-nums text-micro text-ink-3">
         {`video ${row.video_id ?? "deleted"} · match ${row.match_id}${row.video_status ? ` · ${row.video_status}` : ""}`}
       </Text>
     </Plate>

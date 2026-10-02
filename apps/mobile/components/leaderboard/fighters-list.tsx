@@ -104,13 +104,13 @@ export function FightersList({
         }}
         ListEmptyComponent={
           <View className="rounded-md border border-dashed border-hairline p-8 items-center mx-1">
-            <Text className="font-body text-[13px] text-ink-3">
+            <Text className="font-body text-body text-ink-3">
               No athletes found
             </Text>
           </View>
         }
         ListFooterComponent={
-          <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l pt-3">
+          <Text className="text-center font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l pt-3">
             Rankings based on current ELO
           </Text>
         }

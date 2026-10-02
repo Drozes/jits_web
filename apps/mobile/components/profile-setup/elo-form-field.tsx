@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Text, TextInput, View, type TextInputProps } from "react-native";
 import { cn } from "@/lib/cn";
+import { typeSize } from "@/lib/typography";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 
 /**
@@ -48,15 +49,15 @@ export function EloField({ label, helper, error, children }: EloFieldProps) {
         accessible={labelHidden ? false : undefined}
         importantForAccessibility={labelHidden ? "no-hide-descendants" : undefined}
         accessibilityElementsHidden={labelHidden ? true : undefined}
-        className="font-heading text-[10px] text-ink-3 uppercase tracking-caps-xl"
+        className="font-heading text-micro text-ink-3 uppercase tracking-caps-xl"
       >
         {label}
       </Text>
       <EloFieldLabelContext.Provider value={field}>{children}</EloFieldLabelContext.Provider>
       {error ? (
-        <Text className="font-body text-[12px] text-negative">{error}</Text>
+        <Text className="font-body text-small text-negative">{error}</Text>
       ) : helper ? (
-        <Text className="font-body text-[12px] text-ink-3">{helper}</Text>
+        <Text className="font-body text-small text-ink-3">{helper}</Text>
       ) : null}
     </View>
   );
@@ -71,7 +72,7 @@ type EloTextInputProps = TextInputProps & {
 };
 
 export const EloTextInput = React.forwardRef<TextInput, EloTextInputProps>(
-  ({ className, hasError, onFocus, onBlur, accessibilityLabel, ...rest }, ref) => {
+  ({ className, hasError, onFocus, onBlur, accessibilityLabel, style, ...rest }, ref) => {
     const tokens = useThemedTokens();
     const field = React.useContext(EloFieldLabelContext);
     const usesFieldLabel = field !== undefined && accessibilityLabel === undefined;
@@ -92,7 +93,7 @@ export const EloTextInput = React.forwardRef<TextInput, EloTextInputProps>(
           onBlur?.(e);
         }}
         className={cn(
-          "bg-surface-3 border rounded-xs px-4 py-3 text-[14px] font-body text-ink",
+          "bg-surface-3 border rounded-xs px-4 py-3 font-body text-ink",
           hasError
             ? "border-negative"
             : focused
@@ -100,6 +101,7 @@ export const EloTextInput = React.forwardRef<TextInput, EloTextInputProps>(
               : "border-hairline-strong",
           className,
         )}
+        style={[typeSize("callout"), style]}
         {...rest}
       />
     );

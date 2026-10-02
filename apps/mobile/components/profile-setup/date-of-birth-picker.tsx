@@ -121,7 +121,7 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
       <StatePressable dim onPress={open} accessibilityRole="button">
         <View className="bg-surface-3 border border-hairline-strong rounded-xs h-12 px-4 flex-row items-center">
           <Text
-            className={`text-[14px] font-body flex-1 ${formatted ? "text-ink" : "text-ink-3"}`}
+            className={`text-callout font-body flex-1 ${formatted ? "text-ink" : "text-ink-3"}`}
             numberOfLines={1}
           >
             {formatted ?? "Select your date of birth"}
@@ -171,7 +171,7 @@ export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
                 }}
               >
                 <PressableScale onPress={confirmIos} hitSlop={8} accessibilityRole="button">
-                  <Text className="font-heading text-[14px] text-cta uppercase tracking-caps-l">
+                  <Text className="font-heading text-callout text-cta uppercase tracking-caps-l">
                     Done
                   </Text>
                 </PressableScale>

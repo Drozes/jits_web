@@ -33,7 +33,7 @@ const badgeVariants = cva(
   },
 );
 
-const badgeTextVariants = cva("font-mono text-[10px] uppercase tracking-caps-l", {
+const badgeTextVariants = cva("font-mono text-micro uppercase tracking-caps-l", {
   variants: {
     variant: {
       default: "text-ink",

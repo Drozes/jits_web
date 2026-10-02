@@ -28,7 +28,7 @@ export default function AdminRepeatDisputersScreen() {
     <>
       <AppHeader title="Repeat disputers" back />
       <PageContainer noTabBar contentContainerStyle={{ paddingTop: 24, gap: 12 }}>
-        <Text className="font-body text-[12px] text-ink-3 px-1">
+        <Text className="font-body text-small text-ink-3 px-1">
           Athletes with 3 or more disputes resolved against them in the last 30 days. A signal only: nothing is
           changed automatically.
         </Text>
@@ -38,7 +38,7 @@ export default function AdminRepeatDisputersScreen() {
           </View>
         ) : error ? (
           <Plate variant="loss" className="gap-3">
-            <Text testID="disputers-error" className="font-body text-[13px] text-ink leading-relaxed">
+            <Text testID="disputers-error" className="font-body text-body text-ink leading-relaxed">
               {error}
             </Text>
             <Button variant="secondary" label="Retry" height={36} className="self-start" onPress={reload} />
@@ -47,7 +47,7 @@ export default function AdminRepeatDisputersScreen() {
           <>
             {rows.length === 0 ? (
               <Plate>
-                <Text testID="disputers-empty" className="font-body text-[13px] text-ink-2">
+                <Text testID="disputers-empty" className="font-body text-body text-ink-2">
                   No repeat disputers in the last 30 days.
                 </Text>
               </Plate>

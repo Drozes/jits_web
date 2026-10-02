@@ -92,7 +92,7 @@ export default function InviteScreen() {
 
         {phase.kind === "error" ? (
           <Plate className="gap-4" testID="invite-error">
-            <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+            <Text accessibilityRole="alert" className="font-body text-callout text-ink leading-6">
               {phase.message}
             </Text>
             {phase.hint === "too_many_open_invites" ? (
@@ -108,29 +108,29 @@ export default function InviteScreen() {
 
         {invite && (phase.kind === "open" || phase.kind === "claimed") ? (
           <>
-            <Text className="font-body text-[14px] text-ink-2 text-center leading-6">
+            <Text className="font-body text-callout text-ink-2 text-center leading-6">
               Have them scan this with their phone camera, or type the code in ELO RATED.
             </Text>
             <View className="items-center">
               <InviteQr value={invite.url} />
             </View>
             <View className="items-center gap-1">
-              <Text className="font-mono text-[11px] uppercase tracking-caps-l text-ink-3">Code</Text>
+              <Text className="font-mono tabular-nums text-caption uppercase tracking-caps-l text-ink-3">Code</Text>
               <Text
                 testID="invite-code"
                 accessibilityLabel={`Code ${invite.short_code.split("").join(" ")}`}
-                className={`font-mono text-[40px] tabular-nums tracking-[4px] ${codeStale ? "text-ink-3" : "text-ink"}`}
+                className={`font-mono text-display-40 tabular-nums tracking-code ${codeStale ? "text-ink-3" : "text-ink"}`}
               >
                 {invite.short_code_display}
               </Text>
               {codeStale ? (
-                <Text testID="invite-code-stale" className="font-body text-[12px] text-ink-3 text-center">
+                <Text testID="invite-code-stale" className="font-body text-small text-ink-3 text-center">
                   This code expired. Getting a new one... The QR and link still work.
                 </Text>
               ) : null}
             </View>
             <View className="items-center py-2" accessibilityLiveRegion="polite">
-              <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
+              <Text className="font-heading text-callout text-ink uppercase tracking-caps-l">
                 {phase.kind === "claimed"
                   ? phase.claimerName
                     ? `Waiting for ${phase.claimerName}...`
@@ -140,7 +140,7 @@ export default function InviteScreen() {
             </View>
             {locationDenied ? (
               <View className="gap-2">
-                <Text className="font-body text-[13px] text-ink-2 leading-5">{LOCATION_DENIED_COPY}</Text>
+                <Text className="font-body text-body text-ink-2 leading-5">{LOCATION_DENIED_COPY}</Text>
                 <Button variant="secondary" label="Open Settings" onPress={() => void Linking.openSettings()} />
               </View>
             ) : null}
@@ -163,14 +163,14 @@ export default function InviteScreen() {
 
         {phase.kind === "booked" ? (
           <Plate className="gap-4" testID="invite-booked">
-            <Text className="font-heading text-[18px] text-ink uppercase">
+            <Text className="font-heading text-title text-ink uppercase tracking-caps">
               {phase.opponentName ? `You're booked: ${me} vs ${phase.opponentName}` : "You're booked"}
             </Text>
-            <Text className="font-body text-[14px] text-ink leading-6">
+            <Text className="font-body text-callout text-ink leading-6">
               {showStart ? START_AVAILABLE_COPY : BOOKED_COPY}
             </Text>
             {showStart && phase.startError ? (
-              <Text testID="invite-start-error" accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+              <Text testID="invite-start-error" accessibilityRole="alert" className="font-body text-callout text-ink leading-6">
                 {phase.startError}
               </Text>
             ) : null}
@@ -189,7 +189,7 @@ export default function InviteScreen() {
 
         {phase.kind === "closed" ? (
           <Plate className="gap-4" testID="invite-booking-closed">
-            <Text accessibilityRole="alert" className="font-body text-[14px] text-ink leading-6">
+            <Text accessibilityRole="alert" className="font-body text-callout text-ink leading-6">
               {BOOKING_CLOSED_COPY}
             </Text>
             <Button label="Go to the Arena" onPress={() => router.replace(ARENA_HREF as Href)} />
@@ -198,8 +198,8 @@ export default function InviteScreen() {
 
         {phase.kind === "started" && isInArenaMatch() ? (
           <Plate className="gap-4" testID="invite-started">
-            <Text className="font-heading text-[18px] text-ink uppercase">Your match is ready</Text>
-            <Text className="font-body text-[14px] text-ink leading-6">
+            <Text className="font-heading text-title text-ink uppercase tracking-caps">Your match is ready</Text>
+            <Text className="font-body text-callout text-ink leading-6">
               Finish your current match, then start this one.
             </Text>
             <Button label="Go to the match" onPress={() => router.replace(arenaMatchHref(phase.matchId) as Href)} />
@@ -208,7 +208,7 @@ export default function InviteScreen() {
 
         {phase.kind === "revoked" || phase.kind === "expired" ? (
           <Plate className="gap-4">
-            <Text className="font-body text-[14px] text-ink leading-6">
+            <Text className="font-body text-callout text-ink leading-6">
               {phase.kind === "revoked" ? "Challenge withdrawn." : "This challenge expired."}
             </Text>
             <Button label="New challenge" onPress={() => void retry()} />

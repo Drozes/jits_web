@@ -116,7 +116,7 @@ function GenderChip({
       {active ? <SelectCheck size={12} /> : null}
       <Text
         className={cn(
-          "font-heading text-[12px] uppercase tracking-caps-l",
+          "font-heading text-small uppercase tracking-caps-l",
           active ? "text-ink" : "text-ink-2",
         )}
       >

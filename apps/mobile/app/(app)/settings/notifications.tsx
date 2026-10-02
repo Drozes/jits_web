@@ -121,7 +121,7 @@ export default function NotificationsScreen() {
           </View>
         )}
 
-        <Text className="font-body text-[12px] text-ink-3 leading-relaxed">
+        <Text className="font-body text-small text-ink-3 leading-relaxed">
           Changes are saved automatically. You can also manage notifications
           through your device settings.
         </Text>
@@ -151,10 +151,10 @@ function ToggleRow({
       className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-4"
     >
       <View className="flex-1 min-w-0">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l mb-1">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l mb-1">
           {label}
         </Text>
-        <Text className="font-body text-[12px] text-ink-3 leading-snug">
+        <Text className="font-body text-small text-ink-3 leading-snug">
           {description}
         </Text>
       </View>

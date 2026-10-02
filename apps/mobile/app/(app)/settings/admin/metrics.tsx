@@ -33,7 +33,7 @@ export default function AdminMetricsScreen() {
           </View>
         ) : error ? (
           <Plate variant="loss" className="gap-3">
-            <Text className="font-body text-[13px] text-ink leading-relaxed">
+            <Text className="font-body text-body text-ink leading-relaxed">
               {error}
             </Text>
             <Button variant="secondary" label="Retry" height={36} className="self-start" onPress={reload} />
@@ -79,7 +79,7 @@ function MetricGroup({
 }) {
   return (
     <View className="gap-2">
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l px-1">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l px-1">
         {heading}
       </Text>
       <Plate className="p-0 overflow-hidden">
@@ -87,10 +87,10 @@ function MetricGroup({
           <View key={r.label}>
             {idx > 0 ? <View className="h-px bg-hairline-faint" /> : null}
             <View className="flex-row items-center justify-between px-4 py-3">
-              <Text className="font-body text-[13px] text-ink-2">{r.label}</Text>
+              <Text className="font-body text-body text-ink-2">{r.label}</Text>
               {/* Default a missing/null key to 0 so a malformed RPC payload
                   renders 0, not a blank value. */}
-              <Text className="font-mono tabular-nums text-[16px] text-ink">
+              <Text className="font-mono tabular-nums text-subhead text-ink">
                 {r.value ?? 0}
               </Text>
             </View>

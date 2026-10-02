@@ -181,10 +181,10 @@ export default function ProfileStatsScreen() {
           ) : (
             <View className="py-12 items-center gap-2">
               <Swords size={28} color={tokens.textTertiary} />
-              <Text className="font-heading text-[14px] text-ink uppercase tracking-caps">
+              <Text className="font-heading text-callout text-ink uppercase tracking-caps">
                 {timeWindow === "all" ? "No matches yet" : "No matches in this window"}
               </Text>
-              <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+              <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
                 {timeWindow === "all" ? "Complete a match to see your history" : "Pick a longer window to see more"}
               </Text>
             </View>
@@ -214,12 +214,11 @@ interface StatTileProps {
 function StatTile({ label, value, valueClassName }: StatTileProps) {
   return (
     <View className="flex-1 bg-surface-3 border border-hairline rounded-md px-3 py-3 items-center">
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
         {label}
       </Text>
       <Text
-        className={`font-mono-bold tabular-nums mt-1 ${valueClassName ?? "text-ink"}`}
-        style={{ fontSize: 22, lineHeight: 26 }}
+        className={`font-mono-bold tabular-nums text-title-xl mt-1 ${valueClassName ?? "text-ink"}`}
       >
         {value}
       </Text>
@@ -317,11 +316,11 @@ function StatsHeader({
       >
         <MetaTag>Record</MetaTag>
         <View className="flex-row items-center gap-2">
-          <Text className="font-mono-bold text-[11px] text-ink tabular-nums">{wins}W</Text>
-          <Text className="font-mono text-[11px] text-ink-3">·</Text>
-          <Text className="font-mono-bold text-[11px] text-negative tabular-nums">{losses}L</Text>
-          <Text className="font-mono text-[11px] text-ink-3">·</Text>
-          <Text className="font-mono text-[11px] text-ink-3 tabular-nums">{draws}D</Text>
+          <Text className="font-mono-bold text-caption text-ink tabular-nums">{wins}W</Text>
+          <Text className="font-mono tabular-nums text-caption text-ink-3">·</Text>
+          <Text className="font-mono-bold text-caption text-negative tabular-nums">{losses}L</Text>
+          <Text className="font-mono tabular-nums text-caption text-ink-3">·</Text>
+          <Text className="font-mono text-caption text-ink-3 tabular-nums">{draws}D</Text>
         </View>
       </View>
 

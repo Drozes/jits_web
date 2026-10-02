@@ -43,7 +43,7 @@ export default function AdminFlagsScreen() {
           </View>
         ) : flags.length === 0 ? (
           <Plate>
-            <Text className="font-body text-[13px] text-ink-3 leading-relaxed">
+            <Text className="font-body text-body text-ink-3 leading-relaxed">
               No feature flags defined.
             </Text>
           </Plate>
@@ -89,9 +89,9 @@ function FlagRow({
       className="flex-row items-center gap-3 px-4 py-3 active:bg-surface-4"
     >
       <View className="flex-1 min-w-0">
-        <Text className="font-mono text-[11px] text-ink mb-1">{flagKey}</Text>
+        <Text className="font-mono tabular-nums text-caption text-ink mb-1">{flagKey}</Text>
         {description ? (
-          <Text className="font-body text-[12px] text-ink-3 leading-snug">
+          <Text className="font-body text-small text-ink-3 leading-snug">
             {description}
           </Text>
         ) : null}
@@ -138,8 +138,8 @@ function ShareDiagnosticsRow() {
   }, []);
   return (
     <Plate>
-      <Text className="font-mono text-[11px] text-ink mb-1">Highlight share diagnostics</Text>
-      <Text testID="share-diagnostics" className="font-body text-[12px] text-ink-3 leading-snug">
+      <Text className="font-mono tabular-nums text-caption text-ink mb-1">Highlight share diagnostics</Text>
+      <Text testID="share-diagnostics" className="font-body text-small text-ink-3 leading-snug">
         {caps ? formatShareDiagnostics(caps) : "Checking…"}
       </Text>
     </Plate>

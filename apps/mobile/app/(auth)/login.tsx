@@ -87,7 +87,7 @@ export default function LoginScreen() {
         >
           <View className="items-center gap-3">
             <Wordmark size="hero" />
-            <Text className="font-mono text-[11px] text-ink-3 uppercase tracking-caps-xl">
+            <Text className="font-mono tabular-nums text-caption text-ink-3 uppercase tracking-caps-xl">
               What&apos;s your number?
             </Text>
           </View>
@@ -145,7 +145,7 @@ export default function LoginScreen() {
               accessibilityRole="button"
               className="active:opacity-70"
             >
-              <Text className="text-center font-mono text-[11px] text-ink-2 uppercase tracking-caps-l">
+              <Text className="text-center font-mono tabular-nums text-caption text-ink-2 uppercase tracking-caps-l">
                 Don&apos;t have an account?{" "}
                 <Text className="text-cta">Register</Text>
               </Text>

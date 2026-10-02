@@ -71,22 +71,22 @@ export function CompetitorRow({
         photoUrl={competitor.profilePhotoUrl ?? null}
       />
       <View className="flex-1">
-        <Text numberOfLines={1} className="font-heading text-[14px] text-ink">
+        <Text numberOfLines={1} className="font-heading text-callout text-ink">
           {displayName}
         </Text>
         <Text
-          className="mt-0.5 font-mono-bold text-[12px] text-ink"
+          className="mt-0.5 font-mono-bold text-small text-ink"
           style={{ fontVariant: ["tabular-nums"] }}
         >
           {rating}
           {ratingLabel == null && eloDiff !== 0 ? (
-            <Text className="font-mono text-[12px] text-ink-2">
+            <Text className="font-mono tabular-nums text-small text-ink-2">
               {`  ${gap} vs you`}
             </Text>
           ) : null}
         </Text>
         {meta ? (
-          <Text numberOfLines={1} className="mt-0.5 font-body text-[11px] text-ink-2">
+          <Text numberOfLines={1} className="mt-0.5 font-body text-caption text-ink-2">
             {meta}
           </Text>
         ) : null}
@@ -127,7 +127,7 @@ export function CompetitorRow({
               className="min-h-[44px] justify-center rounded-sm border border-hairline-strong px-3 active:bg-surface-4"
               style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
             >
-              <Text className="font-heading text-[11px] text-ink uppercase tracking-caps">
+              <Text className="font-heading text-caption text-ink uppercase tracking-caps">
                 Challenge
               </Text>
             </PressableScale>
@@ -143,7 +143,7 @@ export function CompetitorRow({
               className="min-h-[44px] justify-center rounded-sm border border-cta px-3 active:bg-surface-4"
               style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
             >
-              <Text className="font-heading text-[11px] text-cta uppercase tracking-caps">
+              <Text className="font-heading text-caption text-cta uppercase tracking-caps">
                 Go live
               </Text>
             </PressableScale>

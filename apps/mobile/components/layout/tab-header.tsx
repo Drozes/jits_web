@@ -54,7 +54,7 @@ export function TabHeader({ title, onArena = false }: TabHeaderProps) {
         accessibilityRole="header"
         numberOfLines={1}
         maxFontSizeMultiplier={1.3}
-        className="font-heading text-[12px] text-ink-2 uppercase tracking-caps-l"
+        className="font-heading text-small text-ink-2 uppercase tracking-caps-l"
         style={{ flexShrink: 0 }}
       >
         {title}

@@ -86,14 +86,14 @@ export default function SettingsHelpScreen() {
 function HelpPlate({ section }: { section: HelpSection }) {
   return (
     <Plate>
-      <Text className="font-heading text-[16px] text-ink uppercase tracking-caps mb-3">
+      <Text className="font-heading text-subhead text-ink uppercase tracking-caps mb-3">
         {section.title}
       </Text>
       <View className="gap-3">
         {section.paragraphs.map((paragraph, index) => (
           <Text
             key={index}
-            className="font-body text-[12px] text-ink-2 leading-relaxed"
+            className="font-body text-small text-ink-2 leading-relaxed"
           >
             {paragraph}
           </Text>

@@ -65,6 +65,7 @@ import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdo
 import type { EloStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
+import { TABULAR, TYPE_SCALE, typeStep } from "@/lib/typography";
 import { InitialsBlock, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { PressableScale } from "@/components/ui/pressable-scale";
@@ -478,7 +479,7 @@ export function ChallengePromptSheet({
                     numberOfLines={2}
                     maxFontSizeMultiplier={MAX_FONT_SCALE}
                     className="font-body"
-                    style={{ fontSize: 13, color: p.text2 }}
+                    style={[typeStep("body"), { color: p.text2 }]}
                   >
                     Accept and you both drop straight into the match.
                   </Text>
@@ -490,7 +491,7 @@ export function ChallengePromptSheet({
                     numberOfLines={1}
                     maxFontSizeMultiplier={MAX_FONT_SCALE}
                     className="font-body"
-                    style={{ fontSize: 13, color: p.text }}
+                    style={[typeStep("body"), { color: p.text }]}
                   >
                     {`+${shown.moreCount} more`}
                   </Text>
@@ -568,7 +569,7 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
       <InitialsBlock
         name={challenge.challengerName}
         size={88}
-        fontSize={30}
+        fontSize={TYPE_SCALE["headline-2xl"].fontSize}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
       />
       <View style={{ flex: 1, gap: 8, minWidth: 0 }}>
@@ -577,7 +578,7 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
           numberOfLines={1}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           className="font-display"
-          style={{ fontSize: 44, lineHeight: 42, color: p.text }}
+          style={[typeStep("display-44"), { lineHeight: 42, color: p.text }]}
         >
           {shortName(challenge.challengerName)}
         </Text>
@@ -587,7 +588,7 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             className="font-mono"
-            style={{ fontSize: 13, color: p.text2, fontVariant: ["tabular-nums"] }}
+            style={[typeStep("body"), { color: p.text2 }, TABULAR]}
           >
             {meta}
           </Text>
@@ -597,7 +598,7 @@ function PromptChallenger({ challenge }: { challenge: IncomingChallenge }) {
           numberOfLines={1}
           maxFontSizeMultiplier={MAX_FONT_SCALE}
           className="font-body"
-          style={{ fontSize: 13, color: p.text2 }}
+          style={[typeStep("body"), { color: p.text2 }]}
         >
           {`${shortName(challenge.challengerName)} is live in the Arena`}
         </Text>
@@ -652,8 +653,8 @@ function PromptActions({
             testID="challenge-prompt-decline-text"
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            className="font-heading uppercase"
-            style={{ fontSize: 14, letterSpacing: 1.12, color: p.text }}
+            className="font-heading uppercase tracking-caps"
+            style={[typeStep("callout"), { color: p.text }]}
           >
             Decline
           </Text>
@@ -691,8 +692,8 @@ function PromptActions({
             testID="challenge-prompt-accept-text"
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
-            className="font-heading uppercase"
-            style={{ fontSize: 14, letterSpacing: 1.12, color: p.onCta }}
+            className="font-heading uppercase tracking-caps"
+            style={[typeStep("callout"), { color: p.onCta }]}
           >
             {accepted ? "Accepted" : "Accept"}
           </Text>
@@ -718,11 +719,13 @@ function PromptActions({
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_FONT_SCALE}
             className="font-heading"
-            style={{
-              fontSize: 14,
-              color: p.text2,
-              textDecorationLine: "underline",
-            }}
+            style={[
+              typeStep("callout"),
+              {
+                color: p.text2,
+                textDecorationLine: "underline",
+              },
+            ]}
           >
             Later
           </Text>

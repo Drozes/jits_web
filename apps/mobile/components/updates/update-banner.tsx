@@ -62,7 +62,7 @@ export function UpdateBanner({
           <Text
             accessibilityElementsHidden
             importantForAccessibility="no"
-            className="font-body text-base text-ink-2 flex-1"
+            className="font-body text-callout text-ink-2 flex-1"
             numberOfLines={2}
           >
             {UPDATE_BANNER_BODY}

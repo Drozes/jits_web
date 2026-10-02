@@ -21,15 +21,14 @@ function StatTile({
 }) {
   return (
     <View className="flex-1 bg-surface-3 border border-hairline rounded-md px-4 py-4 items-center">
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
         {label}
       </Text>
       <Text
         className={cn(
-          "font-mono-bold mt-2 tabular-nums",
+          "font-mono-bold text-headline-xl mt-2 tabular-nums",
           valueClassName ?? "text-ink",
         )}
-        style={{ fontSize: 28, lineHeight: 34 }}
       >
         {value}
       </Text>
