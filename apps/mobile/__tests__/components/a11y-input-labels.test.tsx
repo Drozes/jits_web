@@ -166,7 +166,7 @@ describe("guard: no unlabeled TextInput or Switch in app/ or components/", () =>
    * spread from their callers. Only these files may rely on a spread; any
    * other control must name itself.
    */
-  const SPREAD_WRAPPERS = new Set(["components/ui/input.tsx", "components/ui/switch.tsx"]);
+  const SPREAD_WRAPPERS = new Set(["components/ui/switch.tsx"]);
 
   it("every one carries accessibilityLabel or a Switch label (spread only in allowlisted wrappers)", () => {
     const missing = sites

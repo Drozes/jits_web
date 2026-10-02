@@ -1,9 +1,10 @@
 import * as React from "react";
-import { ActivityIndicator, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
 import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
 import { setRecordingOptIn } from "@/lib/match-flow/recording-optin";
 import { usePalette } from "@/lib/theme/palette";
+import { Switch } from "@/components/ui/switch";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, Mono, StakesStrip, StatusPlate, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
@@ -167,15 +168,13 @@ function RecordingPanel({ oppName }: { oppName: string }) {
             {oppLabel}
           </Mono>
         </View>
+        {/* The one app Switch (R3 MF-9): its track and thumb come from the theme, never green or a literal. */}
         <Switch
           testID="faceoff-record-toggle"
-          accessibilityLabel="Record from my phone"
+          label="Record from my phone"
           value={f.recording}
           disabled={f.myReady}
           onValueChange={setRecordingOptIn}
-          trackColor={{ false: p.panel, true: p.win }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={p.panel}
         />
       </View>
       {nobody ? (

@@ -52,6 +52,8 @@ describe("one Button (WP3)", () => {
     for (const gone of [
       "components/auth/auth-buttons.tsx",
       "components/highlight-viewer/viewer-button.tsx",
+      // WP4 (jits-3eeg.5): the legacy shadcn Button.
+      "components/ui/button.tsx",
     ]) {
       expect(fs.existsSync(path.join(ROOT, gone))).toBe(false);
     }
@@ -60,13 +62,13 @@ describe("one Button (WP3)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("no new uses of the legacy shadcn Button (WP4 deletes it; only the update banner is left)", () => {
+  it("nothing imports a legacy Button (the shadcn one was deleted by WP4; the one Button is elo-system/button)", () => {
     const legacy = /from\s+["'](@\/components\/ui\/button|\.\.?\/(ui\/)?button)["']/;
     const barrel = /import\s*\{[^}]*\bButton\b[^}]*\}\s*from\s*["']@\/components\/ui["']/;
     const offenders = FILES.filter(
-      (f) => (legacy.test(f.text) || barrel.test(f.text)) && !f.file.startsWith("components/ui/"),
+      (f) => (legacy.test(f.text) || barrel.test(f.text)) && !f.file.startsWith("components/ui/elo-system/"),
     ).map((f) => f.file);
-    expect(offenders).toEqual(["components/updates/update-banner.tsx"]);
+    expect(offenders).toEqual([]);
   });
 
   it("no Signal Red fill on a raw Pressable / Touchable (a red CTA is a Button or a PressableScale)", () => {

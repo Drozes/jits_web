@@ -16,13 +16,6 @@ import * as path from "path";
 const ROOT = path.resolve(__dirname, "../../..");
 const DIRS = ["app", "components"];
 
-/**
- * `components/ui/select.tsx` is the unused shadcn Select that WP4
- * (jits-3eeg.5, R3 LG-1) deletes; it is left untouched here so that delete
- * merges cleanly. Remove this entry if the file survives WP4.
- */
-const ALLOW = new Set(["components/ui/select.tsx"]);
-
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -33,8 +26,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 const FILES = DIRS.flatMap((d) => walk(path.join(ROOT, d)))
-  .map((full) => ({ rel: path.relative(ROOT, full).split(path.sep).join("/"), src: fs.readFileSync(full, "utf8") }))
-  .filter((f) => !ALLOW.has(f.rel));
+  .map((full) => ({ rel: path.relative(ROOT, full).split(path.sep).join("/"), src: fs.readFileSync(full, "utf8") }));
 
 const usesRnModal = (src: string) => /<Modal\b/.test(src);
 // `\s` after the tag: a JSX element, not a `<BottomSheetModal>` mention in a comment.

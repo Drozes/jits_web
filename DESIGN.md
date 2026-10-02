@@ -151,7 +151,7 @@ Amber marks draws and pressure score, and the states that are waiting on somethi
 
 | Token | Value (both themes) | Source |
 |---|---|---|
-| `heat-orange` | `hsl(25, 95%, 53%)` (`#F97415`) | `lib/tokens.ts` key `heatOrange`; Tailwind `bg-heat-orange` (the legacy `brandOrange` holds the same value until WP4 deletes it) |
+| `heat-orange` | `hsl(25, 95%, 53%)` (`#F97415`) | `lib/tokens.ts` key `heatOrange`; Tailwind `bg-heat-orange` (the legacy `brandOrange` with the same value was deleted by WP4) |
 | `heat-red` | `#EC6A74` | `lib/tokens.ts` key `heatRed`; Tailwind `bg-heat-red` (`arena-tab-icon.tsx` `HEAT_EMBER_RED` reads it) |
 
 Heat colors draw Arena heat and nothing else: the live embers (two `heat-orange`, one `signal-red`), the countable embers (`heat-red`), the blade clash spark (`signal-red`) and the challenge afterglow edge. Both are fixed across themes and both fall below 3:1 on every light surface (see [Accessibility](#accessibility)).
@@ -219,7 +219,7 @@ Chrome over a camera preview, a video or a photo does not follow the app theme. 
 - Push notification accent `#ef4444` (Tailwind red-500) in `app.json:119` is not a brand color. The Android channel light in `lib/notifications/register-push.ts` now uses `signal-red` (WP7); the `app.json` value is native config and changes only with the next store build.
 - The splash files read the dark tokens (`darkTokens`, `onMediaTokens.white`) instead of hard-coding them (WP7). Their gold cap is the dark `attention` value, a sanctioned one-off for the launch moment, not a pattern.
 - `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg` (`rgba(230,57,70,0.16)`, a red tint that WP2 retires) and `track` for the match flow; they are JS mirrors, not kit tokens.
-- Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) are retiring; see [Legacy](#legacy-retiring-wp4).
+- Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) were removed by WP4 and no longer resolve; see [Legacy](#legacy-retiring-wp4).
 
 ## Typography
 
@@ -464,7 +464,7 @@ Motion in ELO RATED carries meaning or it does not exist. This section carries o
 | `spring.select` | damping 14, stiffness 260 | 99 | (none) |
 | `PRESS_SCALE` | 0.97 | 103 | web press scale 0.98 (`globals.css:143`) |
 
-Component constants outside the token file: `ROLL_MS` 600 and `ROLL_MAX_SPAN` 30 (`rolling-number.tsx`); blade clash 60ms spread plus 160ms snap, spark 80ms in and 300ms out (`arena-tab-icon.tsx:125-133`); `FIGHT_EASING = BRAND_EASE_OUT_CURVE` (`fight-tokens.ts:14`). The single-Moment durations that were literals (the countdown GO fade, the verdict celebration, the tap marks) are named in `moment` with their shipped values (R3 MF-11, WP6), and the hold-to-end retract is `duration.fast`. The offline banner's 220ms stays a literal until WP4 restyles the banner on `duration.fast` (R3 SC-1). The launch splash keeps its own timing in `@jits/shared/constants` (`SPLASH_REVEAL`, `SPLASH_STATEMENT`, `SPLASH_GLOW_STATEMENT`).
+Component constants outside the token file: `ROLL_MS` 600 and `ROLL_MAX_SPAN` 30 (`rolling-number.tsx`); blade clash 60ms spread plus 160ms snap, spark 80ms in and 300ms out (`arena-tab-icon.tsx:125-133`); `FIGHT_EASING = BRAND_EASE_OUT_CURVE` (`fight-tokens.ts:14`). The single-Moment durations that were literals (the countdown GO fade, the verdict celebration, the tap marks) are named in `moment` with their shipped values (R3 MF-11, WP6), and the hold-to-end retract is `duration.fast`. The offline banner slides over `duration.fast` (WP4, R3 SC-1). The launch splash keeps its own timing in `@jits/shared/constants` (`SPLASH_REVEAL`, `SPLASH_STATEMENT`, `SPLASH_GLOW_STATEMENT`).
 
 In a static preview, draw the Reduce Motion end state: the final number, the cooled edge, the static ember, the filled tally.
 
@@ -554,7 +554,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | Launch splash reveal | Moment | `SplashReveal` / `SplashStatement` / `SplashGlowStatement` with `ErMark` | Once per cold start, handing off from the native splash (the one sanctioned on-mount moment). The climb's odometer is `RollingNumber` on the UI thread (the whole 480-point climb over `NUMBER_ROLL_MS` 900ms, out-cubic). The Statement's glow ramps in with the ignite, breathes up and back once and rests at its baseline; it never loops. Its static white text halo (`textShadow`, `splash-statement.tsx`) is the app's only shadow, sanctioned for this moment only: never copy it to product UI. Timing and curves are splash-local, sourced from `@jits/shared/constants` rather than `@/lib/motion`: the brand ease-out from `SPLASH_REVEAL.EASING_BEZIER` (the same curve as `easing.brandOut`), the Glow Statement's expand settle `SPLASH_GLOW_STATEMENT.EASING_EXPAND`, and an `Easing.inOut(Easing.ease)` glow breathe | Heavy impact at the lock beat | Resting frame, read with `useReduceMotion()` on the first frame and dismissing at the same moment. A late switch snaps to the resting frame, drops the pending lock haptic and dismisses after at most the reduced-motion hold |
 | Hold-to-end fill | Reactive | Live match, End match button (`components/match-flow/live/hold-to-end-button.tsx`) | While the finger holds: a Reanimated shared value scales a full-size fill (`scaleX` from the left; `scaleY` from the bottom on the landscape tile) and the 2px rule under the label, linear over `HOLD_TO_END_MS` 1200ms; no width animation. The end comes from its own timer, never the fill. An early release retracts it over `duration.fast` on the brand ease-out | `matchEnd` when the hold completes | Unchanged (it tracks the touch) |
 | Time-up drain bar | Moment | Live match state strip (`components/match-flow/live/state-strip.tsx`) | Time is up: a 2px bar empties on `scaleX` from the left, linear over the auto-end delay (`AUTO_END_DELAY_MS` 1000ms), on the UI thread; the auto-end itself is timed by the live step, not the bar | none | Unchanged (it is a timer, not decoration) |
-| Offline banner | Moment | Root layout, challenge prompt | Connectivity changes: slides in when offline, out when back (220ms) | none | Unchanged |
+| Offline banner | Moment | Root layout, challenge prompt (`components/offline-banner.tsx`) | Connectivity changes: slides down on the UI thread when offline (Reanimated `translateY`, `duration.fast` 240ms, brand ease-out); its content drops at once when back online | none | Appears in place, no slide |
 
 ### Other
 
@@ -563,7 +563,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 
 ### Kit names for the colors the Motion Rule names
 
-`heatOrange` (`lib/tokens.ts`; the legacy `brandOrange` holds the same value) is the kit's `heat-orange`; `heatRed` (`#EC6A74`, the countable embers) is `heat-red`; Signal Red is `signal-red`; the lifted red of the Accept sweep is `signal-red-lift`; Gain Green is `gain-green`. Heat colors appear only in the Arena ember, countable embers, the blade clash spark and the challenge afterglow.
+`heatOrange` (`lib/tokens.ts`) is the kit's `heat-orange`; `heatRed` (`#EC6A74`, the countable embers) is `heat-red`; Signal Red is `signal-red`; the lifted red of the Accept sweep is `signal-red-lift`; Gain Green is `gain-green`. Heat colors appear only in the Arena ember, countable embers, the blade clash spark and the challenge afterglow.
 
 ## Accessibility
 
@@ -605,7 +605,7 @@ Every text token passes 4.5:1 on every surface in both themes. `plate-bright` is
 |---|---|---|
 | `on-signal` on `signal-red` | 4.60 | Pass (both themes; the same values) |
 | `on-signal` on `signal-red-lift` | 5.67 | Pass |
-| `ink` (dark, `#E8EDF2`) on `signal-red` | 3.54 | FAIL: the pre-repair pairing. Never put white on the red. The legacy shadcn `Button` default variant still does (`components/ui/button.tsx:15`, WP3/WP4) |
+| `ink` (dark, `#E8EDF2`) on `signal-red` | 3.54 | FAIL: the pre-repair pairing. Never put white on the red. The legacy shadcn `Button` default variant did, until WP4 deleted it |
 
 ### Fills, rules and marks
 
@@ -695,33 +695,33 @@ Rule (the on-media contrast rule, WP7): on-media text sits only on `on-media-bad
 
 The family map of the mobile app (`apps/mobile`), which component is canonical in each family, and what is legacy. Each kit card (`components/<Comp>/`) is a static HTML twin of a React Native component, drawn from the code with these tokens; React Native cannot run in the preview frame, so every card README says which RN file it was hand-written from.
 
-Three token channels exist in code, and the kit draws all three from the same tokens: NativeWind ELO classes (most components), `usePalette()` JS colors (the match flow; a mirror of the same values), and the fixed `ON_MEDIA` / `BROADCAST` on-media set (chrome over video). Legacy shadcn classes are a fourth channel that is retiring (see [Legacy](#legacy-retiring-wp4)).
+Three token channels exist in code, and the kit draws all three from the same tokens: NativeWind ELO classes (most components), `usePalette()` JS colors (the match flow; a mirror of the same values), and the fixed `ON_MEDIA` / `BROADCAST` on-media set (chrome over video). The legacy shadcn classes were a fourth channel; WP4 removed them (see [Legacy](#legacy-retiring-wp4)).
 
 ### Which component to use
 
 | I need... | Use | Not |
 |---|---|---|
 | A destructive action | `Button` destructive: an outline in `negative` | a red fill (the retired `DestructiveButton`) |
-| A primary action | `Button` primary (`components/ui/elo-system/button.tsx`; `FightButton` is its match-flow alias) | the shadcn `Button` default variant, a hand-rolled `bg-cta` Pressable |
+| A primary action | `Button` primary (`components/ui/elo-system/button.tsx`; `FightButton` is its match-flow alias) | a hand-rolled `bg-cta` Pressable (the shadcn `Button` was deleted by WP4) |
 | A secondary or text action | `Button` secondary / ghost | a raw `Pressable` with an `active:` class |
 | An action over camera or film | `Button` glass | a hand-rolled glass `Pressable` |
 | A compact strip action (ROLL, OPEN, CANCEL, CONFIRM) | `OutlineAction` | a small `Button` |
 | Anything pressable that commits | `PressableScale` underneath | raw `Pressable` with a function `style` |
 | A still pressable (rows, chips, toggles, chrome over video) | `StatePressable` (`dim` for the 0.7 pressed dip) | raw `Pressable` with no pressed feedback or a function `style` |
-| A container | `Plate` (variants default, accent, live, win, loss) | shadcn `Card` (dead) |
+| A container | `Plate` (variants default, accent, live, win, loss) | shadcn `Card` (deleted, WP4) |
 | An Arena strip | `StripShell` (compact Plate on `panel`, 3px rail) | |
-| A caps label tag | `MetaTag` | shadcn `Badge` |
+| A caps label tag | `MetaTag`; `Badge` is the same tag with tones (WP4) | |
 | Win / loss / draw | `OutcomeTag` | |
-| A filter or segment | `Chip` (+ a row of chips); selected = `plate-bright` fill, `hairline-strong` border, `ink` label | shadcn `Tabs` (unused) |
+| A filter or segment | `Chip` (+ a row of chips); selected = `plate-bright` fill, `hairline-strong` border, `ink` label | shadcn `Tabs` (deleted, WP4) |
 | A count badge | `CountPill` | |
 | Live state | `LivePill`, `LiveDot` | a green dot drawn by hand |
 | A rating | `EloTile` with `RollingNumber` | |
 | A rating change | `DeltaNumber` (static) or `DeltaChip` (after a roll) | a third formatter |
-| A person | `Avatar32` (square initials or photo) | shadcn `Avatar` (round, unused), `InitialsBlock` outside the match flow |
+| A person | `Avatar32` (square initials or photo) | shadcn `Avatar` (round, deleted by WP4), `InitialsBlock` outside the match flow |
 | A notice | `toast.success / error / info` (`BrandToast`) | a banner for a one-off message |
 | Loading | the skeleton set (`SkeletonProvider`, `SkeletonBlock`, `SkeletonPlate`, ...) | a free-floating red `ActivityIndicator` |
 | A busy action | `Button busy` (the busy-button pattern) | a spinner next to a button |
-| A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (dead) |
+| A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (deleted, WP4) |
 | A sheet | `Sheet` or a `BottomSheetModal` spreading `useSheetChrome()` with `SheetBackdrop` (`components/ui/sheet.tsx`); an RN `Modal` picker uses `SHEET_RADIUS`, `panel`, `ON_MEDIA.scrim` and `useModalAnimation("slide")` | gorhom's default 15px radius, a sheet's own background, handle or black backdrop literal |
 
 ### Families
@@ -736,13 +736,13 @@ Three token channels exist in code, and the kit draws all three from the same to
 | `FightButton` | `components/match-flow/fight/fight-ui.tsx` | Thin match-flow alias of `Button` (primary / secondary / ghost) |
 | `OutlineAction` | `components/arena/strip-primitives.tsx` | Canonical compact action: 28px tall, `radius-tag`, `hairline-strong`, `action-sm` label, 44px hit area |
 | `SteelSheen` | `components/ui/steel-sheen.tsx` | Ambient sweep on a waiting-on-you button (Accept, Confirm result) |
-| shadcn `Button` | `components/ui/button.tsx` | Legacy, deprecated: the update banner only (WP4 deletes it); white label on red (3.54:1) |
+| shadcn `Button` | `components/ui/button.tsx` | Deleted by WP4; the update banner, its last caller, is on the unified `Button` |
 
 Cards (Actions family): **Button** (primary, secondary, ghost, destructive outline in `negative`; states rest, pressed, disabled, busy) and **OutlineAction**.
 
 #### Status and badges
 
-`MetaTag` (21 sites) is the canonical tag: `hairline` border, `radius-tag`, `meta-label` text in `ink-2`. `OutcomeTag` and `LivePill` are semantic wrappers. `CountPill` (`components/ui/count-pill.tsx`) is the filled count: `signal-red` fill, `on-signal` 9px mono bold digits, `radius-tag`, shared by the header bell and the tab bar. `HeaderStatusChip` (`components/layout/header-status-chip.tsx`) sits on every tab root and says live (`gain-green` edge), neutral (`ink-3` edge) or incoming (`signal-red` edge). Overlapping tags (`FilmBadge`, `HudTag`, participant `StatusBadge`, shadcn `Badge`) fold into one tag with tones.
+`MetaTag` (21 sites) is the canonical tag: `hairline` border, `radius-tag`, `meta-label` text in `ink-2`. `OutcomeTag` and `LivePill` are semantic wrappers. `CountPill` (`components/ui/count-pill.tsx`) is the filled count: `signal-red` fill, `on-signal` 9px mono bold digits, `radius-tag`, shared by the header bell and the tab bar. `HeaderStatusChip` (`components/layout/header-status-chip.tsx`) sits on every tab root and says live (`gain-green` edge), neutral (`ink-3` edge) or incoming (`signal-red` edge). Overlapping tags (`FilmBadge`, `HudTag`, participant `StatusBadge`) fold into one tag with tones. `Badge` (`components/ui/badge.tsx`, admin members) already is that tag since WP4: the `MetaTag` look with tones `default` (`hairline-strong` border, `ink`), `secondary` (`plate` fill, `ink-2`), `destructive` (`negative`), `success` (`gain-green`, wins only) and `outline` (exactly `MetaTag`).
 
 Cards (Status family): **MetaTag**, **LivePill** (with LiveDot), **CountPill** (with tab badges). The header status chip is drawn in the AppHeader card.
 
@@ -774,7 +774,7 @@ Cards: **Plate** (Surfaces family); **OnAirStrip** and **ChallengeStrip** (incom
 
 #### Feedback and loading
 
-`toast` + `BrandToast` (`components/ui/toast.tsx`, 89 calls) is canonical: `plate` fill, `hairline-strong` border, `radius-plate`, a 3px left rule (success `ink`, deliberately not green; error `signal-red`; info `ink-3`), `toast-title` plus `body-12`, no shadow. The skeleton set (`components/ui/skeleton/skeleton.tsx`) runs one shared 1400ms shimmer clock. Skeleton bars (`SkeletonBlock`) are `plate-bright` (`bg-surface-4`), one tier above their host plate (`Plate`, `SkeletonPlate`, the rank and participant rows), with an `ink` band at 8% opacity, so they read at rest and under Reduce Motion (WP6, bead jits-3eeg.7). Banners (offline, update, upload progress, queue status) have no shared shell yet; the offline banner is a legacy red bar (R3 SC-1, WP4).
+`toast` + `BrandToast` (`components/ui/toast.tsx`, 89 calls) is canonical: `plate` fill, `hairline-strong` border, `radius-plate`, a 3px left rule (success `ink`, deliberately not green; error `signal-red`; info `ink-3`), `toast-title` plus `body-12`, no shadow. The skeleton set (`components/ui/skeleton/skeleton.tsx`) runs one shared 1400ms shimmer clock. Skeleton bars (`SkeletonBlock`) are `plate-bright` (`bg-surface-4`), one tier above their host plate (`Plate`, `SkeletonPlate`, the rank and participant rows), with an `ink` band at 8% opacity, so they read at rest and under Reduce Motion (WP6, bead jits-3eeg.7). Banners (offline, update, upload progress, queue status) have no shared shell yet. Since WP4 the offline banner is a `panel` bar with a `hairline-strong` bottom edge and mono caps `ink` copy (R3 SC-1), the update banner is a `panel` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`, and the critical update modal sits on `void` with `ink` / `ink-2` text (R3 SC-2).
 
 Cards (Feedback family): **Toast**, **Skeleton**.
 
@@ -892,11 +892,11 @@ Finding IDs (SH, BT, HO, AR, RK, PR, MF, FR, ST, SC, SP, LG, CO, TY, MO, RA, A1,
 
 ## Legacy (retiring, WP4)
 
-The pre-redesign shadcn layer still ships in the mobile app as "compatibility shims" (`__tests__/lib/tokens-contrast.test.ts:15-17`). It is NOT part of this system: its colors are not kit tokens, they are not contrast-gated, and new code must not use them. Bead jits-3eeg.5 (WP4) deletes it after WP3 lands the unified Button.
+The pre-redesign shadcn layer is retired from the mobile app by bead jits-3eeg.5 (WP4), after WP3 landed the unified Button. It was never part of this system: its colors were not kit tokens and were not contrast-gated. `__tests__/components/legacy-shadcn-guard.test.ts` fails if a deleted primitive, a legacy color class or the legacy CSS-variable plumbing comes back.
 
 ### Legacy colors
 
-Defined in `apps/mobile/lib/tokens.ts` (`lightTokens`, `darkTokens`), mirrored as CSS variables in `tailwind.config.js` `lightVars` (light) and `lib/theme/theme-provider.tsx` `buildVars` (dark). Hex is computed from the HSL.
+Removed. The legacy keys are gone from `apps/mobile/lib/tokens.ts`, the legacy `cssVarColors` and `lightVars` entries from `tailwind.config.js`, and the legacy variables from `lib/theme/theme-provider.tsx` `buildVars`, so a legacy class (`bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-destructive`, `border-input` and friends) no longer resolves to a color. One exception, until WP2 merges: `components/ui/switch.tsx` still reads three legacy keys from `useThemedTokens()` (`background`, `primary`, `muted`; no class or CSS variable carries them), and they leave `ColorTokens` when WP2 moves the Switch onto ELO tokens. The table records what each retired key mapped to, for reading old code and the web shadcn layer.
 
 | Key | Tailwind | Light | Dark | Use instead |
 |---|---|---|---|---|
@@ -915,32 +915,32 @@ Defined in `apps/mobile/lib/tokens.ts` (`lightTokens`, `darkTokens`), mirrored a
 | `border` | `border-border` | `hsl(218, 12%, 83%)` (#CED2D9) | `hsl(222, 13%, 18%)` (#282C34) | `hairline` |
 | `input` | `border-input` | `hsl(218, 14%, 79%)` (#C2C7D1) | `hsl(222, 13%, 21%)` (#2F333D) | `hairline-strong` |
 | `gold` | `bg-gold` | `hsl(38, 92%, 50%)` (#F59F0A) | same | `attention` |
-| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | `heat-orange` (WP7 added `heatOrange` / `bg-heat-orange` with this value and moved the Arena heat onto it; no ELO code reads `brandOrange` now, so WP4 can delete it) |
+| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | `heat-orange` (`heatOrange` / `bg-heat-orange`, the same value, added by WP7) |
 | `deepRed` | `bg-deep-red` | `hsl(355, 67%, 47%)` (#C82835) | same | `signal-red` |
 
-**Naming trap.** On mobile `text-primary` is the LEGACY brand red (`--primary`), while web's `--text-primary` is the ink. ELO ink on mobile is `text-ink`. Never write `text-primary` for data. The same collision exists in web Tailwind.
+**Naming trap.** On mobile `text-primary` was the LEGACY brand red (`--primary`), while web's `--text-primary` is the ink. ELO ink on mobile is `text-ink`. Never write `text-primary`. The same collision exists in web Tailwind, where the shadcn layer still lives.
 
 ### Legacy components
 
-| Component | Path | Real users | Fate |
-|---|---|---|---|
-| `Card` family | `components/ui/card.tsx` | 0 (also `rounded-lg` on a non-modal) | Delete; use `Plate` |
-| `Input` | `components/ui/input.tsx` | 0 (raw `TextInput` is used 13 times) | Re-skin to ELO tokens as the form field input |
-| `Label` | `components/ui/label.tsx` | 0 | Delete |
-| `Separator` | `components/ui/separator.tsx` | 0 | Delete; a 1px `hairline` view |
-| `Avatar` | `components/ui/avatar.tsx` | 0 (round, contradicts the square `Avatar32`) | Delete |
-| `Select` | `components/ui/select.tsx` | 0 | Delete; use `SearchSelect` |
-| `Tabs` | `components/ui/tabs.tsx` | 0 (the `<Tabs>` hits are expo-router) | Delete; use `Chip` rows |
-| `OnlineIndicator` | `components/online-indicator.tsx` | 0 | Delete |
-| `Badge` | `components/ui/badge.tsx` | 1 (admin members), `rounded-lg`, system font | Restyle onto `MetaTag` / `OutcomeTag`, keep the `success` variant API |
-| `Dialog` | `components/ui/dialog.tsx` | 1 (Compare Stats), system-font title | Brand titles (WP1) |
-| `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile); since WP1 on the shared chrome (`panel`, 8px, brand title) | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` |
-| `Button` | `components/ui/button.tsx` | Admin screens, update banner, critical update modal | Replaced by the unified `Button` (WP3) |
-| `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags), red `primary` track | Neutral track (WP2) |
-| `OfflineBanner` | `components/offline-banner.tsx` | Root layout | `panel` + `hairline-strong`, mono caps `ink` (WP4) |
-| Update banner and modal | `components/updates/*` | Root layout | ELO surfaces and the unified Button (WP4) |
+| Component | Path | Fate |
+|---|---|---|
+| `Card` family | `components/ui/card.tsx` | Deleted (WP4); use `Plate` |
+| `Input` | `components/ui/input.tsx` | Deleted (WP4; it had no callers). The raw `TextInput`s fold into one ELO form field (WP3/WP5 follow-up) |
+| `Label` | `components/ui/label.tsx` | Deleted (WP4) |
+| `Separator` | `components/ui/separator.tsx` | Deleted (WP4); a 1px `hairline` view |
+| `Avatar` | `components/ui/avatar.tsx` | Deleted (WP4); round, contradicted the square `Avatar32` |
+| `Select` | `components/ui/select.tsx` | Deleted (WP4); use `SearchSelect` |
+| `Tabs` | `components/ui/tabs.tsx` | Deleted (WP4); use `Chip` rows |
+| `OnlineIndicator` | `components/online-indicator.tsx` | Deleted (WP4) |
+| `Button` | `components/ui/button.tsx` | Deleted (WP4); every caller is on the unified `Button` (`components/ui/elo-system/button.tsx`, WP3), the update banner last |
+| `Badge` | `components/ui/badge.tsx` | Kept, restyled (WP4): the `MetaTag` look (`radius-tag`, 1px border, 10px mono caps) with tones `default` (`hairline-strong`, `ink`), `secondary` (`plate` fill, `ink-2`), `destructive` (`negative`), `success` (`gain-green`, kept for win badges) and `outline` (exactly `MetaTag`). One caller (admin members) |
+| `Dialog` | `components/ui/dialog.tsx` | Kept: brand titles since WP1 (Compare Stats) |
+| `Sheet` | `components/ui/sheet.tsx` | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` (WP1) |
+| `Switch` | `components/ui/switch.tsx` | Kept: the one app switch (also the face-off "Record from my phone" toggle since WP4, R3 MF-9); neutral track in WP2 |
+| `OfflineBanner` | `components/offline-banner.tsx` | Restyled (WP4): `panel` bar, `hairline-strong` bottom edge, mono caps `ink` copy, Reanimated slide on `duration.fast`, still under Reduce Motion |
+| Update banner and modal | `components/updates/*` | Restyled (WP4): the banner is a `panel` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`; the critical modal sits on `void` with `ink` / `ink-2` text and the primary `Button` |
 
-Weight classes `font-semibold` and `font-medium` appear only in these atoms; React Native cannot synthesize weights from the custom fonts, so they render in the system font.
+The system-font weight classes (`font-semibold`, `font-medium`, `text-xs` without a brand family) lived in these atoms; React Native cannot synthesize weights from the custom fonts, so they rendered in the system font (R3 TY-5). They left with the deleted files and the restyles.
 
 ### Retired brand assets
 

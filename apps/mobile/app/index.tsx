@@ -30,7 +30,7 @@ export default function Index() {
     }
     return (
       <View className="flex-1 items-center justify-center">
-        <Text className="text-base text-muted-foreground">Loading...</Text>
+        <Text className="font-body text-base text-ink-3">Loading...</Text>
       </View>
     );
   }

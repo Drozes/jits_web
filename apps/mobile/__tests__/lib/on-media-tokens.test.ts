@@ -181,7 +181,6 @@ describe("attention and heat tokens", () => {
     expect(darkTokens.heatOrange).toBe(lightTokens.heatOrange);
     expect(darkTokens.heatRed).toBe(lightTokens.heatRed);
     expect(darkTokens.heatOrange).toBe("hsl(25, 95%, 53%)");
-    expect(darkTokens.heatOrange).toBe(darkTokens.brandOrange);
     expect(darkTokens.heatRed).toBe("#EC6A74");
   });
 

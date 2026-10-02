@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { AccessibilityInfo, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/elo-system/button";
 import { UpdateBannerHeader } from "./update-banner-header";
 
 /** Full a11y copy: announced once and read for the "UPDATE READY" label. */
@@ -18,9 +18,15 @@ interface UpdateBannerProps {
   restarting: boolean;
 }
 
+/** Height of the RESTART button: compact, inside the banner row. */
+export const UPDATE_BANNER_BUTTON_HEIGHT = 36;
+
 /**
- * Dismissible notice for a downloaded non-critical OTA. Inverted surface
- * (jits-5i2w.6) so it is not lost; RESTART is inverted too, never Signal Red.
+ * Dismissible notice for a downloaded non-critical OTA (jits-5i2w.6). On the
+ * ELO surfaces since WP4 (R3 SC-2): a `panel` card (`bg-surface-2`) with a
+ * `hairline-strong` border so it separates from the screen under it without
+ * a shadow, `ink` text, and RESTART as the unified `Button` `secondary`
+ * variant (a `plate` fill, one tier up, so it reads as its own object) (never Signal Red: the screen under it owns its one red CTA).
  */
 export function UpdateBanner({
   onRestart,
@@ -46,7 +52,7 @@ export function UpdateBanner({
     >
       <View
         testID="update-banner-surface"
-        className="bg-foreground rounded-md px-4 py-3 gap-2"
+        className="bg-surface-2 border border-hairline-strong rounded-md px-4 py-3 gap-2"
       >
         <UpdateBannerHeader
           accessibilityCopy={UPDATE_BANNER_COPY}
@@ -56,22 +62,19 @@ export function UpdateBanner({
           <Text
             accessibilityElementsHidden
             importantForAccessibility="no"
-            className="font-body text-base text-background flex-1"
+            className="font-body text-base text-ink-2 flex-1"
             numberOfLines={2}
           >
             {UPDATE_BANNER_BODY}
           </Text>
-          {/* opacity-100 beats Button's disabled opacity-50 (twMerge): readable. */}
           <Button
             testID="update-banner-restart"
-            variant="ghost"
-            className="bg-background opacity-100"
-            textClassName="font-heading text-[12px] uppercase tracking-caps-l text-foreground"
-            disabled={restarting}
+            variant="secondary"
+            height={UPDATE_BANNER_BUTTON_HEIGHT}
+            label={restarting ? "Restarting..." : "Restart"}
+            busy={restarting}
             onPress={onRestart}
-          >
-            {restarting ? "Restarting..." : "Restart"}
-          </Button>
+          />
         </View>
       </View>
     </View>

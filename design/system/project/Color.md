@@ -49,7 +49,7 @@ Amber marks draws and pressure score, and the states that are waiting on somethi
 
 | Token | Value (both themes) | Source |
 |---|---|---|
-| `heat-orange` | `hsl(25, 95%, 53%)` (`#F97415`) | `lib/tokens.ts` key `heatOrange`; Tailwind `bg-heat-orange` (the legacy `brandOrange` holds the same value until WP4 deletes it) |
+| `heat-orange` | `hsl(25, 95%, 53%)` (`#F97415`) | `lib/tokens.ts` key `heatOrange`; Tailwind `bg-heat-orange` (the legacy `brandOrange` with the same value was deleted by WP4) |
 | `heat-red` | `#EC6A74` | `lib/tokens.ts` key `heatRed`; Tailwind `bg-heat-red` (`arena-tab-icon.tsx` `HEAT_EMBER_RED` reads it) |
 
 Heat colors draw Arena heat and nothing else: the live embers (two `heat-orange`, one `signal-red`), the countable embers (`heat-red`), the blade clash spark (`signal-red`) and the challenge afterglow edge. Both are fixed across themes and both fall below 3:1 on every light surface (see Accessibility).
@@ -117,4 +117,4 @@ Chrome over a camera preview, a video or a photo does not follow the app theme. 
 - Push notification accent `#ef4444` (Tailwind red-500) in `app.json:119` is not a brand color. The Android channel light in `lib/notifications/register-push.ts` now uses `signal-red` (WP7); the `app.json` value is native config and changes only with the next store build.
 - The splash files read the dark tokens (`darkTokens`, `onMediaTokens.white`) instead of hard-coding them (WP7). Their gold cap is the dark `attention` value, a sanctioned one-off for the launch moment, not a pattern.
 - `palette.ts` also carries `winRule`, `secondaryBg`, `secondaryBgPressed`, `selectedBg` (`rgba(230,57,70,0.16)`, a red tint that WP2 retires) and `track` for the match flow; they are JS mirrors, not kit tokens.
-- Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) are retiring; see Legacy.
+- Legacy shadcn colors (`primary`, `muted`, `card`, `success` and friends) were removed by WP4 and no longer resolve; see Legacy.

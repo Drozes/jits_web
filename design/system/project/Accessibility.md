@@ -38,7 +38,7 @@ Every text token passes 4.5:1 on every surface in both themes. `plate-bright` is
 |---|---|---|
 | `on-signal` on `signal-red` | 4.60 | Pass (both themes; the same values) |
 | `on-signal` on `signal-red-lift` | 5.67 | Pass |
-| `ink` (dark, `#E8EDF2`) on `signal-red` | 3.54 | FAIL: the pre-repair pairing. Never put white on the red. The legacy shadcn `Button` default variant still does (`components/ui/button.tsx:15`, WP3/WP4) |
+| `ink` (dark, `#E8EDF2`) on `signal-red` | 3.54 | FAIL: the pre-repair pairing. Never put white on the red. The legacy shadcn `Button` default variant did, until WP4 deleted it |
 
 ## Fills, rules and marks
 

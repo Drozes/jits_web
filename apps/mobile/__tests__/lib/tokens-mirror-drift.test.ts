@@ -181,39 +181,18 @@ const TOKEN_MAP: ReadonlyArray<readonly [keyof ColorTokens, string]> = [
 
 /**
  * Mobile tokens with no counterpart in any CSS mirror, listed rather than
- * dropped. These are the pre-redesign shadcn-style compatibility shims: hsl()
- * triples consumed only by React Native components that have not been migrated
- * to the ELO families, which the CSS mirrors never carried. If one ever gains a
- * CSS counterpart, move it into TOKEN_MAP.
+ * dropped: the last three pre-redesign shadcn-style keys, read only by
+ * components/ui/switch.tsx until WP2 moves it onto ELO tokens (WP4,
+ * jits-3eeg.5, deleted the rest). The CSS mirrors never carried them. Delete
+ * an entry here when its key leaves ColorTokens.
  *
  * An unmapped token that should have been compared is how this guard rots, so
  * the completeness test forces every ColorTokens key into exactly one list.
  */
 const UNMAPPED_MOBILE_TOKENS: ReadonlyArray<keyof ColorTokens> = [
   "background",
-  "foreground",
-  "card",
-  "cardForeground",
-  "popover",
-  "popoverForeground",
   "primary",
-  "primaryForeground",
-  "secondary",
-  "secondaryForeground",
   "muted",
-  "mutedForeground",
-  "accent",
-  "accentForeground",
-  "destructive",
-  "destructiveForeground",
-  "success",
-  "successForeground",
-  "border",
-  "input",
-  "ring",
-  "gold",
-  "brandOrange",
-  "deepRed",
 ];
 
 /**

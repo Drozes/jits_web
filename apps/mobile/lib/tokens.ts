@@ -1,15 +1,11 @@
 /**
  * Semantic color tokens for the mobile app.
  *
- * Two parallel naming families coexist here:
- *
- *  1. Legacy shadcn-style tokens (background/card/primary/muted/...) used by
- *     the pre-redesign codebase. Kept for backwards compatibility while the
- *     ELO design system migration is in flight.
- *
- *  2. ELO design system tokens (bgPrimary/bgSecondary/bgElevated/...) mirroring
- *     apps/web/app/design-system/tokens.css 1:1. New code should reach for
- *     these via NativeWind classes (bg-primary, text-tertiary, accent-cta, ...).
+ * The ELO design system tokens (bgPrimary/bgSecondary/bgElevated/...),
+ * mirroring apps/web/app/design-system/tokens.css 1:1. Reach for them via the
+ * NativeWind classes (bg-surface, text-ink-3, bg-cta, ...). The pre-redesign
+ * shadcn-style tokens were removed by WP4 (jits-3eeg.5, R3 LG-3), except the
+ * three below that `components/ui/switch.tsx` still reads.
  *
  * Plus, outside ColorTokens, `onMediaTokens` (bottom of this file): the fixed
  * palette for chrome over camera, video or photo, behind ON_MEDIA and BROADCAST.
@@ -22,31 +18,13 @@
  */
 
 export type ColorTokens = {
-  // ---- Legacy shadcn-style ---------------------------------------------------
+  // ---- Legacy (retiring) ----------------------------------------------------
+  // Read ONLY by components/ui/switch.tsx (WP2 is moving it to ELO tokens).
+  // Remove these three once nothing reads them; no CSS var or Tailwind class
+  // carries them any more.
   background: string;
-  foreground: string;
-  card: string;
-  cardForeground: string;
-  popover: string;
-  popoverForeground: string;
   primary: string;
-  primaryForeground: string;
-  secondary: string;
-  secondaryForeground: string;
   muted: string;
-  mutedForeground: string;
-  accent: string;
-  accentForeground: string;
-  destructive: string;
-  destructiveForeground: string;
-  success: string;
-  successForeground: string;
-  border: string;
-  input: string;
-  ring: string;
-  gold: string;
-  brandOrange: string;
-  deepRed: string;
 
   // ---- ELO design system (Void / Paddock palettes) --------------------------
   bgPrimary: string;        // Void / Paddock — page background
@@ -79,31 +57,10 @@ export type ColorTokens = {
 };
 
 export const lightTokens: ColorTokens = {
-  // Legacy
+  // Legacy, read only by components/ui/switch.tsx (see ColorTokens).
   background: "hsl(216, 24%, 96%)",
-  foreground: "hsl(223, 21%, 6%)",
-  card: "hsl(218, 20%, 89%)",
-  cardForeground: "hsl(223, 21%, 6%)",
-  popover: "hsl(218, 20%, 89%)",
-  popoverForeground: "hsl(223, 21%, 6%)",
   primary: "hsl(355, 78%, 56%)",
-  primaryForeground: "hsl(210, 28%, 93%)",
-  secondary: "hsl(217, 21%, 93%)",
-  secondaryForeground: "hsl(223, 21%, 6%)",
   muted: "hsl(219, 18%, 85%)",
-  mutedForeground: "hsl(215, 14%, 34%)",
-  accent: "hsl(355, 78%, 56%)",
-  accentForeground: "hsl(210, 28%, 93%)",
-  destructive: "hsl(355, 78%, 56%)",
-  destructiveForeground: "hsl(210, 28%, 93%)",
-  success: "hsl(142, 72%, 29%)",
-  successForeground: "hsl(0, 0%, 100%)",
-  border: "hsl(218, 12%, 83%)",
-  input: "hsl(218, 14%, 79%)",
-  ring: "hsl(355, 78%, 56%)",
-  gold: "hsl(38, 92%, 50%)",
-  brandOrange: "hsl(25, 95%, 53%)",
-  deepRed: "hsl(355, 67%, 47%)",
 
   // ELO — Paddock family (light surfaces shift DARKER as they elevate)
   bgPrimary: "#F8FAFC",          // paddock (lifted: plate separation 1.18 -> 1.24)
@@ -134,31 +91,10 @@ export const lightTokens: ColorTokens = {
 };
 
 export const darkTokens: ColorTokens = {
-  // Legacy
+  // Legacy, read only by components/ui/switch.tsx (see ColorTokens).
   background: "hsl(223, 21%, 6%)",
-  foreground: "hsl(210, 28%, 93%)",
-  card: "hsl(222, 16%, 12%)",
-  cardForeground: "hsl(210, 28%, 93%)",
-  popover: "hsl(222, 16%, 12%)",
-  popoverForeground: "hsl(210, 28%, 93%)",
   primary: "hsl(355, 78%, 56%)",
-  primaryForeground: "hsl(210, 28%, 93%)",
-  secondary: "hsl(225, 17%, 9%)",
-  secondaryForeground: "hsl(210, 28%, 93%)",
   muted: "hsl(223, 16%, 17%)",
-  mutedForeground: "hsl(218, 11%, 65%)",
-  accent: "hsl(355, 78%, 56%)",
-  accentForeground: "hsl(210, 28%, 93%)",
-  destructive: "hsl(355, 78%, 56%)",
-  destructiveForeground: "hsl(210, 28%, 93%)",
-  success: "hsl(142, 71%, 45%)",
-  successForeground: "hsl(0, 0%, 100%)",
-  border: "hsl(222, 13%, 18%)",
-  input: "hsl(222, 13%, 21%)",
-  ring: "hsl(355, 78%, 56%)",
-  gold: "hsl(38, 92%, 50%)",
-  brandOrange: "hsl(25, 95%, 53%)",
-  deepRed: "hsl(355, 67%, 47%)",
 
   // ELO — Void family (dark surfaces shift LIGHTER as they elevate)
   bgPrimary: "#0D0F14",          // void (unchanged: matches app.json splash, no native drift)

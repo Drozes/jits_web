@@ -2,7 +2,7 @@
  * Hooks for reading the current color scheme and the matching token map.
  *
  * Most components don't need this — they just use semantic Tailwind classes
- * (`bg-background`, `text-foreground`, etc.) which are wired through CSS
+ * (`bg-surface`, `text-ink`, etc.) which are wired through CSS
  * variables in `tailwind.config.js` and overridden in dark mode by the root
  * `ThemeProvider` (`lib/theme/theme-provider.tsx`).
  *

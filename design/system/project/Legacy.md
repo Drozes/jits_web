@@ -1,10 +1,10 @@
 # Legacy (retiring, WP4)
 
-The pre-redesign shadcn layer still ships in the mobile app as "compatibility shims" (`__tests__/lib/tokens-contrast.test.ts:15-17`). It is NOT part of this system: its colors are not kit tokens, they are not contrast-gated, and new code must not use them. Bead jits-3eeg.5 (WP4) deletes it after WP3 lands the unified Button.
+The pre-redesign shadcn layer is retired from the mobile app by bead jits-3eeg.5 (WP4), after WP3 landed the unified Button. It was never part of this system: its colors were not kit tokens and were not contrast-gated. `__tests__/components/legacy-shadcn-guard.test.ts` fails if a deleted primitive, a legacy color class or the legacy CSS-variable plumbing comes back.
 
 ## Legacy colors
 
-Defined in `apps/mobile/lib/tokens.ts` (`lightTokens`, `darkTokens`), mirrored as CSS variables in `tailwind.config.js` `lightVars` (light) and `lib/theme/theme-provider.tsx` `buildVars` (dark). Hex is computed from the HSL.
+Removed. The legacy keys are gone from `apps/mobile/lib/tokens.ts`, the legacy `cssVarColors` and `lightVars` entries from `tailwind.config.js`, and the legacy variables from `lib/theme/theme-provider.tsx` `buildVars`, so a legacy class (`bg-background`, `text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-destructive`, `border-input` and friends) no longer resolves to a color. One exception, until WP2 merges: `components/ui/switch.tsx` still reads three legacy keys from `useThemedTokens()` (`background`, `primary`, `muted`; no class or CSS variable carries them), and they leave `ColorTokens` when WP2 moves the Switch onto ELO tokens. The table records what each retired key mapped to, for reading old code and the web shadcn layer.
 
 | Key | Tailwind | Light | Dark | Use instead |
 |---|---|---|---|---|
@@ -23,32 +23,32 @@ Defined in `apps/mobile/lib/tokens.ts` (`lightTokens`, `darkTokens`), mirrored a
 | `border` | `border-border` | `hsl(218, 12%, 83%)` (#CED2D9) | `hsl(222, 13%, 18%)` (#282C34) | `hairline` |
 | `input` | `border-input` | `hsl(218, 14%, 79%)` (#C2C7D1) | `hsl(222, 13%, 21%)` (#2F333D) | `hairline-strong` |
 | `gold` | `bg-gold` | `hsl(38, 92%, 50%)` (#F59F0A) | same | `attention` |
-| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | `heat-orange` (WP7 added `heatOrange` / `bg-heat-orange` with this value and moved the Arena heat onto it; no ELO code reads `brandOrange` now, so WP4 can delete it) |
+| `brandOrange` | `bg-brand-orange` | `hsl(25, 95%, 53%)` (#F97415) | same | `heat-orange` (`heatOrange` / `bg-heat-orange`, the same value, added by WP7) |
 | `deepRed` | `bg-deep-red` | `hsl(355, 67%, 47%)` (#C82835) | same | `signal-red` |
 
-**Naming trap.** On mobile `text-primary` is the LEGACY brand red (`--primary`), while web's `--text-primary` is the ink. ELO ink on mobile is `text-ink`. Never write `text-primary` for data. The same collision exists in web Tailwind.
+**Naming trap.** On mobile `text-primary` was the LEGACY brand red (`--primary`), while web's `--text-primary` is the ink. ELO ink on mobile is `text-ink`. Never write `text-primary`. The same collision exists in web Tailwind, where the shadcn layer still lives.
 
 ## Legacy components
 
-| Component | Path | Real users | Fate |
-|---|---|---|---|
-| `Card` family | `components/ui/card.tsx` | 0 (also `rounded-lg` on a non-modal) | Delete; use `Plate` |
-| `Input` | `components/ui/input.tsx` | 0 (raw `TextInput` is used 13 times) | Re-skin to ELO tokens as the form field input |
-| `Label` | `components/ui/label.tsx` | 0 | Delete |
-| `Separator` | `components/ui/separator.tsx` | 0 | Delete; a 1px `hairline` view |
-| `Avatar` | `components/ui/avatar.tsx` | 0 (round, contradicts the square `Avatar32`) | Delete |
-| `Select` | `components/ui/select.tsx` | 0 | Delete; use `SearchSelect` |
-| `Tabs` | `components/ui/tabs.tsx` | 0 (the `<Tabs>` hits are expo-router) | Delete; use `Chip` rows |
-| `OnlineIndicator` | `components/online-indicator.tsx` | 0 | Delete |
-| `Badge` | `components/ui/badge.tsx` | 1 (admin members), `rounded-lg`, system font | Restyle onto `MetaTag` / `OutcomeTag`, keep the `success` variant API |
-| `Dialog` | `components/ui/dialog.tsx` | 1 (Compare Stats), system-font title | Brand titles (WP1) |
-| `Sheet` | `components/ui/sheet.tsx` | 1 (Share Profile); since WP1 on the shared chrome (`panel`, 8px, brand title) | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` |
-| `Button` | `components/ui/button.tsx` | Admin screens, update banner, critical update modal | Replaced by the unified `Button` (WP3) |
-| `Switch` | `components/ui/switch.tsx` | 3 (settings, admin flags), red `primary` track | Neutral track (WP2) |
-| `OfflineBanner` | `components/offline-banner.tsx` | Root layout | `panel` + `hairline-strong`, mono caps `ink` (WP4) |
-| Update banner and modal | `components/updates/*` | Root layout | ELO surfaces and the unified Button (WP4) |
+| Component | Path | Fate |
+|---|---|---|
+| `Card` family | `components/ui/card.tsx` | Deleted (WP4); use `Plate` |
+| `Input` | `components/ui/input.tsx` | Deleted (WP4; it had no callers). The raw `TextInput`s fold into one ELO form field (WP3/WP5 follow-up) |
+| `Label` | `components/ui/label.tsx` | Deleted (WP4) |
+| `Separator` | `components/ui/separator.tsx` | Deleted (WP4); a 1px `hairline` view |
+| `Avatar` | `components/ui/avatar.tsx` | Deleted (WP4); round, contradicted the square `Avatar32` |
+| `Select` | `components/ui/select.tsx` | Deleted (WP4); use `SearchSelect` |
+| `Tabs` | `components/ui/tabs.tsx` | Deleted (WP4); use `Chip` rows |
+| `OnlineIndicator` | `components/online-indicator.tsx` | Deleted (WP4) |
+| `Button` | `components/ui/button.tsx` | Deleted (WP4); every caller is on the unified `Button` (`components/ui/elo-system/button.tsx`, WP3), the update banner last |
+| `Badge` | `components/ui/badge.tsx` | Kept, restyled (WP4): the `MetaTag` look (`radius-tag`, 1px border, 10px mono caps) with tones `default` (`hairline-strong`, `ink`), `secondary` (`plate` fill, `ink-2`), `destructive` (`negative`), `success` (`gain-green`, kept for win badges) and `outline` (exactly `MetaTag`). One caller (admin members) |
+| `Dialog` | `components/ui/dialog.tsx` | Kept: brand titles since WP1 (Compare Stats) |
+| `Sheet` | `components/ui/sheet.tsx` | Kept: the one sheet shell, and home of `useSheetChrome()` / `SheetBackdrop` (WP1) |
+| `Switch` | `components/ui/switch.tsx` | Kept: the one app switch (also the face-off "Record from my phone" toggle since WP4, R3 MF-9); neutral track in WP2 |
+| `OfflineBanner` | `components/offline-banner.tsx` | Restyled (WP4): `panel` bar, `hairline-strong` bottom edge, mono caps `ink` copy, Reanimated slide on `duration.fast`, still under Reduce Motion |
+| Update banner and modal | `components/updates/*` | Restyled (WP4): the banner is a `panel` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`; the critical modal sits on `void` with `ink` / `ink-2` text and the primary `Button` |
 
-Weight classes `font-semibold` and `font-medium` appear only in these atoms; React Native cannot synthesize weights from the custom fonts, so they render in the system font.
+The system-font weight classes (`font-semibold`, `font-medium`, `text-xs` without a brand family) lived in these atoms; React Native cannot synthesize weights from the custom fonts, so they rendered in the system font (R3 TY-5). They left with the deleted files and the restyles.
 
 ## Retired brand assets
 

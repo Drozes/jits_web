@@ -42,7 +42,7 @@ jest.mock("@/lib/motion/haptics", () => {
 
 jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({
-    brandOrange: "hsl(25, 95%, 53%)",
+    heatOrange: "hsl(25, 95%, 53%)",
     accentCta: "#E63946",
     accentCtaText: "#EC6A74",
   }),

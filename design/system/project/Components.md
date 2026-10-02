@@ -2,33 +2,33 @@
 
 The family map of the mobile app (`apps/mobile`), which component is canonical in each family, and what is legacy. Each kit card (`components/<Comp>/`) is a static HTML twin of a React Native component, drawn from the code with these tokens; React Native cannot run in the preview frame, so every card README says which RN file it was hand-written from.
 
-Three token channels exist in code, and the kit draws all three from the same tokens: NativeWind ELO classes (most components), `usePalette()` JS colors (the match flow; a mirror of the same values), and the fixed `ON_MEDIA` / `BROADCAST` on-media set (chrome over video). Legacy shadcn classes are a fourth channel that is retiring (see Legacy).
+Three token channels exist in code, and the kit draws all three from the same tokens: NativeWind ELO classes (most components), `usePalette()` JS colors (the match flow; a mirror of the same values), and the fixed `ON_MEDIA` / `BROADCAST` on-media set (chrome over video). The legacy shadcn classes were a fourth channel; WP4 removed them (see Legacy).
 
 ## Which component to use
 
 | I need... | Use | Not |
 |---|---|---|
 | A destructive action | `Button` destructive: an outline in `negative` | a red fill (the retired `DestructiveButton`) |
-| A primary action | `Button` primary (`components/ui/elo-system/button.tsx`; `FightButton` is its match-flow alias) | the shadcn `Button` default variant, a hand-rolled `bg-cta` Pressable |
+| A primary action | `Button` primary (`components/ui/elo-system/button.tsx`; `FightButton` is its match-flow alias) | a hand-rolled `bg-cta` Pressable (the shadcn `Button` was deleted by WP4) |
 | A secondary or text action | `Button` secondary / ghost | a raw `Pressable` with an `active:` class |
 | An action over camera or film | `Button` glass | a hand-rolled glass `Pressable` |
 | A compact strip action (ROLL, OPEN, CANCEL, CONFIRM) | `OutlineAction` | a small `Button` |
 | Anything pressable that commits | `PressableScale` underneath | raw `Pressable` with a function `style` |
 | A still pressable (rows, chips, toggles, chrome over video) | `StatePressable` (`dim` for the 0.7 pressed dip) | raw `Pressable` with no pressed feedback or a function `style` |
-| A container | `Plate` (variants default, accent, live, win, loss) | shadcn `Card` (dead) |
+| A container | `Plate` (variants default, accent, live, win, loss) | shadcn `Card` (deleted, WP4) |
 | An Arena strip | `StripShell` (compact Plate on `panel`, 3px rail) | |
-| A caps label tag | `MetaTag` | shadcn `Badge` |
+| A caps label tag | `MetaTag`; `Badge` is the same tag with tones (WP4) | |
 | Win / loss / draw | `OutcomeTag` | |
-| A filter or segment | `Chip` (+ a row of chips); selected = `plate-bright` fill, `hairline-strong` border, `ink` label | shadcn `Tabs` (unused) |
+| A filter or segment | `Chip` (+ a row of chips); selected = `plate-bright` fill, `hairline-strong` border, `ink` label | shadcn `Tabs` (deleted, WP4) |
 | A count badge | `CountPill` | |
 | Live state | `LivePill`, `LiveDot` | a green dot drawn by hand |
 | A rating | `EloTile` with `RollingNumber` | |
 | A rating change | `DeltaNumber` (static) or `DeltaChip` (after a roll) | a third formatter |
-| A person | `Avatar32` (square initials or photo) | shadcn `Avatar` (round, unused), `InitialsBlock` outside the match flow |
+| A person | `Avatar32` (square initials or photo) | shadcn `Avatar` (round, deleted by WP4), `InitialsBlock` outside the match flow |
 | A notice | `toast.success / error / info` (`BrandToast`) | a banner for a one-off message |
 | Loading | the skeleton set (`SkeletonProvider`, `SkeletonBlock`, `SkeletonPlate`, ...) | a free-floating red `ActivityIndicator` |
 | A busy action | `Button busy` (the busy-button pattern) | a spinner next to a button |
-| A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (dead) |
+| A picker | `SearchSelect` (`NativeSelect` wraps it) | shadcn `Select` (deleted, WP4) |
 | A sheet | `Sheet` or a `BottomSheetModal` spreading `useSheetChrome()` with `SheetBackdrop` (`components/ui/sheet.tsx`); an RN `Modal` picker uses `SHEET_RADIUS`, `panel`, `ON_MEDIA.scrim` and `useModalAnimation("slide")` | gorhom's default 15px radius, a sheet's own background, handle or black backdrop literal |
 
 ## Families
@@ -43,13 +43,13 @@ Three token channels exist in code, and the kit draws all three from the same to
 | `FightButton` | `components/match-flow/fight/fight-ui.tsx` | Thin match-flow alias of `Button` (primary / secondary / ghost) |
 | `OutlineAction` | `components/arena/strip-primitives.tsx` | Canonical compact action: 28px tall, `radius-tag`, `hairline-strong`, `action-sm` label, 44px hit area |
 | `SteelSheen` | `components/ui/steel-sheen.tsx` | Ambient sweep on a waiting-on-you button (Accept, Confirm result) |
-| shadcn `Button` | `components/ui/button.tsx` | Legacy, deprecated: the update banner only (WP4 deletes it); white label on red (3.54:1) |
+| shadcn `Button` | `components/ui/button.tsx` | Deleted by WP4; the update banner, its last caller, is on the unified `Button` |
 
 Cards (Actions family): **Button** (primary, secondary, ghost, destructive outline in `negative`; states rest, pressed, disabled, busy) and **OutlineAction**.
 
 ### Status and badges
 
-`MetaTag` (21 sites) is the canonical tag: `hairline` border, `radius-tag`, `meta-label` text in `ink-2`. `OutcomeTag` and `LivePill` are semantic wrappers. `CountPill` (`components/ui/count-pill.tsx`) is the filled count: `signal-red` fill, `on-signal` 9px mono bold digits, `radius-tag`, shared by the header bell and the tab bar. `HeaderStatusChip` (`components/layout/header-status-chip.tsx`) sits on every tab root and says live (`gain-green` edge), neutral (`ink-3` edge) or incoming (`signal-red` edge). Overlapping tags (`FilmBadge`, `HudTag`, participant `StatusBadge`, shadcn `Badge`) fold into one tag with tones.
+`MetaTag` (21 sites) is the canonical tag: `hairline` border, `radius-tag`, `meta-label` text in `ink-2`. `OutcomeTag` and `LivePill` are semantic wrappers. `CountPill` (`components/ui/count-pill.tsx`) is the filled count: `signal-red` fill, `on-signal` 9px mono bold digits, `radius-tag`, shared by the header bell and the tab bar. `HeaderStatusChip` (`components/layout/header-status-chip.tsx`) sits on every tab root and says live (`gain-green` edge), neutral (`ink-3` edge) or incoming (`signal-red` edge). Overlapping tags (`FilmBadge`, `HudTag`, participant `StatusBadge`) fold into one tag with tones. `Badge` (`components/ui/badge.tsx`, admin members) already is that tag since WP4: the `MetaTag` look with tones `default` (`hairline-strong` border, `ink`), `secondary` (`plate` fill, `ink-2`), `destructive` (`negative`), `success` (`gain-green`, wins only) and `outline` (exactly `MetaTag`).
 
 Cards (Status family): **MetaTag**, **LivePill** (with LiveDot), **CountPill** (with tab badges). The header status chip is drawn in the AppHeader card.
 
@@ -81,7 +81,7 @@ Cards: **Plate** (Surfaces family); **OnAirStrip** and **ChallengeStrip** (incom
 
 ### Feedback and loading
 
-`toast` + `BrandToast` (`components/ui/toast.tsx`, 89 calls) is canonical: `plate` fill, `hairline-strong` border, `radius-plate`, a 3px left rule (success `ink`, deliberately not green; error `signal-red`; info `ink-3`), `toast-title` plus `body-12`, no shadow. The skeleton set (`components/ui/skeleton/skeleton.tsx`) runs one shared 1400ms shimmer clock. Skeleton bars (`SkeletonBlock`) are `plate-bright` (`bg-surface-4`), one tier above their host plate (`Plate`, `SkeletonPlate`, the rank and participant rows), with an `ink` band at 8% opacity, so they read at rest and under Reduce Motion (WP6, bead jits-3eeg.7). Banners (offline, update, upload progress, queue status) have no shared shell yet; the offline banner is a legacy red bar (R3 SC-1, WP4).
+`toast` + `BrandToast` (`components/ui/toast.tsx`, 89 calls) is canonical: `plate` fill, `hairline-strong` border, `radius-plate`, a 3px left rule (success `ink`, deliberately not green; error `signal-red`; info `ink-3`), `toast-title` plus `body-12`, no shadow. The skeleton set (`components/ui/skeleton/skeleton.tsx`) runs one shared 1400ms shimmer clock. Skeleton bars (`SkeletonBlock`) are `plate-bright` (`bg-surface-4`), one tier above their host plate (`Plate`, `SkeletonPlate`, the rank and participant rows), with an `ink` band at 8% opacity, so they read at rest and under Reduce Motion (WP6, bead jits-3eeg.7). Banners (offline, update, upload progress, queue status) have no shared shell yet. Since WP4 the offline banner is a `panel` bar with a `hairline-strong` bottom edge and mono caps `ink` copy (R3 SC-1), the update banner is a `panel` card with a `hairline-strong` border, `ink` text and a `secondary` RESTART `Button`, and the critical update modal sits on `void` with `ink` / `ink-2` text (R3 SC-2).
 
 Cards (Feedback family): **Toast**, **Skeleton**.
 

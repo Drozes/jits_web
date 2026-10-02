@@ -19,7 +19,7 @@ Chip is the tappable filter and segment pill: a plate-tier box with a strong hai
 | selected (today) | `plate` | `signal-red` | `ink`, plus a 6px `signal-red` square 7px before it |
 | pressed | unchanged | unchanged | 0.7 opacity (`active:opacity-70`) |
 
-Padding 10.5px x 7px (`px-3 py-2`). Rows of chips sit 8px apart (`GenderFilterRow`, the Fighters/Gyms switch on Rankings). Chip plus a chip row is the kit's segmented control; the shadcn `Tabs` is unused.
+Padding 10.5px x 7px (`px-3 py-2`). Rows of chips sit 8px apart (`GenderFilterRow`, the Fighters/Gyms switch on Rankings). Chip plus a chip row is the kit's segmented control; the shadcn `Tabs` was deleted (WP4).
 
 ## Tokens used
 
