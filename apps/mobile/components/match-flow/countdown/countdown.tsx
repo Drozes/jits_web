@@ -3,16 +3,23 @@ import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { duration, easing, useReduceMotion } from "@/lib/motion";
+// The match-flow name for the one haptics vocabulary (same object as
+// `haptics` in @/lib/motion), so the match-flow suites' mocks intercept it.
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
-import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
 import { ON_MEDIA } from "@/lib/theme/palette";
-import { FIGHT_EASING, FIGHT_RADIUS } from "../fight/fight-tokens";
+import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { Mono } from "../fight/fight-ui";
 import { FaceoffChip, type FaceoffAthlete } from "../faceoff/faceoff-top";
 
 /** 3, 2, 1: the countdown runs this long from the server's `started_at`. */
 export const COUNTDOWN_MS = 3_000;
-const EASE = Easing.bezier(...FIGHT_EASING);
+const EASE = easing.brandOut;
+/** Countdown slam: each numeral (and GO) drops in from this scale... */
+export const SLAM_FROM_SCALE = 1.6;
+/** ...and lands in about this long, with a small ease-out back overshoot. */
+export const SLAM_MS = 140;
+const SLAM_EASE = Easing.out(Easing.back(1.7));
 
 /** The numeral showing `msLeft` before GO: 3, 2 or 1 (0 once it is GO). */
 export function countdownNumeral(msLeft: number): number {
@@ -41,8 +48,11 @@ export function numeralSize(windowHeight: number): number {
  * wizard's camera is already full screen underneath on the live step). Both
  * phones time it from the server's `started_at`, so they reach GO together;
  * the recorder (when opted in) arms at GO, when the live step mounts.
- * One heavy haptic per numeral. Reduce Motion shows the numerals without
- * the scale-in. Over the camera it is dark in both app themes (ON_MEDIA).
+ * Countdown slam (Motion Rule registry): each numeral drops in from 1.6x
+ * and lands, a Signal Red bar drains across the bottom to GO, and each
+ * numeral fires one `countdownTick` (GO's `countdownGo` is fired by
+ * `LiveStage`). Reduce Motion crossfades the numerals with a static bar,
+ * haptics kept. Over the camera it is dark in both app themes (ON_MEDIA).
  */
 export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWeight }: CountdownProps) {
   const insets = useSafeAreaInsets();
@@ -64,32 +74,63 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
     return () => clearTimeout(t);
   }, [goAt, numeral]);
 
-  const progress = useSharedValue(Math.max(0, Math.min(1, 1 - (goAt - Date.now()) / COUNTDOWN_MS)));
+  // The Signal Red bar drains from full to empty over the whole countdown,
+  // on the UI thread (scaleX from the left edge). It runs to GO exactly, so
+  // it never changes when the match starts. Reduce Motion: a static bar.
+  const remaining = useSharedValue(Math.max(0, Math.min(1, (goAt - Date.now()) / COUNTDOWN_MS)));
   React.useEffect(() => {
-    const left = Math.max(0, goAt - Date.now());
-    progress.value = withTiming(1, { duration: left, easing: Easing.linear });
-  }, [goAt, progress]);
-  const barStyle = useAnimatedStyle(() => ({ width: `${Math.round(progress.value * 100)}%` }));
-
-  const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
-  const lastRef = React.useRef<number | null>(null);
-  React.useEffect(() => {
-    if (numeral === 0 || lastRef.current === numeral) return;
-    lastRef.current = numeral;
-    void matchHaptics.countdownTick?.();
     if (reduceMotion) {
-      scale.value = 1;
-      opacity.value = 1;
+      remaining.value = 1;
       return;
     }
-    scale.value = 1.35;
+    const left = Math.max(0, goAt - Date.now());
+    remaining.value = Math.max(0, Math.min(1, left / COUNTDOWN_MS));
+    remaining.value = withTiming(0, { duration: left, easing: Easing.linear });
+  }, [goAt, reduceMotion, remaining]);
+  const barStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: remaining.value }] }));
+
+  // Countdown slam: each NEW numeral drops in from 1.6x and lands, with one
+  // `countdownTick`. Keyed on the numeral, so a re-render with the same
+  // numeral neither replays the slam nor buzzes again. Reduce Motion: the
+  // numerals crossfade (the outgoing one fades out over the incoming one),
+  // haptics kept.
+  // The first numeral's first frame is already the start of its slam, so it
+  // never paints once at rest before jumping to 1.6x.
+  const slamFirst = !reduceMotion && numeral > 0;
+  const scale = useSharedValue(slamFirst ? SLAM_FROM_SCALE : 1);
+  const opacity = useSharedValue(slamFirst ? 0 : 1);
+  const outOpacity = useSharedValue(0);
+  const lastRef = React.useRef<number | null>(null);
+  // Read during render, before the effect below records the new numeral:
+  // the numeral this render replaces, drawn (Reduce Motion only) fading out.
+  const outgoing = lastRef.current !== null && lastRef.current !== numeral ? lastRef.current : null;
+  React.useEffect(() => {
+    if (numeral === 0 || lastRef.current === numeral) return;
+    const hadPrevious = lastRef.current !== null;
+    lastRef.current = numeral;
+    void matchHaptics.countdownTick();
+    if (reduceMotion) {
+      scale.value = 1;
+      if (hadPrevious) {
+        opacity.value = 0;
+        outOpacity.value = 1;
+        opacity.value = withTiming(1, { duration: duration.fast, easing: EASE });
+        outOpacity.value = withTiming(0, { duration: duration.fast, easing: EASE });
+      } else {
+        opacity.value = 1;
+        outOpacity.value = 0;
+      }
+      return;
+    }
+    outOpacity.value = 0;
+    scale.value = SLAM_FROM_SCALE;
     opacity.value = 0;
-    scale.value = withTiming(1, { duration: 450, easing: EASE });
-    opacity.value = withTiming(1, { duration: 300, easing: EASE });
-  }, [numeral, reduceMotion, scale, opacity]);
+    scale.value = withTiming(1, { duration: SLAM_MS, easing: SLAM_EASE });
+    opacity.value = withTiming(1, { duration: duration.instant, easing: EASE });
+  }, [numeral, reduceMotion, scale, opacity, outOpacity]);
 
   const numeralStyle = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ scale: scale.value }] }));
+  const outgoingStyle = useAnimatedStyle(() => ({ opacity: outOpacity.value }));
   const size = numeralSize(window.height);
 
   return (
@@ -112,7 +153,14 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
         accessibilityLabel={numeral > 0 ? `Match starts in ${numeral}` : "Go"}
         style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
       >
-        <Animated.View style={numeralStyle}>
+        {reduceMotion && outgoing !== null ? (
+          <Animated.View testID="countdown-numeral-out" pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }, outgoingStyle]}>
+            <Text testID="countdown-numeral-outgoing" className="font-display" style={{ fontSize: size, lineHeight: size, color: ON_MEDIA.white }}>
+              {outgoing > 0 ? String(outgoing) : ""}
+            </Text>
+          </Animated.View>
+        ) : null}
+        <Animated.View testID="countdown-numeral-slam" style={numeralStyle}>
           <Text testID="countdown-numeral" className="font-display" style={{ fontSize: size, lineHeight: size, color: ON_MEDIA.white }}>
             {numeral > 0 ? String(numeral) : ""}
           </Text>
@@ -129,7 +177,7 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
         }}
       >
         <View style={{ width: "100%", height: 3, backgroundColor: ON_MEDIA.track }}>
-          <Animated.View testID="countdown-progress" style={[{ height: 3, backgroundColor: ON_MEDIA.cta }, barStyle]} />
+          <Animated.View testID="countdown-progress" style={[{ width: "100%", height: 3, backgroundColor: ON_MEDIA.cta, transformOrigin: "left" }, barStyle]} />
         </View>
         {/* Landscape has no room under the numeral for the caption or the
             athlete chip; the numeral and the bar carry it there. */}
@@ -144,20 +192,25 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
   );
 }
 
-/** "GRAPPLE", held briefly over the live screen at GO. */
+/**
+ * "GRAPPLE", the red GO, held briefly over the live screen at GO. It slams
+ * in like the numerals (from 1.6x, landing in about 140 ms), then fades. The
+ * `countdownGo` haptic is fired by `LiveStage` at GO, not here, so a remount
+ * of this flash never buzzes. Reduce Motion: shown still, then removed.
+ */
 export function GoFlash() {
   const reduceMotion = useReduceMotion();
   const opacity = useSharedValue(1);
-  const scale = useSharedValue(reduceMotion ? 1 : 0.9);
+  const scale = useSharedValue(reduceMotion ? 1 : SLAM_FROM_SCALE);
   React.useEffect(() => {
     if (reduceMotion) return;
-    scale.value = withTiming(1, { duration: 300, easing: EASE });
+    scale.value = withTiming(1, { duration: SLAM_MS, easing: SLAM_EASE });
     opacity.value = withTiming(0, { duration: 700, easing: Easing.in(Easing.quad) });
   }, [reduceMotion, opacity, scale]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ scale: scale.value }] }));
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]}>
-      <Animated.View style={style}>
+      <Animated.View testID="countdown-go-slam" style={style}>
         <Text
           testID="countdown-go"
           accessibilityLiveRegion="assertive"
