@@ -34,6 +34,7 @@ import {
 import { REDUCED_PRESS_OPACITY } from "@/components/ui/pressable-scale";
 import { PRESSED_OPACITY } from "@/components/ui/state-pressable";
 import { BROADCAST } from "@/components/match-flow/live/broadcast-tokens";
+import { onMediaTokens } from "@/lib/tokens";
 import { ON_MEDIA } from "@/lib/theme/palette";
 import { lightTokens as t } from "@/lib/tokens";
 import { PRESS_SCALE, __setReduceMotionForTests } from "@/lib/motion";
@@ -119,11 +120,14 @@ describe("Button variants", () => {
   it("glass: the fixed on-media glass whatever the theme, white label", () => {
     const s = render(<Button testID="b" variant="glass" label="Allow camera" onPress={jest.fn()} />);
     const st = flat(s.getByTestId("b"));
+    expect(st.backgroundColor).toBe(onMediaTokens.glassStrong);
+    expect(st.borderColor).toBe(onMediaTokens.strong);
+    // The same glass as the live screen's Pause (one on-media source).
     expect(st.backgroundColor).toBe(BROADCAST.glassFill);
     expect(st.borderColor).toBe(BROADCAST.glassBorder);
     expect(labelColor(s.getByText("Allow camera"))).toBe(ON_MEDIA.white);
     fireEvent(s.getByTestId("b"), "pressIn", {});
-    expect(flat(s.getByTestId("b")).backgroundColor).toBe(BROADCAST.glassFillPressed);
+    expect(flat(s.getByTestId("b")).backgroundColor).toBe(onMediaTokens.glassPressed);
   });
 });
 

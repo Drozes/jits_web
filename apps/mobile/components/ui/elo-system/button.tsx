@@ -27,13 +27,12 @@
  */
 import * as React from "react";
 import { ActivityIndicator, Text, View, type Insets, type StyleProp, type ViewStyle } from "react-native";
-import { ON_MEDIA } from "@/lib/theme/palette";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
+import { onMediaTokens } from "@/lib/tokens";
 import { PressableScale, type PressHaptic } from "@/components/ui/pressable-scale";
 import { PRESSED_OPACITY } from "@/components/ui/state-pressable";
 import { SteelSheen } from "@/components/ui/steel-sheen";
-import { BROADCAST } from "@/components/match-flow/live/broadcast-tokens";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "destructive" | "glass";
 
@@ -141,9 +140,10 @@ function useVariantLook(variant: ButtonVariant): VariantLook {
       };
     case "glass":
       return {
-        fg: ON_MEDIA.white,
-        base: { backgroundColor: BROADCAST.glassFill, borderWidth: 1, borderColor: BROADCAST.glassBorder },
-        pressed: { backgroundColor: BROADCAST.glassFillPressed },
+        // The shared on-media glass (the live screen's glass buttons).
+        fg: onMediaTokens.white,
+        base: { backgroundColor: onMediaTokens.glassStrong, borderWidth: 1, borderColor: onMediaTokens.strong },
+        pressed: { backgroundColor: onMediaTokens.glassPressed },
       };
     case "ghost":
     default:
