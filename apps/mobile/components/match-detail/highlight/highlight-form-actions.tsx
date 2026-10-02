@@ -22,7 +22,7 @@ export function HighlightFormActions({ form, progress }: Props) {
   return (
     <View className="gap-2">
       {form.error ? (
-        <Text testID="highlight-feedback-error" accessibilityRole="alert" className="font-body text-[12px] text-ink">
+        <Text testID="highlight-feedback-error" accessibilityRole="alert" className="font-body text-small text-ink">
           {form.error}
         </Text>
       ) : null}
@@ -35,7 +35,7 @@ export function HighlightFormActions({ form, progress }: Props) {
         />
       ) : null}
       {helper ? (
-        <Text testID="highlight-regenerate-helper" className="font-body text-[12px] text-ink-3">
+        <Text testID="highlight-regenerate-helper" className="font-body text-small text-ink-3">
           <MonoNumbers text={helper} />
         </Text>
       ) : null}
@@ -51,7 +51,7 @@ export function HighlightFormActions({ form, progress }: Props) {
           sendDisabled ? "opacity-50" : "active:bg-surface-4",
         )}
       >
-        <Text className="font-heading text-[12px] uppercase tracking-caps text-ink">{HIGHLIGHT_COPY.justSend}</Text>
+        <Text className="font-heading text-small uppercase tracking-caps text-ink">{HIGHLIGHT_COPY.justSend}</Text>
       </Pressable>
     </View>
   );

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { ON_MEDIA } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import type { CardStatus } from "@/lib/film-room/card-status";
 
 type Tone = "light" | "amber" | "outline" | "red";
@@ -52,7 +53,7 @@ export function FilmBadge({
         style,
       ]}
     >
-      <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: t.fg }}>
+      <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: t.fg }, TABULAR]}>
         {label}
       </Text>
     </View>

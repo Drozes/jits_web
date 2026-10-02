@@ -21,10 +21,10 @@ export function ShareReturned({ caption, clipboard, onCopy, onDone }: ShareRetur
   return (
     <View testID="share-returned" className="gap-4">
       <View className="gap-1">
-        <Text accessibilityRole="header" className="font-heading text-[16px] text-ink">
+        <Text accessibilityRole="header" className="font-heading text-subhead text-ink">
           {SHARE_COPY.returnedTitle}
         </Text>
-        <Text className="font-body text-[13px] text-ink-2">{SHARE_COPY.returnedBody}</Text>
+        <Text className="font-body text-body text-ink-2">{SHARE_COPY.returnedBody}</Text>
       </View>
       <CaptionCard caption={caption} clipboard={clipboard} showCopyButton={false} onCopy={onCopy} />
       {clipboard ? (

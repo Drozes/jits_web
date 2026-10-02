@@ -28,7 +28,7 @@ export function OutcomeToggle({
   const tokens = useThemedTokens();
   return (
     <View className="gap-2">
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
         Outcome
       </Text>
       <View className="flex-row gap-2 rounded-md bg-surface-3 border border-hairline-strong p-1">
@@ -59,7 +59,7 @@ export function OutcomeToggle({
               )}
               <Text
                 className={cn(
-                  "font-heading text-[11px] uppercase tracking-caps",
+                  "font-heading text-caption uppercase tracking-caps",
                   active ? "text-ink" : "text-ink-3",
                 )}
               >
@@ -89,7 +89,7 @@ export function WinnerPicker({
 }) {
   return (
     <View className="gap-2">
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
         Winner
       </Text>
       <View className="flex-row gap-2">
@@ -110,7 +110,7 @@ export function WinnerPicker({
               {active ? <SelectCheck size={12} /> : null}
               <Text
                 className={cn(
-                  "shrink text-center font-heading text-[12px] uppercase tracking-caps",
+                  "shrink text-center font-heading text-small uppercase tracking-caps",
                   active ? "text-ink" : "text-ink-2",
                 )}
                 numberOfLines={1}

@@ -21,6 +21,7 @@ import {
   TYPE_STEP_NAMES,
   numeralTracking,
   stepForSize,
+  nearestStep,
   typeSize,
   typeStep,
   type TrackingStep,
@@ -63,6 +64,25 @@ describe("the scale itself", () => {
     }
     expect(stepForSize(9)).toBeUndefined();
     expect(stepForSize(15)).toBeUndefined();
+  });
+
+  it("nearestStep snaps a computed size to the nearest step", () => {
+    // Exact sizes map to their own step.
+    expect(nearestStep(13)).toBe("body");
+    expect(nearestStep(240)).toBe("display-240");
+    // Off-scale sizes snap to the nearest one (tile initials and the Film Room VS).
+    expect(nearestStep(88 * 0.33)).toBe("headline-2xl"); // 29.04: the 88px tile initials
+    expect(nearestStep(34)).toBe("display-36");
+    expect(nearestStep(26.4)).toBe("headline-l");
+    // A tie goes to the smaller step: 15 (14 / 16), 29 (28 / 30), 33 (30 / 36), 38 (36 / 40).
+    expect(nearestStep(15)).toBe("callout");
+    expect(nearestStep(29)).toBe("headline-xl");
+    expect(nearestStep(33)).toBe("headline-2xl");
+    expect(nearestStep(38)).toBe("display-36");
+    // Both ends clamp: below the floor snaps up to micro, above the scale down to display-240.
+    expect(nearestStep(0)).toBe("micro");
+    expect(nearestStep(8)).toBe("micro");
+    expect(nearestStep(1000)).toBe("display-240");
   });
 
   it("typeStep returns a fresh style object with the step's size and line", () => {

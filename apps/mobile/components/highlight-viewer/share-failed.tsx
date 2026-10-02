@@ -18,7 +18,7 @@ interface ShareFailedProps {
 export function ShareFailed({ error, onRetry, onFallback }: ShareFailedProps) {
   return (
     <View testID={`share-failed-${error.kind}`} className="gap-3">
-      <Text testID="share-error" className="font-body text-[13px] text-ink">
+      <Text testID="share-error" className="font-body text-body text-ink">
         {error.message}
       </Text>
       {error.retryable ? (

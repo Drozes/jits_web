@@ -60,14 +60,14 @@ export function PracticeSummary({
         }
       />
       <Plate className="items-center gap-2">
-        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
           Practice complete
         </Text>
-        <Text testID="practice-verdict" className="font-display text-[36px] text-ink tracking-mark">
+        <Text testID="practice-verdict" className="font-display text-display-36 text-ink tracking-mark">
           {verdict(result, athleteId)}
         </Text>
-        <Text className="font-body text-[13px] text-ink">Practice: rating unchanged</Text>
-        <Text className="font-body text-[12px] text-ink-2">Nobody else sees this.</Text>
+        <Text className="font-body text-body text-ink">Practice: rating unchanged</Text>
+        <Text className="font-body text-small text-ink-2">Nobody else sees this.</Text>
       </Plate>
       {localUri && watching ? (
         <Video

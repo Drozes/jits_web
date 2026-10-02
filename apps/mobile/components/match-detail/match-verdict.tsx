@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Text, View } from "react-native";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { formatClock } from "@jits/shared/utils";
 import type { MatchDetailView } from "@jits/shared/api/queries";
 import { usePalette, TABULAR, type Palette } from "@/lib/theme/palette";
@@ -47,39 +48,39 @@ export function MatchVerdict({ view }: { view: MatchDetailView }) {
   return (
     <View testID="match-result-header" style={{ gap: 8 }}>
       <View className="flex-row items-end justify-between" style={{ gap: 12 }}>
-        <Text testID="match-verdict" className="font-display" style={{ fontSize: 52, lineHeight: 52, letterSpacing: 0.8, color: p.text }}>
+        <Text testID="match-verdict" className="font-display" style={[typeStep("display-52"), { lineHeight: 52, letterSpacing: TRACKING.loose, color: p.text }]}>
           {verdict}
         </Text>
         {muted ? (
-          <Text className="font-body" style={{ fontSize: 12, color: p.text2, paddingBottom: 6 }}>
+          <Text className="font-body" style={[typeStep("small"), { color: p.text2, paddingBottom: 6 }]}>
             Rating unchanged
           </Text>
         ) : hasDelta ? (
           <View className="items-end" style={{ gap: 5, paddingBottom: 3 }}>
-            <Text testID="match-elo-delta" className="font-mono-bold" style={[{ fontSize: 18, color: deltaColor(me.elo_delta, p) }, TABULAR]}>
+            <Text testID="match-elo-delta" className="font-mono-bold" style={[typeStep("title"), { color: deltaColor(me.elo_delta, p) }, TABULAR]}>
               {deltaLabel(me.elo_delta)}
             </Text>
             {me.elo_before != null && me.elo_after != null ? (
-              <Text className="font-mono-medium" style={[{ fontSize: 11, letterSpacing: 0.56, color: p.text2 }, TABULAR]}>
+              <Text className="font-mono-medium" style={[typeStep("caption"), { letterSpacing: TRACKING.loose, color: p.text2 }, TABULAR]}>
                 {me.elo_before} {"→"} {me.elo_after}
               </Text>
             ) : null}
           </View>
         ) : null}
       </View>
-      <Text testID="match-verdict-line" className="font-mono-medium uppercase" style={{ fontSize: 11, lineHeight: 16, letterSpacing: 0.8, color: p.text2 }}>
+      <Text testID="match-verdict-line" className="font-mono-medium uppercase" style={[typeStep("caption"), { lineHeight: 16, letterSpacing: TRACKING.caps, color: p.text2 }, TABULAR]}>
         {verdictLine(view)}
       </Text>
       {muted ? (
         <View testID="match-muted-badge" className="self-start" style={{ borderWidth: 1, borderColor: p.strong, borderRadius: 2, paddingHorizontal: 8, paddingVertical: 4 }}>
-          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: p.text2 }}>
+          <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}>
             {muted}
           </Text>
         </View>
       ) : null}
       {match.status === "disputed" ? (
         <View testID="match-disputed-badge" className="self-start" style={{ borderWidth: 1, borderColor: p.amberRule, borderRadius: 2, paddingHorizontal: 8, paddingVertical: 4 }}>
-          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: p.amber }}>
+          <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.amber }, TABULAR]}>
             DISPUTED · UNDER REVIEW
           </Text>
         </View>

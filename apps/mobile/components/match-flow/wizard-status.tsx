@@ -14,7 +14,7 @@ export function WizardLoading() {
   return (
     <View className="flex-1 items-center justify-center bg-surface gap-3">
       <ActivityIndicator color={tokens.textSecondary} />
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
         Loading match...
       </Text>
     </View>
@@ -43,11 +43,11 @@ export function WizardError({
   const router = useRouter();
   return (
     <View className="flex-1 items-center justify-center bg-surface px-6 gap-3">
-      <Text className="font-heading text-[14px] text-ink uppercase tracking-caps text-center">
+      <Text className="font-heading text-callout text-ink uppercase tracking-caps text-center">
         {title}
       </Text>
       {message ? (
-        <Text className="text-center font-body text-[13px] text-ink-2">{message}</Text>
+        <Text className="text-center font-body text-body text-ink-2">{message}</Text>
       ) : null}
       <Button
         testID="wizard-error-exit"

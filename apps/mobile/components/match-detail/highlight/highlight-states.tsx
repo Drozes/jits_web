@@ -6,7 +6,7 @@ import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 /** A muted one-liner (waiting, none, invalidated, notes). */
 export function HighlightNote({ testID, children }: { testID?: string; children: string }) {
   return (
-    <Text testID={testID} className="font-body text-[12px] text-ink-3">
+    <Text testID={testID} className="font-body text-small text-ink-3">
       {children}
     </Text>
   );
@@ -27,7 +27,7 @@ interface FailedProps {
 export function HighlightFailed({ errorMessage, canRetry, busy, onRetry }: FailedProps) {
   return (
     <View testID="highlight-failed" className="gap-3">
-      <Text className="font-body text-[13px] text-ink">{HIGHLIGHT_COPY.failed}</Text>
+      <Text className="font-body text-body text-ink">{HIGHLIGHT_COPY.failed}</Text>
       {errorMessage ? <HighlightNote testID="highlight-error-reason">{errorMessage}</HighlightNote> : null}
       {canRetry ? (
         <Pressable
@@ -42,7 +42,7 @@ export function HighlightFailed({ errorMessage, canRetry, busy, onRetry }: Faile
             busy && "opacity-50",
           )}
         >
-          <Text className="font-heading text-[12px] uppercase tracking-caps text-ink">
+          <Text className="font-heading text-small uppercase tracking-caps text-ink">
             {HIGHLIGHT_COPY.tryAgain}
           </Text>
         </Pressable>

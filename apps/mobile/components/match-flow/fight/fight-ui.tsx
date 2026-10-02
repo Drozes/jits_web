@@ -2,6 +2,7 @@ import * as React from "react";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { ON_MEDIA, usePalette, type Palette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "./fight-tokens";
+import { TRACKING, typeSize, typeStep, type TrackingStep, type TypeStep } from "@/lib/typography";
 import { Button, type ButtonProps } from "@/components/ui/elo-system/button";
 
 /**
@@ -41,9 +42,18 @@ export function shortName(name: string | null | undefined): string {
 interface MonoProps {
   children: React.ReactNode;
   color?: string;
-  size?: number;
+  /**
+   * A type-scale step (lib/typography.ts). Default `micro` (10px). A raw
+   * number is accepted only so call sites outside the WP5b sweep keep
+   * compiling until they migrate; new code passes a step.
+   */
+  size?: TypeStep | number;
   bold?: boolean;
-  spacing?: number;
+  /**
+   * A tracking step. Default `caps-xl` (2.52px). A raw number is accepted only
+   * for call sites not yet migrated; new code passes a step.
+   */
+  spacing?: TrackingStep | number;
   testID?: string;
   numberOfLines?: number;
   style?: StyleProp<ViewStyle>;
@@ -53,8 +63,10 @@ interface MonoProps {
 }
 
 /** JetBrains Mono caps label. */
-export function Mono({ children, color, size = 10, bold = false, spacing = 2.52, testID, numberOfLines, accessibilityLabel, maxFontSizeMultiplier }: MonoProps) {
+export function Mono({ children, color, size = "micro", bold = false, spacing = "caps-xl", testID, numberOfLines, accessibilityLabel, maxFontSizeMultiplier }: MonoProps) {
   const p = usePalette();
+  const sizeStyle = typeof size === "number" ? { fontSize: size } : typeStep(size);
+  const letterSpacing = typeof spacing === "number" ? spacing : TRACKING[spacing];
   return (
     <Text
       testID={testID}
@@ -62,7 +74,7 @@ export function Mono({ children, color, size = 10, bold = false, spacing = 2.52,
       numberOfLines={numberOfLines}
       maxFontSizeMultiplier={maxFontSizeMultiplier}
       className={bold ? "font-mono-bold" : "font-mono-medium"}
-      style={[{ fontSize: size, letterSpacing: spacing, color: color ?? p.text2 }, TABULAR]}
+      style={[sizeStyle, { letterSpacing, color: color ?? p.text2 }, TABULAR]}
     >
       {children}
     </Text>
@@ -94,7 +106,12 @@ export function InitialsBlock({
 }: {
   name: string;
   size: number | "fill";
-  fontSize: number;
+  /**
+   * A type-scale step for the initials (size only: the glyph is centered in a
+   * fixed box, so no line height is set). A raw number is accepted only for
+   * call sites not yet migrated.
+   */
+  fontSize: TypeStep | number;
   /** Dynamic Type cap for the initials (the block is a fixed size). */
   maxFontSizeMultiplier?: number;
   /** Bebas Neue instead of DM Sans. */
@@ -125,7 +142,10 @@ export function InitialsBlock({
       <Text
         maxFontSizeMultiplier={maxFontSizeMultiplier}
         className={display ? "font-display" : "font-heading"}
-        style={{ fontSize, letterSpacing: 1, color: p.text }}
+        style={[
+          typeof fontSize === "number" ? { fontSize } : typeSize(fontSize),
+          { letterSpacing: TRACKING.caps, color: p.text },
+        ]}
       >
         {initialsOf(name)}
       </Text>
@@ -196,7 +216,7 @@ export function StakesStrip({
             numberOfLines={lines}
             maxFontSizeMultiplier={maxFontSizeMultiplier}
             className="font-mono-bold"
-            style={[{ fontSize: 16, color: c.key === "draw" ? (c.value < 0 ? p.amber : p.text) : deltaColor(c.value, p) }, TABULAR]}
+            style={[typeStep("subhead"), { color: c.key === "draw" ? (c.value < 0 ? p.amber : p.text) : deltaColor(c.value, p) }, TABULAR]}
           >
             {formatSignedDelta(c.value)}
           </Text>
@@ -246,13 +266,13 @@ export function StatusPlate({
       }}
     >
       {done ? (
-        <Text className="font-mono-bold" style={{ fontSize: 12, color }}>
+        <Text className="font-mono-bold" style={[typeStep("small"), { color }, TABULAR]}>
           {"✓"}
         </Text>
       ) : (
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
       )}
-      <Mono bold color={color} spacing={1.68} numberOfLines={1}>
+      <Mono bold color={color} spacing="caps-l" numberOfLines={1}>
         {label}
       </Mono>
     </View>
@@ -299,14 +319,14 @@ export function RatingBlock({
       <View style={{ gap: 6 }}>
         <Mono color={p.text3}>{label}</Mono>
         {ratingNode ?? (
-          <Text className="font-mono-bold" style={[{ fontSize: 22, color: p.text }, TABULAR]}>
+          <Text className="font-mono-bold" style={[typeStep("title-xl"), { color: p.text }, TABULAR]}>
             {ratingText}
           </Text>
         )}
       </View>
       {deltaNode ??
         (delta != null && delta !== 0 ? (
-          <Text testID={deltaTestID} className="font-mono-bold" style={[{ fontSize: 26, color: deltaColor(delta, p) }, TABULAR]}>
+          <Text testID={deltaTestID} className="font-mono-bold" style={[typeStep("headline-l"), { color: deltaColor(delta, p) }, TABULAR]}>
             {formatSignedDelta(delta)}
           </Text>
         ) : null)}

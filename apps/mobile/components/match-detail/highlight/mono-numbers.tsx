@@ -1,8 +1,6 @@
 import * as React from "react";
 import { Text } from "react-native";
-
-/** Tabular mono for digits inside a label, whatever the label's own font. */
-const MONO_STYLE = { fontVariant: ["tabular-nums" as const] };
+import { TABULAR } from "@/lib/typography";
 
 /**
  * Children for a `Text`: `text` with every run of digits wrapped in a nested
@@ -15,7 +13,7 @@ export function MonoNumbers({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         /^\d+$/.test(part) ? (
-          <Text key={i} testID="mono-number" className="font-mono" style={MONO_STYLE}>
+          <Text key={i} testID="mono-number" className="font-mono" style={TABULAR}>
             {part}
           </Text>
         ) : (

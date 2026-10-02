@@ -48,16 +48,16 @@ export function ResultBanner({
 
   return (
     <Plate variant={variant} className="items-center gap-2">
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
         {kicker}
       </Text>
       <Text
         testID="confirm-verdict"
-        className={cn("font-display text-[36px] tracking-mark", verdictColor)}
+        className={cn("font-display text-display-36 tracking-mark", verdictColor)}
       >
         {verdictText}
       </Text>
-      <Text className="text-center font-body text-[12px] text-ink-2">
+      <Text className="text-center font-body text-small text-ink-2">
         {subtitle ??
           "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review."}
       </Text>
@@ -121,14 +121,14 @@ export function ConfirmPanel({
       )}
       <Text
         className={cn(
-          "w-full text-center font-heading text-[11px] uppercase tracking-caps",
+          "w-full text-center font-heading text-caption uppercase tracking-caps",
           confirmed ? "text-ink" : "text-ink-2",
         )}
         numberOfLines={1}
       >
         {label}
       </Text>
-      <Text className="font-body text-[12px] text-ink-3" numberOfLines={1}>
+      <Text className="font-body text-small text-ink-3" numberOfLines={1}>
         {STATUS_COPY[state]}
       </Text>
     </View>

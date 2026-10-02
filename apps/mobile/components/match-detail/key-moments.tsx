@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { PlayCircle } from "lucide-react-native";
 import { formatClock, type KeyMoment } from "@jits/shared/utils";
 import { usePalette, TABULAR } from "@/lib/theme/palette";
@@ -46,11 +47,11 @@ export function KeyMoments({ moments, durationS, tags, onJump }: KeyMomentsProps
   return (
     <View testID="key-moments" style={{ gap: 10 }}>
       <View className="flex-row items-center justify-between">
-        <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text }}>
+        <Text accessibilityRole="header" className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-xl"], color: p.text }, TABULAR]}>
           KEY MOMENTS
         </Text>
         {moments.length > 0 ? (
-          <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: p.text3 }}>
+          <Text className="font-mono-medium" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text3 }, TABULAR]}>
             TAP TO JUMP
           </Text>
         ) : null}
@@ -67,15 +68,15 @@ export function KeyMoments({ moments, durationS, tags, onJump }: KeyMomentsProps
             className="flex-row items-center active:opacity-70"
             style={{ height: 52, gap: 14, borderBottomWidth: 1, borderBottomColor: p.hairline }}
           >
-            <Text className="font-mono-bold" style={[{ width: 44, fontSize: 13, color: p.text }, TABULAR]}>
+            <Text className="font-mono-bold" style={[typeStep("body"), { width: 44, color: p.text }, TABULAR]}>
               {formatClock(m.t)}
             </Text>
-            <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={{ fontSize: 14, letterSpacing: 0.4, color: p.text }}>
+            <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={[typeStep("callout"), { letterSpacing: TRACKING.loose, color: p.text }]}>
               {m.label}
             </Text>
             {m.kind === "finish" ? (
               <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.strong, justifyContent: "center" }}>
-                <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: p.text }}>
+                <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text }, TABULAR]}>
                   FINISH
                 </Text>
               </View>
@@ -88,7 +89,7 @@ export function KeyMoments({ moments, durationS, tags, onJump }: KeyMomentsProps
         <View testID="technique-tags" className="flex-row flex-wrap" style={{ gap: 6 }}>
           {tags.map((t) => (
             <View key={t} style={{ height: 26, paddingHorizontal: 9, borderRadius: 2, borderWidth: 1, borderColor: p.hairline, backgroundColor: p.secondaryBg, justifyContent: "center" }}>
-              <Text className="font-mono-medium uppercase" style={{ fontSize: 10, letterSpacing: 1.2, color: p.text }}>
+              <Text className="font-mono-medium uppercase" style={[typeStep("micro"), { letterSpacing: TRACKING.caps, color: p.text }, TABULAR]}>
                 {t}
               </Text>
             </View>

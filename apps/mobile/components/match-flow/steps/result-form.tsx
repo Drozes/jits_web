@@ -8,6 +8,7 @@ import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
+import { TRACKING, typeSize, typeStep } from "@/lib/typography";
 import { InitialsBlock, Mono, initialsOf, shortName } from "../fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
 
@@ -86,13 +87,13 @@ export function WinnerTiles({
             borderRadius: FIGHT_RADIUS.plate,
           })}
         >
-          <InitialsBlock name={a.displayName} size={112} fontSize={36} />
+          <InitialsBlock name={a.displayName} size={112} fontSize="display-36" />
           <View style={{ alignItems: "center", gap: 8 }}>
-            <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 18, letterSpacing: 0.72, color: p.text }}>
+            <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("title"), { letterSpacing: TRACKING.loose, color: p.text }]}>
               {shortName(a.displayName)}
             </Text>
             {meta(a) ? (
-              <Mono size={12} spacing={0.56}>
+              <Mono size="small" spacing="loose">
                 {meta(a)}
               </Mono>
             ) : null}
@@ -113,13 +114,13 @@ export function WinnerChip({ winner, onChange }: { winner: ResultAthlete; onChan
       style={{ height: 56, paddingLeft: 10, paddingRight: 6, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: p.plate, borderWidth: 1, borderColor: p.strong, borderRadius: FIGHT_RADIUS.button }}
     >
       <View style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", backgroundColor: p.panel, borderWidth: 1, borderColor: p.strong, borderRadius: FIGHT_RADIUS.tag }}>
-        <Text className="font-heading" style={{ fontSize: 13, color: p.text }}>
+        <Text className="font-heading" style={[typeStep("body"), { color: p.text }]}>
           {initialsOf(winner.displayName)}
         </Text>
       </View>
       <View style={{ flex: 1, gap: 4 }}>
         <Mono color={p.text3}>WINNER</Mono>
-        <Text numberOfLines={1} className="font-heading uppercase" style={{ fontSize: 16, letterSpacing: 0.64, color: p.text }}>
+        <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: p.text }]}>
           {shortName(winner.displayName)}
         </Text>
       </View>
@@ -132,7 +133,7 @@ export function ChangeButton({ onPress, testID = "result-change" }: { onPress: (
   const p = usePalette();
   return (
     <PressableScale testID={testID} accessibilityRole="button" accessibilityLabel="Change" onPress={onPress} style={{ height: 44, paddingHorizontal: 12, justifyContent: "center" }}>
-      <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.red }}>
+      <Text className="font-heading uppercase" style={[typeStep("body"), { letterSpacing: TRACKING.caps, color: p.red }]}>
         Change
       </Text>
     </PressableScale>
@@ -158,7 +159,7 @@ export function SubmissionGrid({
   const searchedLabel = inGrid ? undefined : submissionTypes.find((t) => t.code === value)?.display_name;
   return (
     <View style={{ gap: 10 }}>
-      <Mono bold size={11}>
+      <Mono bold size="caption">
         HOW DID IT END?
       </Mono>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -187,7 +188,7 @@ export function SubmissionGrid({
                 borderRadius: FIGHT_RADIUS.button,
               }}
             >
-              <Text numberOfLines={2} className="font-heading" style={{ flex: 1, fontSize: 14, color: p.text }}>
+              <Text numberOfLines={2} className="font-heading" style={[typeStep("callout"), { flex: 1, color: p.text }]}>
                 {t.display_name}
               </Text>
               {selected ? <Check size={16} color={p.text} /> : null}
@@ -231,7 +232,7 @@ export function FinishTimeField({
   const inputRef = React.useRef<TextInput>(null);
   return (
     <View style={{ gap: 8 }}>
-      <Mono bold size={11}>
+      <Mono bold size="caption">
         FINISH TIME
       </Mono>
       <View
@@ -248,7 +249,7 @@ export function FinishTimeField({
           keyboardType="numeric"
           maxLength={5}
           className="font-mono-bold"
-          style={[{ minWidth: 104, fontSize: 30, letterSpacing: -0.6, color: p.text, padding: 0 }, TABULAR]}
+          style={[typeSize("headline-2xl"), { minWidth: 104, letterSpacing: TRACKING.tight, color: p.text, padding: 0 }, TABULAR]}
         />
         <View style={{ flex: 1 }}>
           {invalid ? (
@@ -281,12 +282,12 @@ export function DrawPlate({ onChange }: { onChange: () => void }) {
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <Handshake size={22} color={p.amber} />
-        <Text className="font-heading uppercase" style={{ flex: 1, fontSize: 15, letterSpacing: 1, color: p.text }}>
+        <Text className="font-heading uppercase" style={[typeStep("subhead"), { flex: 1, letterSpacing: TRACKING.caps, color: p.text }]}>
           Match ends in a draw
         </Text>
         <ChangeButton onPress={onChange} testID="result-change-draw" />
       </View>
-      <Text className="font-body" style={{ fontSize: 13, color: p.text2 }}>
+      <Text className="font-body" style={[typeStep("body"), { color: p.text2 }]}>
         Draws cost both athletes rating.
       </Text>
     </View>

@@ -2,6 +2,7 @@ import { Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
 import type { UnavailableVariant } from "@/lib/match-flow/live-view-state";
 import { BROADCAST } from "./broadcast-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { Button } from "@/components/ui/elo-system/button";
 
 /**
@@ -60,24 +61,28 @@ export function NoVideoPlate({
       <Text
         accessibilityRole="header"
         className="font-display"
-        style={{
-          fontSize: compact ? 28 : 36,
-          lineHeight: compact ? 27 : 34,
-          letterSpacing: -0.18,
-          color: BROADCAST.inkDark,
-          textAlign: "center",
-        }}
+        style={[
+          typeStep(compact ? "headline-xl" : "display-36"),
+          {
+            lineHeight: compact ? 27 : 34,
+            letterSpacing: TRACKING.tight,
+            color: BROADCAST.inkDark,
+            textAlign: "center",
+          },
+        ]}
       >
         {copy.heading}
       </Text>
       <Text
         className="font-body"
-        style={{
-          fontSize: compact ? 13 : 14,
-          lineHeight: compact ? 18.2 : 21,
-          color: BROADCAST.body72,
-          textAlign: "center",
-        }}
+        style={[
+          typeStep(compact ? "body" : "callout"),
+          {
+            lineHeight: compact ? 18.2 : 21,
+            color: BROADCAST.body72,
+            textAlign: "center",
+          },
+        ]}
       >
         {copy.body}
       </Text>

@@ -67,16 +67,16 @@ export function PracticeResult({
   return (
     <View className="gap-5 px-1 py-4">
       <View className="items-center gap-2">
-        <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
           Match Ended
         </Text>
-        <Text className="font-display text-[28px] text-ink tracking-mark text-center">
+        <Text className="font-display text-headline-xl text-ink tracking-mark text-center">
           RECORD RESULT
         </Text>
       </View>
       <OutcomeToggle value={outcome} onChange={setOutcome} />
       {outcome === "submission" && submissionTypes.length === 0 ? (
-        <Text testID="practice-no-submissions" className="font-body text-[13px] text-ink-2">
+        <Text testID="practice-no-submissions" className="font-body text-body text-ink-2">
           Submission list unavailable right now. Record a draw to continue.
         </Text>
       ) : null}
@@ -106,10 +106,10 @@ export function PracticeResult({
       ) : null}
       {outcome === "draw" ? (
         <Plate testID="practice-draw-plate" className="items-center gap-2">
-          <Text className="font-heading text-[13px] text-ink uppercase tracking-caps">
+          <Text className="font-heading text-body text-ink uppercase tracking-caps">
             Match ends in a draw
           </Text>
-          <Text className="font-body text-[12px] text-ink-2 text-center">
+          <Text className="font-body text-small text-ink-2 text-center">
             Practice: no rating change.
           </Text>
         </Plate>

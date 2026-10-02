@@ -6,6 +6,7 @@ import { setRecordingOptIn } from "@/lib/match-flow/recording-optin";
 import { usePalette } from "@/lib/theme/palette";
 import { Switch } from "@/components/ui/switch";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { FightButton, Mono, StakesStrip, StatusPlate, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 import { WeightCheckPanel, WeightCheckPlate } from "./faceoff-weight-check";
@@ -49,14 +50,14 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
         <View
           style={{ height: 32, alignItems: "center", justifyContent: "center", borderTopWidth: 1, borderBottomWidth: 1, borderColor: p.hairline }}
         >
-          <Mono size={11}>{gapLine}</Mono>
+          <Mono size="caption">{gapLine}</Mono>
         </View>
       ) : null}
       {stakes ? (
         <StakesStrip testID="weight-stakes" win={stakes.challenger_win} draw={stakes.challenger_draw} loss={stakes.challenger_loss} />
       ) : null}
       {gap > 0 ? (
-        <Text testID="weight-gap-note" className="font-body" style={{ fontSize: 13, color: p.text2 }}>
+        <Text testID="weight-gap-note" className="font-body" style={[typeStep("body"), { color: p.text2 }]}>
           The heavier athlete{"’"}s rating is adjusted for the weight gap.
         </Text>
       ) : null}
@@ -134,7 +135,7 @@ function ReadyCheck({ opponent }: FaceoffBodyProps) {
         </View>
       ) : !f.myReady ? (
         <View style={{ gap: 10 }}>
-          <Text className="font-body" style={{ alignSelf: "center", fontSize: 13, color: p.text2 }}>
+          <Text className="font-body" style={[typeStep("body"), { alignSelf: "center", color: p.text2 }]}>
             Match starts when you both tap ready
           </Text>
           <FightButton testID="ready-button" label="I'm ready" height={72} onPress={f.tapReady} />
@@ -161,7 +162,7 @@ function RecordingPanel({ oppName }: { oppName: string }) {
         style={{ minHeight: 56, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.button }}
       >
         <View style={{ flex: 1, gap: 4 }}>
-          <Text className="font-heading uppercase" style={{ fontSize: 13, letterSpacing: 0.8, color: p.text }}>
+          <Text className="font-heading uppercase" style={[typeStep("body"), { letterSpacing: TRACKING.caps, color: p.text }]}>
             Record from my phone
           </Text>
           <Mono testID="faceoff-opponent-recording" color={f.opponentRecording ? p.text : p.text3}>
@@ -184,7 +185,7 @@ function RecordingPanel({ oppName }: { oppName: string }) {
           style={{ minHeight: 40, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderStyle: "dashed", borderColor: p.amber, borderRadius: FIGHT_RADIUS.button }}
         >
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.amber }} />
-          <Text className="font-body" style={{ flex: 1, fontSize: 13, color: p.amber }}>
+          <Text className="font-body" style={[typeStep("body"), { flex: 1, color: p.amber }]}>
             No one is recording this match
           </Text>
         </View>

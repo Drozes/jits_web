@@ -77,10 +77,10 @@ export function CameraOverlay({
         <View className="flex-row items-center gap-3">
           <CameraOff size={20} color={tokens.textSecondary} />
           <View className="flex-1">
-            <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+            <Text className="font-heading text-small text-ink uppercase tracking-caps">
               {permissionCanAskAgain ? "Camera access needed" : "Camera access denied"}
             </Text>
-            <Text className="mt-1 font-body text-[12px] text-ink-2">
+            <Text className="mt-1 font-body text-small text-ink-2">
               {permissionCanAskAgain
                 ? "Grant access to record this match. The match will run regardless."
                 : "This match will not be recorded and runs as normal. To record your next match, enable camera and microphone access in Settings after this one. Changing them restarts the app."}
@@ -146,7 +146,7 @@ export function CameraOverlay({
             style={{ backgroundColor: onMediaTokens.badge }}
           >
             <View className={cn("h-2 w-2 rounded-full bg-cta")} />
-            <Text className="font-mono-bold text-[10px] uppercase tracking-caps-l" style={{ color: BROADCAST.white }}>
+            <Text className="font-mono-bold tabular-nums text-micro uppercase tracking-caps-l" style={{ color: BROADCAST.white }}>
               REC
             </Text>
           </View>

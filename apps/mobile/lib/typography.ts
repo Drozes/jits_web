@@ -129,6 +129,20 @@ export function stepForSize(px: number): TypeStep | undefined {
 }
 
 /**
+ * The step whose size is nearest to `px`; a tie goes to the smaller step, and
+ * anything outside the scale snaps to its end (`micro` / `display-240`). For
+ * sizes computed from a box (tile initials at a third of the tile, the Film
+ * Room VS at 0.3 of it): `typeSize(nearestStep(tile * 0.33))`.
+ */
+export function nearestStep(px: number): TypeStep {
+  let best: TypeStep = TYPE_STEP_NAMES[0];
+  for (const name of TYPE_STEP_NAMES) {
+    if (Math.abs(TYPE_SCALE[name].fontSize - px) < Math.abs(TYPE_SCALE[best].fontSize - px)) best = name;
+  }
+  return best;
+}
+
+/**
  * Letter-spacing steps in device px. Mobile tracking is a fixed px computed at
  * a 14px baseline (web uses em), so the same step is proportionally wider on
  * small text. `code` (WP5, R3 ST-4) is the one addition: one-time codes.

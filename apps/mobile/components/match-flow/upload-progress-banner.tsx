@@ -70,13 +70,13 @@ export function UploadProgressBanner({
       >
         <View className="w-full flex-row items-center gap-2">
           <ActivityIndicator size="small" color={tokens.textSecondary} />
-          <Text className="flex-1 font-mono text-[10px] text-ink-2 uppercase tracking-caps-l">
+          <Text className="flex-1 font-mono tabular-nums text-micro text-ink-2 uppercase tracking-caps-l">
             {kind === "stopping" ? "Finishing recording..." : "Uploading match video..."}
           </Text>
           {pct ? (
             <Text
               testID="upload-progress-percent"
-              className="font-mono text-[10px] text-ink-2 tabular-nums"
+              className="font-mono text-micro text-ink-2 tabular-nums"
             >
               {pct}
             </Text>
@@ -108,7 +108,7 @@ export function UploadProgressBanner({
         >
           <AlertTriangle size={14} color={tokens.stateNegative} />
           <Text
-            className="flex-1 font-mono text-[10px] text-negative uppercase tracking-caps-l"
+            className="flex-1 font-mono tabular-nums text-micro text-negative uppercase tracking-caps-l"
             numberOfLines={3}
           >
             Video uploaded. {truncationCopy(truncation)}
@@ -123,7 +123,7 @@ export function UploadProgressBanner({
         className="w-full flex-row items-center gap-2 rounded-xs bg-surface-3 border border-hairline-strong px-3 py-2"
       >
         <CheckCircle2 size={14} color={tokens.textPrimary} />
-        <Text className="font-mono text-[10px] text-ink uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink uppercase tracking-caps-l">
           Match video uploaded
         </Text>
       </View>
@@ -138,7 +138,7 @@ export function UploadProgressBanner({
     >
       <AlertTriangle size={14} color={tokens.stateNegative} />
       <Text
-        className="flex-1 font-mono text-[10px] text-negative uppercase tracking-caps-l"
+        className="flex-1 font-mono tabular-nums text-micro text-negative uppercase tracking-caps-l"
         numberOfLines={3}
       >
         {message ?? "Recording unavailable"}

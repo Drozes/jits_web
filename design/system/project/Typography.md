@@ -18,7 +18,7 @@ Sources: `apps/mobile/tailwind.config.js` `theme.extend.fontFamily` (families), 
 - The one exception: `display` (Bebas Neue) may set a numeral at 40px and up when it is a brand moment, namely the face-off countdown (240px) and the GO slam (116px). Face-off weights are 36px Bebas today (`faceoff-top.tsx:152,179`), recorded under Open decisions.
 - Set labels you act on (buttons, tabs, chips, header titles) in `heading`, uppercase, with tracking.
 - Set small metadata in `mono`, uppercase, at `tracking-caps-l` (1.68px) or wider. A caps label with no tracking is a bug (R3 TY-3); `<Label>` cannot render one.
-- Set prose in `body`. A number inside a sentence may stay in the sentence ("Profile weight saved: 172.5 lbs, for future matches."), but a number that is the point of the line goes in `mono`.
+- Set prose in `body`. A number inside a sentence may stay in the sentence, but a number that is the point of the line goes in `mono`: a nested `font-mono` tabular span keeps the sentence whole ("Profile weight saved: **172.5** lbs, for future matches." in `faceoff-top.tsx`, R3 MF-3; `MonoNumbers` in `components/match-detail/highlight/mono-numbers.tsx` does it for every digit run).
 - Never set text below 10px (`micro`, the floor). The only sanctioned exception is the CountPill digit (9px, capped at 1.3x Dynamic Type).
 - Write the wordmark "ELO RATED" as live Bebas Neue text in `ink` with `tracking-mark`; there is no wordmark file.
 
@@ -136,6 +136,9 @@ Rules for every site:
 | `fontSize: 30` | `headline-2xl` | none |
 | `text-[36px]` ... `fontSize: 240` | `display-<px>` (36, 40, 44, 48, 52, 60, 64, 72, 80, 88, 96, 116, 240) | none |
 | Computed sizes (`SIZE_PX[size]`, `Math.round(size * 0.33)`) | key the size table by step and read `typeStep()` | none |
+| Sizes computed from a box (tile initials at `size * 0.33`, the Film Room VS at `tileSize * 0.3`) | `typeSize(nearestStep(px))`: `nearestStep` (`lib/typography.ts`) snaps to the nearest step, a tie to the smaller one, and clamps to `micro` / `display-240`; size only, since the glyph is centered in a fixed box | up to half the gap between steps; the 88px tile initials (`athlete-tile.tsx`, also the match-detail hero) 29 to `headline-2xl` 30 (+1px) |
+| `InitialsBlock` `fontSize={32}` (`result-waiting.tsx`, the claimer block) | `headline-2xl` | -2px: sanctioned off-scale snap. Initials in a fixed 96px box; no 32 step, and a step is not added for one block |
+| `InitialsBlock` `fontSize={34}` (`verdict-hero.tsx`, the no-still fallback plate; not the SlamIn verdict) | `display-36` | +2px: sanctioned off-scale snap. Initials in a fixed 104px box; no 34 step |
 
 Line height: a site with no line height gets the step's (within a pixel or two of the font's natural line); a site with its own `lineHeight` keeps it in `style` after the step (`style={[typeStep("micro"), { lineHeight: 12 }]}`).
 
@@ -152,6 +155,7 @@ Line height: a site with no line height gets the step's (within a pixel or two o
 | `-2.8`, `-3.2`, `-3.52`, `-fontSize * 0.04` | `numeralTracking(px)` / `tracking="numeral"` |
 | `-0.6`, `-0.18` | `tight` (-0.28) |
 | `2` on the GO slam, `3` on the splash reveal, `3.6`, `6.3` on the splash statement | keep: registered Adding Flare moments, sanctioned in the guard |
+| `1` on the verdict SlamIn (WIN / LOSS / DRAW, `verdict-step.tsx`) | keep: the registered verdict moment, kept identical, sanctioned in the guard |
 
 ### Recipes
 
@@ -171,7 +175,7 @@ Line height: a site with no line height gets the step's (within a pixel or two o
 
 ### The guard
 
-`apps/mobile/__tests__/components/ui/typography-guard.test.ts` counts, per file: `text-[Npx]` classes, `fontSize` literals, sizes under 10px, rem-named sizes (`text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl` to `text-9xl`; 10.5 / 12.25 / 14 / 15.75 / 17.5px at rem 14), off-scale tracking and `font-mono` `<Text>` tags with no tabular figures. The registered moments that keep a literal on purpose (the CountPill 9px digit, the splash 15px line and its 6.3 / 3.6 / 3 tracking, the GO slam's 2px tracking) are a named sanctioned list pinned to exact counts, outside the ratchet. The baseline (`__tests__/fixtures/typography-baseline.json`, WP5-core: 445 `text-[Npx]` / 172 `fontSize` / 12 under 10px / 8 rem-named / 53 off-scale tracking / 192 untabular mono, across 189 files) only goes down: a count above it fails, and a count below it fails until you lower it with `UPDATE_TYPOGRAPHY_BASELINE=1 npx jest __tests__/components/ui/typography-guard` (it never raises a count). `Mono`, `Label` and `MetaTag` are held at zero.
+`apps/mobile/__tests__/components/ui/typography-guard.test.ts` counts, per file: `text-[Npx]` classes, `fontSize` literals, sizes under 10px, rem-named sizes (`text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl` to `text-9xl`; 10.5 / 12.25 / 14 / 15.75 / 17.5px at rem 14), off-scale tracking and `font-mono` `<Text>` tags with no tabular figures. The registered moments that keep a literal on purpose (the CountPill 9px digit, the splash 15px line and its 6.3 / 3.6 / 3 tracking, the GO slam's 2px tracking, the verdict SlamIn's 1px tracking) are a named sanctioned list pinned to exact counts, outside the ratchet. The baseline (`__tests__/fixtures/typography-baseline.json`, WP5-core: 445 `text-[Npx]` / 172 `fontSize` / 12 under 10px / 8 rem-named / 53 off-scale tracking / 192 untabular mono, across 189 files) only goes down: a count above it fails, and a count below it fails until you lower it with `UPDATE_TYPOGRAPHY_BASELINE=1 npx jest __tests__/components/ui/typography-guard` (it never raises a count). `Mono`, `Label` and `MetaTag` are held at zero.
 
 ## Text styles
 

@@ -2,6 +2,7 @@ import * as React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { SkeletonBlock, SkeletonProvider } from "@/components/ui/skeleton";
 import { usePalette } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { matchCountLabel } from "@/lib/film-room/format";
 
 /** "SEPTEMBER 2026 ──────── 6 MATCHES"; count null when the month may be incomplete. */
@@ -9,12 +10,12 @@ export function MonthHeader({ label, count }: { label: string; count: number | n
   const p = usePalette();
   return (
     <View className="flex-row items-center" style={{ gap: 10, marginTop: 22, marginBottom: 12 }}>
-      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text2 }}>
+      <Text accessibilityRole="header" className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-xl"], color: p.text2 }, TABULAR]}>
         {label}
       </Text>
       <View style={{ flex: 1, height: 1, backgroundColor: p.hairline }} />
       {count != null ? (
-        <Text className="font-mono-medium" style={{ fontSize: 10, letterSpacing: 1.68, color: p.text3 }}>
+        <Text className="font-mono-medium" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text3 }, TABULAR]}>
           {matchCountLabel(count)}
         </Text>
       ) : null}
@@ -47,15 +48,15 @@ function Panel({ testID, title, body, action }: { testID: string; title: string;
   const p = usePalette();
   return (
     <View testID={testID} className="items-center" style={{ marginTop: 48, paddingHorizontal: 24, gap: 8 }}>
-      <Text className="font-mono-bold text-center" style={{ fontSize: 11, letterSpacing: 1.68, color: p.text }}>
+      <Text className="font-mono-bold text-center" style={[typeStep("caption"), { letterSpacing: TRACKING["caps-l"], color: p.text }, TABULAR]}>
         {title}
       </Text>
-      <Text className="font-body text-center" style={{ fontSize: 13, lineHeight: 19, color: p.text2 }}>
+      <Text className="font-body text-center" style={[typeStep("body"), { lineHeight: 19, color: p.text2 }]}>
         {body}
       </Text>
       {action ? (
         <Pressable accessibilityRole="button" accessibilityLabel={action.label} onPress={action.onPress} hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }} className="active:opacity-70" style={{ marginTop: 8 }}>
-          <Text className="font-mono-bold uppercase" style={{ fontSize: 10, letterSpacing: 1.68, color: p.red }}>
+          <Text className="font-mono-bold uppercase" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.red }, TABULAR]}>
             {action.label}
           </Text>
         </Pressable>
@@ -102,7 +103,7 @@ export function ListFooter({ loadingMore, moreError, onRetry }: { loadingMore: b
   if (moreError) {
     return (
       <Pressable testID="film-room-more-retry" accessibilityRole="button" onPress={onRetry} className="items-center active:opacity-70" style={{ paddingVertical: 24 }}>
-        <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: p.text2 }}>
+        <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}>
           COULDN'T LOAD MORE. TAP TO RETRY
         </Text>
       </Pressable>

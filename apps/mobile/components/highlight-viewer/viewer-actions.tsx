@@ -51,7 +51,7 @@ export function ViewerActions(props: ViewerActionsProps) {
       ) : null}
       {showSave && savePermissionDenied ? (
         <View testID="viewer-save-permission" className="gap-2 py-1">
-          <Text className="font-body text-[12px] text-ink-2">{SHARE_COPY.savePermissionDenied}</Text>
+          <Text className="font-body text-small text-ink-2">{SHARE_COPY.savePermissionDenied}</Text>
           <Button
             height={44}
             testID="viewer-open-settings"

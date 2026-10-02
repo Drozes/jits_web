@@ -39,20 +39,20 @@ export function WaitStep({ message, allowSkip, onSkip, timeoutMs = 30_000 }: Wai
       <Plate className="items-center gap-4 py-8">
         {!timedOut ? (
           <>
-            <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+            <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
               Waiting
             </Text>
             <ActivityIndicator size="large" color={tokens.textSecondary} />
-            <Text className="text-center font-body text-[13px] text-ink-2">
+            <Text className="text-center font-body text-body text-ink-2">
               {message ?? "Waiting..."}
             </Text>
           </>
         ) : (
           <>
-            <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+            <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
               Still waiting
             </Text>
-            <Text className="text-center font-body text-[13px] text-ink-2">
+            <Text className="text-center font-body text-body text-ink-2">
               Continue without?
             </Text>
             {onSkip ? (

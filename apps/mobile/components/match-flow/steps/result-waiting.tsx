@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { usePalette } from "@/lib/theme/palette";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { FightButton, InitialsBlock, Mono, shortName } from "../fight/fight-ui";
 import type { ResultAthlete } from "./result-form";
@@ -38,12 +39,12 @@ export function ResultWaiting({
     <View testID="result-waiting" style={{ gap: 20 }}>
       <Mono>MATCH OVER</Mono>
       <View accessibilityRole="summary" accessibilityLiveRegion="polite" style={{ alignItems: "center", gap: 24, paddingVertical: 24 }}>
-        <InitialsBlock name={claimer.displayName} size={96} fontSize={32} />
-        <Text className="font-display" style={{ maxWidth: 320, textAlign: "center", fontSize: 48, lineHeight: 46, color: p.text }}>
+        <InitialsBlock name={claimer.displayName} size={96} fontSize="headline-2xl" />
+        <Text className="font-display" style={[typeStep("display-48"), { maxWidth: 320, textAlign: "center", lineHeight: 46, color: p.text }]}>
           {`${name} is recording the result`}
         </Text>
         <Dots />
-        <Text className="font-body" style={{ fontSize: 15, color: p.text2, textAlign: "center" }}>
+        <Text className="font-body" style={[typeStep("callout"), { color: p.text2, textAlign: "center" }]}>
           You{"’"}ll confirm it in a moment.
         </Text>
       </View>
@@ -52,24 +53,24 @@ export function ResultWaiting({
           {cells.map((c, i) => (
             <View key={c.label} style={{ flex: 1, paddingVertical: 14, paddingHorizontal: 12, gap: 8, borderLeftWidth: i ? 1 : 0, borderColor: p.hairline }}>
               <Mono color={p.text3}>{c.label}</Mono>
-              <Text className="font-mono-bold" style={[{ fontSize: 18, color: p.text }, TABULAR]}>
+              <Text className="font-mono-bold" style={[typeStep("title"), { color: p.text }, TABULAR]}>
                 {c.value}
               </Text>
             </View>
           ))}
         </View>
         <View style={{ padding: 12, flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderColor: p.hairline }}>
-          <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: p.text }}>
+          <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("body"), { flex: 1, letterSpacing: TRACKING.loose, color: p.text }]}>
             {`${shortName(me.displayName)} vs ${shortName(opponent.displayName)}`}
           </Text>
-          <Mono size={11} spacing={0}>
+          <Mono size="caption" spacing="normal">
             {[me.elo, opponent.elo].map((e) => (e != null ? String(e) : "--")).join(" · ")}
           </Mono>
         </View>
       </View>
       {onTakeOver ? (
         <View style={{ gap: 8 }}>
-          <Text className="font-body" style={{ fontSize: 13, color: p.text2, textAlign: "center" }}>
+          <Text className="font-body" style={[typeStep("body"), { color: p.text2, textAlign: "center" }]}>
             {`Still no result from ${name}.`}
           </Text>
           <FightButton testID="result-take-over" variant="secondary" label="Record it myself" onPress={onTakeOver} />

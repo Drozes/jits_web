@@ -32,10 +32,10 @@ import {
 export function PracticeTip({ text }: { text: string }) {
   return (
     <Plate testID="practice-tip" className="gap-1">
-      <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+      <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
         Practice tip
       </Text>
-      <Text className="font-body text-[13px] text-ink">{text}</Text>
+      <Text className="font-body text-body text-ink">{text}</Text>
     </Plate>
   );
 }
@@ -97,7 +97,7 @@ export function PracticeWeight({
 }) {
   return (
     <View className="gap-5 px-1 py-4">
-      <Text className="text-center font-display text-[28px] text-ink tracking-mark">
+      <Text className="text-center font-display text-headline-xl text-ink tracking-mark">
         ON THE SCALE
       </Text>
       <View className="flex-row justify-center gap-3">
