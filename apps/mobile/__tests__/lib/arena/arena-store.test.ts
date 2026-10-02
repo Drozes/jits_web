@@ -716,13 +716,17 @@ describe("isAthleteGoLiveFlip (Arena tab blade clash, Adding Flare)", () => {
       call = liveSwitch.goLive();
     });
     expect(isAthleteGoLiveFlip()).toBe(true);
+    // The store stamps the settle time inside the act, so bracket it: the
+    // window is 2s from a stamp in [before, after]. Reading Date.now() only
+    // after the act made this fail whenever a millisecond passed (jits-psyv).
+    const before = Date.now();
     await act(async () => {
       release(true);
       await call;
     });
-    const settled = Date.now();
-    expect(isAthleteGoLiveFlip(settled + 2000)).toBe(true);
-    expect(isAthleteGoLiveFlip(settled + 2500)).toBe(false);
+    const after = Date.now();
+    expect(isAthleteGoLiveFlip(before + 2000)).toBe(true);
+    expect(isAthleteGoLiveFlip(after + 2500)).toBe(false);
   });
 
   it("is false after a go-offline", async () => {

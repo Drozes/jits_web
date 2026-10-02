@@ -96,3 +96,29 @@ afterEach(() => {
   globalThis.__expoVideoHandle = undefined;
   globalThis.__expoVideoInitialStatus = undefined;
 });
+
+/**
+ * Never let a fake-timer handle reach Node's real clearImmediate.
+ *
+ * A component that calls setImmediate while `jest.useFakeTimers()` is on gets
+ * a fake handle (a plain object). If it is unmounted after
+ * `jest.useRealTimers()` (RNTL's auto-cleanup runs after the test body), its
+ * cleanup passes that handle to Node's REAL clearImmediate, which decrements
+ * Node's pending-immediate counter for an immediate it never queued. The
+ * counter then reads 0 while a real immediate is still pending (jest-runner's
+ * own end-of-file `setImmediate(() => resolve(...))`), so libuv spins at 100%
+ * CPU and never runs it: the suite never finishes and the CI job hangs until
+ * it is cancelled (jits-psyv). React Native's StatusBar does exactly this in
+ * `_updatePropsStack` (clearImmediate(StatusBar._updateImmediate)).
+ *
+ * A real Immediate always carries `_onImmediate` (null once it ran or was
+ * cleared), so anything else is not Node's and is ignored here. Fake timers
+ * restore whatever was installed when they were turned on, i.e. this guard.
+ */
+{
+  const realClearImmediate = global.clearImmediate;
+  global.clearImmediate = function clearImmediate(handle) {
+    if (handle && typeof handle === "object" && !("_onImmediate" in handle)) return;
+    return realClearImmediate.call(this, handle);
+  };
+}

@@ -3,6 +3,15 @@
 // both are React 19.x and work fine in practice.
 process.env.RNTL_SKIP_DEPS_CHECK = "true";
 
+// Run every suite in a zone behind UTC (the team's zone), the same on a dev
+// Mac and on the UTC GitHub runner. The DOB / under-16 cutoff suites assert
+// that a cutoff follows the UTC date while the local date is a day behind.
+// Setting process.env.TZ inside a test file does not work: jest gives each
+// test file a sandboxed copy of process.env, so the real process keeps its
+// zone and those suites only passed on machines already in Toronto
+// (jits-psyv). The workers inherit this from the parent process.
+process.env.TZ = "America/Toronto";
+
 module.exports = {
   preset: "jest-expo",
   // jest's default testMatch treats EVERY .ts file under __tests__ as a suite.
