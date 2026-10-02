@@ -1,13 +1,11 @@
 import * as React from "react";
 import { StyleSheet, Text, View, useWindowDimensions, type StyleProp, type TextStyle } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
-import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import { easing, moment, useReduceMotion } from "@/lib/motion";
 import { usePalette } from "@/lib/theme/palette";
-import { FIGHT_EASING } from "../fight/fight-tokens";
 
-const EASE = Easing.bezier(...FIGHT_EASING);
-/** The brand rating tick. */
-export const RATING_TICK_MS = 480;
+/** The brand ease-out (`FIGHT_EASING` is the same curve). */
+const EASE = easing.brandOut;
 
 /** Sharp rectangles, brand colors only (palette keys); x is a fraction of the width. */
 const PIECES = [
@@ -24,14 +22,15 @@ const PIECES = [
 ];
 
 /**
- * One fall of confetti over the win verdict (approved exception to the
- * minimal-motion rule). Plays once; nothing at all under Reduce Motion.
+ * One fall of confetti over the win verdict (a Moment in the Motion Rule
+ * registry). Only when the verdict plays (once per result); nothing at all
+ * under Reduce Motion.
  */
-export function Confetti({ height = 600 }: { height?: number }) {
+export function Confetti({ height = 600, play }: { height?: number; play: boolean }) {
   const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
   const palette = usePalette();
-  if (reduceMotion) return null;
+  if (reduceMotion || !play) return null;
   return (
     <View testID="verdict-confetti" pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { height }]}>
       {PIECES.map((p, i) => (
@@ -46,9 +45,9 @@ function Piece({ left, w, h, color, delay, fall }: { left: number; w: number; h:
   const rot = useSharedValue(0);
   const opacity = useSharedValue(1);
   React.useEffect(() => {
-    y.value = withDelay(delay, withTiming(fall, { duration: 1800, easing: Easing.in(Easing.quad) }));
-    rot.value = withDelay(delay, withTiming(360, { duration: 1800 }));
-    opacity.value = withDelay(delay + 1200, withTiming(0, { duration: 600 }));
+    y.value = withDelay(delay, withTiming(fall, { duration: moment.confettiFall, easing: easing.inQuad }));
+    rot.value = withDelay(delay, withTiming(360, { duration: moment.confettiFall }));
+    opacity.value = withDelay(delay + moment.confettiFadeDelay, withTiming(0, { duration: moment.confettiFade }));
   }, [y, rot, opacity, delay, fall]);
   const style = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -69,16 +68,17 @@ export function SlamIn({ children, animate }: { children: React.ReactNode; anima
       opacity.value = 1;
       return;
     }
-    scale.value = withTiming(1, { duration: 520, easing: EASE });
-    opacity.value = withTiming(1, { duration: 300, easing: EASE });
+    scale.value = withTiming(1, { duration: moment.slamIn, easing: EASE });
+    opacity.value = withTiming(1, { duration: moment.slamInFade, easing: EASE });
   }, [play, scale, opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ scale: scale.value }] }));
   return <Animated.View style={[{ alignSelf: "flex-start" }, style]}>{children}</Animated.View>;
 }
 
-/** Rises in once after the verdict (the rank strip). */
-export function RiseIn({ children, delay = 500 }: { children: React.ReactNode; delay?: number }) {
-  const reduceMotion = useReduceMotion();
+/** Rises in once after the verdict (the rank strip); static without `play`. */
+export function RiseIn({ children, delay = moment.riseInDelay, play }: { children: React.ReactNode; delay?: number; play: boolean }) {
+  const osReduceMotion = useReduceMotion();
+  const reduceMotion = osReduceMotion || !play;
   const y = useSharedValue(reduceMotion ? 0 : 12);
   const opacity = useSharedValue(reduceMotion ? 1 : 0);
   React.useEffect(() => {
@@ -87,54 +87,11 @@ export function RiseIn({ children, delay = 500 }: { children: React.ReactNode; d
       opacity.value = 1;
       return;
     }
-    y.value = withDelay(delay, withTiming(0, { duration: 400, easing: EASE }));
-    opacity.value = withDelay(delay, withTiming(1, { duration: 400, easing: EASE }));
+    y.value = withDelay(delay, withTiming(0, { duration: moment.riseIn, easing: EASE }));
+    opacity.value = withDelay(delay, withTiming(1, { duration: moment.riseIn, easing: EASE }));
   }, [reduceMotion, delay, y, opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: y.value }] }));
   return <Animated.View style={style}>{children}</Animated.View>;
-}
-
-/**
- * The rating counting from `before` to `after` in RATING_TICK_MS (the one
- * brand auto-animation). Shows `after` at once when either is missing or
- * under Reduce Motion.
- */
-export function useRatingTick(before: number | null, after: number | null): number | null {
-  const reduceMotion = useReduceMotion();
-  const animate = before != null && after != null && before !== after && !reduceMotion;
-  const [value, setValue] = React.useState<number | null>(animate ? before : after);
-  React.useEffect(() => {
-    if (!animate || before == null || after == null) {
-      setValue(after);
-      return;
-    }
-    const start = Date.now();
-    setValue(before);
-    const id = setInterval(() => {
-      const t = Math.min(1, (Date.now() - start) / RATING_TICK_MS);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(Math.round(before + (after - before) * eased));
-      if (t >= 1) clearInterval(id);
-    }, 16);
-    return () => clearInterval(id);
-  }, [animate, before, after]);
-  return value;
-}
-
-/**
- * "1512 -> 1526" with the after value ticking up in RATING_TICK_MS. A leaf of
- * its own, so the 60 fps tick re-renders this Text only, never the verdict.
- */
-export function TickingRating({ before, after }: { before: number | null; after: number | null }) {
-  const p = usePalette();
-  const ticking = useRatingTick(before, after);
-  const shown = ticking ?? after;
-  const text = before != null && shown != null && before !== after ? `${before} \u2192 ${shown}` : shown != null ? `${shown}` : "";
-  return (
-    <Text testID="verdict-rating" className="font-mono-bold" style={{ fontSize: 22, color: p.text, fontVariant: ["tabular-nums"] }}>
-      {text}
-    </Text>
-  );
 }
 
 /** Plain text helper so the verdict file stays short. */

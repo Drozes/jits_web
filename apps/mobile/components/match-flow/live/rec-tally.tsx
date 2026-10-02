@@ -4,6 +4,7 @@ import type { TallyVariant } from "@/lib/match-flow/live-view-state";
 import { spokenDuration } from "@/lib/match-flow/live-view-state";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { BROADCAST, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 
 /**
  * Top-left HUD tally. "REC mm:ss" appears only while the recorder is
@@ -62,7 +63,7 @@ export function RecTally({ variant, recordingSeconds }: { variant: TallyVariant;
       )}
       <Text
         className="font-mono-bold"
-        style={[{ fontSize: 11, lineHeight: 13, letterSpacing: 1.68, color: textColor }, TABULAR]}
+        style={[typeStep("caption"), { lineHeight: 13, letterSpacing: TRACKING["caps-l"], color: textColor }, TABULAR]}
       >
         {label}
       </Text>

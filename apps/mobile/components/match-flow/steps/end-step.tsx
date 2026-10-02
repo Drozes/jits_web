@@ -31,10 +31,10 @@ export function EndStep({ delayMs = 800, onAdvance }: EndStepProps) {
     <View className="px-1 py-8">
       <Plate className="items-center gap-4 py-8">
         <CheckCircle2 size={48} color={tokens.textPrimary} />
-        <Text className="font-display text-[28px] text-ink tracking-mark">
+        <Text className="font-display text-headline-xl text-ink tracking-mark">
           MATCH ENDED
         </Text>
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
           Up next: record the result
         </Text>
       </Plate>

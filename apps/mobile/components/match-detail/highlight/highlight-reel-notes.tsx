@@ -17,7 +17,7 @@ export function HighlightReelNotes({ progress }: { progress: HighlightProgress }
     <>
       {progress.phase === "regenerating" ? (
         <View testID="highlight-regenerating" className="bg-surface-4 rounded-md px-3 py-2">
-          <Text className="font-body text-[12px] text-ink">
+          <Text className="font-body text-small text-ink">
             <MonoNumbers text={regeneratingBanner(progress.renderTotal)} />
           </Text>
         </View>
@@ -25,7 +25,7 @@ export function HighlightReelNotes({ progress }: { progress: HighlightProgress }
       {playback ? (
         <Text
           testID="highlight-meta"
-          className="font-mono text-[12px] text-ink-3"
+          className="font-mono text-small text-ink-3"
           style={{ fontVariant: ["tabular-nums"] }}
         >
           {metaLine(playback.durationS, playback.version)}

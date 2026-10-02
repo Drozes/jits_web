@@ -1,0 +1,45 @@
+<!-- @dsCard group="Feedback" height=287 width=390 subtitle="Brand toast: success, error, info" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toast preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bleed{margin:0 -16px;display:flex;flex-direction:column;gap:10px}
+.toast{margin:0 16px;background:var(--plate);border:1px solid var(--hairline-strong);border-left-width:3px;border-radius:var(--radius-plate);padding:10.5px 14px;display:flex;flex-direction:column;gap:3.5px}
+.toast.success{border-left-color:var(--ink)}
+.toast.error{border-left-color:var(--signal-red)}
+.toast.info{border-left-color:var(--ink-3)}
+.t1{font-family:var(--font-heading);font-weight:700;font-size:13px;line-height:17px;color:var(--ink)}
+.t2{font-family:var(--font-body);font-size:12px;line-height:16px;color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="cell"><p class="cap">success (ink rule, not green)</p>
+    <div class="bleed"><div class="toast success"><span class="t1">Saved locally</span><span class="t2">Confirmation will sync when you're back online.</span></div></div>
+  </div>
+  <div class="cell"><p class="cap">error (Signal Red rule)</p>
+    <div class="bleed"><div class="toast error"><span class="t1">Could not share</span></div></div>
+  </div>
+  <div class="cell"><p class="cap">info (ink-3 rule)</p>
+    <div class="bleed"><div class="toast info"><span class="t1">Result disputed</span><span class="t2">Alex disputed the result. An admin will review it.</span></div></div>
+  </div>
+</div>
+</body>
+</html>

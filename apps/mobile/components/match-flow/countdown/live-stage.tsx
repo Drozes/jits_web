@@ -1,4 +1,5 @@
 import * as React from "react";
+import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 import type { LiveParticipant } from "@/lib/match-flow/live-view-state";
 import { LiveStep } from "../steps/live-step";
@@ -53,10 +54,17 @@ export function LiveStage(props: LiveStageProps) {
   const goAt = Number.isFinite(serverGo) ? Math.min(serverGo, mountedAt + COUNTDOWN_MS) : mountedAt;
   const [phase, setPhase] = React.useState<"countdown" | "live">(() => (Date.now() >= goAt ? "live" : "countdown"));
   const [flash, setFlash] = React.useState(false);
+  // True once THIS stage counted down to GO. GO then gets `countdownGo`, which
+  // replaces the live step's own `matchStart` buzz (one haptic per event).
+  // Re-entering past GO never counted down, so the live step keeps its
+  // `matchStart` there.
+  const [countedDown, setCountedDown] = React.useState(false);
 
   React.useEffect(() => {
     if (phase !== "countdown") return;
     const t = setTimeout(() => {
+      void matchHaptics.countdownGo();
+      setCountedDown(true);
       setPhase("live");
       setFlash(true);
     }, Math.max(0, goAt - Date.now()));
@@ -89,6 +97,7 @@ export function LiveStage(props: LiveStageProps) {
         opponent={opponent}
         startedAt={clockStartFor(startedAt)}
         recordingEnabled={recording}
+        startHaptic={!countedDown}
       />
       {flash ? <GoFlash /> : null}
     </>

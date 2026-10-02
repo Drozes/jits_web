@@ -57,7 +57,9 @@ const VALUES: WizardValues = {
 const LABELS = /^(First Name|Last Name|Gender|Date of Birth|Weight \(lbs\)|Instagram|Home Gym|Gym Instagram|City)$/;
 
 function labelOrder(utils: ReturnType<typeof render>) {
-  return utils.getAllByText(LABELS).map((n) => n.props.children as string);
+  // Hidden elements included: a text field's visible label is hidden from
+  // assistive tech because the input carries it as its name (WP7 review).
+  return utils.getAllByText(LABELS, { includeHiddenElements: true }).map((n) => n.props.children as string);
 }
 
 const editable: GymInstagramField = { visible: true, readOnly: false, storedHandle: null, canManage: false };

@@ -98,7 +98,7 @@ export function AppHeader({
           <Text
             numberOfLines={1}
             style={{ flexShrink: 1 }}
-            className="font-heading text-[12px] text-ink-2 uppercase tracking-caps-l"
+            className="font-heading text-small text-ink-2 uppercase tracking-caps-l"
           >
             {title}
           </Text>

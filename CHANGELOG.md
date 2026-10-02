@@ -27,6 +27,54 @@ Built to jr_be `specs/016-invites/addendum-live-location-fixes.md` section 4. JS
 - Review fixes: Android's runtime permission dialog (which reads as "background" then "active") no longer aborts a Go Live or re-arms the challenger's ask (a "permission request in flight" flag in `lib/invites/location.ts`); the live write waits up to 1.5 s for the app to be active again; a background mid-reading resolves the flow at once instead of waiting on the fix; a Go Live never closes the challenger's `arena` explain (sheets close only for their own purpose, and a closed wait is always answered); a fix is never started once the 10 s budget is spent; the Precise Location copy also covers a Precise-on phone with a poor fix; web matches the PostgREST prefix of the project URL exactly. End-to-end test: `apps/mobile/__tests__/lib/arena/go-live-end-to-end.test.tsx`.
 - Tests: `apps/mobile/__tests__/lib/arena/live-location-fixes.test.tsx`, `__tests__/lib/invites/read-location-once.test.ts`, `__tests__/lib/match-flow/faceoff-location-log.test.ts`, `__tests__/lib/arena/location-telemetry.test.ts`, `__tests__/components/arena/going-live-feedback.test.tsx`, `__tests__/lib/supabase/client-platform-header.test.ts`, `packages/shared/src/api/location-events.test.ts`, `apps/web/lib/supabase/platform-fetch.test.ts`, plus additions to the use-arena-live, challenger reading, face-off and header chip suites.
 
+## OTA "Design system conformance" (runtime 0.5.0), 2026-10-02
+
+Production OTA group `c54b2861-51a0-44ce-9362-1a9c2377c1b0` from `main` `f0b8d11` (PRs #37 CI fix, #38 design kit, #39 conformance, #40 promotion). JS-only. Brings `apps/mobile` in line with the ELO RATED Design System (https://claude.ai/artifact/NkvxzxKo3R7acP5j6aRTTe, mirrored in `design/system/project/`, kit version `1790970770-1f18`). Design canvas synced to version `1790970841-9c7a` (54 boards). Adding Flare animations, timings and haptics are unchanged.
+
+### Mobile: design system conformance (jits-3eeg)
+
+**Added**
+- `apps/mobile/components/ui/elo-system/button.tsx`: one brand `Button` on `PressableScale` (primary, secondary, ghost, destructive outline, glass; disabled 0.5, busy, Dynamic Type safe), replacing the auth, practice, viewer and hand-rolled CTAs.
+- `apps/mobile/lib/typography.ts`, `components/ui/elo-system/mono.tsx`, `label.tsx`: the type scale (text and display steps, tracking steps, `typeStep` / `typeSize`), tabular numbers everywhere, tracked caps labels, a 10px floor.
+- `components/ui/elo-system/selection.tsx`: one selected state (plate-bright fill, strong hairline, ink check).
+- `lib/motion/use-modal-animation.ts`, shared sheet chrome in `components/ui/sheet.tsx`: 8px sheet corners, brand titles, one `on-media-scrim`, Reduce-Motion-aware modals.
+- Tokens: `attention` (amber), heat (`heatOrange`, `heatRed`) and one `onMediaTokens` source; labels on every input and switch.
+- Guard tests: color semantics, one Button, legacy shadcn, modal chrome, typography ratchet, kit `tokens.json` drift.
+
+**Changed**
+- Signal Red only on CTAs and negatives, Gain Green only on gains, wins and live; neutral spinners, Switch and input focus edge; amber draw headlines.
+- Hold-to-end fill and time-up drain on the UI thread; splash odometer via `RollingNumber`; skeleton bars visible at rest.
+- Offline banner, update banner and critical update modal restyled on ELO tokens.
+
+**Removed**
+- The legacy shadcn primitives (card, input, label, avatar, separator, tabs, select, button, online-indicator) and the legacy color tokens.
+
+### CI
+- **Fixed** the Test job hang (jits-psyv): a fake-timer handle passed to Node 22's real `clearImmediate` stalled jest; test-only guard in `apps/mobile/jest.setup.js`, `TZ` set in `jest.config.js`, `timeout-minutes: 20` on every job.
+
+## OTA "Adding Flare" (runtime 0.5.0), 2026-10-01
+
+Production OTA group `e74e62b0-ae9a-4f90-a46d-dd755adbf19c` from `main` `02157d3` (PRs #33, #34). Design canvas synced to version `1790908046-09bc` (boards 13, 14, 15, 23, 27, 29, 57, 59).
+
+### Mobile: Adding Flare, the Motion Rule and motion with meaning (jits-pddd)
+
+JS-only, OTA-eligible for runtime 0.5.0 (build 25) installs only; earlier runtimes never receive it. No new native dependency (Reanimated, react-native-svg and expo-haptics are already linked). The Motion Rule in `DESIGN.md` ("Motion") replaces the old minimal-motion rule: every animation is Reactive (touch), a Moment (once, on a real state change) or Ambient (only while a live, loading or waiting-on-you state is true, paused in background), runs on the UI thread, has a still Reduce Motion state and is listed in the registry. Never a haptic on a loss or for ambient motion. Web is unchanged (the ELO odometer and delta chip have a web parity follow-up).
+
+**Added**
+- Foundation: `apps/mobile/lib/motion/` (`tokens.ts` durations, tempo, easings, springs and press scale; `haptics.ts`, the one haptics vocabulary, with `matchHaptics` kept as an alias; `use-app-active.ts`; `use-first-load-entering.ts`; `index.ts` barrel).
+- Arena tab icon (`apps/mobile/components/layout/arena-tab-icon.tsx`): ember rise while live; countable embers (one per pending challenge, 1 to 3) in place of the count pill, which returns above 3; blade clash with a spark on going live (`goLive` haptic) and on a new challenge (silent; the prompt already buzzes). Tab select bounce on all four tabs with the `select` haptic.
+- Buttons: `apps/mobile/components/ui/pressable-scale.tsx` (press scale, 0.85 opacity dip under Reduce Motion) on every `Button`, every `FightButton`, the Arena Challenge CTAs and every Arena Go live control (the header status chip's Go live is unchanged); `apps/mobile/components/ui/steel-sheen.tsx` on the incoming-challenge Accept and the match-flow Confirm result; the accept sweep on Accept (fill, glint, "Accepted", `accept` haptic; the accept call is never delayed).
+- ELO and results: `RollingNumber` odometer (`apps/mobile/components/ui/elo-system/rolling-number.tsx`, 600 ms, only changed digits roll) replaces the count-up tick in `EloTile` and the verdict celebration; `DeltaChip` (`delta-chip.tsx`) with sign and arrow; play-once per result (`play-once.ts`, persisted, 5 minute freshness); "the tap" on a submission win (three tick marks and `tapTick` haptics, winner only; still and silent for the loser); `ratingGain` haptic on a gain only.
+- Arena screen: `apps/mobile/components/arena/afterglow-edge.tsx` (incoming challenge edge cools over 2 s, keyed on `created_at`), `apps/mobile/components/arena/on-air-strip.tsx` (ON AIR tally and heartbeat trace), one shared tempo clock (`apps/mobile/lib/arena/arena-tempo.ts`) set by how many athletes are live in the lobby.
+- Rankings and Profile: first-load list stagger (Rankings, Profile recent matches, Arena roster); rank-up swap flare (`apps/mobile/lib/leaderboard/use-rank-climb.ts`, `apps/mobile/components/leaderboard/rank-flare.tsx`), once per climb.
+- Countdown slam on the face-off countdown (numerals drop from 1.6x, a Signal Red bar drains to a red GO, `countdownTick` / `countdownGo`); total length and match start unchanged.
+
+**Changed**
+- Skeletons: one module-level shimmer clock (translateX band) replaces the opacity breath.
+- LIVE pulse: Arena and header live dots share the tempo clock; the match LIVE pill and the "Sent" pill keep the fixed 1400 ms pace.
+- Haptics: the challenge prompt's arrival buzz is `challengeArrived` (once per challenge id); the Challenge tap and Confirm result use `press`. The only direct `expo-haptics` calls left are the offline-queued result and the launch splash.
+- `DESIGN.md` Motion section and the `CLAUDE.md` brand one-liner describe the Motion Rule, the haptics vocabulary and the animation registry.
+
 ## 0.5.0 (build 25), 2026-10-01
 
 Release "Invites + Friends", shipped DARK. iOS version and runtime 0.5.0, EAS build 25 (`0e1331ed-17c1-4b50-bac9-3d9556437071`) on TestFlight; web deployed to Vercel from `main` (`41d79a4`). Needs the jr_be migrations `20261001100000` to `20261001300700` (applied on prod) and the `push` and `delete-account` edge functions (deployed). Prod flags `invites_enabled` and `match_location_required` are both off. A new runtime: OTAs for 0.4.0 never reach 0.5.0 installs and vice versa.

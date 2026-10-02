@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
+import { TRACKING, typeStep } from "@/lib/typography";
 import { PlayCircle } from "lucide-react-native";
 import { formatVideoDuration } from "@jits/shared/utils";
 import type { MatchDetailVideo } from "@jits/shared/api/queries";
@@ -37,7 +38,7 @@ export function FilmAngles({ videos, opponentName, onWatch }: FilmAnglesProps) {
   const p = usePalette();
   return (
     <View testID="film-angles" style={{ gap: 10 }}>
-      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text }}>
+      <Text accessibilityRole="header" className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-xl"], color: p.text }, TABULAR]}>
         {videos.length > 1 ? "FILM · 2 ANGLES" : "FILM"}
       </Text>
       <View style={{ borderTopWidth: 1, borderTopColor: p.hairline }}>
@@ -58,15 +59,15 @@ export function FilmAngles({ videos, opponentName, onWatch }: FilmAnglesProps) {
               style={{ minHeight: 60, gap: 12, borderBottomWidth: 1, borderBottomColor: p.hairline, opacity: processing ? 0.7 : 1 }}
             >
               <View className="flex-1 min-w-0" style={{ gap: 5 }}>
-                <Text numberOfLines={1} className="font-heading" style={{ fontSize: 14, letterSpacing: 0.4, color: p.text }}>
+                <Text numberOfLines={1} className="font-heading" style={[typeStep("callout"), { letterSpacing: TRACKING.loose, color: p.text }]}>
                   {angleName(v, opponentName)}
                 </Text>
-                <Text numberOfLines={1} className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: status.color }}>
+                <Text numberOfLines={1} className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: status.color }, TABULAR]}>
                   {status.text}
                 </Text>
               </View>
               {duration ? (
-                <Text className="font-mono-medium" style={[{ fontSize: 12, color: p.text2 }, TABULAR]}>
+                <Text className="font-mono-medium" style={[typeStep("small"), { color: p.text2 }, TABULAR]}>
                   {duration}
                 </Text>
               ) : null}

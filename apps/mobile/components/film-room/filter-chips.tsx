@@ -1,6 +1,8 @@
 import * as React from "react";
-import { Pressable, ScrollView, Text } from "react-native";
+import { ScrollView, Text } from "react-native";
+import { StatePressable } from "@/components/ui/state-pressable";
 import { usePalette } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import type { LibraryFilter, OutcomeFilter } from "@/lib/film-room/rows";
 
 const OUTCOMES: { id: OutcomeFilter; label: string }[] = [
@@ -13,7 +15,8 @@ const OUTCOMES: { id: OutcomeFilter; label: string }[] = [
 function Chip({ label, on, onPress, testID, a11y, role = "tab" }: { label: string; on: boolean; onPress: () => void; testID: string; a11y?: string; role?: "tab" | "button" }) {
   const p = usePalette();
   return (
-    <Pressable
+    <StatePressable
+      dim
       testID={testID}
       accessibilityRole={role}
       accessibilityLabel={a11y ?? label}
@@ -31,10 +34,10 @@ function Chip({ label, on, onPress, testID, a11y, role = "tab" }: { label: strin
         backgroundColor: on ? p.text : p.secondaryBg,
       }}
     >
-      <Text className="font-mono-bold uppercase" style={{ fontSize: 11, letterSpacing: 1.68, color: on ? p.bg : p.text }}>
+      <Text className="font-mono-bold uppercase" style={[typeStep("caption"), { letterSpacing: TRACKING["caps-l"], color: on ? p.bg : p.text }, TABULAR]}>
         {label}
       </Text>
-    </Pressable>
+    </StatePressable>
   );
 }
 

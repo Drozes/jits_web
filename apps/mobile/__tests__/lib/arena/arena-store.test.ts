@@ -9,6 +9,7 @@ import {
   __resetArenaStoreForTests,
   arenaActions,
   getLeftMatchIds,
+  isAthleteGoLiveFlip,
   liveSwitch,
   notifyOpponentUnavailable,
   publishArenaSelfId,
@@ -693,5 +694,77 @@ describe("live switch guard (F11: disabled while saving, 2s cooldown, no undo)",
     });
     expect(retried).toBe(true);
     expect(goLive).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("isAthleteGoLiveFlip (Arena tab blade clash, Adding Flare)", () => {
+  it("is false with no guarded go-live, so an app restore never counts", () => {
+    registerArenaController(controller());
+    act(() => {
+      publishArenaState({ ...IDLE_ARENA_STATE, liveTransition: "going-live" });
+    });
+    expect(isAthleteGoLiveFlip()).toBe(false);
+  });
+
+  it("is true while the athlete's go-live is in flight and for 2s after it settles", async () => {
+    let release!: (v: boolean) => void;
+    registerArenaController(
+      controller({ goLive: jest.fn(() => new Promise<boolean>((r) => (release = r))) }),
+    );
+    let call!: Promise<boolean | "ignored">;
+    act(() => {
+      call = liveSwitch.goLive();
+    });
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    // The store stamps the settle time inside the act, so bracket it: the
+    // window is 2s from a stamp in [before, after]. Reading Date.now() only
+    // after the act made this fail whenever a millisecond passed (jits-psyv).
+    const before = Date.now();
+    await act(async () => {
+      release(true);
+      await call;
+    });
+    const after = Date.now();
+    expect(isAthleteGoLiveFlip(before + 2000)).toBe(true);
+    expect(isAthleteGoLiveFlip(after + 2500)).toBe(false);
+  });
+
+  it("is false after a go-offline", async () => {
+    registerArenaController(controller());
+    await act(async () => {
+      await liveSwitch.goOffline();
+    });
+    expect(isAthleteGoLiveFlip()).toBe(false);
+  });
+
+  it("forgets a settled go-live on sign-out, so the next athlete's arrival never counts", async () => {
+    registerArenaController(controller());
+    await act(async () => {
+      await liveSwitch.goLive();
+    });
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    await act(async () => {
+      await takeArenaOfflineBeforeSignOut(10);
+    });
+    expect(isAthleteGoLiveFlip()).toBe(false);
+  });
+
+  it("forgets a settled go-live when the app goes to the background", async () => {
+    registerArenaController(controller());
+    await act(async () => {
+      await liveSwitch.goLive();
+    });
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    // The module listens to AppState from load; drive its listener.
+    const { AppState } = require("react-native");
+    const calls = (AppState.addEventListener as jest.Mock).mock?.calls ?? [];
+    const listeners = calls
+      .filter((c: unknown[]) => c[0] === "change")
+      .map((c: unknown[]) => c[1] as (s: string) => void);
+    expect(listeners.length).toBeGreaterThan(0);
+    for (const l of listeners) l("inactive");
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    for (const l of listeners) l("background");
+    expect(isAthleteGoLiveFlip()).toBe(false);
   });
 });

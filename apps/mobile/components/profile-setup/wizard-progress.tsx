@@ -16,10 +16,10 @@ export function WizardProgress({ currentIdx, total, label }: WizardProgressProps
   return (
     <View className="gap-3">
       <View className="items-center gap-1">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-xl">
+        <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
           Step {currentIdx + 1} of {total}
         </Text>
-        <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
+        <Text className="font-heading text-callout text-ink uppercase tracking-caps-l">
           {label}
         </Text>
       </View>

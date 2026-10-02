@@ -10,13 +10,12 @@ import * as React from "react";
 import { Text, View } from "react-native";
 import {
   BottomSheetModal,
-  BottomSheetBackdrop,
   BottomSheetScrollView,
   type BottomSheetBackdropProps,
 } from "@gorhom/bottom-sheet";
 import type { NotificationDateGroup } from "@jits/shared/types/notification";
 import { getDateGroup } from "@jits/shared/utils";
-import { useThemedTokens } from "@/lib/theme/use-theme";
+import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
 import { bellItemRoute, type BellItem } from "@/lib/notifications/notification-items";
 import { NotificationRow } from "./notification-item";
 
@@ -38,9 +37,7 @@ interface NotificationPanelProps {
   onItemPress?: (item: BellItem) => void;
 }
 
-const renderBackdrop = (props: BottomSheetBackdropProps) => (
-  <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} />
-);
+const renderBackdrop = (props: BottomSheetBackdropProps) => <SheetBackdrop {...props} />;
 
 export function NotificationPanel({
   open,
@@ -50,7 +47,7 @@ export function NotificationPanel({
   onItemPress,
 }: NotificationPanelProps) {
   const ref = React.useRef<BottomSheetModal | null>(null);
-  const tokens = useThemedTokens();
+  const chrome = useSheetChrome();
 
   // Only dismiss a sheet that is actually showing. Calling dismiss() on a gorhom
   // modal that was never presented (this effect's first run, open=false) or
@@ -107,11 +104,10 @@ export function NotificationPanel({
       enablePanDownToClose
       onChange={handleSheetChange}
       backdropComponent={renderBackdrop}
-      backgroundStyle={{ backgroundColor: tokens.bgSecondary }}
-      handleIndicatorStyle={{ backgroundColor: tokens.textTertiary }}
+      {...chrome}
     >
       <View className="border-b border-hairline px-4 pb-3">
-        <Text className="font-heading text-[14px] text-ink uppercase tracking-caps-l">
+        <Text className="font-heading text-callout text-ink uppercase tracking-caps-l">
           Notifications
         </Text>
       </View>
@@ -119,7 +115,7 @@ export function NotificationPanel({
       <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         {items.length === 0 && missed.length === 0 ? (
           <View className="items-center py-12">
-            <Text className="font-body text-[13px] text-ink-2">
+            <Text className="font-body text-body text-ink-2">
               No notifications yet
             </Text>
           </View>
@@ -148,7 +144,7 @@ function SectionLabel({ label }: { label: string }) {
   return (
     <Text
       accessibilityRole="header"
-      className="px-4 pb-1 pt-4 font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-l"
+      className="px-4 pb-1 pt-4 font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-l"
     >
       {label}
     </Text>

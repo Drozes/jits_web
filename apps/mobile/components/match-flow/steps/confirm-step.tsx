@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { Check, Flag } from "lucide-react-native";
-import * as Haptics from "expo-haptics";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { confirmMatchResult } from "@jits/shared/api/mutations";
@@ -10,13 +9,17 @@ import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
+import { haptics } from "@/lib/motion";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { LEAVE_COUNTS_AS_CONFIRMING, disputeLockNote, isDisputeWindowClosed } from "@/lib/match-flow/match-extras";
 import { useDisputeLocksAt } from "@/lib/match-flow/use-dispute-locks-at";
 import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { FightButton, InitialsBlock, Mono, RatingBlock, shortName } from "../fight/fight-ui";
 import { DisputeForm } from "./dispute-form";
+import { TapMarks } from "../verdict/rating-moment";
+import { markResultFresh } from "@/components/ui/elo-system/play-once";
 
 export interface ConfirmAthlete {
   athlete_id: string;
@@ -126,7 +129,12 @@ export function ConfirmStep(props: ConfirmStepProps) {
       reconcileNow();
       return;
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    // The one haptic for confirming (a commit action, Light). If the Confirm
+    // button ever gains a `press` haptic of its own, drop this call: one
+    // haptic per event. The verdict's `ratingGain` is a later, separate moment.
+    void haptics.press();
+    // The verdict that follows is fresh even if the match completed long ago.
+    markResultFresh(matchId);
     if (isQueuedResult(res.data)) {
       toast.success({ text1: "Saved locally", description: "Confirmation will sync when you're back online." });
     }
@@ -164,7 +172,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
     <View style={{ gap: 20 }}>
       <View style={{ gap: 10 }}>
         <Mono>{opponentConfirmed ? `RESULT RECORDED BY ${oppShort.toUpperCase()}` : "RESULT RECORDED"}</Mono>
-        <Text accessibilityRole="header" className="font-heading uppercase" style={{ fontSize: 30, letterSpacing: 0.6, color: p.text }}>
+        <Text accessibilityRole="header" className="font-heading uppercase" style={[typeStep("headline-2xl"), { letterSpacing: TRACKING.loose, color: p.text }]}>
           Confirm result
         </Text>
       </View>
@@ -172,21 +180,26 @@ export function ConfirmStep(props: ConfirmStepProps) {
       <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}>
         <View style={{ paddingVertical: 20, paddingHorizontal: 16, gap: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {winner ? <InitialsBlock name={winner.display_name} size={40} fontSize={14} /> : null}
+            {winner ? <InitialsBlock name={winner.display_name} size={40} fontSize="callout" /> : null}
             <View style={{ flex: 1 }}>
               <Mono color={p.text3}>{isDraw ? "RESULT" : "WINNER"}</Mono>
             </View>
-            <Text testID="confirm-verdict" className="font-mono-bold" style={{ fontSize: 11, letterSpacing: 1.68, color: p.text2 }}>
+            <Text testID="confirm-verdict" className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}>
               {confirmVerdict(resultData, me.athlete_id)}
             </Text>
           </View>
-          <Text className="font-display" style={{ fontSize: 60, lineHeight: 56, color: p.text }}>
+          <Text className="font-display" style={[typeStep("display-60"), { lineHeight: 56, color: p.text }]}>
             {isDraw ? "Draw" : winner ? `${shortName(winner.display_name)} won` : "Result in"}
           </Text>
           {how ? (
-            <Text className="font-body" style={{ fontSize: 16, color: p.text2 }}>
-              {how}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text className="font-body" style={[typeStep("subhead"), { color: p.text2 }]}>
+                {how}
+              </Text>
+              {/* "The tap", drawn still and silent here: the moment itself
+                  plays once, on the verdict, for the winner. */}
+              {resultData?.result === "submission" && winner ? <TapMarks play={false} /> : null}
+            </View>
           ) : null}
         </View>
         {me.elo_after != null ? (
@@ -214,7 +227,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
 
       {!myConfirmed ? (
         <View style={{ gap: 12 }}>
-          <FightButton testID="confirm-result" label="Confirm result" onPress={() => void handleConfirm()} icon={(c) => <Check size={16} color={c} />} />
+          <FightButton testID="confirm-result" label="Confirm result" sheen onPress={() => void handleConfirm()} icon={(c) => <Check size={16} color={c} />} />
           {windowClosed ? null : (
             <FightButton
               testID="confirm-dispute"
@@ -226,12 +239,12 @@ export function ConfirmStep(props: ConfirmStepProps) {
           )}
           <View testID="confirm-lock-notes" style={{ gap: 6, alignItems: "center" }}>
             {windowClosed ? null : (
-              <Text className="font-mono-bold" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text }}>
+              <Text className="font-mono-bold" style={[typeStep("caption"), { textAlign: "center", letterSpacing: TRACKING.loose, color: p.text }, TABULAR]}>
                 {LEAVE_COUNTS_AS_CONFIRMING}
               </Text>
             )}
             {lockNote ? (
-              <Text className="font-mono" style={{ textAlign: "center", fontSize: 11, letterSpacing: 0.4, color: p.text2 }}>
+              <Text className="font-mono" style={[typeStep("caption"), { textAlign: "center", letterSpacing: TRACKING.loose, color: p.text2 }, TABULAR]}>
                 {lockNote}
               </Text>
             ) : null}
@@ -249,10 +262,10 @@ function StatusRow({ name, status, done, divider = false, testID }: { name: stri
       testID={testID}
       style={{ height: 48, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: divider ? 1 : 0, borderColor: p.hairline }}
     >
-      <Text numberOfLines={1} className="font-heading uppercase" style={{ flex: 1, fontSize: 13, letterSpacing: 0.52, color: p.text }}>
+      <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("body"), { flex: 1, letterSpacing: TRACKING.loose, color: p.text }]}>
         {name}
       </Text>
-      <Mono bold size={11} spacing={1.68} color={done ? p.win : p.amber}>
+      <Mono bold size="caption" spacing="caps-l" color={done ? p.text : p.amber}>
         {status}
       </Mono>
     </View>

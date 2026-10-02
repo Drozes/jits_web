@@ -4,6 +4,7 @@ import Svg, { Circle, Line, Polyline, Text as SvgText } from "react-native-svg";
 import { eloGridTicks, type EloProgression } from "@jits/shared/utils";
 import { Plate } from "@/components/ui/elo-system";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { TYPE_SCALE } from "@/lib/typography";
 
 const CHART_HEIGHT = 120;
 const PLOT_TOP = 21;
@@ -58,21 +59,21 @@ export function EloProgressionChart({ progression }: EloProgressionChartProps) {
   return (
     <Plate>
       <View className="flex-row items-baseline justify-between mb-3">
-        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+        <Text className="font-heading text-small text-ink uppercase tracking-caps">
           ELO Progression
         </Text>
         <View className="flex-row items-baseline gap-2">
           {matches > 0 && (
             <Text
               testID="elo-progression-delta"
-              className={`font-mono-bold text-[11px] tabular-nums ${
+              className={`font-mono-bold text-caption tabular-nums ${
                 delta > 0 ? "text-positive" : delta < 0 ? "text-negative" : "text-ink-3"
               }`}
             >
               {signed(delta)}
             </Text>
           )}
-          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+          <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
             {matches === 1 ? "1 match" : `${matches} matches`}
           </Text>
         </View>
@@ -99,7 +100,7 @@ export function EloProgressionChart({ progression }: EloProgressionChartProps) {
                 x={width}
                 y={y(t) - 3}
                 textAnchor="end"
-                fontSize={8}
+                fontSize={TYPE_SCALE.micro.fontSize}
                 fontFamily="JetBrainsMono_400Regular"
                 fill={tokens.textTertiary}
               >
@@ -129,7 +130,7 @@ export function EloProgressionChart({ progression }: EloProgressionChartProps) {
           <SvgText
             x={LEFT_PAD}
             y={Math.min(CHART_HEIGHT - 2, startY + 15)}
-            fontSize={10}
+            fontSize={TYPE_SCALE.micro.fontSize}
             fontFamily="JetBrainsMono_700Bold"
             fill={tokens.textTertiary}
           >
@@ -139,7 +140,7 @@ export function EloProgressionChart({ progression }: EloProgressionChartProps) {
             x={endX}
             y={Math.max(10, endY - 8)}
             textAnchor="end"
-            fontSize={11}
+            fontSize={TYPE_SCALE.caption.fontSize}
             fontFamily="JetBrainsMono_700Bold"
             fill={tokens.textPrimary}
           >
@@ -150,10 +151,10 @@ export function EloProgressionChart({ progression }: EloProgressionChartProps) {
 
       {(startDate || endDate) && (
         <View className="flex-row justify-between mt-2">
-          <Text className="font-mono text-[9px] text-ink-3 uppercase tracking-caps tabular-nums">
+          <Text className="font-mono text-micro text-ink-3 uppercase tracking-caps tabular-nums">
             {startDate ? shortDate(startDate) : ""}
           </Text>
-          <Text className="font-mono text-[9px] text-ink-3 uppercase tracking-caps tabular-nums">
+          <Text className="font-mono text-micro text-ink-3 uppercase tracking-caps tabular-nums">
             {endDate ? shortDate(endDate) : ""}
           </Text>
         </View>

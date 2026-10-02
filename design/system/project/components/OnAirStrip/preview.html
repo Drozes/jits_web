@@ -1,0 +1,44 @@
+<!-- @dsCard group="Arena" height=139 subtitle="ON AIR tally and heartbeat" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OnAirStrip preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.oa{height:24.5px;display:flex;align-items:center;gap:10.5px;width:358px;max-width:100%}
+.tally{position:relative;height:17.5px;display:flex;align-items:center;padding:0 5.25px;border:1px solid var(--gain-green);border-radius:var(--radius-tag);overflow:hidden;flex:none}
+.tfill{position:absolute;inset:0;background:var(--gain-green);opacity:0.18}
+.tt{position:relative;font-family:var(--font-mono);font-weight:700;font-size:10px;line-height:13px;letter-spacing:2.52px;text-transform:uppercase;color:var(--gain-green)}
+.trace{flex:1;height:14px;position:relative}
+.trace svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.trace path{fill:none;stroke:var(--gain-green);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.rest svg{opacity:0.3}
+.body{background:var(--void);padding:0}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="cell"><p class="cap">Live, between beats (trace at rest, 0.3)</p>
+    <div class="oa"><span class="tally"><span class="tfill"></span><span class="tt">On air</span></span><span class="trace rest"><svg viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true"><path d="M0 8 H62 L65 8 L68 2 L72 14 L75 5 L77 8 H100"/></svg></span></div>
+  </div>
+  <div class="cell"><p class="cap">Reduce Motion (tally filled, full trace static)</p>
+    <div class="oa"><span class="tally"><span class="tfill"></span><span class="tt">On air</span></span><span class="trace"><svg viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true"><path d="M0 8 H62 L65 8 L68 2 L72 14 L75 5 L77 8 H100"/></svg></span></div>
+  </div>
+</div>
+</body>
+</html>

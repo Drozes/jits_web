@@ -23,13 +23,14 @@ const STATUS_LABEL: Record<ParticipantStatus, string> = {
 
 const STATUS_BORDER: Record<ParticipantStatus, string> = {
   available: "border-positive",
-  busy: "border-negative",
+  // "In Match" is a status, not a loss: neutral, never red (WP2, R3 CO-7).
+  busy: "border-hairline-strong",
   self: "border-hairline-strong",
 };
 
 const STATUS_TEXT: Record<ParticipantStatus, string> = {
   available: "text-positive",
-  busy: "text-negative",
+  busy: "text-ink-2",
   self: "text-ink-3",
 };
 
@@ -38,7 +39,7 @@ function StatusBadge({ status }: { status: ParticipantStatus }) {
     <View className={cn("px-2 py-[2px] border rounded-xs", STATUS_BORDER[status])}>
       <Text
         className={cn(
-          "font-mono-bold text-[10px] uppercase tracking-caps-l",
+          "font-mono-bold tabular-nums text-micro uppercase tracking-caps-l",
           STATUS_TEXT[status],
         )}
       >
@@ -74,11 +75,11 @@ export function ParticipantRow({
       <View className="flex-1 min-w-0">
         <Text
           numberOfLines={1}
-          className="font-heading text-[12px] text-ink"
+          className="font-heading text-small text-ink"
         >
           {name}
         </Text>
-        <Text className="font-mono text-[12px] text-ink-3 mt-[2px]">
+        <Text className="font-mono tabular-nums text-small text-ink-3 mt-[2px]">
           {subtitle}
         </Text>
       </View>

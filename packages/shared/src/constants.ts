@@ -156,7 +156,7 @@ export const DEFAULT_SPLASH_VARIANT: SplashVariant = SPLASH_VARIANT.GLOW_STATEME
  * All values in ms. Reuses SPLASH_REVEAL.EASING_BEZIER for the brand ease-out.
  * Sequence: WE ARE eyebrow fades up; ELO RATED ignites (opacity+scale 1.04->1,
  * no flash); ARE YOU? fades up on the beat + a Heavy haptic; then ELO RATED
- * settles into a gentle, even glow breathe loop. Reduced-motion shows the resting
+ * breathes its glow up and back once and rests. Reduced-motion shows the resting
  * frame and dismisses after a short hold.
  */
 export const SPLASH_STATEMENT = {
@@ -177,8 +177,9 @@ export const SPLASH_STATEMENT = {
   /** Felt "lock" — Heavy haptic on the ARE YOU beat (suppressed under reduced-motion). */
   HAPTIC_DELAY_MS: 1080,
 
-  /** Gentle even glow breathe on ELO RATED — full up-and-back cycle, loops forever
-   * until the overlay unmounts at handoff. Low amplitude (a calm glow, not a pulse). */
+  /** Gentle even glow breathe on ELO RATED: one full up-and-back cycle, played
+   * once after the ignite, then the glow rests at its baseline (a Moment never
+   * loops). Low amplitude (a calm glow, not a pulse). */
   GLOW_BREATHE_MS: 6000,
 
   /** Hold the landed frame before the cross-fade out. */

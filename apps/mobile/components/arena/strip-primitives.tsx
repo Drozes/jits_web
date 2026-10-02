@@ -4,13 +4,19 @@
  * import them.
  */
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 import { cn } from "@/lib/cn";
+import { PressableScale } from "@/components/ui/pressable-scale";
 
 /** Largest Dynamic Type scale on the dense Arena strip text (spec 4.2). */
 export const MAX_SCALE = 1.3;
 
-/** A small outline action: ROLL, OPEN, CANCEL, CONFIRM. 44pt hit area. */
+/**
+ * A small outline action: ROLL, OPEN, CANCEL, CONFIRM. 44pt hit area. Press
+ * scale (Motion Rule, Reactive); no haptic prop: a caller that commits
+ * (ROLL sends a challenge) fires `haptics.press` itself.
+ */
 export function OutlineAction({
   label,
   accessibilityLabel,
@@ -31,7 +37,7 @@ export function OutlineAction({
   testID?: string;
 }) {
   return (
-    <Pressable
+    <PressableScale
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -44,18 +50,18 @@ export function OutlineAction({
         "h-8 justify-center rounded-xs border px-3 active:bg-surface-4",
         dim ? "border-hairline" : "border-hairline-strong",
       )}
-      style={disabled ? { opacity: 0.5 } : undefined}
+      style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
     >
       <Text
         maxFontSizeMultiplier={MAX_SCALE}
         className={cn(
-          "font-heading text-[11px] uppercase tracking-caps",
+          "font-heading text-caption uppercase tracking-caps",
           dim ? "text-ink-3" : "text-ink",
         )}
       >
         {label}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -63,11 +69,14 @@ export function StripShell({
   rail,
   testID,
   children,
+  edge,
 }: {
   /** `red` only for "someone wants you" (a rail, never a CTA). */
   rail: "red" | "neutral";
   testID: string;
   children: React.ReactNode;
+  /** Drawn over the strip's bottom edge (the challenge afterglow). */
+  edge?: React.ReactNode;
 }) {
   return (
     <View
@@ -79,6 +88,7 @@ export function StripShell({
       )}
     >
       {children}
+      {edge}
     </View>
   );
 }

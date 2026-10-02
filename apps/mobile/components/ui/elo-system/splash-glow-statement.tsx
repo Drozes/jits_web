@@ -1,8 +1,9 @@
 import * as React from "react";
-import { AccessibilityInfo, Dimensions, StyleSheet, Text, View } from "react-native";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
   Extrapolation,
+  cancelAnimation,
   interpolate,
   runOnJS,
   useAnimatedStyle,
@@ -15,6 +16,8 @@ import * as Haptics from "expo-haptics";
 import * as SplashScreen from "expo-splash-screen";
 import { SPLASH_GLOW_STATEMENT, SPLASH_REVEAL } from "@jits/shared/constants";
 import { ErMark } from "@/components/ui/elo-system/er-mark";
+import { useReduceMotion } from "@/lib/motion";
+import { darkTokens } from "@/lib/tokens";
 
 const S = SPLASH_GLOW_STATEMENT;
 const EASE = Easing.bezier(
@@ -33,10 +36,11 @@ const EXPAND = Easing.bezier(
 
 // Void "arena" palette, theme-independent, matches the native splash exactly so
 // the hand-off has no seam.
-const VOID = "#0D0F14";
-const WHITE = "#E8EDF2"; // ELO RATED
-const GRAY = "#9CA3AF"; // WE ARE
-const RED = "#E63946"; // Signal Red, ARE YOU? only
+// The dark (Void) tokens, pinned: the statement ignores the app theme.
+const VOID = darkTokens.bgPrimary;
+const WHITE = darkTokens.textPrimary; // ELO RATED
+const GRAY = darkTokens.textSecondary; // WE ARE
+const RED = darkTokens.accentCta; // Signal Red, ARE YOU? only
 
 // dp width of the centered mark. KEEP THIS EQUAL to app.json's expo-splash-screen
 // `imageWidth`, that's what makes the static native splash and this animated
@@ -138,6 +142,13 @@ interface SplashGlowStatementProps {
   onDone: () => void;
 }
 
+/**
+ * "Glow Statement" launch splash (Motion Rule registry: Launch splash reveal,
+ * a Moment, once per cold start). Reduce Motion is read with
+ * `useReduceMotion()` (correct on the first frame); a late flip to on snaps
+ * to the resting frame, drops the pending lock haptic and dismisses after at
+ * most the reduced hold.
+ */
 export function SplashGlowStatement({ onDone }: SplashGlowStatementProps) {
   // DM Sans mark layers. Frame 0 = the static splash: mark fully on. The mark holds
   // its size and just fades (Option B); the Bebas wordmark does the size match.
@@ -154,14 +165,41 @@ export function SplashGlowStatement({ onDone }: SplashGlowStatementProps) {
   // Whole-overlay opacity; dismissal cross-dissolves it to 0.
   const farewell = useSharedValue(1);
 
+  const reduceMotion = useReduceMotion();
   // The mark must NOT be visible in the reduced-motion resting frame (it would
-  // overlap the wordmark). We start with it shown so frame 0 is correct for the
-  // full-motion path, then unmount it if reduce-motion turns out to be on.
-  const [showMark, setShowMark] = React.useState(true);
+  // overlap the wordmark). Known on the first frame; a late flip unmounts it.
+  const [showMark, setShowMark] = React.useState(!reduceMotion);
+
+  // Resting final frame: NO mark, full ELO RATED, WE ARE + ARE YOU?; no
+  // expand, scale or haptic motion.
+  const rest = React.useCallback(() => {
+    [glyph, dot, weare, expand, areyou].forEach((v) => cancelAnimation(v));
+    setShowMark(false);
+    glyph.value = 0;
+    dot.value = 0;
+    weare.value = 1;
+    expand.value = 1; // letters at their final slots, wordmark at final size
+    areyou.value = 1;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The pending lock haptic and dismiss, kept so a late Reduce Motion switch
+  // can drop the haptic and shorten the hold (see the effect below).
+  const startedAtRef = React.useRef(0);
+  const hapticTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissFnRef = React.useRef<() => void>(() => undefined);
+  const scheduleDismiss = React.useCallback((ms: number) => {
+    if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
+      dismissFnRef.current();
+    }, ms);
+  }, []);
 
   React.useEffect(() => {
-    let mounted = true;
     const timers: ReturnType<typeof setTimeout>[] = [];
+    startedAtRef.current = Date.now();
 
     // Hand the native splash off to this overlay (identical Void bg → no seam).
     SplashScreen.hideAsync().catch(() => {});
@@ -172,59 +210,65 @@ export function SplashGlowStatement({ onDone }: SplashGlowStatementProps) {
       });
     };
 
-    (async () => {
-      let reduce = false;
-      try {
-        reduce = await AccessibilityInfo.isReduceMotionEnabled();
-      } catch {}
-      if (!mounted) return;
+    if (reduceMotion) {
+      // Fade the resting frame IN via opacity only, no expand / scale / haptic.
+      rest();
+      intro.value = withTiming(1, { duration: S.REDUCED_MOTION_FADEIN_MS, easing: EASE });
+      timers.push(setTimeout(dismiss, S.REDUCED_MOTION_FADEIN_MS + S.REDUCED_MOTION_HOLD_MS));
+      return () => timers.forEach(clearTimeout);
+    }
 
-      if (reduce) {
-        // Resting final frame: NO mark, full ELO RATED, WE ARE + ARE YOU?. Fade the
-        // group IN via opacity only, no expand / scale / haptic.
-        setShowMark(false);
-        glyph.value = 0;
-        dot.value = 0;
-        weare.value = 1;
-        expand.value = 1; // letters at their final slots, wordmark at final size
-        areyou.value = 1;
-        intro.value = withTiming(1, { duration: S.REDUCED_MOTION_FADEIN_MS, easing: EASE });
-        timers.push(setTimeout(dismiss, S.REDUCED_MOTION_FADEIN_MS + S.REDUCED_MOTION_HOLD_MS));
-        return;
-      }
+    // Full motion. The hero group is opaque; each element reveals itself.
+    intro.value = 1;
 
-      // Full motion. The hero group is opaque; each element reveals itself.
-      intro.value = 1;
+    // WE ARE rises in during the hold (left-aligned).
+    weare.value = withDelay(S.WEARE_DELAY_MS, withTiming(1, { duration: S.WEARE_MS, easing: EASE }));
 
-      // WE ARE rises in during the hold (left-aligned).
-      weare.value = withDelay(S.WEARE_DELAY_MS, withTiming(1, { duration: S.WEARE_MS, easing: EASE }));
+    // Red interpunct fades out within the hold, before any letter expands.
+    dot.value = withDelay(S.DOT_FADE_DELAY_MS, withTiming(0, { duration: S.DOT_FADE_MS, easing: EASE }));
 
-      // Red interpunct fades out within the hold, before any letter expands.
-      dot.value = withDelay(S.DOT_FADE_DELAY_MS, withTiming(0, { duration: S.DOT_FADE_MS, easing: EASE }));
+    // EXP: the mark's white E/R crossfade out as the Bebas wordmark crossfades in
+    // (at the mark's size) and expands outward from the seed, settling to final.
+    glyph.value = withDelay(S.EXP_DELAY_MS, withTiming(0, { duration: S.MARK_FADE_MS, easing: EASE }));
+    expand.value = withDelay(S.EXP_DELAY_MS, withTiming(1, { duration: TOTAL_EXPAND, easing: EXPAND }));
 
-      // EXP: the mark's white E/R crossfade out as the Bebas wordmark crossfades in
-      // (at the mark's size) and expands outward from the seed, settling to final.
-      glyph.value = withDelay(S.EXP_DELAY_MS, withTiming(0, { duration: S.MARK_FADE_MS, easing: EASE }));
-      expand.value = withDelay(S.EXP_DELAY_MS, withTiming(1, { duration: TOTAL_EXPAND, easing: EXPAND }));
+    // LOCK: a Heavy haptic + "ARE YOU?" rises in red (right-aligned).
+    areyou.value = withDelay(S.AREYOU_DELAY_MS, withTiming(1, { duration: S.AREYOU_MS, easing: EASE }));
+    hapticTimerRef.current = setTimeout(() => {
+      hapticTimerRef.current = null;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+    }, S.HAPTIC_DELAY_MS);
 
-      // LOCK: a Heavy haptic + "ARE YOU?" rises in red (right-aligned).
-      areyou.value = withDelay(S.AREYOU_DELAY_MS, withTiming(1, { duration: S.AREYOU_MS, easing: EASE }));
-      timers.push(
-        setTimeout(() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
-        }, S.HAPTIC_DELAY_MS),
-      );
-
-      timers.push(setTimeout(dismiss, S.TOTAL_MS));
-    })();
+    dismissFnRef.current = dismiss;
+    scheduleDismiss(S.TOTAL_MS);
 
     return () => {
-      mounted = false;
       timers.forEach(clearTimeout);
+      if (hapticTimerRef.current != null) clearTimeout(hapticTimerRef.current);
+      if (dismissTimerRef.current != null) clearTimeout(dismissTimerRef.current);
     };
     // Mount-only: the statement plays once per cold start.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reduce Motion switched on mid-reveal: snap to the resting frame, no lock
+  // haptic, and the dismiss comes after at most the reduced-motion hold.
+  const startedReduced = React.useRef(reduceMotion).current;
+  React.useEffect(() => {
+    if (!reduceMotion || startedReduced) return;
+    rest();
+    // No lock haptic and no full hold for a late Reduce Motion read: drop the
+    // pending haptic and dismiss after at most the reduced-motion hold.
+    if (hapticTimerRef.current != null) {
+      clearTimeout(hapticTimerRef.current);
+      hapticTimerRef.current = null;
+    }
+    if (dismissTimerRef.current != null) {
+      const remaining = Math.max(0, S.TOTAL_MS - (Date.now() - startedAtRef.current));
+      scheduleDismiss(Math.min(remaining, S.REDUCED_MOTION_HOLD_MS));
+    }
+    intro.value = 1;
+  }, [reduceMotion, startedReduced, rest, intro, scheduleDismiss]);
 
   const weareStyle = useAnimatedStyle(() => ({
     opacity: weare.value,

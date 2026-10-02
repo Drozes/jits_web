@@ -7,10 +7,10 @@ import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { getMyFriends, removeFriend, type FriendCard } from "@jits/shared/api/friends";
 import { AppHeader } from "@/components/layout/app-header";
-import { CtaButton, SecondaryButton, TertiaryButton } from "@/components/auth/auth-buttons";
 import { OpenChallenges } from "@/components/invite/open-challenges";
 import { useAuth } from "@/lib/auth/hooks";
 import { Avatar32, LivePill, Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { supabase } from "@/lib/supabase/client";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
@@ -68,8 +68,8 @@ export default function FriendsScreen() {
       <AppHeader title="Friends" back backFallback={"/profile" as Href} />
       {error ? (
         <View className="gap-4 p-6">
-          <Text accessibilityRole="alert" className="font-body text-[14px] text-ink-2">{error}</Text>
-          <SecondaryButton label="Try again" onPress={() => void load()} />
+          <Text accessibilityRole="alert" className="font-body text-callout text-ink-2">{error}</Text>
+          <Button variant="secondary" label="Try again" onPress={() => void load()} />
         </View>
       ) : friends === null ? (
         <View className="items-center py-16">
@@ -82,11 +82,11 @@ export default function FriendsScreen() {
           contentContainerStyle={{ padding: 16, gap: 8 }}
           ListEmptyComponent={
             <Plate className="gap-4">
-              <Text className="font-body text-[14px] text-ink leading-6">
+              <Text className="font-body text-callout text-ink leading-6">
                 No friends yet. When someone accepts your invite, you're friends automatically.
               </Text>
               {invitesOn ? (
-                <CtaButton label="Invite a training partner" onPress={() => router.push("/invite/join" as Href)} />
+                <Button label="Invite a training partner" onPress={() => router.push("/invite/join" as Href)} />
               ) : null}
             </Plate>
           }
@@ -94,7 +94,7 @@ export default function FriendsScreen() {
             invitesOn ? (
               <View className="gap-4 pt-4">
                 <OpenChallenges athleteId={athlete?.id ?? null} reloadKey={focusCount} />
-                <TertiaryButton label="Got a challenge code?" onPress={() => router.push("/invite-code" as Href)} />
+                <Button variant="ghost" height={44} label="Got a challenge code?" onPress={() => router.push("/invite-code" as Href)} />
               </View>
             ) : null
           }
@@ -108,8 +108,8 @@ export default function FriendsScreen() {
               >
                 <Avatar32 name={item.display_name} photoUrl={item.avatar_url} />
                 <View className="flex-1">
-                  <Text className="font-heading text-[14px] text-ink" numberOfLines={1}>{item.display_name}</Text>
-                  <Text className="font-mono text-[12px] tabular-nums text-ink-3">{item.current_elo} ELO</Text>
+                  <Text className="font-heading text-callout text-ink" numberOfLines={1}>{item.display_name}</Text>
+                  <Text className="font-mono text-small tabular-nums text-ink-3">{item.current_elo} ELO</Text>
                 </View>
                 {item.is_live ? <LivePill /> : null}
               </Pressable>
@@ -120,7 +120,7 @@ export default function FriendsScreen() {
                 onPress={() => confirmRemove(item)}
                 className="px-2 py-1 active:opacity-70"
               >
-                <Text className="font-heading text-[11px] uppercase tracking-caps-l text-ink-3">Remove</Text>
+                <Text className="font-heading text-caption uppercase tracking-caps-l text-ink-3">Remove</Text>
               </Pressable>
             </View>
           )}

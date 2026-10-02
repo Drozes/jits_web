@@ -15,9 +15,12 @@ import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { buildShareText, buildShareUrl } from "@jits/shared/utils";
 import { UploadProgressBanner } from "../upload-progress-banner";
 import { usePalette } from "@/lib/theme/palette";
-import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
-import { FightButton, Mono, RatingBlock, deltaColor, formatSignedDelta, shortName } from "../fight/fight-ui";
-import { Confetti, RiseIn, SlamIn, TickingRating } from "./celebration";
+import { typeSize, typeStep } from "@/lib/typography";
+import { FIGHT_RADIUS } from "../fight/fight-tokens";
+import { FightButton, Mono, shortName } from "../fight/fight-ui";
+import { Confetti, RiseIn, SlamIn } from "./celebration";
+import { RatingMoment } from "./rating-moment";
+import { isResultFresh, usePlayOnce } from "@/components/ui/elo-system/play-once";
 import { HERO_HEIGHT, VerdictHero } from "./verdict-hero";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { useScrolledPast } from "../wizard-scroll";
@@ -54,11 +57,18 @@ interface VerdictStepProps {
   uploadedVideoId: string | null;
   /** Athletes with a confirmation row (from the wizard's reconciler). */
   confirmedAthleteIds?: string[];
+  /**
+   * The result's type when known (the broadcast or the reconciler); else
+   * a named submission counts as one.
+   */
+  resultType?: "submission" | "draw" | null;
+  /** `matches.completed_at`: an old result does not celebrate. */
+  completedAt?: string | null;
 }
 
 /**
  * Step 8, the verdict. A win celebrates (confetti, the verdict slams in, the
- * rating ticks, the rank strip rises); a loss is calm. Every outcome gets
+ * rating rolls, the rank strip rises); a loss is calm. Every outcome gets
  * the same actions (P-Verdict, jits-02vo.8): Watch film, Back to Arena, and
  * Share match as one full-width tertiary row. Running it back is an
  * ordinary Arena challenge, never a shortcut here. The opening still (or the
@@ -72,7 +82,7 @@ interface VerdictStepProps {
  */
 export function VerdictStep(props: VerdictStepProps) {
   const p = usePalette();
-  const { matchId, exitHref, exitLabel, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [] } = props;
+  const { matchId, exitHref, exitLabel, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [], resultType = null, completedAt = null } = props;
   const router = useRouter();
   const invitesOn = useInvitesEnabled();
   const insets = useSafeAreaInsets();
@@ -111,6 +121,12 @@ export function VerdictStep(props: VerdictStepProps) {
   }, [awaitingOpponent, reconcileNow]);
 
   const win = !disputed && outcome === "win";
+
+  // The whole celebration (confetti, slam, roll, tap, rank strip) plays ONCE
+  // per result: the first time this match's verdict is seen, on any launch,
+  // and only while the result is fresh (decided here, on mount).
+  const play = usePlayOnce(`verdict:${matchId}`, !disputed && isResultFresh(matchId, completedAt));
+  const submission = resultType != null ? resultType === "submission" : submissionName != null;
   const loss = !disputed && outcome === "loss";
 
   const videos = useVerdictVideos(matchId, me.athlete_id, uploadedVideoId);
@@ -169,51 +185,51 @@ export function VerdictStep(props: VerdictStepProps) {
         filmExpected={filmExpected}
         topInset={insets.top}
       />
-      {win ? <Confetti /> : null}
+      {win ? <Confetti play={play} /> : null}
       <View style={{ paddingHorizontal: 16, marginTop: videos.posterUrl ? -72 : 24, gap: 16 }}>
         <View style={{ gap: 8 }}>
-          <SlamIn animate={win}>
-            <Text testID="summary-verdict" className="font-display" style={{ fontSize: win ? 96 : 80, lineHeight: win ? 88 : 72, letterSpacing: 1, color: verdictColor }}>
+          <SlamIn animate={win && play}>
+            <Text testID="summary-verdict" className="font-display" style={[
+                typeSize(win ? "display-96" : "display-80"),
+                // The SlamIn verdict (Adding Flare) keeps its tuned line box and 1px tracking.
+                { lineHeight: win ? 88 : 72, letterSpacing: 1, color: verdictColor },
+              ]}>
               {verdict}
             </Text>
           </SlamIn>
           {how ? (
-            <Text className="font-body-medium" style={{ fontSize: 16, color: win ? p.text : p.text2 }}>
+            <Text className="font-body-medium" style={[typeStep("subhead"), { color: win ? p.text : p.text2 }]}>
               {loss ? `${how} · vs ${oppShort}` : how}
             </Text>
           ) : null}
-          {loss && how ? null : <Mono size={11} spacing={1.68}>{`VS ${oppShort.toUpperCase()}`}</Mono>}
+          {loss && how ? null : <Mono size="caption" spacing="caps-l">{`VS ${oppShort.toUpperCase()}`}</Mono>}
           {disputed ? (
-            <Text testID="summary-disputed-note" className="font-body" style={{ fontSize: 14, color: p.text2 }}>
+            <Text testID="summary-disputed-note" className="font-body" style={[typeStep("callout"), { color: p.text2 }]}>
               An admin will review it. Your rating change stands until they do.
             </Text>
           ) : null}
         </View>
 
         {eloAfter != null ? (
-          <RatingBlock
+          <RatingMoment
+            play={play}
+            outcome={outcome}
+            disputed={disputed}
+            submission={submission}
             before={eloBefore}
             after={eloAfter}
             delta={eloDelta}
-            ratingNode={<TickingRating before={disputed ? null : eloBefore} after={eloAfter} />}
-            deltaNode={
-              eloDelta != null && eloDelta !== 0 ? (
-                <Text testID="summary-elo-delta" className="font-mono-bold" style={[{ fontSize: 26, color: outcome === "draw" ? p.amber : deltaColor(eloDelta, p) }, TABULAR]}>
-                  {formatSignedDelta(eloDelta)}
-                </Text>
-              ) : null
-            }
           />
         ) : null}
 
         {rankText ? (
-          <RiseIn>
+          <RiseIn play={play}>
             <View
               testID="verdict-rank-strip"
               style={{ height: 40, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: p.winRule, borderRadius: FIGHT_RADIUS.plate }}
             >
               <TrendingUp size={16} color={p.win} />
-              <Mono size={11} spacing={1.68} color={p.text}>
+              <Mono size="caption" spacing="caps-l" color={p.text}>
                 {rankText}
               </Mono>
             </View>
@@ -221,7 +237,7 @@ export function VerdictStep(props: VerdictStepProps) {
         ) : null}
 
         {gap > 0 ? (
-          <Mono size={10} spacing={1.2}>{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. Heavier athlete’s ELO was adjusted.`}</Mono>
+          <Mono size="micro" spacing="caps">{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. Heavier athlete’s ELO was adjusted.`}</Mono>
         ) : null}
 
         {upload.kind !== "hidden" ? <UploadProgressBanner {...upload} /> : null}

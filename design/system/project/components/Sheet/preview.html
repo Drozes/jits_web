@@ -1,0 +1,70 @@
+<!-- @dsCard group="Surfaces" height=634 width=390 subtitle="Shipped (WP1): bottom sheet chrome" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sheet preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bleed{margin:0 -16px}
+.scr{position:relative;background:var(--void);overflow:hidden}
+.scrim{position:absolute;inset:0;background:var(--on-media-scrim)}
+.under{padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.ghostline{height:12px;border-radius:var(--radius-tag);background:var(--plate)}
+.sheet{position:relative;background:var(--panel);border-top-left-radius:var(--radius-sheet);border-top-right-radius:var(--radius-sheet);border-top:1px solid var(--hairline)}
+.handle{height:24px;display:flex;align-items:center;justify-content:center}
+.handle span{width:30px;height:4px;border-radius:4px;background:var(--ink-3)}
+.content{padding:0 14px 14px}
+.title{font-family:var(--font-heading);font-weight:700;font-size:14px;line-height:18px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink);padding-bottom:10.5px}
+.plate{background:var(--plate);border:1px solid var(--hairline);border-left:3px solid var(--signal-red);border-radius:var(--radius-plate);padding:14px;display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:14px}
+.nm{font-family:var(--font-heading);font-weight:700;font-size:16px;letter-spacing:1.12px;text-transform:uppercase;color:var(--ink)}
+.lb{font-family:var(--font-mono);font-size:10px;letter-spacing:2.52px;text-transform:uppercase;color:var(--ink-3)}
+.elo{font-family:var(--font-mono);font-weight:700;font-size:36px;line-height:43px;color:var(--ink);font-variant-numeric:tabular-nums}
+.rec{display:flex;gap:7px;font-family:var(--font-mono);font-size:12px;font-variant-numeric:tabular-nums}
+.cta{margin-top:14px;display:flex;align-items:center;justify-content:center;gap:7px;padding:14px 17.5px;background:var(--signal-red);border-radius:var(--radius-button);color:var(--on-signal);font-family:var(--font-heading);font-weight:700;font-size:12px;letter-spacing:1.12px;text-transform:uppercase}
+.info{margin-top:14px;display:flex;gap:7px;align-items:flex-start;color:var(--ink-3);font-family:var(--font-body);font-size:11px;line-height:15px}
+.today .sheet{border-top-left-radius:15px;border-top-right-radius:15px}
+.today .title{font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-weight:600;font-size:15.75px;letter-spacing:0;text-transform:none}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="sec"><span class="flag">Shipped (WP1)</span><p class="cap">8px top corners, panel, brand title</p></div>
+  <div class="bleed"><div class="scr">
+    <div class="under"><span class="ghostline" style="width:60%"></span><span class="ghostline" style="width:80%"></span><span class="ghostline" style="width:40%"></span></div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="handle"><span></span></div>
+      <div class="content">
+        <div class="title">Share Profile</div>
+        <div class="plate">
+          <span class="nm">Mina Park</span>
+          <span style="display:flex;flex-direction:column;align-items:center"><span class="lb">ELO Rating</span><span class="elo">1526</span></span>
+          <span class="rec"><span style="color:var(--ink)">14W</span><span style="color:var(--ink-3)">&middot;</span><span style="color:var(--negative)">6L</span><span style="color:var(--ink-3)">&middot;</span><span style="color:var(--ink-2)">170 lbs</span></span>
+        </div>
+        <div class="cta"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>Share my number</div>
+        <div class="info"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" style="margin-top:1px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Shared profiles show your display name, ELO rating, and win/loss record. No personal information is included.</span></div>
+      </div>
+    </div>
+  </div></div>
+  <div class="sec"><span class="flag today">Before WP1</span><p class="cap">gorhom default 15px corners, system-font title</p></div>
+  <div class="bleed today"><div class="scr">
+    <div class="sheet"><div class="handle"><span></span></div><div class="content"><div class="title">Share Profile</div></div></div>
+  </div></div>
+</div>
+</body>
+</html>

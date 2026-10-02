@@ -2202,3 +2202,69 @@ describe("Arena nearby: On the mat by proximity and Online & close (016 addendum
     expect(r.getByTestId("arena-invite-actions")).toBeTruthy();
   });
 });
+
+describe("Arena: Adding Flare live surfaces (jits-pddd.6)", () => {
+  it("ON AIR shows in the body while live, never while offline", () => {
+    const r = render(<ArenaScreen />);
+    expect(r.queryByTestId("arena-on-air")).toBeNull();
+    mockIsLive = true;
+    r.rerender(<ArenaScreen />);
+    expect(r.getByTestId("arena-on-air")).toBeTruthy();
+    // Exactly one Go live / Go offline action stays on screen (the harness).
+    expect(r.getAllByLabelText(/^Go (live|offline)$/)).toHaveLength(1);
+  });
+
+  it("the incoming strip carries the challenge afterglow edge", () => {
+    mockIsLive = true;
+    mockChallenge.incoming = INCOMING;
+    mockChallenge.incomingCount = 1;
+    const r = render(<ArenaScreen />);
+    const strip = r.getByTestId("arena-strip-incoming");
+    expect(within(strip).getByTestId("arena-afterglow", { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it("the Challenge tap on a row buzzes once, through the press haptic", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [competitor({ id: "a-1", displayName: "Alpha" })];
+    mockLobbyIds = new Set(["a-1"]);
+    const r = render(<ArenaScreen />);
+    fireEvent.press(rowButton(r, "a-1", "Challenge Alpha") as never);
+    expect(mockImpact).toHaveBeenCalledTimes(1);
+    expect(mockImpact).toHaveBeenCalledWith("light");
+  });
+
+  it("the On the mat rows stagger on the first load only, never on a roster refetch or lobby sync", () => {
+    mockIsLive = true;
+    mockRoster.competitors = [
+      competitor({ id: "a-1", displayName: "Alpha" }),
+      competitor({ id: "a-2", displayName: "Bravo", eloDiff: 120 }),
+    ];
+    mockLobbyIds = new Set(["a-1", "a-2"]);
+    /** Row wrappers carrying an entering animation. */
+    // The shared `@/lib/motion` helper returns a Reanimated Keyframe (an
+    // object), not an entry function: count any entering animation.
+    const entering = (r: ReturnType<typeof render>) =>
+      r.UNSAFE_root.findAll((n: { props: Record<string, unknown> }) => n.props.entering != null).length;
+
+    const r = render(<ArenaScreen />);
+    expect(entering(r)).toBeGreaterThanOrEqual(2);
+
+    // A roster refetch: new array, one more athlete.
+    mockRoster = {
+      ...mockRoster,
+      competitors: [...mockRoster.competitors, competitor({ id: "a-3", displayName: "Charlie", eloDiff: 140 })],
+    };
+    mockLobbyIds = new Set(["a-1", "a-2", "a-3"]);
+    r.rerender(<ArenaScreen />);
+    expect(r.getByTestId("arena-mat-row-a-3")).toBeTruthy();
+    expect(entering(r)).toBe(0);
+
+    // A lobby sync (a new Set with the same ids) and a pull-to-refresh state.
+    mockLobbyIds = new Set(["a-1", "a-2", "a-3"]);
+    mockRoster = { ...mockRoster, isRefreshing: true };
+    r.rerender(<ArenaScreen />);
+    mockRoster = { ...mockRoster, isRefreshing: false };
+    r.rerender(<ArenaScreen />);
+    expect(entering(r)).toBe(0);
+  });
+});

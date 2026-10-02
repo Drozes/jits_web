@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { SHARE_COPY, type ShareError } from "@/lib/highlight-share";
-import { ViewerButton } from "./viewer-button";
+import { Button } from "@/components/ui/elo-system/button";
 
 interface ShareFailedProps {
   error: ShareError;
@@ -18,14 +18,14 @@ interface ShareFailedProps {
 export function ShareFailed({ error, onRetry, onFallback }: ShareFailedProps) {
   return (
     <View testID={`share-failed-${error.kind}`} className="gap-3">
-      <Text testID="share-error" className="font-body text-[13px] text-ink">
+      <Text testID="share-error" className="font-body text-body text-ink">
         {error.message}
       </Text>
       {error.retryable ? (
-        <ViewerButton testID="share-retry" label={SHARE_COPY.tryAgain} variant="primary" onPress={onRetry} />
+        <Button height={44} testID="share-retry" label={SHARE_COPY.tryAgain} variant="primary" onPress={onRetry} />
       ) : null}
       {error.canFallBack ? (
-        <ViewerButton testID="share-fallback" label={SHARE_COPY.useShareSheet} variant="text" onPress={onFallback} />
+        <Button height={44} testID="share-fallback" label={SHARE_COPY.useShareSheet} variant="ghost" className="self-center" onPress={onFallback} />
       ) : null}
     </View>
   );

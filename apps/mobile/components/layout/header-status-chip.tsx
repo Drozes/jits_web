@@ -113,7 +113,7 @@ const BORDER_TONE: Record<ChipTone, string> = {
 };
 
 // Literal for Tailwind's class scan; keep in step with FONT_PX.
-const TEXT_CLASS = "font-mono-bold text-[10px] uppercase";
+const TEXT_CLASS = "font-mono-bold text-micro uppercase";
 const TEXT_STYLE = { fontVariant: ["tabular-nums" as const] };
 
 // ---------------------------------------------------------------------------

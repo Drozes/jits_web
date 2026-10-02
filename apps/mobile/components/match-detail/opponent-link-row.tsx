@@ -28,14 +28,14 @@ export function OpponentLinkRow({ opponent, onPress }: OpponentLinkRowProps) {
         className="rounded-full"
       />
       <View className="flex-1 min-w-0">
-        <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+        <Text className="font-mono text-micro text-ink-3 uppercase tracking-caps-l tabular-nums">
           Opponent
         </Text>
-        <Text numberOfLines={1} className="font-heading text-[14px] text-ink">
+        <Text numberOfLines={1} className="font-heading text-callout text-ink">
           {opponent.display_name}
         </Text>
       </View>
-      <Text className="font-mono-bold text-[14px] text-ink tabular-nums">
+      <Text className="font-mono-bold text-callout text-ink tabular-nums">
         {opponent.current_elo}
       </Text>
       <View pointerEvents="none">

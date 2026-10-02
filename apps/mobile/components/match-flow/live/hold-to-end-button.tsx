@@ -1,17 +1,14 @@
 import * as React from "react";
-import {
-  Animated,
-  Easing,
-  Pressable,
-  Text,
-  View,
-  type AccessibilityActionEvent,
-} from "react-native";
+import { Pressable, Text, View, type AccessibilityActionEvent } from "react-native";
+import Animated, { cancelAnimation, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Square } from "lucide-react-native";
 import { HOLD_TO_END_MS } from "@/lib/match-flow/live-view-state";
+import { duration, easing } from "@/lib/motion";
 import { BROADCAST, BROADCAST_LANDSCAPE, BROADCAST_RADIUS, BROADCAST_SIZE } from "./broadcast-tokens";
+import { TRACKING, typeStep } from "@/lib/typography";
 
-const RETRACT_MS = 240;
+/** The fill retracts to empty on an early release (`duration.fast`, brand ease-out). */
+export const RETRACT_MS = duration.fast;
 
 const A11Y_ACTIONS = [
   { name: "activate", label: "End match" },
@@ -39,9 +36,15 @@ interface HoldToEndButtonProps {
  * trigger: RN cancels its timer once the finger drifts 10 px, while the
  * press itself stays active, so a rolling thumb would fill the bar and never
  * end. Screen reader users get "End match" actions instead.
+ *
+ * Hold-to-end fill (Motion Rule registry, Reactive): a Reanimated shared
+ * value scales a full-size fill from its leading edge (`scaleX` from the
+ * left; `scaleY` from the bottom on the landscape tile) and the 2px rule
+ * under the label, on the UI thread. No layout property animates. It tracks
+ * the touch, so it is unchanged under Reduce Motion.
  */
 export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = false }: HoldToEndButtonProps) {
-  const progress = React.useRef(new Animated.Value(0)).current;
+  const progress = useSharedValue(0);
   const [holding, setHolding] = React.useState(false);
   const [complete, setComplete] = React.useState(false);
   const completeRef = React.useRef(false);
@@ -69,13 +72,8 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = 
   }, []);
 
   const retract = React.useCallback(() => {
-    progress.stopAnimation();
-    Animated.timing(progress, {
-      toValue: 0,
-      duration: RETRACT_MS,
-      easing: Easing.bezier(0.22, 1, 0.36, 1),
-      useNativeDriver: false,
-    }).start();
+    cancelAnimation(progress);
+    progress.value = withTiming(0, { duration: RETRACT_MS, easing: easing.brandOut });
   }, [progress]);
 
   const finish = React.useCallback(() => {
@@ -83,8 +81,8 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = 
     if (completeRef.current || disabledRef.current) return;
     completeRef.current = true;
     setComplete(true);
-    progress.stopAnimation();
-    progress.setValue(1);
+    cancelAnimation(progress);
+    progress.value = 1;
     setHold(false);
     onEnd();
   }, [clearHoldTimer, onEnd, progress, setHold]);
@@ -100,12 +98,8 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = 
     if (disabledRef.current || completeRef.current) return;
     cancelledRef.current = false;
     setHold(true);
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: HOLD_TO_END_MS,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    }).start();
+    // A readout only: completion comes from the timer below.
+    progress.value = withTiming(1, { duration: HOLD_TO_END_MS, easing: easing.linear });
     clearHoldTimer();
     holdTimerRef.current = setTimeout(() => {
       holdTimerRef.current = null;
@@ -141,18 +135,21 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = 
   React.useEffect(
     () => () => {
       clearHoldTimer();
-      progress.stopAnimation();
+      cancelAnimation(progress);
     },
     [clearHoldTimer, progress],
   );
 
   const label = complete || ending ? "ENDING" : holding ? "KEEP HOLDING" : "HOLD TO END";
   const dimmed = disabled || complete;
-  const fillWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
   // The tile's fill carries the vertical reading; the bottom rule stays horizontal.
+  const fillAnimated = useAnimatedStyle(() =>
+    tile ? { transform: [{ scaleY: progress.value }] } : { transform: [{ scaleX: progress.value }] },
+  );
+  const ruleAnimated = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.value }] }));
   const fillStyle = tile
-    ? { left: 0, right: 0, bottom: 0, height: fillWidth }
-    : { left: 0, top: 0, bottom: 0, width: fillWidth };
+    ? { left: 0, right: 0, bottom: 0, height: "100%" as const, transformOrigin: "bottom" }
+    : { left: 0, top: 0, bottom: 0, width: "100%" as const, transformOrigin: "left" };
 
   return (
     <Pressable
@@ -184,11 +181,14 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = 
       <Animated.View
         testID="live-end-fill"
         pointerEvents="none"
-        style={{
-          position: "absolute",
-          ...fillStyle,
-          backgroundColor: BROADCAST.ctaHover,
-        }}
+        style={[
+          {
+            position: "absolute",
+            ...fillStyle,
+            backgroundColor: BROADCAST.ctaHover,
+          },
+          fillAnimated,
+        ]}
       />
       <View
         pointerEvents="none"
@@ -199,7 +199,8 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = 
           className="font-heading"
           numberOfLines={tile ? 2 : 1}
           style={[
-            { fontSize: 14, lineHeight: 16, letterSpacing: 1.12, color: BROADCAST.ink },
+            typeStep("callout"),
+            { lineHeight: 16, letterSpacing: TRACKING.caps, color: BROADCAST.ink },
             tile ? { lineHeight: 15.4, textAlign: "center" } : null,
           ]}
         >
@@ -217,7 +218,10 @@ export function HoldToEndButton({ disabled, ending, onEnd, onHoldChange, tile = 
           backgroundColor: BROADCAST.track,
         }}
       >
-        <Animated.View style={{ height: 2, width: fillWidth, backgroundColor: BROADCAST.ink }} />
+        <Animated.View
+          testID="live-end-rule"
+          style={[{ height: 2, width: "100%", backgroundColor: BROADCAST.ink, transformOrigin: "left" }, ruleAnimated]}
+        />
       </View>
     </Pressable>
   );

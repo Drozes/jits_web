@@ -1,12 +1,14 @@
 import { View, Text } from "react-native";
 import { cn } from "@/lib/cn";
+import { TYPE_SCALE, typeSize, type TypeStep } from "@/lib/typography";
 
 type DeltaSize = "s" | "m" | "l";
 
-const SIZE_PX: Record<DeltaSize, number> = {
-  s: 12,
-  m: 16,
-  l: 28,
+/** The number step and the arrow glyph step (0.8x the number) per size. */
+const SIZE_STEP: Record<DeltaSize, { number: TypeStep; glyph: TypeStep }> = {
+  s: { number: "small", glyph: "micro" },
+  m: { number: "subhead", glyph: "body" },
+  l: { number: "headline-xl", glyph: "title-xl" },
 };
 
 interface DeltaNumberProps {
@@ -39,7 +41,8 @@ export function DeltaNumber({
         : "0"
     : `${Math.abs(value)}`;
 
-  const px = SIZE_PX[size];
+  const step = SIZE_STEP[size];
+  const px = TYPE_SCALE[step.number].fontSize;
   // Flat placeholder (no real delta, e.g. leaderboard rows passing 0): show only
   // the muted em-dash, not a redundant "0".
   const showNumber = showSign || value !== 0;
@@ -48,16 +51,16 @@ export function DeltaNumber({
     <View className={cn("flex-row items-center", className)}>
       {!showSign && (
         <Text
-          className={cn("font-mono-bold", colorClass, showNumber && "mr-[2px]")}
-          style={{ fontSize: Math.round(px * 0.8), lineHeight: px }}
+          className={cn("font-mono-bold tabular-nums", colorClass, showNumber && "mr-[2px]")}
+          style={{ ...typeSize(step.glyph), lineHeight: px }}
         >
           {glyph}
         </Text>
       )}
       {showNumber && (
         <Text
-          className={cn("font-mono-bold", colorClass)}
-          style={{ fontSize: px, lineHeight: Math.round(px * 1.2) }}
+          className={cn("font-mono-bold tabular-nums", colorClass)}
+          style={{ ...typeSize(step.number), lineHeight: Math.round(px * 1.2) }}
         >
           {numericText}
         </Text>

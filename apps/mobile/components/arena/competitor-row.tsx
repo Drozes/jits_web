@@ -9,8 +9,11 @@
  * working control, not a label.
  */
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
-import * as Haptics from "expo-haptics";
+import { Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
+import { StatePressable } from "@/components/ui/state-pressable";
+import { haptics } from "@/lib/motion";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { Plate, Avatar32, LivePill, MetaTag } from "@/components/ui/elo-system";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 
@@ -68,22 +71,22 @@ export function CompetitorRow({
         photoUrl={competitor.profilePhotoUrl ?? null}
       />
       <View className="flex-1">
-        <Text numberOfLines={1} className="font-heading text-[14px] text-ink">
+        <Text numberOfLines={1} className="font-heading text-callout text-ink">
           {displayName}
         </Text>
         <Text
-          className="mt-0.5 font-mono-bold text-[12px] text-ink"
+          className="mt-0.5 font-mono-bold text-small text-ink"
           style={{ fontVariant: ["tabular-nums"] }}
         >
           {rating}
           {ratingLabel == null && eloDiff !== 0 ? (
-            <Text className="font-mono text-[12px] text-ink-2">
+            <Text className="font-mono tabular-nums text-small text-ink-2">
               {`  ${gap} vs you`}
             </Text>
           ) : null}
         </Text>
         {meta ? (
-          <Text numberOfLines={1} className="mt-0.5 font-body text-[11px] text-ink-2">
+          <Text numberOfLines={1} className="mt-0.5 font-body text-caption text-ink-2">
             {meta}
           </Text>
         ) : null}
@@ -95,56 +98,55 @@ export function CompetitorRow({
     <Plate variant={inLobby ? "live" : "default"} className="px-4 py-3">
       <View className="flex-row items-center gap-3">
         {onOpenProfile ? (
-          <Pressable
+          <StatePressable
+            dim
             accessibilityRole="button"
             accessibilityLabel={`${displayName}, ELO ${rating}`}
             onPress={onOpenProfile}
             className="flex-1 flex-row items-center gap-3"
           >
             {identity}
-          </Pressable>
+          </StatePressable>
         ) : (
           <View className="flex-1 flex-row items-center gap-3">{identity}</View>
         )}
 
         <View className="shrink-0 items-end gap-1">
           {action.kind === "challenge" ? (
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Challenge ${displayName}`}
               accessibilityState={{ disabled }}
               onPress={() => {
                 // The one tap that sends something to another person gets a
-                // light acknowledgement. Feedback only, never fatal.
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
-                  () => undefined,
-                );
+                // light acknowledgement (the `press` commit haptic).
+                void haptics.press();
                 onChallenge();
               }}
               disabled={disabled}
               className="min-h-[44px] justify-center rounded-sm border border-hairline-strong px-3 active:bg-surface-4"
-              style={disabled ? { opacity: 0.5 } : undefined}
+              style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
             >
-              <Text className="font-heading text-[11px] text-ink uppercase tracking-caps">
+              <Text className="font-heading text-caption text-ink uppercase tracking-caps">
                 Challenge
               </Text>
-            </Pressable>
+            </PressableScale>
           ) : null}
 
           {action.kind === "go-live" ? (
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Go live to challenge ${displayName}`}
               accessibilityState={{ disabled }}
               onPress={onGoLive}
               disabled={disabled}
               className="min-h-[44px] justify-center rounded-sm border border-cta px-3 active:bg-surface-4"
-              style={disabled ? { opacity: 0.5 } : undefined}
+              style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
             >
-              <Text className="font-heading text-[11px] text-cta uppercase tracking-caps">
+              <Text className="font-heading text-caption text-cta uppercase tracking-caps">
                 Go live
               </Text>
-            </Pressable>
+            </PressableScale>
           ) : null}
 
           {action.kind === "pending" ? <Tag label="Pending" /> : null}

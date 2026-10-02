@@ -4,12 +4,13 @@ import { useRouter } from "expo-router";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Plate } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { toast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
+import { typeSize } from "@/lib/typography";
 import { supabase } from "@/lib/supabase/client";
 import { DELETE_CONFIRM_WORD, deleteAccount, isDeleteConfirmed } from "@/lib/account/delete-account";
-import { CtaButton, DestructiveButton, TertiaryButton } from "@/components/auth/auth-buttons";
 
 const FAILED = "We couldn't delete your account. Check your connection and try again.";
 const MATCH_LIVE = "Finish your match first. You can delete your account once it ends.";
@@ -62,11 +63,11 @@ export default function DeleteAccountScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Plate className="gap-3">
-          <Text className="font-heading text-[18px] text-ink uppercase tracking-caps">Delete account</Text>
-          <Text className="font-body text-[14px] text-ink leading-relaxed">
+          <Text className="font-heading text-title text-ink uppercase tracking-caps">Delete account</Text>
+          <Text className="font-body text-callout text-ink leading-relaxed">
             This permanently deletes your profile, photos and ELO. Your past matches stay in your opponents&apos; history as a deleted athlete. This can&apos;t be undone.
           </Text>
-          <Text className="font-body text-[13px] text-ink-2 leading-relaxed">
+          <Text className="font-body text-body text-ink-2 leading-relaxed">
             Your name, profile photo, avatar, current weight, birthday, Instagram, friends, open invites,
             push devices, and the messages and chat photos you sent are erased, and you leave the
             rankings. Match records (including weigh-ins, videos and stills) stay with the matches they
@@ -75,12 +76,12 @@ export default function DeleteAccountScreen() {
         </Plate>
 
         {step === "explain" ? (
-          <CtaButton label="Continue" onPress={() => setStep("confirm")} testID="delete-continue" />
+          <Button label="Continue" onPress={() => setStep("confirm")} testID="delete-continue" />
         ) : (
           <ConfirmStep typed={typed} onChange={setTyped} deleting={deleting} onDelete={onDelete} />
         )}
 
-        <TertiaryButton label="Keep my account" onPress={() => router.back()} disabled={deleting} />
+        <Button variant="ghost" height={44} label="Keep my account" onPress={() => router.back()} disabled={deleting} />
       </PageContainer>
     </KeyboardAvoidingView>
   );
@@ -101,7 +102,7 @@ function ConfirmStep({
   const ready = isDeleteConfirmed(typed);
   return (
     <View className="gap-3">
-      <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+      <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
         Type {DELETE_CONFIRM_WORD} to confirm
       </Text>
       <TextInput
@@ -115,9 +116,11 @@ function ConfirmStep({
         autoComplete="off"
         editable={!deleting}
         accessibilityLabel={`Type ${DELETE_CONFIRM_WORD} to confirm`}
-        className="font-mono text-[16px] text-ink bg-surface-3 border border-hairline rounded-xs px-3 py-3"
+        className="font-mono text-ink bg-surface-3 border border-hairline rounded-xs px-3 py-3"
+        style={typeSize("subhead")}
       />
-      <DestructiveButton
+      <Button
+        variant="destructive"
         testID="delete-submit"
         label={deleting ? "Deleting..." : "Delete account"}
         onPress={onDelete}

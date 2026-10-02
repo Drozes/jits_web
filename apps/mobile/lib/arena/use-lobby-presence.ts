@@ -62,6 +62,7 @@ import { LOBBY_TOPIC } from "./constants";
 import { countOnTheMat } from "./mat-board";
 import { getMatRosterIds, subscribeMatRoster } from "./mat-roster-store";
 import { getNearbyOnMatCount, subscribeNearbyOnMatCount } from "./arena-store";
+import { othersLive, publishTempoOthersLive } from "./arena-tempo";
 
 /**
  * Tracked payload. `looking_for_casual` / `looking_for_ranked` are carried for
@@ -157,11 +158,15 @@ const listeners = new Set<() => void>();
 function readPresence(state: Record<string, LobbyPayload[]>): void {
   lobbyIds = new Set(Object.keys(state));
   lobbyKnown = true;
+  // The LIVE pulse tempo follows how many others are live (arena-tempo.ts);
+  // the presence key is the athlete id, so self is left out by it.
+  publishTempoOthersLive(othersLive(lobbyIds, channelAthleteId));
 }
 
 function clearPresence(): void {
   lobbyIds = new Set();
   lobbyKnown = false;
+  publishTempoOthersLive(0);
 }
 
 function emitChange() {

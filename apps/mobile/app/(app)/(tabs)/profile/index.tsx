@@ -1,6 +1,7 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import Animated from "react-native-reanimated";
 import { ArrowUpRight } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -22,6 +23,7 @@ import { TabHeader } from "@/components/layout/tab-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { AppVersionLabel } from "@/components/layout/app-version-label";
 import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
+import { Button } from "@/components/ui/elo-system/button";
 import { HistoryRowAction } from "@/components/profile/history-row-action";
 import {
   SkeletonProvider,
@@ -32,6 +34,7 @@ import {
   SkeletonParticipantRow,
 } from "@/components/ui/skeleton";
 import { formatRelativeDate } from "@jits/shared/utils";
+import { useFirstLoadEntering } from "@/lib/motion";
 
 type ShareAthlete = {
   id: string;
@@ -60,7 +63,7 @@ function ShareProfileButton({ athlete }: { athlete: ShareAthlete }) {
         <View pointerEvents="none">
           <ArrowUpRight size={16} color={tokens.textSecondary} />
         </View>
-        <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
+        <Text className="font-heading text-small text-ink uppercase tracking-caps">
           Share profile
         </Text>
       </Pressable>
@@ -71,7 +74,8 @@ function ShareProfileButton({ athlete }: { athlete: ShareAthlete }) {
 /**
  * Cold-load placeholder mirroring the real layout: header plate (avatar + two
  * name/gym lines), a 3-tile stat strip, then four recent-match rows under the
- * "Recent Matches" tag. Static by default per the minimal-motion brand rule.
+ * "Recent Matches" tag. The bars carry the shared skeleton shimmer (Motion
+ * Rule, Ambient tier); the real rows then rise in once (list enter stagger).
  */
 function ProfileSkeleton() {
   return (
@@ -131,11 +135,14 @@ export default function ProfileScreen() {
   // Serve recent matches from the single cached history payload fetched by
   // useProfileData; no separate round-trip.
   const recent = React.useMemo(() => history.slice(0, 5), [history]);
+  // List enter stagger (Motion Rule): the recent-match rows rise in the
+  // first time they appear, never on refetch, pull-to-refresh or refocus.
+  const entering = useFirstLoadEntering();
 
   if (!athlete) {
     return (
       <View className="flex-1 bg-surface items-center justify-center">
-        <ActivityIndicator color={tokens.accentCta} />
+        <ActivityIndicator color={tokens.textTertiary} />
       </View>
     );
   }
@@ -155,7 +162,7 @@ export default function ProfileScreen() {
       <TabHeader title="Profile" />
       <PageContainer
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.accentCta} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.textTertiary} />
         }
         contentContainerStyle={{ paddingTop: 24, gap: 24 }}
       >
@@ -180,23 +187,24 @@ export default function ProfileScreen() {
               <MetaTag>Recent Matches</MetaTag>
               {recent.length === 0 ? (
                 <View className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-6 items-center">
-                  <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+                  <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
                     No Matches Yet
                   </Text>
                 </View>
               ) : (
                 <View className="gap-[1px]">
-                  {recent.map((m) => {
+                  {recent.map((m, i) => {
                     const name = m.opponent_display_name ?? "Opponent";
                     return (
-                      <ParticipantRow
-                        key={m.match_id}
-                        name={`vs ${name}`}
-                        subtitle={formatRelativeDate(m.completed_at)}
-                        onPress={() => router.push(matchDetailHref(m.match_id))}
-                        accessibilityLabel={`Open match vs ${name}`}
-                        action={<HistoryRowAction eloDelta={m.elo_delta} eloAfter={m.elo_after} />}
-                      />
+                      <Animated.View key={m.match_id} entering={entering(i)}>
+                        <ParticipantRow
+                          name={`vs ${name}`}
+                          subtitle={formatRelativeDate(m.completed_at)}
+                          onPress={() => router.push(matchDetailHref(m.match_id))}
+                          accessibilityLabel={`Open match vs ${name}`}
+                          action={<HistoryRowAction eloDelta={m.elo_delta} eloAfter={m.elo_after} />}
+                        />
+                      </Animated.View>
                     );
                   })}
                 </View>
@@ -217,21 +225,17 @@ export default function ProfileScreen() {
             />
 
             <View className="gap-2">
-              <Pressable
+              <Button
+                variant="secondary"
+                label="View Detailed Stats"
                 onPress={() => router.push("/(app)/profile/stats")}
-                accessibilityRole="button"
-                className="bg-surface-3 border border-hairline-strong rounded-sm px-5 py-4 items-center active:bg-surface-4"
-              >
-                <Text className="font-heading text-[12px] text-ink uppercase tracking-caps">
-                  View Detailed Stats
-                </Text>
-              </Pressable>
+              />
             </View>
 
             <AccountSection />
 
             <View className="items-center gap-1 py-2">
-              <Text className="text-center font-mono text-[10px] text-ink-3 uppercase tracking-caps-l">
+              <Text className="text-center font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
                 ELO RATED Beta
               </Text>
               <AppVersionLabel />

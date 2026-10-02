@@ -1,6 +1,8 @@
 import * as React from "react";
-import { View, type ViewProps } from "react-native";
+import { View, type LayoutChangeEvent, type ViewProps } from "react-native";
 import Animated, {
+  cancelAnimation,
+  makeMutable,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -10,49 +12,90 @@ import Animated, {
 } from "react-native-reanimated";
 import { cva } from "class-variance-authority";
 import { cn } from "@/lib/cn";
-
-// Mirrors live-pill.tsx PULSE_DURATION_MS exactly: the ONLY sanctioned loop
-// frequency in the app. Half-period (700ms) drives the opacity breath so a
-// full 1.0 -> 0.55 -> 1.0 cycle takes 1400ms, identical to the LIVE pulse.
-const PULSE_HALF_DURATION_MS = 700;
-const PULSE_MIN_OPACITY = 0.55;
-
-const SkeletonContext = React.createContext<{ opacity: SharedValue<number> } | null>(null);
+import { duration, useAppActive, useReduceMotion } from "@/lib/motion";
 
 /**
- * Owns the single shared reanimated value for an entire skeleton tree so the
- * whole skeleton breathes in unison: one opacity-only loop (1.0 -> 0.55 -> 1.0)
- * reusing the blessed LIVE-pulse cadence (1400ms full period). NO shimmer, NO
- * transform, NO color motion — the brand-legal liveness cue, not a gradient
- * sweep (see motionDecision in the spec). Breath is ON by default; pass
- * `pulse={false}` for a fully static tree.
+ * Skeleton shimmer (Motion Rule registry, Ambient tier): ONE module-level
+ * clock (0 to 1, `duration.shimmer` 1400ms, linear, repeating) drives a faint
+ * highlight band across every skeleton bar in the app, so all bars stay in
+ * phase and the whole thing costs one animation. The clock runs only while at
+ * least one shimmering `SkeletonProvider` is mounted with the app in the
+ * foreground; Reduce Motion leaves plain static bars.
+ */
+let clock: SharedValue<number> | null = null;
+let holders = 0;
+
+function shimmerClock(): SharedValue<number> {
+  if (!clock) {
+    const m = makeMutable(0) as unknown;
+    // The Reanimated jest mock returns the raw number; give tests a holder.
+    clock = (typeof m === "object" && m !== null ? m : { value: 0 }) as SharedValue<number>;
+  }
+  return clock;
+}
+
+function acquireShimmer(): () => void {
+  holders += 1;
+  if (holders === 1) {
+    const c = shimmerClock();
+    c.value = 0;
+    c.value = withRepeat(
+      withTiming(1, { duration: duration.shimmer, easing: Easing.linear }),
+      -1,
+      false,
+    );
+  }
+  return () => {
+    holders -= 1;
+    if (holders === 0 && clock) {
+      cancelAnimation(clock);
+      clock.value = 0;
+    }
+  };
+}
+
+/** Tests only: how many providers hold the shimmer clock. */
+export function __shimmerHoldersForTests(): number {
+  return holders;
+}
+
+/**
+ * The band's width as a share of the bar, and its opacity. The band is `ink`
+ * at a low opacity: one step further in the theme's lift direction than the
+ * `plate-bright` bar (lighter in dark, darker in light), since there is no
+ * surface tier above the bar.
+ */
+const BAND_FRACTION = 0.4;
+const BAND_OPACITY = 0.08;
+
+const SkeletonContext = React.createContext<{ shimmer: boolean } | null>(null);
+
+/**
+ * Wraps a skeleton tree and turns its shimmer on. `pulse` (the prop's name
+ * from the old opacity breath, kept for callers) defaults to true; pass
+ * `pulse={false}` for a fully static tree. Every provider shares the one
+ * module-level clock above.
  */
 export function SkeletonProvider({
-  pulse = true,
+  pulse: shimmer = true,
   children,
 }: {
   pulse?: boolean;
   children?: React.ReactNode;
 }) {
-  const opacity = useSharedValue(1);
+  const reduceMotion = useReduceMotion();
+  const appActive = useAppActive();
+  const running = shimmer && !reduceMotion && appActive;
 
   React.useEffect(() => {
-    if (pulse) {
-      opacity.value = withRepeat(
-        withTiming(PULSE_MIN_OPACITY, {
-          duration: PULSE_HALF_DURATION_MS,
-          easing: Easing.inOut(Easing.ease),
-        }),
-        -1,
-        true,
-      );
-    } else {
-      opacity.value = 1;
-    }
-  }, [pulse, opacity]);
+    if (!running) return undefined;
+    return acquireShimmer();
+  }, [running]);
+
+  const value = React.useMemo(() => ({ shimmer: shimmer && !reduceMotion }), [shimmer, reduceMotion]);
 
   return (
-    <SkeletonContext.Provider value={{ opacity }}>
+    <SkeletonContext.Provider value={value}>
       <View accessibilityLabel="Loading" accessibilityState={{ busy: true }}>
         {children}
       </View>
@@ -60,11 +103,64 @@ export function SkeletonProvider({
   );
 }
 
+/**
+ * The highlight band inside one bar, positioned from the shared clock. Its
+ * width is a static share of the bar; only `translateX` animates, so no
+ * layout property changes per frame. The bar's width is measured once (and
+ * again only if the bar resizes) into a shared value the transform reads.
+ */
+function ShimmerBand() {
+  const width = useSharedValue(0);
+  const progress = shimmerClock();
+  const onLayout = React.useCallback(
+    (e: LayoutChangeEvent) => {
+      width.value = e.nativeEvent.layout.width;
+    },
+    [width],
+  );
+  const style = useAnimatedStyle(() => {
+    const band = width.value * BAND_FRACTION;
+    return {
+      transform: [{ translateX: -band + progress.value * (width.value + band) }],
+    };
+  });
+  return (
+    <View
+      pointerEvents="none"
+      onLayout={onLayout}
+      style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+    >
+      <Animated.View
+        testID="skeleton-shimmer"
+        className="bg-ink"
+        style={[
+          {
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: 0,
+            width: `${BAND_FRACTION * 100}%`,
+            opacity: BAND_OPACITY,
+          },
+          style,
+        ]}
+      />
+    </View>
+  );
+}
+
 const RADIUS_CLASS = { xs: "rounded-xs", md: "rounded-md", full: "rounded-full" } as const;
 
-const blockVariants = cva("bg-surface-3");
+/**
+ * Bars are `plate-bright` (`bg-surface-4`), one tier above the `plate`
+ * (`bg-surface-3`) of the plates and rows that host them (`SkeletonPlate`,
+ * `SkeletonRankRow`, `SkeletonParticipantRow`), so they read at rest and
+ * under Reduce Motion, not only while the band crosses them (kit K2,
+ * jits-3eeg.7).
+ */
+const blockVariants = cva("bg-surface-4");
 
-/** One neutral placeholder rect. Consumes the provider opacity; opaque static when no provider. */
+/** One neutral placeholder rect. Shimmers inside a shimmering provider; static otherwise. */
 export function SkeletonBlock({
   width,
   height,
@@ -79,15 +175,16 @@ export function SkeletonBlock({
   className?: string;
 } & Omit<ViewProps, "style"> & { style?: ViewProps["style"] }) {
   const ctx = React.useContext(SkeletonContext);
-  const animatedStyle = useAnimatedStyle(() => ({ opacity: ctx?.opacity?.value ?? 1 }));
   return (
-    <Animated.View
+    <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      className={cn(blockVariants(), RADIUS_CLASS[radius], className)}
-      style={[{ width, height }, animatedStyle, style]}
+      className={cn(blockVariants(), RADIUS_CLASS[radius], "overflow-hidden", className)}
+      style={[{ width, height }, style]}
       {...rest}
-    />
+    >
+      {ctx?.shimmer ? <ShimmerBand /> : null}
+    </View>
   );
 }
 

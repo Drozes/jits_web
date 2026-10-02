@@ -2,10 +2,11 @@ import { Text, View } from "react-native";
 import { LivePill } from "@/components/ui/elo-system";
 import { spokenDuration, type SlabLabel } from "@/lib/match-flow/live-view-state";
 import { BROADCAST, BROADCAST_LANDSCAPE, BROADCAST_RADIUS, BROADCAST_SIZE, TABULAR } from "./broadcast-tokens";
+import { TRACKING, numeralTracking, typeStep } from "@/lib/typography";
 
-const LABEL_TEXT = { fontSize: 10, lineHeight: 12, letterSpacing: 2.52 };
-const DIGITS = { fontSize: 88, lineHeight: 92, letterSpacing: -3.52 };
-const DIGITS_LANDSCAPE = { fontSize: 80, lineHeight: 84, letterSpacing: -3.2 };
+const LABEL_TEXT = { ...typeStep("micro"), lineHeight: 12, letterSpacing: TRACKING["caps-xl"] };
+const DIGITS = { ...typeStep("display-88"), lineHeight: 92, letterSpacing: numeralTracking(88) };
+const DIGITS_LANDSCAPE = { ...typeStep("display-80"), lineHeight: 84, letterSpacing: numeralTracking(80) };
 
 /** What a screen reader hears before the time, so the state is not only visual. */
 const SPOKEN_PREFIX: Record<SlabLabel, string> = {
@@ -19,7 +20,7 @@ function StaticLabel({ text, color, dot }: { text: string; color: string; dot: b
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
       {dot ? <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: color }} /> : null}
-      <Text className="font-mono-bold" style={[LABEL_TEXT, { color }]}>
+      <Text className="font-mono-bold" style={[LABEL_TEXT, { color }, TABULAR]}>
         {text}
       </Text>
     </View>
@@ -59,7 +60,7 @@ export function ClockSlab({
     >
       <View testID={`live-slab-${label}`} style={{ position: "absolute", left: 12, top: 10 }}>
         {label === "live" ? (
-          <LivePill label="LIVE" onDark />
+          <LivePill label="LIVE" onDark pace="fixed" />
         ) : label === "paused" ? (
           <StaticLabel text="PAUSED" color={BROADCAST.amber} dot />
         ) : label === "time" ? (
@@ -70,7 +71,7 @@ export function ClockSlab({
       </View>
       <Text
         className="font-mono-medium"
-        style={[{ position: "absolute", right: 12, top: 10, fontSize: 10, lineHeight: 12, letterSpacing: 1.68, color: BROADCAST.dim62 }, TABULAR]}
+        style={[typeStep("micro"), { position: "absolute", right: 12, top: 10, lineHeight: 12, letterSpacing: TRACKING["caps-l"], color: BROADCAST.dim62 }, TABULAR]}
       >
         OF {durationFormatted}
       </Text>

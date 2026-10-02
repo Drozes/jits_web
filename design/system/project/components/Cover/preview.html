@@ -1,0 +1,46 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: var(--void); }
+  .cover { position: relative; width: 960px; height: 288px; overflow: hidden; background: var(--void); }
+  .cover svg { position: absolute; left: 0; top: 0; }
+  .b-red { fill: var(--signal-red); }
+  .b-ink { fill: var(--ink); }
+  .b-relief { fill: var(--plate-bright); }
+  .b-gain { fill: var(--gain-green); }
+  .cut { fill: var(--void); font-family: var(--font-mono); font-weight: 700; font-size: 252px; }
+  .tile { rx: var(--radius-plate); ry: var(--radius-plate); }
+  .name { position: absolute; left: 28px; bottom: 56px; max-width: 440px; margin: 0;
+    font-family: var(--font-display); font-weight: 400; font-size: 104px; line-height: 0.95;
+    letter-spacing: -0.07px; color: var(--ink); }
+  .tagline { position: absolute; left: 28px; bottom: 28px; max-width: 440px; margin: 0;
+    font-family: var(--font-body); font-size: 13px; line-height: 18px; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="cover">
+  <svg width="960" height="288" viewBox="0 0 960 288" aria-hidden="true">
+    <!-- blocks: signal-red slab 424x126 (identity), ink band 256x56 (size-header), plate-bright band 312x78 (relief), gain-green square 42x42 (space-12, state, small) -->
+    <!-- arrangement: unequal horizontal bands stacked like a ranked ladder, right-aligned and bleeding off the top, right and bottom edges, space-4 (14px) gaps, all right of x=480 -->
+    <!-- pattern: one oversized JetBrains Mono "1" (mono numerals are the brand's data face; rank one) cut out of the signal-red slab in void, clipped by the slab -->
+    <!-- scales: gaps space-4 14px, band heights size-header 56 / space-16 56 multiples, green side space-12 42px, corners radius-plate 4px -->
+    <defs>
+      <clipPath id="slab"><rect x="536" y="70" width="440" height="126" rx="4" ry="4"/></clipPath>
+    </defs>
+    <rect class="b-ink tile" x="704" y="-4" width="272" height="60"/>
+    <rect class="b-red tile" x="536" y="70" width="440" height="126"/>
+    <g clip-path="url(#slab)">
+      <text class="cut" x="806" y="262">1</text>
+    </g>
+    <rect class="b-gain tile" x="592" y="210" width="42" height="42"/>
+    <rect class="b-relief tile" x="648" y="210" width="328" height="82"/>
+  </svg>
+  <h1 class="name">ELO<br>RATED</h1>
+  <p class="tagline">Go live in the Arena. Every match is ranked.</p>
+</div>
+<script>/* Static cover: no motion, nothing to mount. */</script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { usePalette } from "@/lib/theme/palette";
 import type { BreakdownPhase } from "@/lib/match-detail/use-match-film";
 import { isNoMatch } from "@jits/shared/utils";
@@ -9,12 +10,13 @@ function Heading({ tier }: { tier: string | null }) {
   const p = usePalette();
   return (
     <View className="flex-row items-center justify-between">
-      <Text accessibilityRole="header" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.52, color: p.text }}>
+      <Text accessibilityRole="header" className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-xl"], color: p.text }, TABULAR]}>
         AI BREAKDOWN
       </Text>
       {tier ? (
-        <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: tier === "premium" ? p.amberRule : p.strong, justifyContent: "center" }}>
-          <Text className="font-mono-bold" style={{ fontSize: 9, letterSpacing: 1.6, color: tier === "premium" ? p.amber : p.text2 }}>
+        <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.strong, justifyContent: "center" }}>
+          {/* The tier is a label, not a waiting state: ink steps only, never amber (WP2, R3 FR-2). */}
+          <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: tier === "premium" ? p.text : p.text2 }, TABULAR]}>
             {tier.toUpperCase()}
           </Text>
         </View>
@@ -26,7 +28,7 @@ function Heading({ tier }: { tier: string | null }) {
 function Body({ children, tone = "text" }: { children: React.ReactNode; tone?: "text" | "muted" }) {
   const p = usePalette();
   return (
-    <Text className="font-body" style={{ fontSize: 14, lineHeight: 21, color: tone === "text" ? p.text : p.text2 }}>
+    <Text className="font-body" style={[typeStep("callout"), { lineHeight: 21, color: tone === "text" ? p.text : p.text2 }]}>
       {children}
     </Text>
   );
@@ -46,7 +48,7 @@ export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry
   } else if (phase.kind === "analyzing") {
     body = (
       <View style={{ gap: 6 }}>
-        <Text testID="breakdown-analyzing" className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 2.2, color: p.amber }}>
+        <Text testID="breakdown-analyzing" className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-xl"], color: p.amber }, TABULAR]}>
           {phase.total ? `ANALYZING ${phase.done ?? 0}/${phase.total}` : "ANALYZING"}
         </Text>
         <Body tone="muted">The breakdown and key moments land here when the analysis finishes.</Body>
@@ -64,7 +66,7 @@ export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry
       <View style={{ gap: 8 }}>
         <Body tone="muted">Couldn't load the breakdown.</Body>
         <Pressable accessibilityRole="button" accessibilityLabel="Retry breakdown" onPress={onRetry} className="self-start active:opacity-70" hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
-          <Text className="font-mono-bold" style={{ fontSize: 10, letterSpacing: 1.68, color: p.red }}>
+          <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.red }, TABULAR]}>
             TRY AGAIN
           </Text>
         </Pressable>

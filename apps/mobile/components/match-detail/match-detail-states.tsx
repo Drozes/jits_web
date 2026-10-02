@@ -21,10 +21,10 @@ export function MatchDetailSkeleton() {
 export function MatchNoVideo() {
   return (
     <Plate testID="match-detail-no-video" className="gap-1">
-      <Text className="font-body text-[12px] text-ink-2">
+      <Text className="font-body text-small text-ink-2">
         No video was recorded for this match.
       </Text>
-      <Text className="font-body text-[12px] text-ink-3">
+      <Text className="font-body text-small text-ink-3">
         Videos show up here when either athlete records the match.
       </Text>
     </Plate>
@@ -63,10 +63,10 @@ export function MatchDetailError({ code, onBack, onRetry }: MatchDetailErrorProp
   const label = retryable ? "Try again" : "Back";
   return (
     <View testID={panel.testID} className="flex-1 items-center justify-center px-8 gap-2">
-      <Text className="font-mono text-[11px] text-ink uppercase tracking-caps-l text-center">
+      <Text className="font-mono text-caption text-ink uppercase tracking-caps-l text-center tabular-nums">
         {panel.title}
       </Text>
-      <Text className="font-body text-[12px] text-ink-3 text-center">{panel.body}</Text>
+      <Text className="font-body text-small text-ink-3 text-center">{panel.body}</Text>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}
@@ -74,7 +74,7 @@ export function MatchDetailError({ code, onBack, onRetry }: MatchDetailErrorProp
         hitSlop={{ top: 14, bottom: 14, left: 8, right: 8 }}
         className="active:opacity-70"
       >
-        <Text className="font-mono-bold text-[10px] text-cta uppercase tracking-caps-l">
+        <Text className="font-mono-bold text-micro text-cta uppercase tracking-caps-l tabular-nums">
           {label}
         </Text>
       </Pressable>

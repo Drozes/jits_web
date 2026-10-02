@@ -22,6 +22,9 @@ import { FightButton } from "@/components/match-flow/fight/fight-ui";
 import { HudTagButton } from "@/components/match-flow/live/hud-tag";
 import { PauseButton } from "@/components/match-flow/live/pause-button";
 import { StatePressable } from "@/components/ui/state-pressable";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { Button } from "@/components/ui/elo-system/button";
+import { registerCSS } from "react-native-css-interop/dist/test";
 
 type Styled = { props: { style?: unknown } };
 const flat = (el: Styled) =>
@@ -49,11 +52,14 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
     );
     const st = flat(s.getByTestId("result-record"));
     expect(st.backgroundColor).toBe(lightTokens.accentCta);
-    expect(st.height).toBe(56);
+    // WP3 review: a minimum height, so a large Dynamic Type label can grow it.
+    expect(st.minHeight).toBe(56);
     expect(st.paddingHorizontal).toBe(16);
   });
 
-  it("secondary FightButton (WATCH FILM) keeps its fill and strong hairline", () => {
+  it("secondary FightButton (WATCH FILM) keeps its plate fill and strong hairline", () => {
+    // WP3 (kit Button card, "Secondary fill"): the secondary fill is the
+    // `plate` token, not the old translucent `secondaryBg`.
     const p = paletteFor("light");
     const s = render(
       <ThemeProvider>
@@ -61,10 +67,10 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
       </ThemeProvider>,
     );
     const st = flat(s.getByTestId("summary-watch-film"));
-    expect(st.backgroundColor).toBe(p.secondaryBg);
+    expect(st.backgroundColor).toBe(p.plate);
     expect(st.borderWidth).toBe(1);
     expect(st.borderColor).toBe(p.strong);
-    expect(st.height).toBe(56);
+    expect(st.minHeight).toBe(56);
   });
 
   it("ghost FightButton (the full-width SHARE row) keeps its layout", () => {
@@ -74,7 +80,7 @@ describe("function styles survive the NativeWind Pressable interop (light theme,
       </ThemeProvider>,
     );
     const st = flat(s.getByTestId("summary-share"));
-    expect(st.height).toBe(44);
+    expect(st.minHeight).toBe(44);
     expect(st.flex).toBeUndefined();
     expect(st.flexDirection).toBe("row");
   });
@@ -148,5 +154,41 @@ describe("no raw Pressable takes a function style", () => {
       });
     }
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("className survives PressableScale (the animated Pressable behind every Button, Adding Flare)", () => {
+  // Plain CSS stand-ins for Tailwind utilities, compiled by the same interop
+  // the app runs, so the assertions do not depend on the theme's tokens.
+  beforeAll(() => {
+    registerCSS(
+      ".tst-h { height: 40px } .tst-fill { background-color: #E63946 } .active\\:tst-dim:active { opacity: 0.7 }",
+    );
+  });
+
+  it("PressableScale keeps a className fill and height, and its active: variant", () => {
+    const s = render(
+      <PressableScale testID="ps" className="tst-h tst-fill active:tst-dim" onPress={jest.fn()}>
+        <Text>x</Text>
+      </PressableScale>,
+    );
+    const st = flat(s.getByTestId("ps"));
+    expect(st.height).toBe(40);
+    expect(String(st.backgroundColor).toLowerCase()).toBe("#e63946");
+    expect(st.opacity).toBeUndefined();
+
+    fireEvent(s.getByTestId("ps"), "pressIn", {});
+    expect(flat(s.getByTestId("ps")).opacity).toBeCloseTo(0.7, 3);
+    expect(flat(s.getByTestId("ps")).height).toBe(40);
+    fireEvent(s.getByTestId("ps"), "pressOut", {});
+    expect(flat(s.getByTestId("ps")).opacity).toBeUndefined();
+  });
+
+  it("a Button keeps its placement className and its variant fill alongside the press scale", () => {
+    const s = render(<Button testID="btn-cls" className="tst-h" label="Go" onPress={jest.fn()} />);
+    const st = flat(s.getByTestId("btn-cls"));
+    expect(st.height).toBe(40);
+    expect(String(st.backgroundColor).toLowerCase()).toBe("#e63946");
+    expect(st.transform).toEqual([{ scale: 1 }]);
   });
 });

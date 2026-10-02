@@ -56,8 +56,8 @@ export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPrevi
         className="flex-row items-center gap-3 bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3 active:bg-surface-4"
       >
         <View className="flex-1 min-w-0">
-          <Text className="font-heading text-[14px] text-ink uppercase tracking-caps">Film Room</Text>
-          <Text className="font-body text-[12px] text-ink-3">Every match, its film and the breakdown.</Text>
+          <Text className="font-heading text-callout text-ink uppercase tracking-caps">Film Room</Text>
+          <Text className="font-body text-small text-ink-3">Every match, its film and the breakdown.</Text>
         </View>
         <View pointerEvents="none">
           <ChevronRight size={16} color={tokens.textSecondary} />
@@ -66,7 +66,7 @@ export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPrevi
 
       {error && items === undefined ? (
         <Pressable testID="past-videos-error" accessibilityRole="button" onPress={onRetry} className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3 active:bg-surface-4">
-          <Text className="font-body text-[12px] text-ink-3">Couldn't load your film. Tap to retry.</Text>
+          <Text className="font-body text-small text-ink-3">Couldn't load your film. Tap to retry.</Text>
         </Pressable>
       ) : preview.length > 0 ? (
         <ScrollView
@@ -95,7 +95,7 @@ export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPrevi
         </ScrollView>
       ) : items !== undefined ? (
         <View testID="past-videos-empty" className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-3">
-          <Text className="font-body text-[12px] text-ink-3">No match film yet. Record your next match to watch it here.</Text>
+          <Text className="font-body text-small text-ink-3">No match film yet. Record your next match to watch it here.</Text>
         </View>
       ) : null}
     </View>

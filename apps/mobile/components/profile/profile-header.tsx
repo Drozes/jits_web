@@ -1,6 +1,6 @@
 import { Text, View } from "react-native";
 import { Image } from "expo-image";
-import { MetaTag } from "@/components/ui/elo-system";
+import { MetaTag, Mono } from "@/components/ui/elo-system";
 import { cn } from "../../lib/cn";
 import { athletePhotoSource } from "../../lib/athlete-photo";
 import { getInitials } from "@jits/shared/utils";
@@ -45,18 +45,18 @@ export function ProfileHeader({ athlete, gymName, rank }: ProfileHeaderProps) {
             transition={150}
           />
         ) : (
-          <Text className="font-mono-bold text-[24px] text-ink tracking-caps">
+          <Text className="font-mono-bold tabular-nums text-headline text-ink tracking-caps">
             {initials}
           </Text>
         )}
       </View>
 
       <View className="items-center gap-1">
-        <Text className="font-heading text-[24px] text-ink" numberOfLines={1}>
+        <Text className="font-heading text-headline text-ink" numberOfLines={1}>
           {athlete.display_name}
         </Text>
         {metaParts.length > 0 ? (
-          <Text className="font-mono text-[10px] text-ink-3 uppercase tracking-caps-xl text-center">
+          <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl text-center">
             {metaParts.join("  ·  ")}
           </Text>
         ) : null}
@@ -64,25 +64,22 @@ export function ProfileHeader({ athlete, gymName, rank }: ProfileHeaderProps) {
 
       <View className="items-center gap-2 w-full">
         <View className="bg-surface-3 border border-hairline rounded-md px-6 py-5 items-center w-full">
-          <Text className="font-mono-bold text-[10px] text-ink-3 uppercase tracking-caps-xl">
+          <Text className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-xl">
             ELO Rating
           </Text>
-          <Text
-            className="font-mono-bold text-ink mt-2"
-            style={{ fontSize: 72, lineHeight: 86, letterSpacing: -2.8 }}
-          >
+          <Mono size="display-72" weight="bold" tracking="numeral" className="text-ink mt-2" style={{ lineHeight: 86 }}>
             {athlete.current_elo}
-          </Text>
+          </Mono>
           {rank != null ? (
             <Text
               testID="profile-rank"
-              className="font-mono-bold text-ink text-[12px] uppercase tracking-caps-l tabular-nums mt-2"
+              className="font-mono-bold text-ink text-small uppercase tracking-caps-l tabular-nums mt-2"
             >
               #{rank}
               <Text className="text-ink-3">  ·  Global</Text>
             </Text>
           ) : athlete.highest_elo && athlete.highest_elo > athlete.current_elo ? (
-            <Text className="font-mono text-ink-3 text-[10px] uppercase tracking-caps-l mt-2">
+            <Text className="font-mono tabular-nums text-ink-3 text-micro uppercase tracking-caps-l mt-2">
               Peak {athlete.highest_elo}
             </Text>
           ) : null}

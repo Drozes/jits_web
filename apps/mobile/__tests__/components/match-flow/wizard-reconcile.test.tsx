@@ -96,6 +96,8 @@ jest.mock("@/lib/match-flow/use-keep-awake", () => ({
 jest.mock("@/lib/match-flow/use-haptics", () => ({
   matchHaptics: {
     matchStart: () => Promise.resolve(),
+    countdownTick: () => Promise.resolve(),
+    countdownGo: () => Promise.resolve(),
     matchEnd: () => Promise.resolve(),
     timeWarning: () => Promise.resolve(),
     resultRecorded: () => Promise.resolve(),

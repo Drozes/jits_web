@@ -1,17 +1,36 @@
 import * as React from "react";
 import { View, Text } from "react-native";
 import Animated, {
+  cancelAnimation,
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
-  Easing,
 } from "react-native-reanimated";
 import { cn } from "@/lib/cn";
-import { useReduceMotion } from "@/lib/match-flow/use-reduce-motion";
+import { onMediaTokens } from "@/lib/tokens";
+import { duration, useAppActive, useReduceMotion } from "@/lib/motion";
+import {
+  LIVE_DOT_MIN_OPACITY,
+  LIVE_DOT_MIN_SCALE,
+  pulseLevel,
+  useLivePulseStyle,
+} from "@/lib/arena/arena-tempo";
+
+/**
+ * What sets a live dot's speed.
+ * - `arena` (default): the shared Arena tempo clock, for "live in the Arena"
+ *   indicators (the header chip, Live / In lobby plates, friends live).
+ * - `fixed`: the fixed `duration.pulse` cycle (1400 ms), for pills whose
+ *   meaning is not the lobby (the match screen's LIVE, a sent challenge).
+ */
+export type LivePace = "arena" | "fixed";
 
 interface LivePillProps {
   label?: string;
+  /** See `LivePace`. `arena` by default. */
+  pace?: LivePace;
   className?: string;
   /**
    * Fixed #22C55E dot and text for dark chrome over video (the live
@@ -20,11 +39,12 @@ interface LivePillProps {
   onDark?: boolean;
 }
 
-const ON_DARK_GREEN = "#22C55E";
-
-const PULSE_DURATION_MS = 1400;
+/** Gain Green over media (`onMediaTokens.win`), whatever the app theme. */
+const ON_DARK_GREEN = onMediaTokens.win;
 
 interface LiveDotProps {
+  /** `arena` (shared tempo clock, default) or `fixed` (1400 ms). */
+  pace?: LivePace;
   /** Dot diameter in points. 7 by default (the LIVE pill's). */
   size?: number;
   /** Fixed #22C55E, for dark chrome over video. */
@@ -33,34 +53,19 @@ interface LiveDotProps {
 }
 
 /**
- * The pulsing green LIVE dot on its own. It is the app's ONE pulse (1400ms,
- * `PULSE_DURATION_MS`): the LIVE pill and the header status chip render this,
- * so there is never a second rhythm. The pushed screens' `HeaderLiveDot`
- * (`components/layout/header-live-dot.tsx`) is deliberately STATIC and must
- * not use this (decision Q1, spec 3: one pulse).
+ * The pulsing green LIVE dot on its own (Motion Rule, Ambient: "LIVE pulse").
+ * It beats on the ONE shared Arena tempo clock (`lib/arena/arena-tempo.ts`):
+ * its speed follows how many athletes are live in the lobby, and every live
+ * dot in the app (this, the LIVE pill, the header live dot, the ON AIR
+ * heartbeat) stays in phase. With `pace="fixed"` it keeps its own fixed
+ * 1400 ms cycle instead (a match LIVE, a sent challenge: not the lobby).
+ * Either way: static under Reduce Motion and paused in the background.
  * Decorative: hidden from assistive tech, the caller labels the state.
  */
-export function LiveDot({ size = 7, onDark = false, testID }: LiveDotProps) {
-  const opacity = useSharedValue(1);
-  const scale = useSharedValue(1);
-
-  React.useEffect(() => {
-    opacity.value = withRepeat(
-      withTiming(0.45, { duration: PULSE_DURATION_MS / 2, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-    );
-    scale.value = withRepeat(
-      withTiming(0.8, { duration: PULSE_DURATION_MS / 2, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-    );
-  }, [opacity, scale]);
-
-  const dotStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
+export function LiveDot({ size = 7, onDark = false, testID, pace = "arena" }: LiveDotProps) {
+  const arenaStyle = useLivePulseStyle(pace === "arena");
+  const fixedStyle = useFixedPulseStyle(pace === "fixed");
+  const dotStyle = pace === "fixed" ? fixedStyle : arenaStyle;
 
   return (
     <Animated.View
@@ -78,56 +83,61 @@ export function LiveDot({ size = 7, onDark = false, testID }: LiveDotProps) {
 }
 
 /**
- * The GOING LIVE dot (live location fixes 4.2): an ink-3 ring on the same
- * 1400ms pulse as `LiveDot` (one rhythm in the app), shown from the Go Live
- * tap until the flow resolves, so a slow permission check or location fix
- * never reads as a dead tap. With Reduce Motion on it is a still ring.
- * Decorative: the caller labels the state.
+ * The LIVE pulse on a fixed `duration.pulse` cycle, per dot. Runs only while
+ * `enabled`, the app is in the foreground and Reduce Motion is off; else
+ * static (opacity 1, scale 1).
  */
-export function PendingDot({ size = 7, testID }: { size?: number; testID?: string }) {
+function useFixedPulseStyle(enabled: boolean) {
   const reduceMotion = useReduceMotion();
-  const opacity = useSharedValue(1);
-  const scale = useSharedValue(1);
+  const appActive = useAppActive();
+  const animate = enabled && appActive && !reduceMotion;
+  const phase = useSharedValue(0);
 
   React.useEffect(() => {
-    if (reduceMotion) {
-      opacity.value = 1;
-      scale.value = 1;
-      return;
-    }
-    opacity.value = withRepeat(
-      withTiming(0.35, { duration: PULSE_DURATION_MS / 2, easing: Easing.inOut(Easing.ease) }),
+    if (!animate) return;
+    phase.value = 0;
+    phase.value = withRepeat(
+      withTiming(1, { duration: duration.pulse, easing: Easing.linear }),
       -1,
-      true,
+      false,
     );
-    scale.value = withRepeat(
-      withTiming(0.8, { duration: PULSE_DURATION_MS / 2, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true,
-    );
-  }, [opacity, scale, reduceMotion]);
+    return () => cancelAnimation(phase);
+  }, [animate, phase]);
 
-  const dotStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
+  return useAnimatedStyle(() => {
+    const level = animate ? pulseLevel(phase.value) : 0;
+    return {
+      opacity: 1 - (1 - LIVE_DOT_MIN_OPACITY) * level,
+      transform: [{ scale: 1 - (1 - LIVE_DOT_MIN_SCALE) * level }],
+    };
+  }, [animate]);
+}
 
+/**
+ * The GOING LIVE dot (live location fixes 4.2): an ink-3 ring on the fixed
+ * LIVE pulse (`duration.pulse`, one rhythm in the app), shown from the Go
+ * Live tap until the flow resolves, so a slow permission check or location
+ * fix never reads as a dead tap. Static under Reduce Motion and paused in the
+ * background (`useFixedPulseStyle`). Decorative: the caller labels the state.
+ */
+export function PendingDot({ size = 7, testID }: { size?: number; testID?: string }) {
+  const pulseStyle = useFixedPulseStyle(true);
   return (
     <Animated.View
       testID={testID}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       className="rounded-full border border-ink-3"
-      style={[{ width: size, height: size, borderRadius: size / 2 }, dotStyle]}
+      style={[{ width: size, height: size, borderRadius: size / 2 }, pulseStyle]}
     />
   );
 }
 
-export function LivePill({ label = "LIVE", className, onDark = false }: LivePillProps) {
+export function LivePill({ label = "LIVE", className, onDark = false, pace = "arena" }: LivePillProps) {
   return (
     // 6 px on dark chrome, matching the broadcast slab's static labels.
     <View className={cn("flex-row items-center", onDark ? undefined : "gap-2", className)} style={onDark ? { gap: 6 } : undefined}>
-      <LiveDot onDark={onDark} />
+      <LiveDot onDark={onDark} pace={pace} />
       <Text
         className={cn(
           "font-mono-bold text-[10px] uppercase tracking-caps-xl",

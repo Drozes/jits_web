@@ -24,7 +24,7 @@ function FlaggedNote() {
       <View pointerEvents="none">
         <Film size={12} color={tokens.textSecondary} />
       </View>
-      <Text className="font-body text-[12px] text-ink-2 text-center">{DISCOVERY_COPY.summaryNote}</Text>
+      <Text className="font-body text-small text-ink-2 text-center">{DISCOVERY_COPY.summaryNote}</Text>
     </View>
   );
 }

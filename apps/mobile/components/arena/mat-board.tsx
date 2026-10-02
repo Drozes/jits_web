@@ -4,20 +4,26 @@
  * Presentational only; the screen decides what shows with the rules in
  * `lib/arena/mat-board.ts`.
  *
- * Brand: one Signal Red CTA per surface, no shadows, radius 2 to 4, no
- * animation (only the header chip pulses).
+ * Brand: one Signal Red CTA per surface, no shadows, radius 2 to 4. Motion
+ * (Motion Rule, DESIGN.md): a new incoming challenge strip's bottom edge
+ * cools from hot (the challenge afterglow, `afterglow-edge.tsx`); nothing
+ * else here moves.
  *
  * Match-loop harness contract (tools/match-loop/sim/screens.ts), keep exact:
  * the live segments `Go live` / `Go offline`, every challenge button
  * `Challenge <name>` (the Closest Match one adds the hint `Closest match`),
  * the waiting strip's StaticText `Waiting for <name>` and `Cancel challenge`.
  */
-import { Pressable, Text, View } from "react-native";
-import * as Haptics from "expo-haptics";
+import { Text, View } from "react-native";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
+import { StatePressable } from "@/components/ui/state-pressable";
+import { haptics } from "@/lib/motion";
+import { PressableScale } from "@/components/ui/pressable-scale";
 import { Avatar32, MetaTag } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
 import { PendingDot } from "@/components/ui/elo-system/live-pill";
 import { MAX_SCALE, OutlineAction, StripShell } from "@/components/arena/strip-primitives";
+import { AfterglowEdge } from "@/components/arena/afterglow-edge";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
 import {
   formatCountdown,
@@ -25,8 +31,7 @@ import {
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
 import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
-
-const TABULAR = { fontVariant: ["tabular-nums" as const] };
+import { TABULAR } from "@/lib/typography";
 
 /** What a countdown counts down to: a challenge's live window. */
 export interface CountdownSource {
@@ -74,7 +79,7 @@ export function CountdownText({
 
 /** A light acknowledgement on the one tap that sends something to someone. */
 function tapHaptic(): void {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+  void haptics.press();
 }
 
 /** `+32`, `−14`, `±0` (U+2212 minus, the mockup's). */
@@ -112,14 +117,14 @@ export function MatSectionLabel({ label, right }: { label: string; right?: strin
     <View className="mb-1 flex-row items-baseline justify-between">
       <Text
         maxFontSizeMultiplier={MAX_SCALE}
-        className="font-heading text-[10px] text-ink-3 uppercase tracking-caps-xl"
+        className="font-heading text-micro text-ink-3 uppercase tracking-caps-xl"
       >
         {label}
       </Text>
       {right ? (
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-mono-bold text-[10px] text-ink-2 uppercase"
+          className="font-mono-bold text-micro text-ink-2 uppercase tracking-caps-l"
           style={TABULAR}
         >
           {right}
@@ -171,7 +176,7 @@ export function MatControlBar({
     const selected = isLive === live;
     const disabled = selected || locked;
     return (
-      <Pressable
+      <PressableScale
         testID={live ? "arena-segment-live" : "arena-segment-offline"}
         accessibilityRole="button"
         accessibilityLabel={
@@ -199,13 +204,13 @@ export function MatControlBar({
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
           className={cn(
-            "font-heading text-[10px] uppercase tracking-caps",
+            "font-heading text-micro uppercase tracking-caps",
             selected ? (live ? "text-positive" : "text-ink") : "text-ink-3",
           )}
         >
           {live ? "Live" : "Offline"}
         </Text>
-      </Pressable>
+      </PressableScale>
     );
   };
 
@@ -222,7 +227,7 @@ export function MatControlBar({
         testID="arena-mat-counts"
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="ml-auto shrink font-mono-bold text-[10px] text-ink-2 uppercase"
+        className="ml-auto shrink font-mono-bold text-micro text-ink-2 uppercase tracking-caps-l"
         style={TABULAR}
       >
         {counts}
@@ -265,7 +270,7 @@ function StripLine({
         numberOfLines={1}
         accessibilityLabel={headAccessibilityLabel}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="shrink font-mono-bold text-[11px] text-ink uppercase"
+        className="shrink font-mono-bold text-caption text-ink uppercase"
         style={TABULAR}
       >
         {head}
@@ -275,7 +280,7 @@ function StripLine({
         source={source}
         active={active}
         format={(c) => (c ? ` · ${c}` : null)}
-        className="font-mono-bold text-[11px] text-ink uppercase"
+        className="font-mono-bold text-caption text-ink uppercase"
       />
       {more > 0 ? (
         <Text
@@ -283,7 +288,7 @@ function StripLine({
           numberOfLines={1}
           accessibilityLabel={`plus ${more} more`}
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-mono-bold text-[11px] text-ink uppercase"
+          className="font-mono-bold text-caption text-ink uppercase"
           style={TABULAR}
         >
           {` · +${more}`}
@@ -300,12 +305,15 @@ function StripLine({
  * 8:41 · +2`.
  */
 export function IncomingStrip({
+  challengeId,
   name,
   count,
   source,
   active,
   onOpen,
 }: {
+  /** The challenge in hand: its afterglow cools once per id. */
+  challengeId?: string | null;
   name: string;
   count: number;
   /** The challenge whose live window the countdown shows. */
@@ -315,7 +323,11 @@ export function IncomingStrip({
   onOpen: () => void;
 }) {
   return (
-    <StripShell rail="red" testID="arena-strip-incoming">
+    <StripShell
+      rail="red"
+      testID="arena-strip-incoming"
+      edge={<AfterglowEdge challengeId={challengeId} createdAt={source?.createdAt} />}
+    >
       <StripLine
         head={`${name} wants to roll`}
         source={source}
@@ -371,6 +383,7 @@ export function WaitingStrip({
  * shows (the Closest Match button demotes).
  */
 export function OfferStrip({
+  challengeId,
   name,
   count = 1,
   source,
@@ -378,6 +391,8 @@ export function OfferStrip({
   onGoLive,
   disabled,
 }: {
+  /** The offered challenge: its afterglow cools once per id. */
+  challengeId?: string | null;
   name: string;
   /** This challenge plus the other fresh on-mat ones (`· +N`). */
   count?: number;
@@ -387,7 +402,11 @@ export function OfferStrip({
   disabled: boolean;
 }) {
   return (
-    <StripShell rail="red" testID="arena-strip-offer">
+    <StripShell
+      rail="red"
+      testID="arena-strip-offer"
+      edge={<AfterglowEdge challengeId={challengeId} createdAt={source?.createdAt} />}
+    >
       <StripLine
         head={`${name} wants to roll`}
         source={source}
@@ -395,7 +414,7 @@ export function OfferStrip({
         countdownTestID="arena-strip-countdown"
         count={count}
       />
-      <Pressable
+      <PressableScale
         testID="arena-offer-go-live"
         accessibilityRole="button"
         accessibilityLabel={`Go live to answer ${name}`}
@@ -404,15 +423,15 @@ export function OfferStrip({
         disabled={disabled}
         hitSlop={{ top: 8, bottom: 8 }}
         className="h-8 justify-center rounded-xs bg-cta px-3 active:bg-cta-hover"
-        style={disabled ? { opacity: 0.6 } : undefined}
+        style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
       >
         <Text
           maxFontSizeMultiplier={MAX_SCALE}
-          className="font-heading text-[11px] text-ink-on-cta uppercase tracking-caps"
+          className="font-heading text-caption text-ink-on-cta uppercase tracking-caps"
         >
           Go live
         </Text>
-      </Pressable>
+      </PressableScale>
     </StripShell>
   );
 }
@@ -444,7 +463,7 @@ export function AwayStrip({
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="font-mono-bold text-[10px] text-ink-3 uppercase"
+        className="font-mono-bold tabular-nums text-micro text-ink-3 uppercase tracking-caps-l"
       >
         Not on the mat
       </Text>
@@ -465,7 +484,7 @@ export function ConfirmStrip({
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
-        className="flex-1 font-mono-bold text-[11px] text-ink uppercase"
+        className="flex-1 font-mono-bold text-caption text-ink uppercase"
         style={TABULAR}
       >
         {opponentName ? `Result to confirm · vs ${opponentName}` : "Result to confirm"}
@@ -533,7 +552,7 @@ export function ClosestMatchCard({
         {emptyText ? (
           <Text
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-mono-bold text-[11px] text-ink-3 uppercase"
+            className="font-mono-bold tabular-nums text-caption text-ink-3 uppercase"
           >
             {emptyText}
           </Text>
@@ -576,14 +595,14 @@ export function ClosestMatchCard({
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-heading text-[14px] text-ink"
+            className="font-heading text-callout text-ink"
           >
             {name}
           </Text>
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="mt-0.5 font-mono text-[11px] text-ink-2"
+            className="mt-0.5 font-mono text-caption text-ink-2"
             style={TABULAR}
           >
             {facts}
@@ -593,7 +612,7 @@ export function ClosestMatchCard({
               testID="arena-closest-stakes"
               numberOfLines={1}
               maxFontSizeMultiplier={MAX_SCALE}
-              className="mt-0.5 font-mono-bold text-[11px] text-ink-2 uppercase"
+              className="mt-0.5 font-mono-bold text-caption text-ink-2 uppercase"
               style={TABULAR}
             >
               {`Win ${formatGap(stakes.challenger_win)} · Loss ${formatGap(stakes.challenger_loss)}`}
@@ -631,7 +650,7 @@ function ClosestCtaButton({
 }) {
   const label = kind === "challenge" && name ? `Challenge ${name}` : "Go live to roll";
   return (
-    <Pressable
+    <PressableScale
       testID="arena-closest-cta"
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -651,19 +670,19 @@ function ClosestCtaButton({
         "h-11 items-center justify-center rounded-sm px-4",
         red ? "bg-cta active:bg-cta-hover" : "border border-hairline-strong active:bg-surface-4",
       )}
-      style={disabled ? { opacity: 0.6 } : undefined}
+      style={disabled ? { opacity: DISABLED_OPACITY } : undefined}
     >
       <Text
         numberOfLines={1}
         maxFontSizeMultiplier={MAX_SCALE}
         className={cn(
-          "font-heading text-[12px] uppercase tracking-caps",
+          "font-heading text-small uppercase tracking-caps",
           red ? "text-ink-on-cta" : "text-ink",
         )}
       >
         {label}
       </Text>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -725,7 +744,8 @@ export function MatRow({
       testID={`arena-mat-row-${competitor.id}`}
       className="min-h-[48px] flex-row items-center gap-3 border-b border-l-2 border-b-hairline border-l-positive py-1.5 pl-2"
     >
-      <Pressable
+      <StatePressable
+        dim
         accessibilityRole="button"
         accessibilityLabel={`${isFriend ? "Friend, " : ""}${matRowLabel(displayName, currentElo, eloDiff, weight)}${band ? `, ${band.spoken}` : ""}`}
         onPress={onOpenProfile}
@@ -737,7 +757,7 @@ export function MatRow({
             <Text
               numberOfLines={1}
               maxFontSizeMultiplier={MAX_SCALE}
-              className="shrink font-heading text-[13px] text-ink"
+              className="shrink font-heading text-body text-ink"
             >
               {displayName}
             </Text>
@@ -745,7 +765,7 @@ export function MatRow({
               <Text
                 testID={`arena-friend-badge-${competitor.id}`}
                 maxFontSizeMultiplier={MAX_SCALE}
-                className="rounded-xs border border-hairline-strong px-1 font-heading text-[9px] uppercase tracking-caps-l text-ink-2"
+                className="rounded-xs border border-hairline-strong px-1 font-heading text-micro uppercase tracking-caps-l text-ink-2"
               >
                 Friend
               </Text>
@@ -754,7 +774,7 @@ export function MatRow({
           <Text
             numberOfLines={1}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="mt-0.5 font-mono text-[11px] text-ink-2"
+            className="mt-0.5 font-mono text-caption text-ink-2"
             style={TABULAR}
           >
             {`${currentElo} · `}
@@ -762,21 +782,21 @@ export function MatRow({
               testID={`arena-mat-gap-${competitor.id}`}
               // Data, not state: never red (spec 3, "Red never decorates
               // data"), nor green (green means live). Ink, like the mockup.
-              className="font-mono-bold text-ink-2"
+              className="font-mono-bold tabular-nums text-ink-2"
             >
               {formatGap(eloDiff)}
             </Text>
             {weight ? ` · ${weight} lbs` : ""}
           </Text>
         </View>
-      </Pressable>
+      </StatePressable>
 
       <View className="shrink-0 flex-row items-center gap-2">
         {band ? (
           <Text
             testID={`arena-close-band-${competitor.id}`}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-mono-bold text-[11px] text-ink-2"
+            className="font-mono-bold text-caption text-ink-2"
             style={TABULAR}
             // Already part of the row's label.
             accessibilityElementsHidden
@@ -811,7 +831,7 @@ export function MatRow({
             source={action.source}
             active={action.active}
             format={(c) => (c ? `Sent ${c}` : "Sent")}
-            className="font-mono-bold text-[11px] text-ink-3 uppercase"
+            className="font-mono-bold text-caption text-ink-3 uppercase"
           />
         ) : null}
         {action.kind === "pending" ? <MetaTag>Pending</MetaTag> : null}
@@ -820,7 +840,7 @@ export function MatRow({
           <Text
             testID={`arena-not-on-mat-${competitor.id}`}
             maxFontSizeMultiplier={MAX_SCALE}
-            className="font-heading text-[9px] uppercase tracking-caps-l text-ink-3"
+            className="font-heading text-micro uppercase tracking-caps-l text-ink-3"
           >
             Not on your mat
           </Text>
