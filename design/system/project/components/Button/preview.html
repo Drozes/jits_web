@@ -1,0 +1,103 @@
+<!-- @dsCard group="Actions" height=1310 subtitle="Target (WP3): one brand button" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Button preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;width:358px;max-width:100%}
+.btn{height:56px;display:flex;align-items:center;justify-content:center;gap:10px;padding:0 16px;border-radius:var(--radius-button);border:1px solid transparent;font-family:var(--font-heading);font-weight:700;font-size:14px;line-height:18px;letter-spacing:1.12px;text-transform:uppercase;white-space:nowrap;overflow:hidden}
+.primary{background:var(--signal-red);color:var(--on-signal)}
+.primary.pressed{background:var(--signal-red-lift)}
+.secondary{background:var(--plate);border-color:var(--hairline-strong);color:var(--ink)}
+.secondary.pressed{background:var(--plate-bright)}
+.ghost{background:none;color:var(--ink);font-size:13px}
+.ghost.pressed{opacity:var(--opacity-pressed)}
+.destructive{background:none;border-color:var(--negative);color:var(--negative)}
+.destructive.pressed{background:var(--plate)}
+.pressed{transform:scale(0.97)}
+.disabled{opacity:var(--opacity-disabled)}
+.spin{width:16px;height:16px;flex:none;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;transform:rotate(-30deg)}
+.legacy{height:auto;padding:14px 17.5px;letter-spacing:1.68px}
+.legacy.tertiary{background:none;color:var(--ink-2);padding:10.5px 17.5px}
+.sizes{display:flex;flex-direction:column;gap:10px;width:358px;max-width:100%}
+.sizes .btn{width:100%}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="sec"><span class="flag">Target (WP3)</span><p class="cap">one Button on PressableScale</p></div>
+  
+  <div class="cell">
+    <div class="sec"><p class="cap">variant="primary" (one per surface)</p></div>
+    <div class="grid">
+      <div class="cell"><p class="cap">default</p><div class="btn primary">Confirm</div></div>
+      <div class="cell"><p class="cap">pressed (0.97)</p><div class="btn primary pressed">Confirm</div></div>
+      <div class="cell"><p class="cap">disabled (0.5)</p><div class="btn primary disabled">Confirm</div></div>
+      <div class="cell"><p class="cap">busy</p><div class="btn primary"><span class="spin"></span>Confirm</div></div>
+    </div>
+  </div>
+  
+  <div class="cell">
+    <div class="sec"><p class="cap">variant="secondary"</p></div>
+    <div class="grid">
+      <div class="cell"><p class="cap">default</p><div class="btn secondary">Re-weigh</div></div>
+      <div class="cell"><p class="cap">pressed (0.97)</p><div class="btn secondary pressed">Re-weigh</div></div>
+      <div class="cell"><p class="cap">disabled (0.5)</p><div class="btn secondary disabled">Re-weigh</div></div>
+      <div class="cell"><p class="cap">busy</p><div class="btn secondary"><span class="spin"></span>Re-weigh</div></div>
+    </div>
+  </div>
+  
+  <div class="cell">
+    <div class="sec"><p class="cap">variant="ghost"</p></div>
+    <div class="grid">
+      <div class="cell"><p class="cap">default</p><div class="btn ghost">Share match</div></div>
+      <div class="cell"><p class="cap">pressed (0.97)</p><div class="btn ghost pressed">Share match</div></div>
+      <div class="cell"><p class="cap">disabled (0.5)</p><div class="btn ghost disabled">Share match</div></div>
+      <div class="cell"><p class="cap">busy</p><div class="btn ghost"><span class="spin"></span>Share match</div></div>
+    </div>
+  </div>
+  
+  <div class="cell">
+    <div class="sec"><p class="cap">variant="destructive" (proposed, owner to confirm)</p></div>
+    <div class="grid">
+      <div class="cell"><p class="cap">default</p><div class="btn destructive">Delete</div></div>
+      <div class="cell"><p class="cap">pressed (0.97)</p><div class="btn destructive pressed">Delete</div></div>
+      <div class="cell"><p class="cap">disabled (0.5)</p><div class="btn destructive disabled">Delete</div></div>
+      <div class="cell"><p class="cap">busy</p><div class="btn destructive"><span class="spin"></span>Delete</div></div>
+    </div>
+  </div>
+  <div class="cell">
+    <p class="cap">height 56 (default) and 44, with icon</p>
+    <div class="sizes">
+      <div class="btn primary"><svg class="ico" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>Share my number</div>
+      <div class="btn secondary" style="height:44px">Dispute result</div>
+    </div>
+  </div>
+  <div class="cell">
+    <div class="sec"><span class="flag today">Today</span><p class="cap">auth-buttons.tsx: no press scale, opacity dip</p></div>
+    <div class="sizes">
+      <div class="btn primary legacy">Continue</div>
+      <div class="btn secondary legacy">Not now</div>
+      <div class="btn legacy tertiary">Got a challenge code?</div>
+    </div>
+    <p class="note">CtaButton, SecondaryButton and TertiaryButton (65 call sites) use a raw Pressable with active:opacity-90/70 and no press scale. The legacy DestructiveButton fills with the shadcn destructive red under a #E8EDF2 label (3.54:1), so it is not drawn here.</p>
+  </div>
+</div>
+</body>
+</html>

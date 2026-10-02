@@ -1,0 +1,71 @@
+<!-- @dsCard group="Match flow" height=864 width=390 subtitle="Face-off 3-2-1 over the camera" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Countdown preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bleed{margin:0 -16px}
+.scr{position:relative;height:700px;background:var(--on-media-ink);overflow:hidden}
+.scrim{position:absolute;inset:0;background:var(--on-media-scrim)}
+.top{position:absolute;left:16px;right:16px;top:59px;height:28px;display:flex;align-items:center}
+.rec{height:28px;padding:0 10px;display:flex;align-items:center;gap:7px;border:1px solid var(--on-media-cta);border-radius:var(--radius-tag);background:var(--on-media-tag)}
+.rec.off{border-color:var(--on-media-strong)}
+.ring{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--on-media-red)}
+.rec.off .ring{border-color:var(--on-media-text3)}
+.mono{font-family:var(--font-mono);font-weight:700;font-size:10px;line-height:13px;letter-spacing:1.68px;color:var(--on-media-red)}
+.rec.off .mono{color:var(--on-media-text2)}
+.num{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:240px;line-height:240px;color:var(--on-media-white)}
+.barw{position:absolute;left:48px;right:48px;bottom:166px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.track{width:100%;height:3px;background:var(--on-media-track)}
+.fillr{height:3px;width:55%;background:var(--on-media-cta)}
+.capm{font-family:var(--font-mono);font-weight:500;font-size:10px;line-height:14px;letter-spacing:2.52px;color:var(--on-media-text2);text-align:center}
+.vschip{position:absolute;left:16px;right:16px;bottom:60px;height:56px;display:flex;background:var(--on-media-chip);border:1px solid var(--on-media-chip-border);border-radius:var(--radius-button)}
+.side{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:5px}
+.side.l{padding-left:12px}
+.side.r{padding-right:12px;align-items:flex-end}
+.nm{display:flex;align-items:center;gap:7px;font-family:var(--font-heading);font-weight:700;font-size:15px;line-height:19px;letter-spacing:0.6px;text-transform:uppercase;color:var(--on-media-ink);white-space:nowrap}
+.sq{width:4px;height:4px;background:var(--on-media-cta)}
+.mt{font-family:var(--font-mono);font-size:11px;line-height:14px;color:var(--on-media-ink3);font-variant-numeric:tabular-nums}
+.side.l .mt{padding-left:11px}
+.vs{width:44px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:22px;color:var(--on-media-ink-red)}
+.recs{display:flex;gap:10px;flex-wrap:wrap}
+.recs .rec{position:static}
+.dark{background:var(--on-media-ink);padding:10px;border-radius:var(--radius-plate);display:flex;gap:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="k">
+  <p class="cap">Numeral 2 landed, bar draining (portrait, 390 x 700)</p>
+  <div class="bleed"><div class="scr">
+    <div class="scrim"></div>
+    <div class="top"><div class="rec"><span class="ring"></span><span class="mono">REC ARMS AT GO</span></div></div>
+    <div class="num">2</div>
+    <div class="barw"><div class="track"><div class="fillr"></div></div><span class="capm">SYNCED TO SERVER CLOCK &middot; BOTH PHONES</span></div>
+    <div class="vschip">
+      <div class="side l"><span class="nm"><span class="sq"></span>M. Park</span><span class="mt">1526 &middot; 170 LBS</span></div>
+      <div class="vs">VS</div>
+      <div class="side r"><span class="nm">Alex</span><span class="mt">1498 &middot; 172.5 LBS</span></div>
+    </div>
+  </div></div>
+  <div class="cell"><p class="cap">Recording chip: armed, not recording</p>
+    <div class="dark"><div class="rec"><span class="ring"></span><span class="mono">REC ARMS AT GO</span></div><div class="rec off"><span class="ring"></span><span class="mono">NOT RECORDING</span></div></div>
+  </div>
+</div>
+</body>
+</html>

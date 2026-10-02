@@ -1,0 +1,53 @@
+<!-- @dsCard group="Data" height=355 subtitle="Odometer roll, settled frame" -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RollingNumber preview</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--void);color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.k{padding:16px;display:flex;flex-direction:column;gap:18px;max-width:100%}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:8px}
+.cell{display:flex;flex-direction:column;gap:6px;min-width:0}
+.cap{font-family:var(--font-mono);font-weight:400;font-size:10px;line-height:14px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink-3);margin:0}
+.sec{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.flag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid var(--hairline-strong);border-radius:var(--radius-tag);font-family:var(--font-mono);font-weight:700;font-size:9px;letter-spacing:1.68px;text-transform:uppercase;color:var(--ink)}
+.flag.today{color:var(--ink-2);border-color:var(--hairline)}
+.note{font-family:var(--font-body);font-size:12px;line-height:17px;color:var(--ink-2);margin:0;max-width:358px}
+.tab{font-variant-numeric:tabular-nums}
+.ico{display:block;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.v{font-family:var(--font-mono);font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.strip{display:flex;gap:0;align-items:center}
+.colm{width:36px;height:44px;overflow:hidden;position:relative;border-top:1px solid var(--hairline);border-bottom:1px solid var(--hairline)}
+.colm span{display:block;height:44px;line-height:44px;text-align:center;font-family:var(--font-mono);font-weight:700;font-size:40px;color:var(--ink)}
+.diag{display:flex;gap:16px;align-items:flex-start}
+.reel{display:flex;flex-direction:column;align-items:center;gap:2px}
+.reel span{font-family:var(--font-mono);font-weight:700;font-size:14px;line-height:16px;color:var(--ink-3)}
+.reel span.on{color:var(--ink);font-size:16px}
+.reel.still span{color:var(--ink-3)}
+</style>
+</head>
+<body>
+<div class="k">
+  <div class="cell"><p class="cap">Landed: plain text (EloTile 64, verdict 22)</p>
+    <div class="row" style="align-items:baseline;gap:24px">
+      <span class="v" style="font-size:64px;line-height:70.4px;letter-spacing:-2.56px">1526</span>
+      <span class="v" style="font-size:22px;line-height:26px">1526</span>
+    </div>
+  </div>
+  <div class="cell"><p class="cap">How it rolls: 1512 to 1526 (ones run 2 to 9, 0 to 6; tens carry once)</p>
+    <div class="diag">
+      <div class="reel still"><span class="on">1</span><span>held</span></div>
+      <div class="reel still"><span class="on">5</span><span>held</span></div>
+      <div class="reel"><span>1</span><span class="on">2</span></div>
+      <div class="reel"><span>2</span><span>&#8942;</span><span>9</span><span>0</span><span>&#8942;</span><span class="on">6</span></div>
+    </div>
+    <p class="note">Each column is a 0 to 9 strip (plus a trailing 0 for the wrap) behind a clip; a higher column moves only while every column below it carries from 9 to 0. Spans above 30 start the roll 30 from the final value.</p>
+  </div>
+</div>
+</body>
+</html>
