@@ -1,4 +1,5 @@
 import "react-native-url-polyfill/auto";
+import { Platform } from "react-native";
 import { createClient, processLock } from "@supabase/supabase-js";
 import type { Database } from "@jits/shared/types/database";
 import { env } from "../env";
@@ -23,7 +24,14 @@ import { SecureStoreAdapter } from "./secure-storage";
  *   silent disconnects on flaky mobile networks.
  * - `worker` option is intentionally omitted: Web Workers don't exist on
  *   React Native; the realtime client falls back to its default behavior.
+ * - `x-elo-platform` (`ios` / `android`) on every request: the backend's
+ *   `_request_platform()` reads it into `athlete_live_sessions.platform` and
+ *   `athlete_location_events.platform` (live location fixes 4.4). Native
+ *   requests have no CORS preflight, so a custom header is safe here; the
+ *   server ignores it where it does not read it.
  */
+export const SUPABASE_CLIENT_HEADERS = { "x-elo-platform": Platform.OS } as const;
+
 export const supabase = createClient<Database>(
   env.supabaseUrl,
   env.supabaseAnonKey,
@@ -39,5 +47,6 @@ export const supabase = createClient<Database>(
       params: { eventsPerSecond: 10 },
       heartbeatIntervalMs: 15_000,
     },
+    global: { headers: { ...SUPABASE_CLIENT_HEADERS } },
   },
 );
