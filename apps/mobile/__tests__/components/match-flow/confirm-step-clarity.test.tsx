@@ -10,7 +10,9 @@
  *   match_result_lock_seconds().
  * - After confirming, the step moves on to the verdict, even while the
  *   opponent is still pending: no "Continue without waiting" exit.
- * - A successful confirm gives a light impact; a failed one the error buzz.
+ * - A successful confirm gives a light impact (`haptics.press`); a failed one
+ *   the error buzz.
+ * - A submission result draws the tap marks still and silent (Adding Flare).
  */
 import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
@@ -174,6 +176,20 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
     expect(s.getAllByText("Confirm result")).toHaveLength(2);
   });
 
+  it("draws the tap marks still and silent on a submission, none on a draw (Adding Flare)", () => {
+    jest.useFakeTimers();
+    const sub = renderStep({ resultData: { result: "submission", winnerId: "opp-1" }, submissionName: "Armbar" });
+    expect(sub.getByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeTruthy();
+    act(() => {
+      jest.runAllTimers();
+    });
+    // No haptic before the athlete confirms: the moment belongs to the verdict.
+    expect(mockImpact).not.toHaveBeenCalled();
+    sub.unmount();
+    const draw = renderStep({ resultData: { result: "draw" }, finishTimeSeconds: 300 });
+    expect(draw.queryByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeNull();
+  });
+
   it("the recorder is shown already confirmed (auto-confirmed server-side)", () => {
     const s = renderStep({ confirmedAthleteIds: ["opp-1"] });
     s.getByText("RESULT RECORDED BY D. RED");
@@ -247,6 +263,8 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
     getByTestId("confirm-panel-you-confirmed");
     getByTestId("confirm-panel-opponent-confirming");
     expect(mockImpact).toHaveBeenCalledWith("light");
+    // The verdict that follows is fresh even for an old match (Adding Flare).
+    expect(require("@/components/ui/elo-system/play-once").isResultFresh("M1", "2020-01-01T00:00:00Z")).toBe(true);
     expect(mockHapticError).not.toHaveBeenCalled();
     // No leave exit and no dead-end wait: leaving counts as confirming.
     expect(queryByTestId("confirm-leave")).toBeNull();

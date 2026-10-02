@@ -340,7 +340,7 @@ export function RatingBlock({
   deltaTestID?: string;
   /** Replaces the plain delta text. */
   deltaNode?: React.ReactNode;
-  /** Replaces the rating text (the verdict ticks it in its own leaf). */
+  /** Replaces the rating text (the verdict rolls it in its own leaf). */
   ratingNode?: React.ReactNode;
 }) {
   const p = usePalette();

@@ -1,9 +1,9 @@
 import * as React from "react";
-import { AccessibilityInfo, View, Text } from "react-native";
-import * as Haptics from "expo-haptics";
+import { View, Text } from "react-native";
 import { cn } from "@/lib/cn";
 import { useAmber } from "@/components/match-detail/use-amber";
-import { duration } from "@/lib/motion";
+import { haptics } from "@/lib/motion";
+import { RollingNumber, usePlayOnce } from "./rolling-number";
 
 type EloTileSize = "hero" | "large" | "medium" | "small";
 
@@ -16,9 +16,6 @@ const SIZE_PX: Record<EloTileSize, number> = {
   medium: 44,
   small: 36,
 };
-
-/** The sanctioned brand rating tick (`duration.base`, Motion Rule). */
-export const RATING_TICK_MS = duration.base;
 
 interface EloTileProps {
   /** Mono caps label above the number. Optional: Home's hero tile has none. */
@@ -45,6 +42,12 @@ interface EloTileProps {
    * when it lands. The placeholder is blank and hidden from accessibility.
    */
   reserveMeta?: boolean;
+  /**
+   * Before/after mode only: identifies the result, so the roll and its
+   * haptic play once per result (persisted across remounts and restarts).
+   * Without it the tile is static and silent.
+   */
+  playKey?: string;
   className?: string;
 }
 
@@ -57,12 +60,27 @@ interface SingleTileProps {
   /** Before/after pair: share the row equally and shrink the number to fit. */
   compact?: boolean;
   borderClass?: string;
-  /** Accessibility label for the number (the final value while it ticks). */
+  /** Accessibility label for the number (the final value while it rolls). */
   valueLabel?: string;
+  /** Replaces the number Text (the after tile's odometer roll). */
+  valueNode?: React.ReactNode;
   valueTestID?: string;
   meta?: string;
   metaLabel?: string;
   reserveMeta?: boolean;
+}
+
+/** The tile number's text style at a size (no margin: see SingleTile). */
+function numberStyle(size: EloTileSize) {
+  const px = SIZE_PX[size];
+  return {
+    fontSize: px,
+    // RN crops/centers the glyph tightly when lineHeight == fontSize; give
+    // ~10% breathing room so the hero number isn't vertically clipped.
+    lineHeight: px * 1.1,
+    letterSpacing: -px * 0.04,
+    fontVariant: ["tabular-nums" as const],
+  };
 }
 
 /** The meta line's box: 18 line height plus 4 above and 4 below. */
@@ -84,6 +102,7 @@ function SingleTile({
   borderClass,
   valueLabel,
   valueTestID,
+  valueNode,
   meta,
   metaLabel,
   reserveMeta,
@@ -108,25 +127,29 @@ function SingleTile({
           {label}
         </Text>
       ) : null}
-      <Text
-        testID={valueTestID}
-        accessibilityLabel={valueLabel}
-        className="font-mono-bold text-ink"
-        numberOfLines={compact ? 1 : undefined}
-        adjustsFontSizeToFit={compact || undefined}
-        minimumFontScale={compact ? 0.6 : undefined}
-        style={{
-          fontSize: SIZE_PX[size],
-          // RN crops/centers the glyph tightly when lineHeight == fontSize; give
-          // ~10% breathing room so the hero number isn't vertically clipped.
-          lineHeight: SIZE_PX[size] * 1.1,
-          letterSpacing: -SIZE_PX[size] * 0.04,
-          marginTop: hasLabel ? 8 : 0,
-          fontVariant: ["tabular-nums"],
-        }}
-      >
-        {value}
-      </Text>
+      {valueNode ? (
+        <View style={{ alignSelf: "stretch", alignItems: "center", marginTop: hasLabel ? 8 : 0 }}>{valueNode}</View>
+      ) : (
+        <Text
+          testID={valueTestID}
+          accessibilityLabel={valueLabel}
+          className="font-mono-bold text-ink"
+          numberOfLines={compact ? 1 : undefined}
+          adjustsFontSizeToFit={compact || undefined}
+          minimumFontScale={compact ? 0.6 : undefined}
+          style={{
+            fontSize: SIZE_PX[size],
+            // RN crops/centers the glyph tightly when lineHeight == fontSize; give
+            // ~10% breathing room so the hero number isn't vertically clipped.
+            lineHeight: SIZE_PX[size] * 1.1,
+            letterSpacing: -SIZE_PX[size] * 0.04,
+            marginTop: hasLabel ? 8 : 0,
+            fontVariant: ["tabular-nums"],
+          }}
+        >
+          {value}
+        </Text>
+      )}
       {meta ? (
         <Text
           testID="elo-tile-meta"
@@ -156,81 +179,6 @@ function SingleTile({
   );
 }
 
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
-/**
- * The 480ms rating tick: counts from `from` to `to` once per mount, in
- * integer steps with an ease-out curve, then fires one light haptic. With
- * reduce motion on it jumps straight to `to` (the haptic still lands, it is
- * not motion). A non-numeric pair, or a later prop change, never animates:
- * a change mid-tick jumps to the new value and lands (one haptic, never two),
- * and a change after landing just jumps.
- */
-export function useRatingTick(from: string | number, to: string | number): string | number {
-  const start = typeof from === "number" ? from : Number(from);
-  const end = typeof to === "number" ? to : Number(to);
-  const numeric = Number.isFinite(start) && Number.isFinite(end) && from !== "" && to !== "";
-  const [shown, setShown] = React.useState<string | number>(numeric ? start : to);
-  // Set only when the tick lands, so an effect torn down mid-tick (a dev
-  // StrictMode double run) replays it rather than skipping it.
-  const landedRef = React.useRef(false);
-  // Set once frames are actually running (after the async reduce-motion
-  // read), so only a real mid-tick change takes the jump-and-land path.
-  const tickingRef = React.useRef(false);
-
-  React.useEffect(() => {
-    if (!numeric || landedRef.current) {
-      setShown(to);
-      return;
-    }
-    let cancelled = false;
-    let frame: ReturnType<typeof requestAnimationFrame> | null = null;
-    const land = () => {
-      if (cancelled) return;
-      landedRef.current = true;
-      tickingRef.current = false;
-      setShown(end);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
-    };
-    if (tickingRef.current) {
-      // The pair changed mid-tick: never restart from `start`.
-      land();
-      return;
-    }
-    AccessibilityInfo.isReduceMotionEnabled()
-      .catch(() => false)
-      .then((reduce) => {
-        if (cancelled) return;
-        if (reduce || start === end) {
-          land();
-          return;
-        }
-        const t0 = Date.now();
-        tickingRef.current = true;
-        const step = () => {
-          if (cancelled) return;
-          const t = Math.min(1, (Date.now() - t0) / RATING_TICK_MS);
-          if (t >= 1) {
-            land();
-            return;
-          }
-          setShown(Math.round(start + (end - start) * easeOutCubic(t)));
-          frame = requestAnimationFrame(step);
-        };
-        frame = requestAnimationFrame(step);
-      });
-    return () => {
-      cancelled = true;
-      if (frame != null) cancelAnimationFrame(frame);
-    };
-    // Keyed on the values: a changed pair after the tick jumps, never replays.
-  }, [numeric, start, end, to]);
-
-  return shown;
-}
-
 /** Amber lives behind a hook, so only a draw tile mounts it. */
 function AmberAfterTile(props: SingleTileProps) {
   const amber = useAmber();
@@ -249,19 +197,41 @@ function BeforeAfter({
   before,
   after,
   tone,
+  playKey,
   className,
 }: Required<Pick<EloTileProps, "size" | "before" | "after">> &
-  Pick<EloTileProps, "label" | "accent" | "tone" | "className">) {
-  const shown = useRatingTick(before, after);
+  Pick<EloTileProps, "label" | "accent" | "tone" | "playKey" | "className">) {
+  const start = typeof before === "number" ? before : Number(before);
+  const end = typeof after === "number" ? after : Number(after);
+  const numeric = Number.isFinite(start) && Number.isFinite(end) && before !== "" && after !== "";
+  // Only with a playKey: a tile that cannot tell one result from another
+  // never animates (it could replay on every mount).
+  const play = usePlayOnce(playKey, playKey != null && numeric && start !== end);
+  // Only a gain buzzes (Motion Rule): nothing on a loss or a draw tile.
+  const gain = numeric && end > start && tone !== "amber";
   const afterProps: SingleTileProps = {
     label,
-    value: shown,
+    value: after,
     size,
     compact: true,
     accent,
     borderClass: tone && tone !== "amber" ? TONE_BORDER[tone] : undefined,
     valueLabel: String(after),
     valueTestID: "elo-tile-after-value",
+    valueNode: numeric ? (
+      <RollingNumber
+        from={start}
+        to={end}
+        play={play}
+        onLanded={gain ? () => void haptics.ratingGain() : undefined}
+        testID="elo-tile-after-value"
+        accessibilityLabel={String(after)}
+        className="font-mono-bold text-ink"
+        style={numberStyle(size)}
+        fit
+        staticTextProps={{ numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.6 }}
+      />
+    ) : undefined,
   };
   return (
     <View className={cn("flex-row items-center gap-3 self-stretch", className)}>
@@ -284,6 +254,7 @@ export function EloTile({
   meta,
   metaLabel,
   reserveMeta,
+  playKey,
   className,
 }: EloTileProps) {
   if (before !== undefined && after !== undefined) {
@@ -295,6 +266,7 @@ export function EloTile({
         before={before}
         after={after}
         tone={tone}
+        playKey={playKey}
         className={className}
       />
     );

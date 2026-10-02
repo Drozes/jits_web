@@ -1,7 +1,6 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { Check, Flag } from "lucide-react-native";
-import * as Haptics from "expo-haptics";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { confirmMatchResult } from "@jits/shared/api/mutations";
@@ -10,6 +9,7 @@ import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
+import { haptics } from "@/lib/motion";
 import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { LEAVE_COUNTS_AS_CONFIRMING, disputeLockNote, isDisputeWindowClosed } from "@/lib/match-flow/match-extras";
 import { useDisputeLocksAt } from "@/lib/match-flow/use-dispute-locks-at";
@@ -17,6 +17,8 @@ import { usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, InitialsBlock, Mono, RatingBlock, shortName } from "../fight/fight-ui";
 import { DisputeForm } from "./dispute-form";
+import { TapMarks } from "../verdict/rating-moment";
+import { markResultFresh } from "@/components/ui/elo-system/play-once";
 
 export interface ConfirmAthlete {
   athlete_id: string;
@@ -126,7 +128,12 @@ export function ConfirmStep(props: ConfirmStepProps) {
       reconcileNow();
       return;
     }
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    // The one haptic for confirming (a commit action, Light). If the Confirm
+    // button ever gains a `press` haptic of its own, drop this call: one
+    // haptic per event. The verdict's `ratingGain` is a later, separate moment.
+    void haptics.press();
+    // The verdict that follows is fresh even if the match completed long ago.
+    markResultFresh(matchId);
     if (isQueuedResult(res.data)) {
       toast.success({ text1: "Saved locally", description: "Confirmation will sync when you're back online." });
     }
@@ -184,9 +191,14 @@ export function ConfirmStep(props: ConfirmStepProps) {
             {isDraw ? "Draw" : winner ? `${shortName(winner.display_name)} won` : "Result in"}
           </Text>
           {how ? (
-            <Text className="font-body" style={{ fontSize: 16, color: p.text2 }}>
-              {how}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text className="font-body" style={{ fontSize: 16, color: p.text2 }}>
+                {how}
+              </Text>
+              {/* "The tap", drawn still and silent here: the moment itself
+                  plays once, on the verdict, for the winner. */}
+              {resultData?.result === "submission" && winner ? <TapMarks play={false} /> : null}
+            </View>
           ) : null}
         </View>
         {me.elo_after != null ? (
