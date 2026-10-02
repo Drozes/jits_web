@@ -4,7 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSequence, wi
 import { haptics, useReduceMotion } from "@/lib/motion";
 import { usePalette, TABULAR } from "@/lib/theme/palette";
 import { DeltaChip, spokenDelta } from "@/components/ui/elo-system/delta-chip";
-import { RollingNumber, usePlayOnce } from "@/components/ui/elo-system/rolling-number";
+import { RollingNumber } from "@/components/ui/elo-system/rolling-number";
 import { RatingBlock, deltaColor } from "../fight/fight-ui";
 
 /** "The tap": three tick marks, 180ms apart (Motion Rule registry). */
@@ -57,7 +57,11 @@ function TapMark({ index, play, track, fill }: { index: number; play: boolean; t
 }
 
 interface RatingMomentProps {
-  matchId: string;
+  /**
+   * This mount plays the moment: decided ONCE by the verdict for the whole
+   * celebration (`usePlayOnce("verdict:<matchId>")` plus the recency guard).
+   */
+  play: boolean;
   outcome: "win" | "loss" | "draw" | null;
   disputed: boolean;
   /** The result was a submission (points or decision results skip the tap). */
@@ -68,9 +72,9 @@ interface RatingMomentProps {
 }
 
 /**
- * The verdict's rating card as one Moment, played once per confirmed result
- * (keyed on the match and the stamped rating, so a remount or navigating
- * back shows the end state, silent):
+ * The verdict's rating card as one Moment, played when the verdict says so
+ * (once per result; a remount, navigating back or an old result shows the
+ * end state, silent):
  *
  * 1. A submission WIN gets "the tap": the card nudges three times as three
  *    Signal Red marks fill, 180ms apart, each with `tapTick`. The loser of a
@@ -82,15 +86,17 @@ interface RatingMomentProps {
  * Reduce Motion: marks, number and chip are shown final; the winner's
  * haptics keep their timing. VoiceOver reads only "Rating 1526, up 14".
  */
-export function RatingMoment({ matchId, outcome, disputed, submission, before, after, delta }: RatingMomentProps) {
+export function RatingMoment({ play: playProp, outcome, disputed, submission, before, after, delta }: RatingMomentProps) {
   const p = usePalette();
   const reduceMotion = useReduceMotion();
-  const play = usePlayOnce(`verdict:${matchId}:${after}`, !disputed);
+  // Fixed at mount: a later dispute or refresh never restarts the moment.
+  const [play] = React.useState(() => playProp && !disputed);
   const showBefore = !disputed && before != null && before !== after;
   const submissionWin = submission && !disputed && outcome === "win";
   const submissionLoss = submission && !disputed && outcome === "loss";
   const tapPlays = play && submissionWin;
-  const gain = outcome === "win" && !disputed && before != null && after > before;
+  const change = delta ?? (before != null ? after - before : 0);
+  const gain = outcome === "win" && !disputed && change > 0;
   const [landed, setLanded] = React.useState(!play);
 
   // The tap's haptics, winner only, kept under Reduce Motion.

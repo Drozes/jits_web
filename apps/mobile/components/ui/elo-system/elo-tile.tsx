@@ -44,8 +44,8 @@ interface EloTileProps {
   reserveMeta?: boolean;
   /**
    * Before/after mode only: identifies the result, so the roll and its
-   * haptic play once per result even if the tile remounts. Without it the
-   * roll plays once per mount.
+   * haptic play once per result (persisted across remounts and restarts).
+   * Without it the tile is static and silent.
    */
   playKey?: string;
   className?: string;
@@ -204,7 +204,9 @@ function BeforeAfter({
   const start = typeof before === "number" ? before : Number(before);
   const end = typeof after === "number" ? after : Number(after);
   const numeric = Number.isFinite(start) && Number.isFinite(end) && before !== "" && after !== "";
-  const play = usePlayOnce(playKey, numeric && start !== end);
+  // Only with a playKey: a tile that cannot tell one result from another
+  // never animates (it could replay on every mount).
+  const play = usePlayOnce(playKey, playKey != null && numeric && start !== end);
   // Only a gain buzzes (Motion Rule): nothing on a loss or a draw tile.
   const gain = numeric && end > start && tone !== "amber";
   const afterProps: SingleTileProps = {

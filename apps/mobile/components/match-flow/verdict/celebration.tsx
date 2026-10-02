@@ -23,13 +23,14 @@ const PIECES = [
 
 /**
  * One fall of confetti over the win verdict (a Moment in the Motion Rule
- * registry). Plays once; nothing at all under Reduce Motion.
+ * registry). Only when the verdict plays (once per result); nothing at all
+ * under Reduce Motion.
  */
-export function Confetti({ height = 600 }: { height?: number }) {
+export function Confetti({ height = 600, play }: { height?: number; play: boolean }) {
   const reduceMotion = useReduceMotion();
   const { width } = useWindowDimensions();
   const palette = usePalette();
-  if (reduceMotion) return null;
+  if (reduceMotion || !play) return null;
   return (
     <View testID="verdict-confetti" pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[StyleSheet.absoluteFill, { height }]}>
       {PIECES.map((p, i) => (
@@ -74,9 +75,10 @@ export function SlamIn({ children, animate }: { children: React.ReactNode; anima
   return <Animated.View style={[{ alignSelf: "flex-start" }, style]}>{children}</Animated.View>;
 }
 
-/** Rises in once after the verdict (the rank strip). */
-export function RiseIn({ children, delay = 500 }: { children: React.ReactNode; delay?: number }) {
-  const reduceMotion = useReduceMotion();
+/** Rises in once after the verdict (the rank strip); static without `play`. */
+export function RiseIn({ children, delay = 500, play }: { children: React.ReactNode; delay?: number; play: boolean }) {
+  const osReduceMotion = useReduceMotion();
+  const reduceMotion = osReduceMotion || !play;
   const y = useSharedValue(reduceMotion ? 0 : 12);
   const opacity = useSharedValue(reduceMotion ? 1 : 0);
   React.useEffect(() => {

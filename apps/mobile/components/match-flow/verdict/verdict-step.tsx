@@ -19,6 +19,7 @@ import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, Mono, shortName } from "../fight/fight-ui";
 import { Confetti, RiseIn, SlamIn } from "./celebration";
 import { RatingMoment } from "./rating-moment";
+import { isResultFresh, usePlayOnce } from "@/components/ui/elo-system/play-once";
 import { HERO_HEIGHT, VerdictHero } from "./verdict-hero";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { useScrolledPast } from "../wizard-scroll";
@@ -55,6 +56,13 @@ interface VerdictStepProps {
   uploadedVideoId: string | null;
   /** Athletes with a confirmation row (from the wizard's reconciler). */
   confirmedAthleteIds?: string[];
+  /**
+   * The result's type when known (the broadcast or the reconciler); else
+   * a named submission counts as one.
+   */
+  resultType?: "submission" | "draw" | null;
+  /** `matches.completed_at`: an old result does not celebrate. */
+  completedAt?: string | null;
 }
 
 /**
@@ -73,7 +81,7 @@ interface VerdictStepProps {
  */
 export function VerdictStep(props: VerdictStepProps) {
   const p = usePalette();
-  const { matchId, exitHref, exitLabel, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [] } = props;
+  const { matchId, exitHref, exitLabel, matchStatus, outcome, me, opponent, submissionName, finishTimeSeconds, upload, uploadedVideoId, confirmedAthleteIds = [], resultType = null, completedAt = null } = props;
   const router = useRouter();
   const invitesOn = useInvitesEnabled();
   const insets = useSafeAreaInsets();
@@ -112,6 +120,12 @@ export function VerdictStep(props: VerdictStepProps) {
   }, [awaitingOpponent, reconcileNow]);
 
   const win = !disputed && outcome === "win";
+
+  // The whole celebration (confetti, slam, roll, tap, rank strip) plays ONCE
+  // per result: the first time this match's verdict is seen, on any launch,
+  // and only while the result is fresh (decided here, on mount).
+  const play = usePlayOnce(`verdict:${matchId}`, !disputed && isResultFresh(matchId, completedAt));
+  const submission = resultType != null ? resultType === "submission" : submissionName != null;
   const loss = !disputed && outcome === "loss";
 
   const videos = useVerdictVideos(matchId, me.athlete_id, uploadedVideoId);
@@ -170,10 +184,10 @@ export function VerdictStep(props: VerdictStepProps) {
         filmExpected={filmExpected}
         topInset={insets.top}
       />
-      {win ? <Confetti /> : null}
+      {win ? <Confetti play={play} /> : null}
       <View style={{ paddingHorizontal: 16, marginTop: videos.posterUrl ? -72 : 24, gap: 16 }}>
         <View style={{ gap: 8 }}>
-          <SlamIn animate={win}>
+          <SlamIn animate={win && play}>
             <Text testID="summary-verdict" className="font-display" style={{ fontSize: win ? 96 : 80, lineHeight: win ? 88 : 72, letterSpacing: 1, color: verdictColor }}>
               {verdict}
             </Text>
@@ -193,10 +207,10 @@ export function VerdictStep(props: VerdictStepProps) {
 
         {eloAfter != null ? (
           <RatingMoment
-            matchId={matchId}
+            play={play}
             outcome={outcome}
             disputed={disputed}
-            submission={submissionName != null}
+            submission={submission}
             before={eloBefore}
             after={eloAfter}
             delta={eloDelta}
@@ -204,7 +218,7 @@ export function VerdictStep(props: VerdictStepProps) {
         ) : null}
 
         {rankText ? (
-          <RiseIn>
+          <RiseIn play={play}>
             <View
               testID="verdict-rank-strip"
               style={{ height: 40, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: p.winRule, borderRadius: FIGHT_RADIUS.plate }}

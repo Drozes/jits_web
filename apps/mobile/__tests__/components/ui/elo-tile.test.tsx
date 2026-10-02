@@ -31,7 +31,7 @@ jest.mock("@/lib/theme/use-theme", () => ({
 }));
 
 import { EloTile } from "@/components/ui/elo-system/elo-tile";
-import { ROLL_MS, __resetPlayedMomentsForTests } from "@/components/ui/elo-system/rolling-number";
+import { ROLL_LAND_FALLBACK_MS, ROLL_MS, __resetPlayedMomentsForTests } from "@/components/ui/elo-system/rolling-number";
 import { __setReduceMotionForTests } from "@/lib/motion";
 
 beforeEach(() => {
@@ -63,7 +63,7 @@ function afterValue(utils: ReturnType<typeof render>) {
 
 function land() {
   act(() => {
-    jest.advanceTimersByTime(ROLL_MS + 16);
+    jest.advanceTimersByTime(ROLL_MS + ROLL_LAND_FALLBACK_MS + 16);
   });
 }
 
@@ -73,7 +73,7 @@ const flush = async () => {
 
 describe("odometer roll", () => {
   it("rolls (digit columns, not a ticking Text), then lands on the final value with one ratingGain", async () => {
-    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} tone="positive" />);
+    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} tone="positive" playKey="r1000-1016" />);
     // Mid-roll: the number is digit strips, labelled with the final value.
     expect(afterValue(utils).text).toBeNull();
     expect(afterValue(utils).label).toBe("1016");
@@ -92,11 +92,11 @@ describe("odometer roll", () => {
   });
 
   it("a loss lands silent (no haptic on a loss) and never replays on re-render", async () => {
-    const utils = render(<EloTile label="ELO Rating" before={1016} after={1000} tone="negative" />);
+    const utils = render(<EloTile label="ELO Rating" before={1016} after={1000} tone="negative" playKey="r1016-1000" />);
     land();
     await flush();
     expect(afterValue(utils).text).toBe("1000");
-    utils.rerender(<EloTile label="ELO Rating" before={1016} after={1000} tone="negative" />);
+    utils.rerender(<EloTile label="ELO Rating" before={1016} after={1000} tone="negative" playKey="r1016-1000" />);
     act(() => {
       jest.advanceTimersByTime(5_000);
     });
@@ -106,18 +106,18 @@ describe("odometer roll", () => {
   });
 
   it("a draw tile (amber) that gains is silent", async () => {
-    render(<EloTile label="ELO Rating" before={1000} after={1004} tone="amber" />);
+    render(<EloTile label="ELO Rating" before={1000} after={1004} tone="amber" playKey="r1000-1004" />);
     land();
     await flush();
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
   it("a new after value mid-roll jumps to it and lands once, never restarting", async () => {
-    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
+    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} playKey="r1000-1016" />);
     act(() => {
       jest.advanceTimersByTime(200);
     });
-    utils.rerender(<EloTile label="ELO Rating" before={1000} after={1020} />);
+    utils.rerender(<EloTile label="ELO Rating" before={1000} after={1020} playKey="r1000-1020" />);
     expect(afterValue(utils).text).toBe("1020");
     land();
     act(() => {
@@ -130,7 +130,7 @@ describe("odometer roll", () => {
 
   it("with reduce motion on, shows the final value from the first frame (gain haptic kept)", async () => {
     __setReduceMotionForTests(true);
-    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
+    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} playKey="r1000-1016" />);
     expect(afterValue(utils).text).toBe("1016");
     await flushReduceMotion();
     expect(mockNotify).toHaveBeenCalledTimes(1);
@@ -147,6 +147,14 @@ describe("odometer roll", () => {
     land();
     await flush();
     expect(mockNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it("without a playKey is static and silent (it cannot tell results apart)", async () => {
+    const utils = render(<EloTile label="ELO Rating" before={1000} after={1016} />);
+    expect(afterValue(utils).text).toBe("1016");
+    land();
+    await flush();
+    expect(mockNotify).not.toHaveBeenCalled();
   });
 
   it("does not animate a non-numeric pair", async () => {

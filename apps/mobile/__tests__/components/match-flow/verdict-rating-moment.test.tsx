@@ -8,7 +8,8 @@
  * - A draw, a loss and a dispute are silent; a non-submission win skips the
  *   tap but still gains.
  * - Reduce Motion: final value at once, the winner's haptics kept.
- * - Once per result: a remount of the same result is silent and static.
+ * - Without `play` (decided once by the verdict) it is static and silent;
+ *   unmounting mid-roll never buzzes.
  * - VoiceOver reads only "Rating 1526, up 14".
  */
 import * as React from "react";
@@ -35,12 +36,12 @@ jest.mock("expo-haptics", () => ({
 }));
 
 import { RatingMoment, TAP_LEAD_MS, TAP_STAGGER_MS } from "@/components/match-flow/verdict/rating-moment";
-import { ROLL_MS, __resetPlayedMomentsForTests } from "@/components/ui/elo-system/rolling-number";
+import { ROLL_LAND_FALLBACK_MS, ROLL_MS, __resetPlayedMomentsForTests } from "@/components/ui/elo-system/rolling-number";
 import { __setReduceMotionForTests } from "@/lib/motion";
 
 type Props = React.ComponentProps<typeof RatingMoment>;
-const WIN: Props = { matchId: "M1", outcome: "win", disputed: false, submission: true, before: 1512, after: 1526, delta: 14 };
-const LOSS: Props = { matchId: "M1", outcome: "loss", disputed: false, submission: true, before: 1498, after: 1489, delta: -9 };
+const WIN: Props = { play: true, outcome: "win", disputed: false, submission: true, before: 1512, after: 1526, delta: 14 };
+const LOSS: Props = { play: true, outcome: "loss", disputed: false, submission: true, before: 1498, after: 1489, delta: -9 };
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -76,7 +77,7 @@ describe("a submission win", () => {
     // Still rolling: no gain yet, the number is not final Text.
     tick(TAP_LEAD_MS - 2 * TAP_STAGGER_MS + ROLL_MS - 20);
     expect(mockNotify).not.toHaveBeenCalled();
-    tick(40);
+    tick(20 + ROLL_LAND_FALLBACK_MS + 5);
     expect(mockNotify).toHaveBeenCalledTimes(1);
     expect(mockNotify).toHaveBeenCalledWith("success");
     expect(s.getByTestId("verdict-rating-value", { includeHiddenElements: true })).toHaveTextContent("1526");
@@ -100,21 +101,36 @@ describe("a submission win", () => {
     expect(mockNotify).toHaveBeenCalledTimes(1);
   });
 
-  it("plays once per result: a remount or re-render is static and silent", () => {
-    const first = render(<RatingMoment {...WIN} />);
+  it("without play (a replay or an old result) is static: marks filled, no haptics", () => {
+    const s = render(<RatingMoment {...WIN} play={false} />);
+    expect(s.getByTestId("verdict-rating-value", { includeHiddenElements: true })).toHaveTextContent("1526");
+    expect(s.getByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeTruthy();
     all();
-    first.rerender(<RatingMoment {...WIN} />);
+    expect(mockImpact).not.toHaveBeenCalled();
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("a re-render does not replay it", () => {
+    const s = render(<RatingMoment {...WIN} />);
+    all();
+    s.rerender(<RatingMoment {...WIN} />);
     all();
     expect(mockImpact).toHaveBeenCalledTimes(3);
     expect(mockNotify).toHaveBeenCalledTimes(1);
-    first.unmount();
-    const again = render(<RatingMoment {...WIN} />);
-    expect(again.getByTestId("verdict-rating-value", { includeHiddenElements: true })).toHaveTextContent("1526");
+  });
+
+  it("unmounting mid-roll fires no ratingGain", () => {
+    const s = render(<RatingMoment {...WIN} />);
+    tick(TAP_LEAD_MS + ROLL_MS / 2);
+    s.unmount();
     all();
-    expect(mockImpact).toHaveBeenCalledTimes(3);
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it("gains by the stamped delta when it is known", () => {
+    render(<RatingMoment {...WIN} submission={false} before={1526} after={1526} delta={3} />);
+    all();
     expect(mockNotify).toHaveBeenCalledTimes(1);
-    // The marks are still drawn (filled) on the replay.
-    expect(again.getByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeTruthy();
   });
 });
 
@@ -152,7 +168,7 @@ describe("a win that was not a submission", () => {
   it("skips the tap and lands the gain right after the roll", () => {
     const s = render(<RatingMoment {...WIN} submission={false} />);
     expect(s.queryByTestId("verdict-tap-marks", { includeHiddenElements: true })).toBeNull();
-    tick(ROLL_MS + 1);
+    tick(ROLL_MS + ROLL_LAND_FALLBACK_MS + 1);
     expect(mockImpact).not.toHaveBeenCalled();
     expect(mockNotify).toHaveBeenCalledTimes(1);
   });

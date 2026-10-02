@@ -263,6 +263,8 @@ describe("ConfirmStep (opponent view, match-flow redesign)", () => {
     getByTestId("confirm-panel-you-confirmed");
     getByTestId("confirm-panel-opponent-confirming");
     expect(mockImpact).toHaveBeenCalledWith("light");
+    // The verdict that follows is fresh even for an old match (Adding Flare).
+    expect(require("@/components/ui/elo-system/play-once").isResultFresh("M1", "2020-01-01T00:00:00Z")).toBe(true);
     expect(mockHapticError).not.toHaveBeenCalled();
     // No leave exit and no dead-end wait: leaving counts as confirming.
     expect(queryByTestId("confirm-leave")).toBeNull();

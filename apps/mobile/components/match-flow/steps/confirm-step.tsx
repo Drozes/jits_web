@@ -18,6 +18,7 @@ import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { FightButton, InitialsBlock, Mono, RatingBlock, shortName } from "../fight/fight-ui";
 import { DisputeForm } from "./dispute-form";
 import { TapMarks } from "../verdict/rating-moment";
+import { markResultFresh } from "@/components/ui/elo-system/play-once";
 
 export interface ConfirmAthlete {
   athlete_id: string;
@@ -131,6 +132,8 @@ export function ConfirmStep(props: ConfirmStepProps) {
     // button ever gains a `press` haptic of its own, drop this call: one
     // haptic per event. The verdict's `ratingGain` is a later, separate moment.
     void haptics.press();
+    // The verdict that follows is fresh even if the match completed long ago.
+    markResultFresh(matchId);
     if (isQueuedResult(res.data)) {
       toast.success({ text1: "Saved locally", description: "Confirmation will sync when you're back online." });
     }

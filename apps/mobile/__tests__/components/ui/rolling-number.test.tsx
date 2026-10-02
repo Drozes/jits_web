@@ -3,7 +3,9 @@
  *
  * - The odometer math: only the digits that change move; a higher column
  *   moves only while the columns below it carry from 9 to 0.
- * - Digit-count changes (999 to 1003) get a leading blank column.
+ * - Digit-count changes: a leading column is blank until the carry fades it
+ *   in (decided in the worklet); a large change rolls only the last 30.
+ * - Dynamic Type: the digits scale themselves (clamped 2x), OS scaling off.
  * - It lands as a plain Text with the final value; the label is always final.
  * - `onLanded` fires once, after the delay plus the roll; never without play.
  * - Reduce Motion and `play` false show the final value from the first frame.
@@ -13,15 +15,21 @@ import * as React from "react";
 import { Text } from "react-native";
 import { act, render } from "@testing-library/react-native";
 import {
+  ROLL_LAND_FALLBACK_MS,
+  ROLL_MAX_SPAN,
   ROLL_MS,
   RollingNumber,
+  columnOpacity,
   odometerPosition,
+  rollStart,
   usePlayOnce,
   __resetPlayedMomentsForTests,
 } from "@/components/ui/elo-system/rolling-number";
 import { __setReduceMotionForTests, duration } from "@/lib/motion";
 
 const STYLE = { fontSize: 22, lineHeight: 26 };
+/** Past the roll and the completion fallback. */
+const LAND = ROLL_MS + ROLL_LAND_FALLBACK_MS + 1;
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -58,12 +66,30 @@ describe("odometerPosition", () => {
   });
 });
 
+describe("leading columns and large changes", () => {
+  it("a leading column is blank while the number is shorter, fades in on the carry, shown from 10^k", () => {
+    expect(columnOpacity(500, 0)).toBe(1);
+    expect(columnOpacity(998, 3)).toBe(0);
+    expect(columnOpacity(999.5, 3)).toBeCloseTo(0.5);
+    expect(columnOpacity(1000, 3)).toBe(1);
+    expect(columnOpacity(1512, 3)).toBe(1);
+    expect(columnOpacity(9, 1)).toBe(0);
+    expect(columnOpacity(10, 1)).toBe(1);
+  });
+
+  it("starts a large change at most ROLL_MAX_SPAN from the final value", () => {
+    expect(rollStart(1512, 1526)).toBe(1512);
+    expect(rollStart(1000, 1200)).toBe(1200 - ROLL_MAX_SPAN);
+    expect(rollStart(1200, 1000)).toBe(1000 + ROLL_MAX_SPAN);
+  });
+});
+
 describe("RollingNumber", () => {
   it("rolls with the duration within the slow ceiling", () => {
     expect(ROLL_MS).toBeLessThanOrEqual(duration.slow);
   });
 
-  it("draws one column per digit with a leading blank on a digit-count change, then lands on the final Text", () => {
+  it("draws one column per digit across a digit-count change, then lands on the final Text", () => {
     const onLanded = jest.fn();
     const s = render(<RollingNumber testID="n" from={999} to={1003} play onLanded={onLanded} style={STYLE} />);
     const box = s.getByTestId("n");
@@ -71,17 +97,53 @@ describe("RollingNumber", () => {
     // 4 columns x 11 cells (0..9 and the wrap 0), hidden from accessibility.
     const cells = s.UNSAFE_getAllByType(Text);
     expect(cells).toHaveLength(44);
-    // The thousands column shows a blank for its leading zero.
-    expect(cells[0].props.children).toBe(" ");
-    expect(cells[1].props.children).toBe("1");
-    expect(cells[11].props.children).toBe("0");
+    for (const c of cells) expect(c.props.allowFontScaling).toBe(false);
     expect(onLanded).not.toHaveBeenCalled();
     act(() => {
-      jest.advanceTimersByTime(ROLL_MS);
+      jest.advanceTimersByTime(LAND);
     });
     expect(onLanded).toHaveBeenCalledTimes(1);
     expect(s.getByTestId("n")).toHaveTextContent("1003");
     expect(s.UNSAFE_getAllByType(Text)).toHaveLength(1);
+  });
+
+  it("rolls across two digit counts (9 to 31: one column grows) and from a capped large change", () => {
+    const small = render(<RollingNumber testID="a" from={9} to={31} play style={STYLE} />);
+    expect(small.UNSAFE_getAllByType(Text)).toHaveLength(2 * 11);
+    small.unmount();
+    // 5 -> 120 starts at 90: three columns, never a 115-step spin.
+    const big = render(<RollingNumber testID="b" from={5} to={120} play style={STYLE} />);
+    expect(big.UNSAFE_getAllByType(Text)).toHaveLength(3 * 11);
+    act(() => {
+      jest.advanceTimersByTime(LAND);
+    });
+    expect(big.getByTestId("b")).toHaveTextContent("120");
+  });
+
+  it("follows Dynamic Type itself (clamped at 2x) so the digits match the landed Text", () => {
+    const RN = require("react-native");
+    const spy = jest.spyOn(RN, "useWindowDimensions").mockReturnValue({ width: 390, height: 844, scale: 3, fontScale: 3 });
+    try {
+      const s = render(<RollingNumber from={1512} to={1526} play style={STYLE} />);
+      const flat = RN.StyleSheet.flatten(s.UNSAFE_getAllByType(Text)[0].props.style);
+      expect(flat.fontSize).toBe(44);
+      expect(flat.lineHeight).toBe(52);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("unmounting mid-roll never lands", () => {
+    const onLanded = jest.fn();
+    const s = render(<RollingNumber from={1512} to={1526} play onLanded={onLanded} style={STYLE} />);
+    act(() => {
+      jest.advanceTimersByTime(ROLL_MS / 2);
+    });
+    s.unmount();
+    act(() => {
+      jest.runAllTimers();
+    });
+    expect(onLanded).not.toHaveBeenCalled();
   });
 
   it("rolls a fall too and lands once", () => {
@@ -103,7 +165,7 @@ describe("RollingNumber", () => {
     });
     expect(onLanded).not.toHaveBeenCalled();
     act(() => {
-      jest.advanceTimersByTime(540);
+      jest.advanceTimersByTime(540 + ROLL_LAND_FALLBACK_MS);
     });
     expect(onLanded).toHaveBeenCalledTimes(1);
   });
@@ -134,7 +196,7 @@ describe("RollingNumber", () => {
     const onLanded = jest.fn();
     const s = render(<RollingNumber testID="n" from={1512} to={1526} play onLanded={onLanded} style={STYLE} />);
     act(() => {
-      jest.advanceTimersByTime(ROLL_MS);
+      jest.advanceTimersByTime(LAND);
     });
     s.rerender(<RollingNumber testID="n" from={1512} to={1526} play onLanded={onLanded} style={STYLE} />);
     act(() => {
