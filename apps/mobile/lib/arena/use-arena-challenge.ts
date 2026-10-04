@@ -84,6 +84,7 @@ import {
   reportArenaReading,
 } from "./arena-presence";
 import { markMatchLocationRequired } from "./match-location-flag";
+import { markMatchProximityRequired } from "./location-flags";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
 
@@ -320,11 +321,18 @@ export interface UseArenaChallengeArgs {
    */
   lobbyIds?: ReadonlySet<string> | null;
   /**
-   * `match_location_required` is on: an accept reports an `arena` reading
-   * before starting the match, and the challenger's fallback start does too
-   * (contract-location-flag 6).
+   * `match_location_required` is on (contract-location-flag 6). Alone it no
+   * longer makes an Arena start take a reading (instant go-live 4.3).
    */
   locationRequired?: boolean;
+  /**
+   * `match_location_required` AND `match_proximity_required` are on: an
+   * accept reports an `arena` reading before starting the match, and the
+   * challenger's fallback start and the blocked-start Retry do too. Off
+   * (the default since instant go-live): no reading at all, the start goes
+   * at once (decision D8: not even a fire-and-forget one).
+   */
+  proximityRequired?: boolean;
 }
 
 /**
@@ -550,11 +558,11 @@ export function useArenaChallenge({
   onOpponentUnavailable,
   onStaleCancelled,
   lobbyIds,
-  locationRequired = false,
+  proximityRequired = false,
 }: UseArenaChallengeArgs): UseArenaChallengeResult {
   const router = useRouter();
-  const locationRequiredRef = React.useRef(locationRequired);
-  locationRequiredRef.current = locationRequired;
+  const proximityRequiredRef = React.useRef(proximityRequired);
+  proximityRequiredRef.current = proximityRequired;
   const [startBlocked, setStartBlockedState] = React.useState<StartBlocked | null>(null);
   const startBlockedRef = React.useRef<StartBlocked | null>(null);
   const setStartBlocked = React.useCallback((next: StartBlocked | null) => {
@@ -965,11 +973,13 @@ export function useArenaChallenge({
       const { status } = read.data;
       if (status === "accepted") acceptedSeenRef.current.add(challengeId);
       if (status === "started" || (status === "accepted" && mode === "fallback")) {
-        // Starting it myself: the proximity gate needs my fresh reading too.
-        if (status === "accepted" && locationRequiredRef.current) {
+        // Starting it myself: the proximity gate (both flags on) needs my
+        // fresh reading too. Off: no reading at all.
+        if (status === "accepted" && proximityRequiredRef.current) {
           await reportArenaReading(challengeId, { ask: false });
         }
         const started = await startMatchFromChallenge(supabase, challengeId);
+        if (!started.ok && isProximityRefusal(started.error.code)) markMatchProximityRequired(true);
         if (started.ok) {
           enterMatch(challengeId, started.data.match_id, mine.opponentId);
           return;
@@ -1850,13 +1860,26 @@ export function useArenaChallenge({
         // starts on `accepted`, jits-njyd): the row lock made my call re-read
         // `started`. Once more then finds the match that call created.
         // Any other failure (network) gets the same one retry.
-        // Flag on: my reading for this challenge first, so the proximity gate
-        // on the start has a fresh one (the challenger's go_live covers them).
-        if (locationRequiredRef.current) {
+        // Proximity required (both flags on): my reading for this challenge
+        // first, so the gate on the start has a fresh one (the challenger's
+        // go_live tag covers them). Off (instant go-live 4.3): no reading at
+        // all, the start goes at once.
+        const tookReading = proximityRequiredRef.current;
+        if (tookReading) {
           await reportArenaReading(current.challengeId, { ask: true });
         }
         let started = await startMatchFromChallenge(supabase, current.challengeId);
         if (!started.ok && !isProximityRefusal(started.error.code)) {
+          started = await startMatchFromChallenge(supabase, current.challengeId);
+        }
+        if (!started.ok && isProximityRefusal(started.error.code) && !tookReading) {
+          // The server still gates on proximity though the app read the flag
+          // off (it was just turned on, or the backend predates the flag and
+          // gates on match_location_required alone): remember it, and take
+          // the reading this accept would have taken, then start once more.
+          markMatchProximityRequired(true);
+          markMatchLocationRequired(true);
+          await reportArenaReading(current.challengeId, { ask: true });
           started = await startMatchFromChallenge(supabase, current.challengeId);
         }
         if (!started.ok && isProximityRefusal(started.error.code)) {
@@ -1864,6 +1887,7 @@ export function useArenaChallenge({
           // challenge stays accepted (the challenger's plate keeps waiting,
           // with Cancel), and I get the reason with Retry and Cancel.
           markMatchLocationRequired(true);
+          markMatchProximityRequired(true);
           settle(current.challengeId);
           setIncomingBoth(null);
           setStartBlocked({
@@ -1935,7 +1959,11 @@ export function useArenaChallenge({
       runExclusive(async () => {
         const blocked = startBlockedRef.current;
         if (!blocked) return;
-        await reportArenaReading(blocked.challengeId, { ask: true });
+        // The same gate as the accept (both flags on). The sheet is up only
+        // after a proximity refusal, which marked both on.
+        if (proximityRequiredRef.current) {
+          await reportArenaReading(blocked.challengeId, { ask: true });
+        }
         const started = await startMatchFromChallenge(supabase, blocked.challengeId);
         if (startBlockedRef.current?.challengeId !== blocked.challengeId) return;
         if (started.ok) {
