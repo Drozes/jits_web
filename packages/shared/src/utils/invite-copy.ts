@@ -333,6 +333,23 @@ export const GO_LIVE_ACCURACY_COPY = "Can't pin your location. Try near a window
 export const GO_LIVE_LOCATION_DENIED_COPY =
   "Location is off. ELO RATED checks you're on the same mat as your opponent before a match starts. Turn it on in Settings to go live.";
 
+/**
+ * Go Live with iOS Precise Location off (or Android approximate location):
+ * the reading is kilometre-scale, so "try near a window" alone is the wrong
+ * advice. The iOS signal is a heuristic (a reading of 1000 m or worse), so
+ * the copy still covers a Precise-on phone with a poor fix.
+ */
+export const PRECISE_LOCATION_TITLE = "Turn on Precise Location for ELO RATED";
+export const PRECISE_LOCATION_COPY =
+  "Settings > ELO RATED > Location > Precise Location. We use it only to confirm you're on the same mat. Already on? Move near a window or turn on Wi-Fi, then Retry.";
+
+/**
+ * A live restore the athlete did not tap (foreground, after a match, the
+ * 60 s refresh) found location permission gone (an iOS "Allow Once" grant
+ * lapses in the background). A tap runs the full Go Live flow.
+ */
+export const LOCATION_OFF_GO_LIVE_CTA_COPY = "Location is off for ELO RATED. Tap to go live again.";
+
 /** An Arena start refused with `proximity_required` / `proximity_failed`. */
 export function arenaProximityMessage(opponentName: string | null | undefined): string {
   const name = opponentName?.trim() || "your opponent";

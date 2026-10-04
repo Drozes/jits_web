@@ -11,7 +11,7 @@ import * as React from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { NavigationContext } from "@react-navigation/native";
-import { LiveDot } from "@/components/ui/elo-system/live-pill";
+import { LiveDot, PendingDot } from "@/components/ui/elo-system/live-pill";
 import {
   arenaActions,
   useArenaSelfId,
@@ -102,6 +102,8 @@ const TEXT_TONE: Record<ChipTone, string> = {
 
 /** The offline ring (`○`), drawn as a View. */
 export const CHIP_RING_TEST_ID = "header-status-chip-ring";
+/** The GOING LIVE pulse (live location fixes 4.2), drawn in the glyph's slot. */
+export const CHIP_PENDING_TEST_ID = "header-status-chip-pending";
 
 const BORDER_TONE: Record<ChipTone, string> = {
   live: "border-positive",
@@ -269,7 +271,12 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
             gap: GLYPH_GAP,
           }}
         >
-          {model.glyph === "●" ? (
+          {model.kind === "going-live" ? (
+            // From the Go Live tap until the flow resolves (permission,
+            // location fix, report, live write): never a still chip that
+            // reads as a dead tap. Same 6pt slot as the other dots.
+            <PendingDot size={LIVE_DOT_PX} testID={CHIP_PENDING_TEST_ID} />
+          ) : model.glyph === "●" ? (
             <LiveDot size={LIVE_DOT_PX} />
           ) : model.glyph === "○" ? (
             // Not text: the bundled Mono Bold has no U+25CB (see VIEW_GLYPHS).

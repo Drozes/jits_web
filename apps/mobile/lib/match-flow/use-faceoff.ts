@@ -20,6 +20,7 @@ import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { exitMatchTo } from "./exit-to";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
 import { useRecordingOptIn } from "./recording-optin";
+import { useFaceoffLocationLog } from "./use-faceoff-location-log";
 
 /** How often face-off state is repeated until the match starts. A broadcast
  * sent before the other side's channel joined is simply gone, and none of
@@ -138,6 +139,9 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   const router = useRouter();
   const { markExiting } = useMatchSyncContext();
   const recording = useRecordingOptIn();
+  // Record only (live location fixes 4.6): one silent reading logged as
+  // match_start, never awaited by anything below and never asking.
+  useFaceoffLocationLog(p.matchId, p.active);
   const [profileWeightSaved, setProfileWeightSaved] = React.useState<number | null>(null);
   const [weightEditorOpen, setWeightEditorOpen] = React.useState(false);
   const [myWeighed, setMyWeighed] = React.useState(p.phase === "ready");

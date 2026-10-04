@@ -14,14 +14,17 @@
  * `arena-store.ts`, which is the only way the rest of the app reads it.
  */
 import * as React from "react";
+import { AppState } from "react-native";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
+import { getMyLookingForRanked } from "@jits/shared/api/location";
 import type { AthleteGuardRow } from "@jits/shared/api/queries";
 import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
 import { GoLiveLocationSheet } from "@/components/arena/go-live-location-sheet";
 import { StartBlockedSheet } from "@/components/arena/start-blocked-sheet";
 import { useChallengerArenaReading } from "./use-challenger-arena-reading";
 import { toast } from "@/components/ui/toast";
+import { supabase } from "@/lib/supabase/client";
 import { REOPEN_SURFACE_GRACE_MS } from "./constants";
 import { useAuth } from "../auth/hooks";
 import {
@@ -39,11 +42,11 @@ import { useArenaChallenge } from "./use-arena-challenge";
 import { useArenaLive } from "./use-arena-live";
 import {
   cancelLocationSheet,
-  ensureGoLiveLocation,
   goLiveWithLocation,
+  silentGoLiveReading,
   useGoLiveReadingRefresh,
 } from "./go-live-location";
-import { GO_LIVE_FAILED_MESSAGE } from "./go-live-feedback";
+import { GO_LIVE_FAILED_MESSAGE, showLocationOffGoLiveCta } from "./go-live-feedback";
 import {
   markMatchLocationRequired,
   readMatchLocationRequired,
@@ -131,11 +134,21 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     inMatch,
     onManualOffline: () => beginManualOfflineRef.current(),
     // A restore the athlete did not tap: a silent reading first, so the
-    // server accepts the live write (it never asks or shows anything).
+    // server accepts the live write (it never asks or shows anything). With
+    // location permission gone (an iOS "Allow Once" grant lapses in the
+    // background) the live write would only be refused: skip it and offer
+    // the tap-to-go-live CTA instead (live location fixes 1b). Other reading
+    // failures still try the write, as before.
     beforeAutoLive: async () => {
-      if (await readMatchLocationRequired()) await ensureGoLiveLocation({ interactive: false });
+      if (!(await readMatchLocationRequired())) return true;
+      if ((await silentGoLiveReading()) !== "permission") return true;
+      if (AppState.currentState === "active") showLocationOffGoLiveCta();
+      return false;
     },
   });
+  // Read by the refresh handlers below and the controller (registered once).
+  const liveRef = React.useRef(live);
+  liveRef.current = live;
 
   const challenge = useArenaChallenge({
     athleteId: athlete.id,
@@ -180,7 +193,23 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     challenge;
   useArenaLiveKeepAwake(isLive && !inMatch);
   // Keep the go_live reading fresh while live so an Arena start finds one.
-  useGoLiveReadingRefresh(isLive && !inMatch && locationRequired);
+  // Permission gone while live: the tap-to-go-live CTA, once per failure
+  // streak (1d). A tick that did not report may mean the server has expired
+  // the session meanwhile: then the app shows offline too (D7).
+  const athleteId = athlete.id;
+  useGoLiveReadingRefresh(isLive && !inMatch && locationRequired, {
+    onPermissionLost: showLocationOffGoLiveCta,
+    onNotReady: (outcome) => {
+      void liveRef.current
+        .dropIfServerOffline(() => getMyLookingForRanked(supabase, athleteId))
+        .then((dropped) => {
+          if (!dropped) return;
+          if (outcome === "permission") showLocationOffGoLiveCta();
+          else toast.info("You're offline. Go live again in the Arena.");
+        })
+        .catch(() => undefined);
+    },
+  });
   // The challenger's reading while its challenge waits (pending or
   // accepted): a challenger who is not live, or whose go_live reading went
   // stale in the background, would otherwise fail the start's proximity gate.
@@ -230,8 +259,6 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
 
   // Registered through refs so the controller is registered once and still
   // always calls the latest callbacks.
-  const liveRef = React.useRef(live);
-  liveRef.current = live;
   const challengeRef = React.useRef(challenge);
   challengeRef.current = challenge;
   React.useEffect(() => {
@@ -255,11 +282,12 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     const unregister = registerArenaController({
       toggle: async () => {
         const l = liveRef.current;
-        // Going live from offline: the location step first (flag on).
+        // Going live from offline with the flag on: the same flow as goLive
+        // (location step, live write, one go_live_attempt log).
         if (!l.isLive && !l.transition && (await readMatchLocationRequired())) {
-          const ready = await ensureGoLiveLocation({ interactive: true });
-          if (ready === "failed") toast.info(GO_LIVE_FAILED_MESSAGE);
-          if (ready !== "ready") return;
+          const r = await goLive();
+          if (r === false) toast.info(GO_LIVE_FAILED_MESSAGE);
+          return;
         }
         return liveRef.current.toggle();
       },

@@ -36,6 +36,18 @@ jest.mock("@jits/shared/api/athlete-weight", () => ({
   updateAthleteWeight: (...a: unknown[]) => mockUpdateWeight(...a),
 }));
 
+// The face-off location re-poll (live location fixes 4.6): hermetic here,
+// asserted in its own describe below.
+const mockReadLocation = jest.fn();
+jest.mock("@/lib/invites/location", () => ({
+  ...jest.requireActual("@/lib/invites/location"),
+  readLocationOnce: (...a: unknown[]) => mockReadLocation(...a),
+}));
+const mockLogMatchStart = jest.fn();
+jest.mock("@/lib/arena/location-telemetry", () => ({
+  logMatchStartLocation: (...a: unknown[]) => mockLogMatchStart(...a),
+}));
+
 type Handlers = Record<string, ((...a: unknown[]) => void) | undefined>;
 let mockHandlers: Handlers = {};
 const mockSend = {
@@ -112,6 +124,7 @@ beforeEach(() => {
   mockHandlers = {};
   mockGetEloStakes.mockResolvedValue(STAKES);
   __resetRecordingOptInForTests(false);
+  mockReadLocation.mockResolvedValue({ status: "denied", canAskAgain: true });
 });
 
 describe("weigh-in", () => {
@@ -361,5 +374,49 @@ describe("Leave", () => {
     });
     expect(onCancelledRemotely).toHaveBeenCalledTimes(1);
     expect(onCancelledRemotely).toHaveBeenCalledWith("Your opponent left the ready check.");
+  });
+});
+
+describe("face-off location re-poll (live location fixes 4.6): record only", () => {
+  const READING = { lat: 43.6, lng: -79.4, accuracyM: 14 };
+
+  it("one silent reading (never asks), logged once as match_start for this match", async () => {
+    mockReadLocation.mockResolvedValue({ status: "ok", reading: READING });
+    const s = render(<Harness phase="weight" />);
+    await flush();
+    expect(mockReadLocation).toHaveBeenCalledTimes(1);
+    expect(mockReadLocation).toHaveBeenCalledWith({ ask: false, fast: true });
+    await waitFor(() => expect(mockLogMatchStart).toHaveBeenCalledWith("M1", "ok", READING));
+    // The weight step moving to ready (same match, same mount): not again.
+    s.rerender(<Harness phase="ready" />);
+    await flush();
+    expect(mockReadLocation).toHaveBeenCalledTimes(1);
+    expect(mockLogMatchStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("a reading that never settles never blocks the ready handshake or start_match", async () => {
+    mockReadLocation.mockReturnValue(new Promise(() => undefined));
+    mockStart.mockResolvedValue({ ok: true, data: { started_at: "2026-10-02T12:00:00.000Z" } });
+    const onStarted = jest.fn();
+    const s = render(<Harness phase="ready" onStarted={onStarted} />);
+    fireEvent.press(s.getByTestId("ready-button"));
+    act(() => mockHandlers.onReadySignal?.("opp-1"));
+    await waitFor(() => expect(onStarted).toHaveBeenCalledWith("2026-10-02T12:00:00.000Z"));
+    expect(mockStart).toHaveBeenCalledTimes(1);
+    expect(mockLogMatchStart).not.toHaveBeenCalled();
+  });
+
+  it("a log that throws never blocks the weigh-in", async () => {
+    mockReadLocation.mockResolvedValue({ status: "ok", reading: READING });
+    mockLogMatchStart.mockImplementation(() => {
+      throw new Error("boom");
+    });
+    const onWeighedIn = jest.fn();
+    const s = render(<Harness phase="weight" onWeighedIn={onWeighedIn} />);
+    await flush();
+    await act(async () => {
+      fireEvent.press(s.getByTestId("weight-confirm"));
+    });
+    await waitFor(() => expect(onWeighedIn).toHaveBeenCalled());
   });
 });

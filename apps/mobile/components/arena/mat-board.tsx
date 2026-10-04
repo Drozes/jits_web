@@ -21,6 +21,7 @@ import { haptics } from "@/lib/motion";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { Avatar32, MetaTag } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
+import { PendingDot } from "@/components/ui/elo-system/live-pill";
 import { MAX_SCALE, OutlineAction, StripShell } from "@/components/arena/strip-primitives";
 import { AfterglowEdge } from "@/components/arena/afterglow-edge";
 import type { ArenaCompetitor } from "@/lib/arena/use-arena-roster";
@@ -144,6 +145,12 @@ interface ControlBarProps {
   locked: boolean;
   /** A transition is in flight (announced as busy). */
   saving: boolean;
+  /**
+   * The transition in flight is a go-live (the whole Go Live flow: the
+   * permission check, the location fix, the live write). The LIVE segment
+   * pulses meanwhile (live location fixes 4.2).
+   */
+  goingLive?: boolean;
   /** `12 ON MAT · 7 IN BAND`, or `CONNECTING`. */
   counts: string;
   /** Explicit, never a toggle: a stale `isLive` must not flip the athlete. */
@@ -160,6 +167,7 @@ export function MatControlBar({
   isLive,
   locked,
   saving,
+  goingLive = false,
   counts,
   onGoLive,
   onGoOffline,
@@ -184,7 +192,11 @@ export function MatControlBar({
         )}
         style={!selected && locked ? { opacity: 0.6 } : undefined}
       >
-        {live ? (
+        {live && saving && goingLive && !selected ? (
+          // Going live (live location fixes 4.2): the pulse from the tap
+          // until the flow resolves, never a still bar that reads as dead.
+          <PendingDot size={6} testID="arena-segment-live-pending" />
+        ) : live ? (
           <View
             className={cn("h-1.5 w-1.5 rounded-full", selected ? "bg-positive" : "bg-ink-3")}
           />

@@ -52,6 +52,7 @@ import {
   useArenaState,
   publishNearbyOnMatCount,
   useIsInArenaMatch,
+  useLiveSwitchDirection,
   useLiveSwitchPhase,
 } from "@/lib/arena/arena-store";
 import {
@@ -113,6 +114,7 @@ export default function ArenaScreen() {
   const switchLocked = switchPhase !== "ready";
   // Any live transition in flight, from any surface: no Challenge meanwhile.
   const liveSaving = switchPhase === "saving";
+  const goingLive = useLiveSwitchDirection() === "going-live";
   const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {
@@ -301,6 +303,7 @@ export default function ArenaScreen() {
         isLive={isLive}
         locked={switchLocked}
         saving={isSaving || liveSaving}
+        goingLive={goingLive}
         counts={formatMatCounts(onMat, inBand)}
         onGoLive={goLive}
         onGoOffline={() => void goOfflineWithFeedback()}

@@ -57,7 +57,7 @@ import {
   type NavigationProp,
   type ParamListBase,
 } from "@react-navigation/native";
-import { CHIP_RING_TEST_ID, HeaderStatusChip } from "@/components/layout/header-status-chip";
+import { CHIP_PENDING_TEST_ID, CHIP_RING_TEST_ID, HeaderStatusChip } from "@/components/layout/header-status-chip";
 import {
   CHIP_HEIGHT,
   CHIP_MAX_FONT_SCALE,
@@ -959,10 +959,13 @@ describe("HeaderStatusChip", () => {
     expect(ctl.goLive).toHaveBeenCalledTimes(2);
   });
 
-  it("while saving it reads GOING LIVE and a tap does nothing (AC-H3)", async () => {
+  it("while saving it reads GOING LIVE with the pending pulse and a tap does nothing (AC-H3, live location fixes 4.2)", async () => {
     setArena({ isSaving: true });
-    const { getByTestId } = render(<HeaderStatusChip />);
-    expect(chipText(getByTestId)).toBe("◌GOING LIVE");
+    const { getByTestId, queryByTestId } = render(<HeaderStatusChip />);
+    // The pulse is drawn as a view in the glyph slot, not the static text glyph.
+    expect(chipText(getByTestId)).toBe("GOING LIVE");
+    expect(getByTestId(CHIP_PENDING_TEST_ID, { includeHiddenElements: true })).toBeTruthy();
+    expect(queryByTestId(CHIP_RING_TEST_ID)).toBeNull();
     await act(async () => {
       fireEvent.press(getByTestId("header-status-chip"));
     });

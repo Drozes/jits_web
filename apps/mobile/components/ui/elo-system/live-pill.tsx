@@ -113,6 +113,26 @@ function useFixedPulseStyle(enabled: boolean) {
   }, [animate]);
 }
 
+/**
+ * The GOING LIVE dot (live location fixes 4.2): an ink-3 ring on the fixed
+ * LIVE pulse (`duration.pulse`, one rhythm in the app), shown from the Go
+ * Live tap until the flow resolves, so a slow permission check or location
+ * fix never reads as a dead tap. Static under Reduce Motion and paused in the
+ * background (`useFixedPulseStyle`). Decorative: the caller labels the state.
+ */
+export function PendingDot({ size = 7, testID }: { size?: number; testID?: string }) {
+  const pulseStyle = useFixedPulseStyle(true);
+  return (
+    <Animated.View
+      testID={testID}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="rounded-full border border-ink-3"
+      style={[{ width: size, height: size, borderRadius: size / 2 }, pulseStyle]}
+    />
+  );
+}
+
 export function LivePill({ label = "LIVE", className, onDark = false, pace = "arena" }: LivePillProps) {
   return (
     // 6 px on dark chrome, matching the broadcast slab's static labels.

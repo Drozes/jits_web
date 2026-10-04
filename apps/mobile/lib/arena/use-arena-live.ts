@@ -76,9 +76,12 @@ export interface UseArenaLiveArgs {
    * Runs before a go-live the athlete did not tap (return to the foreground,
    * after a match, the arrival re-assert). With `match_location_required` on
    * it reports a fresh `go_live` reading, without asking, so the server
-   * accepts the live write. Never rejects.
+   * accepts the live write. Resolving `false` means "do not write live"
+   * (location permission is gone, live location fixes 1b): the athlete
+   * stays offline and the caller has already offered the tap-to-go-live
+   * CTA. Anything else goes ahead. Never rejects.
    */
-  beforeAutoLive?: () => Promise<void>;
+  beforeAutoLive?: () => Promise<boolean | void>;
 }
 
 export interface UseArenaLiveResult {
@@ -125,6 +128,15 @@ export interface UseArenaLiveResult {
    * write that landed or failed for any other reason (network).
    */
   lastGoLiveRefusal: () => "location_required" | null;
+  /**
+   * The server may end a live session by itself (`expire_stale_live_sessions`
+   * when the `go_live` readings stop, live location fixes D7). While live
+   * with nothing in flight, `read` asks the server; if it says the flag is
+   * off and nothing moved meanwhile, the app drops to offline too (presence
+   * untracked, no flag write: it is already off) instead of showing LIVE
+   * for an athlete nobody can challenge. Resolves true when it dropped.
+   */
+  dropIfServerOffline: (read: () => Promise<boolean | null>) => Promise<boolean>;
 }
 
 /**
@@ -366,11 +378,15 @@ export function useArenaLive({
     );
   }, []);
 
+  /** Bumped by every reconcile, so a server read can tell nothing moved under it. */
+  const generationRef = React.useRef(0);
+
   /** Count of failed go-live writes; see `reconcile`. */
   const goLiveFailuresRef = React.useRef(0);
 
   const reconcile = React.useCallback((): Promise<boolean> => {
     pendingRef.current += 1;
+    generationRef.current += 1;
     // Failed go-live writes so far. A pass whose intent was dropped reports a
     // failure only when one landed AFTER it was enqueued (a go-live queued
     // ahead of it), never one left over from an earlier, unrelated attempt.
@@ -492,11 +508,22 @@ export function useArenaLive({
   /** Same idea for a match: whether going into it is what took them down. */
   const resumeAfterMatchRef = React.useRef(false);
 
-  /** `beforeAutoLive`, bounded so a stuck reading cannot hold a restore. */
-  const runBeforeAutoLive = React.useCallback(async () => {
+  /**
+   * `beforeAutoLive`, bounded so a stuck reading cannot hold a restore.
+   * Resolves false only when it said "do not write live"; a reading that
+   * timed out goes ahead, as before.
+   */
+  const runBeforeAutoLive = React.useCallback(async (): Promise<boolean> => {
     const before = beforeAutoLiveRef.current;
-    if (!before) return;
-    await settleWithin(before(), LOBBY_CALL_BOUND_MS);
+    if (!before) return true;
+    let proceed = true;
+    await settleWithin(
+      before().then((r) => {
+        if (r === false) proceed = false;
+      }),
+      LOBBY_CALL_BOUND_MS,
+    );
+    return proceed;
   }, []);
 
   /**
@@ -505,7 +532,7 @@ export function useArenaLive({
    * on screen would tell them otherwise.
    */
   const restoreLive = React.useCallback(async () => {
-    await runBeforeAutoLive();
+    const proceed = await runBeforeAutoLive();
     // Backgrounded (or into a match) during that reading: hand the intent
     // to the next foreground / the end of the match, never go live unseen.
     if (AppState.currentState !== "active" || inMatchRef.current) {
@@ -513,6 +540,9 @@ export function useArenaLive({
       else resumeLiveRef.current = true;
       return;
     }
+    // Location permission is gone: no live write the server would refuse.
+    // The athlete stays offline; `beforeAutoLive` offered the tap to go live.
+    if (!proceed) return;
     const ok = await requestLiveRef.current();
     if (!ok) toast.info("You're offline. Go live again in the Arena.");
   }, [runBeforeAutoLive]);
@@ -563,11 +593,18 @@ export function useArenaLive({
       void requestLiveRef.current();
       return;
     }
-    void runBeforeAutoLive().then(() => {
-      if (AppState.currentState !== "active" || inMatchRef.current) {
+    void runBeforeAutoLive().then((proceed) => {
+      if (AppState.currentState !== "active" || inMatchRef.current || !proceed) {
         if (inMatchRef.current) resumeAfterMatchRef.current = true;
-        else resumeLiveRef.current = true;
-        void requestOfflineRef.current();
+        else if (proceed) resumeLiveRef.current = true;
+        // The arrived `true` is still committed in the database (presence is
+        // not): mark it so, so this clear actually writes `false` instead of
+        // reading as a no-op and leaving the athlete advertised. Not when the
+        // athlete has tapped Go live meanwhile: that intent wins.
+        if (!desiredRef.current) {
+          actualRef.current = true;
+          void requestOfflineRef.current();
+        }
         return;
       }
       void requestLiveRef.current();
@@ -655,6 +692,33 @@ export function useArenaLive({
     };
   }, []);
 
+  const dropIfServerOffline = React.useCallback(
+    async (read: () => Promise<boolean | null>): Promise<boolean> => {
+      const settled = () => desiredRef.current && actualRef.current && pendingRef.current === 0;
+      if (!settled()) return false;
+      const generation = generationRef.current;
+      let serverLive: boolean | null = null;
+      try {
+        serverLive = await read();
+      } catch {
+        return false;
+      }
+      // Only a definite "off", and only if no transition started meanwhile
+      // (a go-live landing during the read must win).
+      if (serverLive !== false || generation !== generationRef.current || !settled()) return false;
+      desiredRef.current = false;
+      actualRef.current = false;
+      resumeLiveRef.current = false;
+      setIsLive(false);
+      setLastWriteFailed(false);
+      void leaveLobby().catch((error: unknown) => {
+        console.warn("[arena] leaving the lobby failed:", error);
+      });
+      return true;
+    },
+    [setLastWriteFailed],
+  );
+
   return {
     isLive,
     isSaving,
@@ -664,5 +728,6 @@ export function useArenaLive({
     goOffline: manualOffline,
     goLive: requestLive,
     lastGoLiveRefusal: React.useCallback(() => refusalRef.current, []),
+    dropIfServerOffline,
   };
 }
