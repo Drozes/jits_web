@@ -48,6 +48,8 @@ import {
 } from "./go-live-feedback";
 import { goLiveFromTap, restoreFirstFrame, restoreLiveSilently } from "./location-ladder";
 import { useMatchProximityRequired } from "./location-flags";
+import { DriftPromptSheet } from "@/components/arena/drift-prompt-sheet";
+import { useLiveDriftCheck } from "./use-live-drift-check";
 import {
   markMatchLocationRequired,
   readMatchLocationRequired,
@@ -305,6 +307,8 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   useServerEndedLiveCheck(isLive && !inMatch, () =>
     liveRef.current.dropIfServerOffline(() => getMyLookingForRanked(supabase, athleteId)),
   );
+  // The drift check (flag live_location_drift_check, seeded OFF).
+  useLiveDriftCheck({ athleteId, isLive, inMatch, locationRequired });
   // The challenger's reading while its challenge waits (pending or
   // accepted), only while an Arena start needs proximity (both flags on).
   useChallengerArenaReading(
@@ -422,6 +426,10 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     <>
       {/* Go Live location states (explain, denied, accuracy, no fix). */}
       <GoLiveLocationSheet />
+      {/* "Still on the same mat?" (drift check, flag off by default). */}
+      <DriftPromptSheet
+        blocked={inMatch || (!!incoming && !incomingTucked) || !!challenge.startBlocked}
+      />
       <ChallengePromptSheet
         // Never two modals: a blocked start's sheet holds the screen until
         // it is answered; a challenge arriving meanwhile waits in the chip.
