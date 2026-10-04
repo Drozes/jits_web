@@ -14,6 +14,7 @@ let mockState = { incomingCount: 0, isLive: false };
 jest.mock("@/lib/arena/arena-store", () => ({
   useArenaIncomingCount: () => mockState.incomingCount,
   useIsArenaLive: () => mockState.isLive,
+  useIsArenaDisplayLive: () => mockState.isLive,
 }));
 
 let mockFreshIncoming = 0;

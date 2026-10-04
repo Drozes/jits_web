@@ -237,7 +237,8 @@ describe("ArenaBootstrap", () => {
       initialRanked: true,
       inMatch: false,
       onManualOffline: expect.any(Function),
-      beforeAutoLive: expect.any(Function),
+      autoLive: expect.any(Function),
+      onResumeParked: expect.any(Function),
     });
     expect(mockActiveMatchOwner).toHaveBeenCalledWith("me-1");
     expect(mockUseArenaChallenge).toHaveBeenLastCalledWith(

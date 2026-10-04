@@ -47,6 +47,14 @@ var mockArenaOffline = jest.fn(() => Promise.resolve());
 jest.mock("@/lib/arena/arena-store", () => ({
   takeArenaOfflineBeforeSignOut: () => mockArenaOffline(),
 }));
+const mockClearLocations = jest.fn();
+jest.mock("@/lib/location/device-location-store", () => ({
+  clearAllDeviceLocations: () => mockClearLocations(),
+}));
+const mockResetLocationFlags = jest.fn();
+jest.mock("@/lib/arena/location-flags", () => ({
+  resetLocationFlags: () => mockResetLocationFlags(),
+}));
 const mockResetHighlights = jest.fn();
 jest.mock("@/lib/highlight/highlight-store", () => ({
   resetHighlightStore: () => mockResetHighlights(),
@@ -231,6 +239,18 @@ describe("cold-start athlete load", () => {
     });
     expect(r.getByTestId("redirect").props.children).toBe("/login");
     expect(mockRemoveItem).toHaveBeenCalledWith("sb-test-auth-token");
+  });
+
+  it("clears the stored last location and the instant go-live flags on sign-out (4.1)", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    expect(mockClearLocations).not.toHaveBeenCalled();
+    await act(async () => {
+      await signOut!();
+    });
+    expect(mockClearLocations).toHaveBeenCalledTimes(1);
+    expect(mockResetLocationFlags).toHaveBeenCalledTimes(1);
   });
 
   it("clears the downloaded-highlight share cache on sign-out, even when it rejects", async () => {

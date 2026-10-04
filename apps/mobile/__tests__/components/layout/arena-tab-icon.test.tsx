@@ -49,8 +49,15 @@ jest.mock("@/lib/theme/use-theme", () => ({
 }));
 
 let mockAthleteFlip = true;
+/** The go-live Moment is once per tapped attempt (UX 019, section 5). */
+let mockMomentLeft = Infinity;
 jest.mock("@/lib/arena/arena-store", () => ({
   isAthleteGoLiveFlip: () => mockAthleteFlip,
+  claimGoLiveMoment: () => {
+    if (mockMomentLeft <= 0) return false;
+    mockMomentLeft -= 1;
+    return true;
+  },
 }));
 
 import {
@@ -77,6 +84,7 @@ beforeEach(() => {
   now = 1_000_000;
   jest.spyOn(Date, "now").mockImplementation(() => now);
   mockAthleteFlip = true;
+  mockMomentLeft = Infinity;
   setAppState("active");
   __setReduceMotionForTests(false);
   for (const fn of Object.values(mockHaptics)) fn.mockClear();
@@ -256,6 +264,17 @@ describe("blade clash [04.1 + 11.1]", () => {
     u.update({ live: true });
     expect(u.getByTestId("arena-tab-clash-2")).toBeTruthy();
     expect(mockHaptics.goLive).toHaveBeenCalledTimes(2);
+  });
+
+  it("fires once per tapped attempt: a RECONNECTING beat then success does not buzz again (UX 019)", () => {
+    // The attempt's Moment is spent at the optimistic flip.
+    mockMomentLeft = 1;
+    const u = renderIcon({ live: false });
+    u.update({ live: true }); // optimistic flip on the tap
+    u.update({ live: false }); // RECONNECTING
+    u.update({ live: true }); // the write landed
+    expect(mockHaptics.goLive).toHaveBeenCalledTimes(1);
+    expect(u.queryByTestId("arena-tab-clash-2")).toBeNull();
   });
 
   it("Reduce Motion: no clash and no spark, the goLive haptic is kept", () => {

@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### Instant go-live: location ladder, device location store, optimistic chip, proximity flag, drift check (jits-jko7.1 to .4)
+
+Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) and the UX spec `research/019-optimistic-go-live-ux.md` (which wins on UX and copy; orchestrator rulings C1 to C7). JS-only on mobile (OTA-eligible: no dependency, no `app.json` / `app.config.js` change; `expo-secure-store`, `expo-location` and `@react-native-community/netinfo` are already in the binary). Safe before the jr_be migration `20261004100000_instant_go_live.sql`: a `PGRST202` for `p_captured_at` flips the app to the old fresh-reading flow and keeps the 60 s refresh for that backend.
+
+**Added**
+- `apps/mobile/lib/arena/location-ladder.ts`: the location ladder for a tapped go-live (server tag, device tag, OS cache, fresh fix) and for restores (silent, no prompt, no write when no rung lands), the optimistic chip with RECONNECTING / OFFLINE · RETRY recovery (5 s confirm, 15 s window, backoff), the one silent background refresh after a cached rung, `go_live_attempt` with `source`.
+- `apps/mobile/lib/location/device-location-store.ts`: the last server-accepted location per athlete in SecureStore (go_live, browse, arena; the server's `captured_at`), deleted at 4 h, cleared on sign-out, athlete switch and account deletion.
+- `apps/mobile/lib/location/presence-capability.ts`: tells a current backend from a legacy one (`captured_at` in the go_live answer, `PGRST202` for `p_captured_at`).
+- `apps/mobile/lib/network/connectivity.ts`: a synchronous "known offline" for the tap (no optimistic flip without a connection).
+- `apps/mobile/lib/arena/location-flags.ts`: `match_proximity_required` and `live_location_drift_check` flag stores (missing rows read off).
+- `apps/mobile/lib/arena/use-live-drift-check.ts` and `apps/mobile/components/arena/drift-prompt-sheet.tsx`: the drift check and "Still on the same mat?" bottom sheet, behind `live_location_drift_check` (OFF).
+- `apps/mobile/lib/arena/go-live-announce.ts`: VoiceOver announcements (You're live, Finding your location, Reconnecting, You're offline).
+- `packages/shared/src/constants/go-live.ts`: tag windows, drift constants, `isGoLiveTagValid`, `haversineM`, `isDrifted`.
+- Header chip `◌ FINDING YOU` state; the "Location needed to go live" hint after a location failure; the server-ended toast (C6) and the restore fix-failed toast (C3).
+
+**Changed**
+- Go Live with `match_location_required` ON no longer waits on GPS when a tag exists: the chip turns green on the tap with a valid stored tag or OS cached fix and the server confirms in the background; nothing pending is drawn for the first 240 ms; GOING LIVE only for a network wait.
+- Restores (foreground, after a match, cold start) draw LIVE from the first frame with a valid tag, FINDING YOU without one; a restore with no landing rung makes no live write (D12) and shows one toast.
+- The Arena accept path takes no location reading unless `match_proximity_required` is also ON; a proximity refusal marks that flag ON and takes the reading once more; the challenger's waiting reading runs only with both flags ON.
+- `reportGoLivePresence` takes an optional capture time (`p_captured_at`); `logLocationEvent` sends `p_source` and retries without it on an older backend; `InviteRpcError` keeps the PostgREST `code`.
+- Copy (C7, `packages/shared/src/utils/invite-copy.ts`): the explain, denied and Precise Location bodies drop the match-start claims (web shows the same strings).
+- The Arena tab icon's go-live haptic and blade clash fire once per tapped attempt (never on a restore or after RECONNECTING); DESIGN.md Motion registry updated.
+
+**Removed**
+- The 60 s go-live reading refresh while live (`useGoLiveReadingRefresh`); it remains only as `useLegacyGoLiveReadingRefresh` against a backend without the migration.
+
 ### Live location fixes: Allow Once rejoin, GOING LIVE feedback, Precise Location copy, platform header, attempt logging (jits-3i0n.1 to .6)
 
 Built to jr_be `specs/016-invites/addendum-live-location-fixes.md` section 4. JS-only on mobile (OTA-eligible: no native dependency, no `app.json` / `app.config.js` change; `expo-location`, `expo-application` and `expo-updates` are already in build 25). Item 3b (the Swift accuracy module and `NSLocationTemporaryUsageDescriptionDictionary`) is NOT in this slice and needs a TestFlight build.

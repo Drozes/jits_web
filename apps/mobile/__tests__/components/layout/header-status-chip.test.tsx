@@ -79,6 +79,7 @@ import { LIVE_MENU_COPY } from "@/components/layout/live-menu-popover";
 import { GO_OFFLINE_FAILED_MESSAGE } from "@/lib/arena/go-live-feedback";
 import {
   IDLE_ARENA_STATE,
+  PENDING_REVEAL_MS,
   __resetArenaStoreForTests,
   publishArenaSelfId,
   publishArenaState,
@@ -1585,6 +1586,17 @@ describe("HeaderStatusChip", () => {
     );
     const { getByTestId } = render(<HeaderStatusChip />);
     fireEvent.press(getByTestId("header-status-chip"));
+    // Nothing pending is drawn for the first 240 ms (UX 019, 2.3): the chip
+    // keeps its offline look, but takes no taps.
+    expect(getByTestId("header-status-chip").props.accessibilityLabel).toBe(
+      "Live status: 12 on the mat. Go live",
+    );
+    expect(getByTestId("header-status-chip").props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+    act(() => {
+      jest.advanceTimersByTime(PENDING_REVEAL_MS);
+    });
     expect(getByTestId("header-status-chip").props.accessibilityLabel).toBe(
       "Live status: going live",
     );

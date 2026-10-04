@@ -38,6 +38,17 @@ jest.mock("expo-location", () => ({
   getLastKnownPositionAsync: () => Promise.resolve(null),
   getCurrentPositionAsync: (...a: unknown[]) => mockCurrent(...a),
 }));
+jest.mock("expo-secure-store", () => ({
+  getItemAsync: () => Promise.resolve(null),
+  setItemAsync: () => Promise.resolve(),
+  deleteItemAsync: () => Promise.resolve(),
+}));
+jest.mock("@/lib/arena/location-flags", () => ({
+  useMatchProximityRequired: () => false,
+  useLiveDriftCheckEnabled: () => false,
+  markMatchProximityRequired: jest.fn(),
+  resetLocationFlags: jest.fn(),
+}));
 const mockReport = jest.fn();
 const mockLog = jest.fn();
 jest.mock("@jits/shared/api/location", () => ({
@@ -116,6 +127,10 @@ import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
 import { __resetArenaStoreForTests, arenaActions, useLiveSwitchPhase } from "@/lib/arena/arena-store";
 import { __resetGoLiveLocationForTests } from "@/lib/arena/go-live-location";
 import { __resetChallengerArenaReadingForTests } from "@/lib/arena/use-challenger-arena-reading";
+import { __resetLocationLadderForTests } from "@/lib/arena/location-ladder";
+import { __resetDeviceLocationStoreForTests } from "@/lib/location/device-location-store";
+import { __resetPresenceCapabilityForTests } from "@/lib/location/presence-capability";
+import { PENDING_REVEAL_MS } from "@/lib/arena/arena-store";
 import { CHIP_PENDING_TEST_ID, HeaderStatusChip } from "@/components/layout/header-status-chip";
 import { PERMISSION_REQUEST_TIMEOUT_MS } from "@/lib/invites/location";
 
@@ -136,6 +151,9 @@ beforeEach(() => {
   __resetArenaStoreForTests();
   __resetGoLiveLocationForTests();
   __resetChallengerArenaReadingForTests();
+  __resetLocationLadderForTests();
+  __resetDeviceLocationStoreForTests();
+  __resetPresenceCapabilityForTests();
   setAppState("active");
   appStateHandlers = [];
   jest.spyOn(AppState, "addEventListener").mockImplementation(((_e: string, h: (s: string) => void) => {
@@ -225,7 +243,7 @@ it("Android: the runtime dialog's background/active does not abort; Allow goes l
   }
 });
 
-it("the chip shows the pending pulse from the tap, before a slow flag read resolves", async () => {
+it("the chip shows the pending pulse 240 ms after the tap (never before), even while a slow flag read hangs", async () => {
   mockGetPermission.mockResolvedValue({ granted: true, canAskAgain: true });
   let releaseFlag!: (v: boolean) => void;
   render(
@@ -236,13 +254,22 @@ it("the chip shows the pending pulse from the tap, before a slow flag read resol
   );
   mockFlagRead = () => new Promise<boolean>((r) => (releaseFlag = r));
   expect(screen.queryByTestId(CHIP_PENDING_TEST_ID, { includeHiddenElements: true })).toBeNull();
+  jest.useFakeTimers();
   let pending!: Promise<unknown>;
   act(() => {
     pending = arenaActions.goLive();
   });
-  // The flag read has not answered yet: the pulse is already up.
+  // Nothing pending for the first 240 ms (UX 019, 2.3): an answer inside it
+  // shows no spinner at all.
+  expect(screen.queryByTestId(CHIP_PENDING_TEST_ID, { includeHiddenElements: true })).toBeNull();
+  expect(screen.getByTestId("header-status-chip-lead")).toHaveTextContent("GO LIVE");
+  act(() => {
+    jest.advanceTimersByTime(PENDING_REVEAL_MS);
+  });
+  // The flag read has still not answered: the pulse is up now.
   expect(screen.getByTestId(CHIP_PENDING_TEST_ID, { includeHiddenElements: true })).toBeTruthy();
   expect(screen.getByTestId("header-status-chip-lead")).toHaveTextContent("GOING LIVE");
+  jest.useRealTimers();
   await act(async () => {
     releaseFlag(true);
     await pending;

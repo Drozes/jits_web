@@ -5,11 +5,12 @@
  * the Arena screen and the header chip call it.
  *
  *  - flag OFF: Go Live is exactly as before (no location read, no prompt);
- *  - flag ON: explain, permission, a fresh reading reported as `go_live`,
- *    then live; denied with Open Settings; poor accuracy with Retry; the
- *    server's `location_required` HINT with Retry;
- *  - the 60 s go_live refresh runs only while live, foregrounded and not
- *    in a match, and stops with live state;
+ *  - flag ON with no stored tag and no OS cached fix (rung 4 of the
+ *    location ladder): explain, permission, a fresh reading reported as
+ *    `go_live`, then live; denied with Open Settings; poor accuracy with
+ *    Retry; the server's `location_required` HINT with Retry;
+ *  - no reading while live against a current backend (the 60 s refresh is
+ *    gone); the old refresh only against a legacy backend;
  *  - an Arena start the proximity gate refused shows its reason with Retry
  *    and Cancel.
  *
@@ -39,10 +40,24 @@ jest.mock("expo-location", () => ({
   getForegroundPermissionsAsync: () => mockPermission(),
 }));
 const mockReading = jest.fn();
+const mockOsCache = jest.fn();
 let mockInFlight = false;
 jest.mock("@/lib/invites/location", () => ({
   readLocationOnce: (...a: unknown[]) => mockReading(...a),
+  readOsCachedFix: (...a: unknown[]) => mockOsCache(...a),
   permissionRequestInFlight: () => mockInFlight,
+}));
+jest.mock("expo-secure-store", () => ({
+  getItemAsync: () => Promise.resolve(null),
+  setItemAsync: () => Promise.resolve(),
+  deleteItemAsync: () => Promise.resolve(),
+}));
+let mockProximity = false;
+jest.mock("@/lib/arena/location-flags", () => ({
+  useMatchProximityRequired: () => mockProximity,
+  useLiveDriftCheckEnabled: () => false,
+  markMatchProximityRequired: jest.fn(),
+  resetLocationFlags: jest.fn(),
 }));
 const mockReport = jest.fn();
 const mockArenaReport = jest.fn();
@@ -151,13 +166,21 @@ jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({ usePendingChall
 import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
 import { __resetArenaStoreForTests, arenaActions, useArenaMatchScreen } from "@/lib/arena/arena-store";
 import { GO_LIVE_REFRESH_MS, __resetGoLiveLocationForTests } from "@/lib/arena/go-live-location";
+import { __resetLocationLadderForTests, RECOVERY_WINDOW_MS } from "@/lib/arena/location-ladder";
 import { __resetChallengerArenaReadingForTests } from "@/lib/arena/use-challenger-arena-reading";
+import { __resetDeviceLocationStoreForTests } from "@/lib/location/device-location-store";
+import { __resetPresenceCapabilityForTests } from "@/lib/location/presence-capability";
 
 const ACTIVE = { id: "me-1", display_name: "Me", current_elo: 1200, current_weight: 180, status: "active" };
 const OK_READING = { status: "ok", reading: { lat: 43.6, lng: -79.4, accuracyM: 12 } };
-const RECORDED = { ok: true, data: { ok: true, verdict: "recorded", started: false, match_id: null } };
+const RECORDED = {
+  ok: true,
+  data: { ok: true, verdict: "recorded", started: false, match_id: null, captured_at: new Date().toISOString() },
+};
 const EXPLAIN =
-  "ELO RATED checks you're on the same mat as your opponent. Your location is only used to start matches.";
+  "ELO RATED uses your location to put you on the mat with athletes near you. We only check it when you go live.";
+/** Rung 4 after rung 3 looked at the OS cache (permission already granted). */
+const FRESH_AFTER_OS_CACHE = { ask: true, fast: true, skipLastKnown: true };
 
 beforeEach(() => {
   mockInFlight = false;
@@ -165,6 +188,11 @@ beforeEach(() => {
   jest.useRealTimers();
   __resetArenaStoreForTests();
   __resetGoLiveLocationForTests();
+  __resetLocationLadderForTests();
+  __resetDeviceLocationStoreForTests();
+  __resetPresenceCapabilityForTests();
+  mockProximity = false;
+  mockOsCache.mockResolvedValue(null);
   Object.defineProperty(AppState, "currentState", { value: "active", configurable: true });
   mockAthlete = { ...ACTIVE };
   mockIsLive = false;
@@ -183,6 +211,27 @@ beforeEach(() => {
   mockDropIfServerOffline.mockResolvedValue(false);
   mockServerRanked.mockResolvedValue(true);
 });
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+/** Run the owner's restore (`autoLive`) the way `useArenaLive` does. */
+async function runRestore(): Promise<string> {
+  const { autoLive } = mockLiveArgs.mock.calls.at(-1)[0] as {
+    autoLive: (ctx: unknown) => Promise<string>;
+  };
+  let r = "";
+  await act(async () => {
+    r = await autoLive({
+      write: () => mockGoLive(),
+      lastRefusal: () => mockRefusal,
+      canWrite: () => "ok",
+      reason: "foreground",
+    });
+  });
+  return r;
+}
 
 /** Start a Go Live tap; resolves once it settles. */
 function tapGoLive() {
@@ -223,13 +272,13 @@ describe("flag OFF: Go Live unchanged", () => {
     expect(mockGoLive).toHaveBeenCalledTimes(2);
   });
 
-  it("a restore runs no reading", async () => {
+  it("a restore runs no reading: the plain write", async () => {
     render(<ArenaBootstrap />);
-    const { beforeAutoLive } = mockLiveArgs.mock.calls.at(-1)[0] as { beforeAutoLive: () => Promise<void> };
-    await act(async () => {
-      await beforeAutoLive();
-    });
+    const r = await runRestore();
+    expect(r).toBe("live");
     expect(mockReading).not.toHaveBeenCalled();
+    expect(mockOsCache).not.toHaveBeenCalled();
+    expect(mockGoLive).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -251,8 +300,11 @@ describe("flag ON: Go Live needs a fresh reading", () => {
     render(<ArenaBootstrap />);
     const { done } = tapGoLive();
     expect(await done).toBe(true);
-    expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true });
-    expect(mockReport).toHaveBeenCalledWith({}, OK_READING.reading);
+    // No stored tag and no OS cached fix: rung 4, a fresh reading.
+    expect(mockOsCache).toHaveBeenCalledTimes(1);
+    expect(mockReading).toHaveBeenCalledWith(FRESH_AFTER_OS_CACHE);
+    // A fresh reading carries no capture time (the server's receive time).
+    expect(mockReport).toHaveBeenCalledWith({}, OK_READING.reading, { capturedAt: null });
     expect(order).toEqual(["report", "live"]);
   });
 
@@ -289,7 +341,9 @@ describe("flag ON: Go Live needs a fresh reading", () => {
     await waitFor(() => expect(screen.getByTestId("go-live-location-explain")).toBeTruthy());
     fireEvent.press(screen.getByText("Continue"));
     await waitFor(() => expect(screen.getByTestId("go-live-location-denied")).toBeTruthy());
-    expect(screen.getByTestId("go-live-location-body")).toHaveTextContent(/^Location is off\./);
+    expect(screen.getByTestId("go-live-location-body")).toHaveTextContent(
+      "Location is off for ELO RATED. Turn it on in Settings to go live.",
+    );
     fireEvent.press(screen.getByText("Open Settings"));
     expect(await done).toBe("ignored");
     expect(openSettings).toHaveBeenCalled();
@@ -344,35 +398,56 @@ describe("flag ON: Go Live needs a fresh reading", () => {
     expect(mockGoLive).toHaveBeenCalledTimes(2);
   });
 
-  it("a failed report (network) fails the go-live so the caller says so", async () => {
+  it("a failed report (network) is retried silently, then fails the go-live so the caller says so", async () => {
+    jest.useFakeTimers();
     mockReport.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
     render(<ArenaBootstrap />);
-    const { done } = tapGoLive();
-    expect(await done).toBe(false);
+    const pending = arenaActions.goLive();
+    let result: unknown;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(RECOVERY_WINDOW_MS + 100);
+      result = await pending;
+    });
+    expect(result).toBe(false);
+    expect(mockReport.mock.calls.length).toBeGreaterThan(1);
     expect(mockGoLive).not.toHaveBeenCalled();
   });
 
-  it("a restore reads silently (never asks) before the live write", async () => {
+  it("a restore with no tag reads silently (never asks), with permission already granted, before the live write", async () => {
     render(<ArenaBootstrap />);
-    const { beforeAutoLive } = mockLiveArgs.mock.calls.at(-1)[0] as { beforeAutoLive: () => Promise<boolean> };
-    let proceed: boolean | undefined;
-    await act(async () => {
-      proceed = await beforeAutoLive();
-    });
-    expect(proceed).toBe(true);
-    expect(mockReading).toHaveBeenCalledWith({ ask: false, fast: true });
+    const r = await runRestore();
+    expect(r).toBe("live");
+    expect(mockReading).toHaveBeenCalledWith({ ask: false, fast: true, skipLastKnown: true });
     expect(mockReport).toHaveBeenCalledTimes(1);
-    expect(mockPermission).not.toHaveBeenCalled();
+    expect(mockGoLive).toHaveBeenCalledTimes(1);
   });
 
-  it("passes the flag to the Arena challenge hook", () => {
+  it("a restore with no tag and no permission makes no live write, and offers the tap-to-go-live CTA", async () => {
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
     render(<ArenaBootstrap />);
-    expect(mockChallengeArgs).toHaveBeenLastCalledWith(expect.objectContaining({ locationRequired: true }));
+    const r = await runRestore();
+    expect(r).toBe("failed");
+    expect(mockReading).not.toHaveBeenCalled();
+    expect(mockGoLive).not.toHaveBeenCalled();
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+    expect(mockToastInfo.mock.calls[0][0]).toMatchObject({ text1: "Location is off for ELO RATED. Tap to go live again." });
+  });
+
+  it("passes the flags to the Arena challenge hook (proximity only with both on)", () => {
+    const r = render(<ArenaBootstrap />);
+    expect(mockChallengeArgs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locationRequired: true, proximityRequired: false }),
+    );
+    mockProximity = true;
+    r.rerender(<ArenaBootstrap />);
+    expect(mockChallengeArgs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ locationRequired: true, proximityRequired: true }),
+    );
   });
 });
 
-describe("60 s go_live refresh", () => {
+describe("no reading while live (instant go-live 4.2: the 60 s refresh is gone)", () => {
   beforeEach(() => {
     jest.useFakeTimers();
   });
@@ -383,63 +458,112 @@ describe("60 s go_live refresh", () => {
     });
   }
 
-  it("refreshes every 60 s while live with the flag on", async () => {
+  it("a current backend: no reading at all across 10 minutes live (drift flag off)", async () => {
     mockLocationRequired = true;
     mockIsLive = true;
     render(<ArenaBootstrap />);
-    await advance(GO_LIVE_REFRESH_MS - 1);
+    await advance(10 * 60_000);
+    expect(mockReading).not.toHaveBeenCalled();
     expect(mockReport).not.toHaveBeenCalled();
-    await advance(1);
-    expect(mockReading).toHaveBeenCalledWith({ ask: false, fast: true });
-    await waitFor(() => expect(mockReport).toHaveBeenCalledTimes(1));
-    await advance(GO_LIVE_REFRESH_MS);
-    await waitFor(() => expect(mockReport).toHaveBeenCalledTimes(2));
   });
 
-  it("stops when live state goes off", async () => {
-    mockLocationRequired = true;
-    mockIsLive = true;
-    const r = render(<ArenaBootstrap />);
-    mockIsLive = false;
-    r.rerender(<ArenaBootstrap />);
-    await advance(GO_LIVE_REFRESH_MS * 3);
-    expect(mockReading).not.toHaveBeenCalled();
-  });
+  describe("a legacy backend (no instant go-live migration): the old 60 s refresh", () => {
+    beforeEach(() => {
+      __resetPresenceCapabilityForTests("legacy");
+      // An older backend's go_live answer: no `captured_at`.
+      mockReport.mockResolvedValue({ ok: true, data: { ok: true, verdict: "recorded", started: false, match_id: null } });
+    });
 
-  it("starts when live state comes on", async () => {
-    mockLocationRequired = true;
-    const r = render(<ArenaBootstrap />);
-    await advance(GO_LIVE_REFRESH_MS * 2);
-    expect(mockReading).not.toHaveBeenCalled();
-    mockIsLive = true;
-    r.rerender(<ArenaBootstrap />);
-    await advance(GO_LIVE_REFRESH_MS);
-    expect(mockReading).toHaveBeenCalledTimes(1);
-  });
+    it("refreshes every 60 s while live with the flag on", async () => {
+      mockLocationRequired = true;
+      mockIsLive = true;
+      render(<ArenaBootstrap />);
+      await advance(GO_LIVE_REFRESH_MS - 1);
+      expect(mockReport).not.toHaveBeenCalled();
+      await advance(1);
+      expect(mockReading).toHaveBeenCalledWith({ ask: false, fast: true });
+      await waitFor(() => expect(mockReport).toHaveBeenCalledTimes(1));
+      await advance(GO_LIVE_REFRESH_MS);
+      await waitFor(() => expect(mockReport).toHaveBeenCalledTimes(2));
+    });
 
-  it("never runs with the flag off", async () => {
+    it("stops when live state goes off", async () => {
+      mockLocationRequired = true;
+      mockIsLive = true;
+      const r = render(<ArenaBootstrap />);
+      mockIsLive = false;
+      r.rerender(<ArenaBootstrap />);
+      await advance(GO_LIVE_REFRESH_MS * 3);
+      expect(mockReading).not.toHaveBeenCalled();
+    });
+
+    it("never runs with the flag off", async () => {
+      mockIsLive = true;
+      render(<ArenaBootstrap />);
+      await advance(GO_LIVE_REFRESH_MS * 3);
+      expect(mockReading).not.toHaveBeenCalled();
+    });
+
+    it("pauses in a match", async () => {
+      mockLocationRequired = true;
+      mockIsLive = true;
+      render(<ArenaBootstrap />);
+      renderHook(() => useArenaMatchScreen());
+      await advance(GO_LIVE_REFRESH_MS * 3);
+      expect(mockReading).not.toHaveBeenCalled();
+    });
+
+    it("a tap runs the old flow: a fresh reading first (fast path with last known), no OS cache replay", async () => {
+      jest.useRealTimers();
+      mockLocationRequired = true;
+      render(<ArenaBootstrap />);
+      const { done } = tapGoLive();
+      expect(await done).toBe(true);
+      expect(mockOsCache).not.toHaveBeenCalled();
+      expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true });
+      expect(mockReport).toHaveBeenCalledWith({}, OK_READING.reading);
+    });
+  });
+});
+
+describe("the server ends a live session while the app is open (UX 019, 3j)", () => {
+  it("on return to the foreground: drops at once with one tap-to-go-live toast", async () => {
+    const handlers: ((s: string) => void)[] = [];
+    jest.spyOn(AppState, "addEventListener").mockImplementation(((_e: string, h: (s: string) => void) => {
+      handlers.push(h);
+      return { remove: () => undefined };
+    }) as never);
     mockIsLive = true;
+    mockDropIfServerOffline.mockResolvedValue(true);
     render(<ArenaBootstrap />);
-    await advance(GO_LIVE_REFRESH_MS * 3);
-    expect(mockReading).not.toHaveBeenCalled();
+    await act(async () => {
+      for (const h of [...handlers]) h("active");
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mockDropIfServerOffline).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(mockToastInfo).toHaveBeenCalledWith(
+        expect.objectContaining({ text1: "You're offline now. Tap to go live again." }),
+      ),
+    );
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
   });
 
-  it("pauses in a match", async () => {
-    mockLocationRequired = true;
+  it("a server that still has the athlete live: nothing changes, nothing is said", async () => {
+    const handlers: ((s: string) => void)[] = [];
+    jest.spyOn(AppState, "addEventListener").mockImplementation(((_e: string, h: (s: string) => void) => {
+      handlers.push(h);
+      return { remove: () => undefined };
+    }) as never);
     mockIsLive = true;
+    mockDropIfServerOffline.mockResolvedValue(false);
     render(<ArenaBootstrap />);
-    renderHook(() => useArenaMatchScreen());
-    await advance(GO_LIVE_REFRESH_MS * 3);
-    expect(mockReading).not.toHaveBeenCalled();
-  });
-
-  it("skips a tick while backgrounded", async () => {
-    mockLocationRequired = true;
-    mockIsLive = true;
-    render(<ArenaBootstrap />);
-    Object.defineProperty(AppState, "currentState", { value: "background", configurable: true });
-    await advance(GO_LIVE_REFRESH_MS);
-    expect(mockReading).not.toHaveBeenCalled();
+    await act(async () => {
+      for (const h of [...handlers]) h("active");
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(mockDropIfServerOffline).toHaveBeenCalled());
+    expect(mockToastInfo).not.toHaveBeenCalled();
   });
 });
 
@@ -518,6 +642,7 @@ describe("a location sheet never outlives its owner (L5, L6)", () => {
 
   it("L6: the challenger's explain closes when its challenge stops waiting", async () => {
     mockLocationRequired = true;
+    mockProximity = true;
     mockOutgoing = { challengeId: "ch-out", opponentId: "a-2", opponentName: "ALEX", createdAt: null, expiresAt: null };
     mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
     const { rerender } = render(<ArenaBootstrap />);
@@ -533,14 +658,26 @@ describe("a location sheet never outlives its owner (L5, L6)", () => {
 describe("the waiting challenger's arena reading (M1)", () => {
   const OUTGOING = { challengeId: "ch-out", opponentId: "a-2", opponentName: "ALEX", createdAt: null, expiresAt: null };
 
-  it("flag on, permission granted: reports an arena reading for my outgoing challenge, not live", async () => {
+  it("both flags on, permission granted: reports an arena reading for my outgoing challenge, not live", async () => {
     mockLocationRequired = true;
+    mockProximity = true;
     mockOutgoing = OUTGOING;
     render(<ArenaBootstrap />);
     await waitFor(() => expect(mockArenaReport).toHaveBeenCalledTimes(1));
     expect(mockArenaReport).toHaveBeenCalledWith(expect.anything(), OK_READING.reading, "ch-out");
     expect(mockReading).toHaveBeenCalledWith({ ask: false });
     // The privacy reply (recorded only) is all it needs: no sheet, no copy.
+    expect(screen.queryByTestId("go-live-location-explain")).toBeNull();
+  });
+
+  it("location flag on, proximity flag off (the default): no arena reading while waiting", async () => {
+    mockLocationRequired = true;
+    mockOutgoing = OUTGOING;
+    render(<ArenaBootstrap />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockArenaReport).not.toHaveBeenCalled();
     expect(screen.queryByTestId("go-live-location-explain")).toBeNull();
   });
 
@@ -555,6 +692,7 @@ describe("the waiting challenger's arena reading (M1)", () => {
 
   it("permission not granted: the waiting state explains once, then asks and reports", async () => {
     mockLocationRequired = true;
+    mockProximity = true;
     mockOutgoing = OUTGOING;
     mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
     render(<ArenaBootstrap />);
@@ -587,6 +725,7 @@ describe("implausible_movement (reading refused for an implied speed over 50 m/s
 
   it("the waiting challenger's refused arena reading is not retried before the next 60 s tick", async () => {
     mockLocationRequired = true;
+    mockProximity = true;
     mockOutgoing = { challengeId: "ch-out", opponentId: "a-2", opponentName: "ALEX", createdAt: null, expiresAt: null };
     mockArenaReport.mockResolvedValue({ ok: true, data: { ok: false, code: "implausible_movement" } });
     jest.spyOn(console, "warn").mockImplementation(() => {});

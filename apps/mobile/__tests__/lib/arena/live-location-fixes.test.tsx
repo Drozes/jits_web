@@ -8,12 +8,13 @@
  *  - 1a: `canAskAgain` branching (an iOS "Allow Once" grant that lapsed reads
  *    as undetermined + canAskAgain: explain, never denied); the denied
  *    sheet's Retry re-reads the permission.
- *  - 1b: a restore whose silent reading finds permission gone makes no live
+ *  - 1b: a restore with no valid tag and permission gone makes no live
  *    write and offers the tap-to-go-live CTA; the tap runs the full flow;
- *    no system dialog without a tap.
- *  - 1d: the 60 s refresh losing permission while live shows the CTA once
- *    per failure streak; a failing tick asks whether the server expired the
- *    session.
+ *    no system dialog without a tap. Since instant go-live (D12), a restore
+ *    whose silent fix fails makes no write either (one toast).
+ *  - 1d: the 60 s refresh (a LEGACY backend only since instant go-live)
+ *    losing permission while live shows the CTA once per failure streak; a
+ *    failing tick asks whether the server expired the session.
  *  - 1e: backgrounding mid-flow closes the sheet and resolves `dismissed`.
  *  - 3a: reduced precision shows the Precise Location copy.
  *  - 5: one `go_live_attempt` log per athlete-initiated flow with the
@@ -41,10 +42,24 @@ jest.mock("expo-location", () => ({
   getForegroundPermissionsAsync: () => mockPermission(),
 }));
 const mockReading = jest.fn();
+const mockOsCache = jest.fn();
 let mockInFlight = false;
 jest.mock("@/lib/invites/location", () => ({
   readLocationOnce: (...a: unknown[]) => mockReading(...a),
+  readOsCachedFix: (...a: unknown[]) => mockOsCache(...a),
   permissionRequestInFlight: () => mockInFlight,
+}));
+jest.mock("expo-secure-store", () => ({
+  getItemAsync: () => Promise.resolve(null),
+  setItemAsync: () => Promise.resolve(),
+  deleteItemAsync: () => Promise.resolve(),
+}));
+let mockProximity = false;
+jest.mock("@/lib/arena/location-flags", () => ({
+  useMatchProximityRequired: () => mockProximity,
+  useLiveDriftCheckEnabled: () => false,
+  markMatchProximityRequired: jest.fn(),
+  resetLocationFlags: jest.fn(),
 }));
 const mockReport = jest.fn();
 const mockLog = jest.fn();
@@ -139,12 +154,26 @@ jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({ usePendingChall
 import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
 import { __resetArenaStoreForTests, arenaActions } from "@/lib/arena/arena-store";
 import { GO_LIVE_REFRESH_MS, __resetGoLiveLocationForTests } from "@/lib/arena/go-live-location";
+import { __resetLocationLadderForTests, RECOVERY_WINDOW_MS } from "@/lib/arena/location-ladder";
 import { __resetChallengerArenaReadingForTests } from "@/lib/arena/use-challenger-arena-reading";
-import { LOCATION_OFF_GO_LIVE_CTA_COPY, PRECISE_LOCATION_COPY, PRECISE_LOCATION_TITLE } from "@jits/shared/utils";
+import { __resetDeviceLocationStoreForTests } from "@/lib/location/device-location-store";
+import { __resetPresenceCapabilityForTests } from "@/lib/location/presence-capability";
+import {
+  LOCATION_FIX_FAILED_GO_LIVE_CTA_COPY,
+  LOCATION_OFF_GO_LIVE_CTA_COPY,
+  PRECISE_LOCATION_COPY,
+  PRECISE_LOCATION_TITLE,
+} from "@jits/shared/utils";
 
 const READING = { lat: 43.6, lng: -79.4, accuracyM: 12 };
 const OK_READING = { status: "ok", reading: READING };
-const RECORDED = { ok: true, data: { ok: true, verdict: "recorded", started: false, match_id: null } };
+/** A current backend's go_live answer (it carries `captured_at`). */
+const RECORDED = {
+  ok: true,
+  data: { ok: true, verdict: "recorded", started: false, match_id: null, captured_at: new Date().toISOString() },
+};
+/** An older backend's go_live answer (no `captured_at`). */
+const LEGACY_RECORDED = { ok: true, data: { ok: true, verdict: "recorded", started: false, match_id: null } };
 
 let appStateHandlers: ((s: string) => void)[] = [];
 function setAppState(s: string) {
@@ -161,7 +190,12 @@ beforeEach(() => {
   jest.useRealTimers();
   __resetArenaStoreForTests();
   __resetGoLiveLocationForTests();
+  __resetLocationLadderForTests();
+  __resetDeviceLocationStoreForTests();
+  __resetPresenceCapabilityForTests();
   __resetChallengerArenaReadingForTests();
+  mockProximity = false;
+  mockOsCache.mockResolvedValue(null);
   setAppState("active");
   appStateHandlers = [];
   jest.spyOn(AppState, "addEventListener").mockImplementation(((_e: string, h: (s: string) => void) => {
@@ -306,19 +340,33 @@ describe("item 5: one go_live_attempt per tapped flow, with the final outcome", 
     expect(logged()).toEqual(["implausible_movement"]);
   });
 
-  it("error: the report RPC failed (network)", async () => {
+  /** Run a tap through the whole recovery window (fake clock). */
+  async function tapThroughRecovery(): Promise<unknown> {
+    jest.useFakeTimers();
+    const pending = arenaActions.goLive();
+    let result: unknown;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(RECOVERY_WINDOW_MS + 100);
+      result = await pending;
+    });
+    return result;
+  }
+
+  it("error: the report RPC failed (network), retried silently for the recovery window", async () => {
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
     mockReport.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
     render(<ArenaBootstrap />);
-    expect(await tapGoLive().done).toBe(false);
+    expect(await tapThroughRecovery()).toBe(false);
+    expect(mockReport.mock.calls.length).toBeGreaterThan(1);
     expect(logged()).toEqual(["error"]);
   });
 
-  it("error: the live write failed for another reason", async () => {
+  it("error: the live write failed for another reason, retried silently for the recovery window", async () => {
     mockGoLive.mockResolvedValue(false);
     mockRefusal = null;
     render(<ArenaBootstrap />);
-    expect(await tapGoLive().done).toBe(false);
+    expect(await tapThroughRecovery()).toBe(false);
+    expect(mockGoLive.mock.calls.length).toBeGreaterThan(1);
     expect(logged()).toEqual(["error"]);
   });
 
@@ -412,7 +460,10 @@ describe("item 1a: canAskAgain branching", () => {
   });
 
   it("denied (cannot ask): the denied sheet has Retry, which re-reads the permission and continues when granted", async () => {
-    mockPermission.mockResolvedValueOnce({ granted: false, canAskAgain: false });
+    // Read by the ladder (no tag, so no rung 3), then by the location step.
+    mockPermission
+      .mockResolvedValueOnce({ granted: false, canAskAgain: false })
+      .mockResolvedValueOnce({ granted: false, canAskAgain: false });
     render(<ArenaBootstrap />);
     const tap = tapGoLive();
     await waitFor(() => expect(screen.getByTestId("go-live-location-denied")).toBeTruthy());
@@ -421,7 +472,7 @@ describe("item 1a: canAskAgain branching", () => {
     mockPermission.mockResolvedValue({ granted: true, canAskAgain: true });
     fireEvent.press(screen.getByTestId("go-live-location-retry"));
     expect(await tap.done).toBe(true);
-    expect(mockPermission).toHaveBeenCalledTimes(2);
+    expect(mockPermission).toHaveBeenCalledTimes(3);
     expect(mockGoLive).toHaveBeenCalledTimes(1);
     expect(logged()).toEqual(["ok"]);
   });
@@ -539,21 +590,28 @@ describe("item 3a: Precise Location off", () => {
   });
 });
 
-describe("item 1b: a restore that finds permission gone", () => {
-  function beforeAutoLive() {
-    return (mockLiveArgs.mock.calls.at(-1)[0] as { beforeAutoLive: () => Promise<boolean> }).beforeAutoLive;
+describe("item 1b: a restore that finds no tag and permission gone", () => {
+  /** Run the owner's restore (`autoLive`) the way `useArenaLive` does. */
+  async function restore(canWrite: () => string = () => "ok"): Promise<string> {
+    const { autoLive } = mockLiveArgs.mock.calls.at(-1)[0] as { autoLive: (ctx: unknown) => Promise<string> };
+    let r = "";
+    await act(async () => {
+      r = await autoLive({
+        write: () => mockGoLive(),
+        lastRefusal: () => mockRefusal,
+        canWrite,
+        reason: "foreground",
+      });
+    });
+    return r;
   }
 
-  it("says do not write live, shows the CTA, never asks and never logs", async () => {
-    mockReading.mockResolvedValue({ status: "denied", canAskAgain: true });
+  it("makes no live write, shows the CTA, never asks, never reads and never logs", async () => {
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
     render(<ArenaBootstrap />);
-    let proceed: boolean | undefined;
-    await act(async () => {
-      proceed = await beforeAutoLive()();
-    });
-    expect(proceed).toBe(false);
-    expect(mockReading).toHaveBeenCalledWith({ ask: false, fast: true });
-    expect(mockReading).not.toHaveBeenCalledWith(expect.objectContaining({ ask: true }));
+    expect(await restore()).toBe("failed");
+    expect(mockGoLive).not.toHaveBeenCalled();
+    expect(mockReading).not.toHaveBeenCalled();
     expect(mockToastInfo).toHaveBeenCalledWith(
       expect.objectContaining({ text1: LOCATION_OFF_GO_LIVE_CTA_COPY, onPress: expect.any(Function) }),
     );
@@ -563,62 +621,55 @@ describe("item 1b: a restore that finds permission gone", () => {
 
   it("the CTA tap runs the interactive Go Live: explain, then (on Continue only) the system prompt, then live, logged", async () => {
     mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
-    mockReading.mockResolvedValueOnce({ status: "denied", canAskAgain: true });
     render(<ArenaBootstrap />);
-    await act(async () => {
-      await beforeAutoLive()();
-    });
+    await restore();
     const cta = mockToastInfo.mock.calls[0][0] as { onPress: () => void };
     act(() => cta.onPress());
     expect(mockToastHide).toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId("go-live-location-explain")).toBeTruthy());
-    // Still only the silent read: no system dialog without the athlete's Continue.
-    expect(mockReading).toHaveBeenCalledTimes(1);
+    // No reading and no system dialog without the athlete's Continue.
+    expect(mockReading).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText("Continue"));
     await waitFor(() => expect(mockGoLive).toHaveBeenCalledTimes(1));
     expect(mockReading).toHaveBeenLastCalledWith({ ask: true, fast: true });
     await waitFor(() => expect(logged()).toEqual(["ok"]));
   });
 
-  it("other reading failures keep today's behaviour: go ahead with the write, no CTA", async () => {
+  it("D12: a silent fix that fails (permission granted) makes no write; one tap-to-go-live toast", async () => {
     mockReading.mockResolvedValue({ status: "unavailable", reason: "timeout" });
     render(<ArenaBootstrap />);
-    let proceed: boolean | undefined;
-    await act(async () => {
-      proceed = await beforeAutoLive()();
-    });
-    expect(proceed).toBe(true);
-    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(await restore()).toBe("failed");
+    expect(mockReading).toHaveBeenCalledWith({ ask: false, fast: true, skipLastKnown: true });
+    expect(mockGoLive).not.toHaveBeenCalled();
+    expect(mockToastInfo).toHaveBeenCalledTimes(1);
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ text1: LOCATION_FIX_FAILED_GO_LIVE_CTA_COPY, onPress: expect.any(Function) }),
+    );
   });
 
   it("no CTA while the app is not in the foreground", async () => {
-    mockReading.mockResolvedValue({ status: "denied", canAskAgain: true });
+    mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
     render(<ArenaBootstrap />);
     setAppState("background");
-    let proceed: boolean | undefined;
-    await act(async () => {
-      proceed = await beforeAutoLive()();
-    });
-    expect(proceed).toBe(false);
+    expect(await restore()).toBe("failed");
     expect(mockToastInfo).not.toHaveBeenCalled();
   });
 
-  it("flag OFF: no reading, goes ahead", async () => {
+  it("flag OFF: no reading, the plain write", async () => {
     mockLocationRequired = false;
     render(<ArenaBootstrap />);
-    let proceed: boolean | undefined;
-    await act(async () => {
-      proceed = await beforeAutoLive()();
-    });
-    expect(proceed).toBe(true);
+    expect(await restore()).toBe("live");
     expect(mockReading).not.toHaveBeenCalled();
+    expect(mockGoLive).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("item 1d: the 60 s refresh while live", () => {
+describe("item 1d: the 60 s refresh while live (legacy backend only)", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     mockIsLive = true;
+    __resetPresenceCapabilityForTests("legacy");
+    mockReport.mockResolvedValue(LEGACY_RECORDED);
   });
 
   async function tick() {
@@ -744,6 +795,8 @@ describe("review B1 / S3: the permission prompt is not the athlete leaving", () 
 
 describe("review S1: a Go Live never closes the challenger's arena explain", () => {
   it("the arena explain survives a Go Live that completes, and its Continue still reads and reports", async () => {
+    // The challenger's ask exists only while an Arena start needs proximity.
+    mockProximity = true;
     mockOutgoing = { challengeId: "ch-out", opponentId: "a-2", opponentName: "ALEX", createdAt: null, expiresAt: null };
     mockPermission.mockResolvedValue({ granted: false, canAskAgain: true });
     render(<ArenaBootstrap />);

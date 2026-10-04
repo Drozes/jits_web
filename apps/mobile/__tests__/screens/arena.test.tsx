@@ -291,6 +291,8 @@ jest.mock("@/lib/arena/arena-store", () => ({
   publishNearbyOnMatCount: (...a: unknown[]) => mockPublishNearbyCount(...a),
   useArenaState: () => ({ isLive: mockIsLive, isSaving: false, ...mockChallenge }),
   useIsArenaLive: () => mockIsLive,
+  useIsArenaDisplayLive: () => mockIsLive,
+  useGoLiveDisplay: () => null,
   useIsInArenaMatch: () => mockInMatch,
   useLiveSwitchPhase: () => mockSwitchPhase,
   useLiveSwitchDirection: () => (mockSwitchPhase === "saving" ? "going-live" : null),

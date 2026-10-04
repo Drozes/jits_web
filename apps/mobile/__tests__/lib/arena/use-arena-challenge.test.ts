@@ -141,6 +141,10 @@ const mockMarkLocation = jest.fn();
 jest.mock("@/lib/arena/match-location-flag", () => ({
   markMatchLocationRequired: (...a: unknown[]) => mockMarkLocation(...a),
 }));
+const mockMarkProximity = jest.fn();
+jest.mock("@/lib/arena/location-flags", () => ({
+  markMatchProximityRequired: (...a: unknown[]) => mockMarkProximity(...a),
+}));
 
 const mockToastError = jest.fn();
 const mockToastInfo = jest.fn();
@@ -4697,8 +4701,11 @@ describe("match_location_required: Arena accept and the proximity gate", () => {
   });
   const STARTED = { ok: true, data: { success: true, match_id: MATCH, challenge_id: CHALLENGE } };
 
-  function mountWithFlag(locationRequired: boolean) {
-    return renderHook(() => useArenaChallenge({ athleteId: ME, athleteWeight: 180, locationRequired }));
+  /** Both `match_location_required` and `match_proximity_required` on (or off). */
+  function mountWithFlag(on: boolean) {
+    return renderHook(() =>
+      useArenaChallenge({ athleteId: ME, athleteWeight: 180, locationRequired: on, proximityRequired: on }),
+    );
   }
 
   it("flag on: reports an arena reading for the challenge before starting it", async () => {
@@ -4761,6 +4768,72 @@ describe("match_location_required: Arena accept and the proximity gate", () => {
     });
     expect(result.current.startBlocked?.challengeId).toBe(CHALLENGE);
     expect(mockMarkLocation).toHaveBeenCalledWith(true);
+    expect(mockMarkProximity).toHaveBeenCalledWith(true);
+  });
+
+  describe("instant go-live 4.3: match_proximity_required", () => {
+    function mountLocationOnly() {
+      return renderHook(() =>
+        useArenaChallenge({ athleteId: ME, athleteWeight: 180, locationRequired: true, proximityRequired: false }),
+      );
+    }
+
+    it("location ON, proximity OFF: accept starts at once with no location call at all", async () => {
+      mockStartMatch.mockResolvedValue(STARTED);
+      const { result } = mountLocationOnly();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockArenaReading).not.toHaveBeenCalled();
+      expect(mockStartMatch).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+      expect(mockMarkProximity).not.toHaveBeenCalled();
+    });
+
+    it("a server that still gates on proximity (flag just on, or an older backend): one reading, one more start", async () => {
+      mockStartMatch
+        .mockImplementationOnce(async () => {
+          mockCalls.push("start");
+          return proximity("PROXIMITY_REQUIRED");
+        })
+        .mockImplementation(async () => {
+          mockCalls.push("start");
+          return STARTED;
+        });
+      const { result } = mountLocationOnly();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockMarkProximity).toHaveBeenCalledWith(true);
+      expect(mockArenaReading).toHaveBeenCalledTimes(1);
+      expect(mockCalls.slice(0, 3)).toEqual(["start", "arena-reading", "start"]);
+      expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+      expect(result.current.startBlocked).toBeNull();
+    });
+
+    it("the challenger's fallback start takes no reading with proximity OFF", async () => {
+      jest.useFakeTimers();
+      try {
+        const { result } = mountLocationOnly();
+        await sendOne(result);
+        await act(async () => {
+          await challengerUpdateBinding().handler({
+            new: { id: CHALLENGE, challenger_id: ME, opponent_id: OPPONENT, status: "accepted" },
+          });
+        });
+        mockGetStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: FAR_EXPIRY } });
+        await act(async () => {
+          jest.advanceTimersByTime(12_000);
+          await flushAsync();
+        });
+        expect(mockArenaReading).not.toHaveBeenCalled();
+        expect(mockStartMatch).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   it("Retry sends a fresh reading and enters the match once on one mat", async () => {
@@ -4889,7 +4962,9 @@ describe("proximity_required DETAIL: whose location is missing (M1)", () => {
   const STARTED = { ok: true, data: { success: true, match_id: MATCH, challenge_id: CHALLENGE } };
 
   function mount() {
-    return renderHook(() => useArenaChallenge({ athleteId: ME, athleteWeight: 180, locationRequired: true }));
+    return renderHook(() =>
+      useArenaChallenge({ athleteId: ME, athleteWeight: 180, locationRequired: true, proximityRequired: true }),
+    );
   }
 
   it.each([

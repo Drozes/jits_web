@@ -76,7 +76,7 @@ describe("fast path (Go Live, face-off)", () => {
   it("uses a fresh, accurate last known position without a live fix", async () => {
     mockLastKnown.mockResolvedValue(fix(30, 20_000, 43.7));
     const r = await readLocationOnce({ ask: false, fast: true });
-    expect(r).toEqual({ status: "ok", reading: { lat: 43.7, lng: -79.4, accuracyM: 30 } });
+    expect(r).toEqual({ status: "ok", capturedAt: expect.any(Number), reading: { lat: 43.7, lng: -79.4, accuracyM: 30 } });
     expect(mockCurrent).not.toHaveBeenCalled();
     expect(mockLastKnown).toHaveBeenCalledWith({ maxAge: LAST_KNOWN_MAX_AGE_MS, requiredAccuracy: 100 });
   });
@@ -200,7 +200,7 @@ describe("default path (invites) is unchanged", () => {
     const r = await readLocationOnce({ ask: false });
     expect(mockLastKnown).not.toHaveBeenCalled();
     expect(mockCurrent).toHaveBeenCalledWith({ accuracy: 4 });
-    expect(r).toEqual({ status: "ok", reading: { lat: 43.6, lng: -79.4, accuracyM: 10 } });
+    expect(r).toEqual({ status: "ok", capturedAt: expect.any(Number), reading: { lat: 43.6, lng: -79.4, accuracyM: 10 } });
   });
 });
 
