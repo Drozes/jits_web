@@ -13,27 +13,62 @@
  */
 import type { Result } from "./errors";
 import { mapPostgrestError } from "./errors";
-import { obj, parsePresence, rpc, str, type Client, type InviteResult, type PresenceResult } from "./invite-rpc";
+import {
+  isMissingRpcSignature,
+  obj,
+  parsePresence,
+  rpc,
+  str,
+  type Client,
+  type InviteResult,
+  type PresenceResult,
+} from "./invite-rpc";
 import type { LocationReading } from "./invites";
+import {
+  LIVE_LOCATION_DRIFT_CHECK_FLAG,
+  MATCH_PROXIMITY_REQUIRED_FLAG,
+  type GoLiveTagSource,
+} from "../constants/go-live";
 
 export const MATCH_LOCATION_REQUIRED_FLAG = "match_location_required";
+export { LIVE_LOCATION_DRIFT_CHECK_FLAG, MATCH_PROXIMITY_REQUIRED_FLAG };
 
 /**
- * `match_location_required` from `feature_flags` (authenticated SELECT). A
- * missing row reads as off; a failed read is `{ ok:false, error }`.
+ * One `feature_flags` row (authenticated SELECT). A missing row reads as
+ * off (an older backend without the key, or a flag never seeded); a failed
+ * read is `{ ok:false, error }`.
  */
-export async function getMatchLocationRequired(supabase: Client): Promise<Result<boolean>> {
+export async function getFeatureFlag(supabase: Client, key: string): Promise<Result<boolean>> {
   try {
     const { data, error } = await supabase
       .from("feature_flags")
       .select("enabled")
-      .eq("key", MATCH_LOCATION_REQUIRED_FLAG)
+      .eq("key", key)
       .maybeSingle();
     if (error) return { ok: false, error: mapPostgrestError(error) };
     return { ok: true, data: (data as { enabled?: boolean } | null)?.enabled === true };
   } catch (err) {
     return { ok: false, error: { code: "UNKNOWN", message: err instanceof Error ? err.message : String(err) } };
   }
+}
+
+/** `match_location_required`: a location tag is required to be live. */
+export function getMatchLocationRequired(supabase: Client): Promise<Result<boolean>> {
+  return getFeatureFlag(supabase, MATCH_LOCATION_REQUIRED_FLAG);
+}
+
+/**
+ * `match_proximity_required` (instant go-live addendum 3.1): with
+ * `match_location_required` also on, an Arena (non-invite) start needs both
+ * athletes on one mat. Seeded off; an older backend has no row (off).
+ */
+export function getMatchProximityRequired(supabase: Client): Promise<Result<boolean>> {
+  return getFeatureFlag(supabase, MATCH_PROXIMITY_REQUIRED_FLAG);
+}
+
+/** `live_location_drift_check` (addendum 4.4): the client drift check while live. Seeded off. */
+export function getLiveLocationDriftCheck(supabase: Client): Promise<Result<boolean>> {
+  return getFeatureFlag(supabase, LIVE_LOCATION_DRIFT_CHECK_FLAG);
 }
 
 /**
@@ -61,16 +96,48 @@ function readingArgs(reading: LocationReading) {
 }
 
 /**
+ * `report_match_presence` refusals the instant go-live migration adds for a
+ * `go_live` reading sent with `p_captured_at` (addendum 3.4).
+ */
+export type GoLiveReportCode =
+  | "accuracy_too_low"
+  | "implausible_movement"
+  | "tag_too_old"
+  | "captured_at_invalid"
+  | "not_active";
+
+/**
  * The athlete-level Go Live reading (`p_context = 'go_live'`, no scope). The
  * server upserts one current reading per athlete and answers
- * `{ ok:true, verdict:'recorded' }`, or `{ ok:false, code:'accuracy_too_low' }`
- * for a reading coarser than 100 m (not stored).
+ * `{ ok:true, verdict:'recorded', captured_at, tag_valid_until }`, or
+ * `{ ok:false, code }` (`accuracy_too_low`, `implausible_movement`, and with
+ * a capture time `tag_too_old` / `captured_at_invalid`), storing nothing.
+ *
+ * `capturedAt` (ms epoch): when the reading was taken, for a tag replayed
+ * from the device store or the OS cache (instant go-live, rungs 2 and 3).
+ * Omitted, the server uses its own receive time (a reading taken just now),
+ * and the call has exactly the arguments an older backend accepts. With it,
+ * an older backend answers `PGRST202` (no such signature): the caller must
+ * then NOT retry without it (that would launder an old location as fresh)
+ * and falls back to a fresh reading instead.
  */
-export function reportGoLivePresence(supabase: Client, reading: LocationReading): Promise<InviteResult<PresenceResult>> {
+export function reportGoLivePresence(
+  supabase: Client,
+  reading: LocationReading,
+  opts: { capturedAt?: number | null } = {},
+): Promise<InviteResult<PresenceResult>> {
+  const at = opts.capturedAt;
+  const capturedAt = typeof at === "number" && Number.isFinite(at) ? new Date(at).toISOString() : null;
   return rpc(
     supabase,
     "report_match_presence",
-    { ...readingArgs(reading), p_context: "go_live", p_challenge_id: null, p_invite_id: null },
+    {
+      ...readingArgs(reading),
+      p_context: "go_live",
+      p_challenge_id: null,
+      p_invite_id: null,
+      ...(capturedAt ? { p_captured_at: capturedAt } : {}),
+    },
     parsePresence,
   );
 }
@@ -250,8 +317,8 @@ export const ARENA_BAND_ORDER: Record<ArenaCloseBand, number> = {
 // Location event telemetry (016 addendum: live location fixes, section 3.2)
 // ---------------------------------------------------------------------------
 
-/** `athlete_location_events.event`. */
-export type LocationEventKind = "go_live_attempt" | "match_start";
+/** `athlete_location_events.event` (`drift_check` / `drift_prompt`: instant go-live 3.11). */
+export type LocationEventKind = "go_live_attempt" | "match_start" | "drift_check" | "drift_prompt";
 
 /** `athlete_location_events.outcome` (the server's allowlist). */
 export type LocationEventOutcome =
@@ -263,11 +330,23 @@ export type LocationEventOutcome =
   | "accuracy_too_low"
   | "implausible_movement"
   | "location_required"
-  | "error";
+  | "error"
+  // Instant go-live (3.11).
+  | "drifted"
+  | "retagged"
+  | "went_offline"
+  | "tag_too_old";
+
+/** Outcomes an older backend's CHECK accepts in place of the new ones. */
+const LEGACY_OUTCOME: Partial<Record<LocationEventOutcome, LocationEventOutcome>> = {
+  tag_too_old: "location_required",
+};
 
 export interface LocationEventInput {
   event: LocationEventKind;
   outcome: LocationEventOutcome;
+  /** `go_live_attempt` only: which rung of the location ladder produced the tag. */
+  source?: GoLiveTagSource | null;
   /** The reading the flow ended with, when there was one. */
   reading?: LocationReading | null;
   /** Required for `match_start`, absent for `go_live_attempt`. */
@@ -291,8 +370,12 @@ const finite = (v: unknown): v is number => typeof v === "number" && Number.isFi
  * not a participant, the RPC missing on an older backend) comes back as
  * `{ ok:false, error }`. A reading with a non-finite coordinate is sent
  * without coordinates rather than refused by the server.
+ *
+ * `source` is sent as `p_source` only for a `go_live_attempt` that has one.
+ * An older backend without that parameter answers `PGRST202`; the event is
+ * then logged once more without it (and with an outcome its CHECK knows).
  */
-export function logLocationEvent(
+export async function logLocationEvent(
   supabase: Client,
   input: LocationEventInput,
 ): Promise<InviteResult<LocationEventLogged>> {
@@ -301,20 +384,21 @@ export function logLocationEvent(
   const accuracy = r && finite(r.accuracyM) && r.accuracyM >= 0 ? r.accuracyM : null;
   const version = input.appVersion?.trim().slice(0, 32) || null;
   const at = input.occurredAt && Number.isFinite(input.occurredAt.getTime()) ? input.occurredAt.toISOString() : null;
-  return rpc(
-    supabase,
-    // Newer than the generated types until jr_be migration 20261002100100 lands.
-    "log_location_event" as never,
-    {
-      p_event: input.event,
-      p_outcome: input.outcome,
-      p_lat: hasPoint ? r!.lat : null,
-      p_lng: hasPoint ? r!.lng : null,
-      p_accuracy_m: hasPoint ? accuracy : null,
-      p_match_id: input.event === "match_start" ? (input.matchId ?? null) : null,
-      p_app_version: version,
-      p_occurred_at: at,
-    },
-    (d) => (obj(d) ? { logged: obj(d)?.logged === true } : null),
-  );
+  const source = input.event === "go_live_attempt" ? (input.source ?? null) : null;
+  const args = {
+    p_event: input.event,
+    p_outcome: input.outcome,
+    p_lat: hasPoint ? r!.lat : null,
+    p_lng: hasPoint ? r!.lng : null,
+    p_accuracy_m: hasPoint ? accuracy : null,
+    p_match_id: input.event === "match_start" ? (input.matchId ?? null) : null,
+    p_app_version: version,
+    p_occurred_at: at,
+  };
+  const parse = (d: unknown) => (obj(d) ? { logged: obj(d)?.logged === true } : null);
+  // Newer than the generated types until jr_be migration 20261002100100 lands.
+  const fn = "log_location_event" as never;
+  const first = await rpc(supabase, fn, source ? { ...args, p_source: source } : args, parse);
+  if (first.ok || !source || !isMissingRpcSignature(first.error)) return first;
+  return rpc(supabase, fn, { ...args, p_outcome: LEGACY_OUTCOME[input.outcome] ?? input.outcome }, parse);
 }

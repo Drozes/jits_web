@@ -63,7 +63,7 @@ describe("LookingForMatchToggle", () => {
       store.state = { ...store.state, locationPrompt: "explain" };
       render(<LookingForMatchToggle initialRanked={false} />);
       expect(
-        screen.getByText(/checks you're on the same mat as your opponent/),
+        screen.getByText(/put you on the mat with athletes near you/),
       ).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Go live" })).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "Allow location" }));

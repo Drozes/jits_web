@@ -25,6 +25,7 @@
     "./api/invite-rpc": "./src/api/invite-rpc.ts",
     "./constants": "./src/constants.ts",
     "./constants/highlights": "./src/constants/highlights.ts",
+    "./constants/go-live": "./src/constants/go-live.ts",
     "./geo": "./src/geo/index.ts",
     "./hooks": "./src/hooks/index.ts",
     "./hooks/*": "./src/hooks/*.ts",

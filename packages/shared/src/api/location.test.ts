@@ -128,7 +128,7 @@ describe("startInviteBooking", () => {
   it("a missing RPC (old stack) is rpc_missing, not a crash", async () => {
     const { supabase } = rpcClient({ data: null, error: { message: "nope", code: "PGRST202" } });
     const res = await startInviteBooking(supabase, "c1");
-    expect(res).toEqual({ ok: false, error: { hint: "rpc_missing", message: "nope" } });
+    expect(res).toEqual({ ok: false, error: { hint: "rpc_missing", message: "nope", code: "PGRST202" } });
   });
 
   it("an ok answer without a match id is malformed", () => {

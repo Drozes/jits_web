@@ -81,7 +81,7 @@ describe("logLocationEvent", () => {
   it("reports a missing RPC (older backend) as rpc_missing", async () => {
     const { supabase } = rpcClient({ data: null, error: { message: "not found", code: "PGRST202" } });
     const r = await logLocationEvent(supabase, { event: "go_live_attempt", outcome: "ok" });
-    expect(r).toEqual({ ok: false, error: { hint: "rpc_missing", message: "not found" } });
+    expect(r).toEqual({ ok: false, error: { hint: "rpc_missing", message: "not found", code: "PGRST202" } });
   });
 });
 

@@ -15,6 +15,21 @@ type RpcName = keyof Database["public"]["Functions"];
 export interface InviteRpcError {
   hint: string;
   message: string;
+  /**
+   * The PostgREST / Postgres error code when there was one (`PGRST202`: no
+   * function matches the name and arguments, as an older backend answers a
+   * call with a parameter it does not have yet).
+   */
+  code?: string;
+}
+
+/**
+ * The server has no function with these arguments (PostgREST `PGRST202`):
+ * an older backend that predates a new parameter. The caller falls back to
+ * the call (or the behaviour) the older backend understands.
+ */
+export function isMissingRpcSignature(error: InviteRpcError | null | undefined): boolean {
+  return !!error && (error.code === "PGRST202" || error.hint === "rpc_missing");
 }
 
 export type InviteResult<T> = { ok: true; data: T } | { ok: false; error: InviteRpcError };
@@ -40,7 +55,11 @@ export async function rpc<T>(
     if (error) {
       return {
         ok: false,
-        error: { hint: error.hint || (error.code === "PGRST202" ? "rpc_missing" : "unknown"), message: error.message ?? "" },
+        error: {
+          hint: error.hint || (error.code === "PGRST202" ? "rpc_missing" : "unknown"),
+          message: error.message ?? "",
+          ...(error.code ? { code: error.code } : {}),
+        },
       };
     }
     const parsed = parse(data);
@@ -66,6 +85,13 @@ export type PresenceResult =
       started: boolean;
       match_id: string | null;
       start_blocked_reason: StartBlockedReason | null;
+      /**
+       * `go_live` only, from a backend with the instant go-live migration:
+       * the stored tag's capture time (ISO, the clamped value) and when it
+       * stops counting for going live. Absent from an older backend.
+       */
+      captured_at?: string;
+      tag_valid_until?: string;
     }
   | { ok: false; code: "accuracy_too_low" | "booking_closed" | string };
 
@@ -82,5 +108,7 @@ export function parsePresence(data: unknown): PresenceResult | null {
     started: o.started === true,
     match_id: str(o.match_id),
     start_blocked_reason: (str(o.start_blocked_reason) as StartBlockedReason | null) ?? null,
+    ...(str(o.captured_at) ? { captured_at: str(o.captured_at)! } : {}),
+    ...(str(o.tag_valid_until) ? { tag_valid_until: str(o.tag_valid_until)! } : {}),
   };
 }
