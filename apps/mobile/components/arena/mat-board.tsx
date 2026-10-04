@@ -151,6 +151,11 @@ interface ControlBarProps {
    * pulses meanwhile (live location fixes 4.2).
    */
   goingLive?: boolean;
+  /**
+   * A fresh fix or a retried write is running (FINDING YOU, RECONNECTING):
+   * the LIVE segment shows the pending ring, unselected (UX 019, 2.2).
+   */
+  pending?: boolean;
   /** `12 ON MAT · 7 IN BAND`, or `CONNECTING`. */
   counts: string;
   /** Explicit, never a toggle: a stale `isLive` must not flip the athlete. */
@@ -168,6 +173,7 @@ export function MatControlBar({
   locked,
   saving,
   goingLive = false,
+  pending = false,
   counts,
   onGoLive,
   onGoOffline,
@@ -182,7 +188,7 @@ export function MatControlBar({
         accessibilityLabel={
           selected ? (live ? "You are live" : "You are offline") : live ? "Go live" : "Go offline"
         }
-        accessibilityState={{ selected, disabled, busy: saving && !selected }}
+        accessibilityState={{ selected, disabled, busy: (saving || pending) && !selected }}
         onPress={live ? onGoLive : onGoOffline}
         disabled={disabled}
         hitSlop={{ top: 6, bottom: 6 }}
@@ -192,7 +198,7 @@ export function MatControlBar({
         )}
         style={!selected && locked ? { opacity: 0.6 } : undefined}
       >
-        {live && saving && goingLive && !selected ? (
+        {live && ((saving && goingLive) || pending) && !selected ? (
           // Going live (live location fixes 4.2): the pulse from the tap
           // until the flow resolves, never a still bar that reads as dead.
           <PendingDot size={6} testID="arena-segment-live-pending" />

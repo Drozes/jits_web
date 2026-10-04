@@ -40,23 +40,77 @@ import {
 } from "./arena-store";
 import { useArenaChallenge } from "./use-arena-challenge";
 import { useArenaLive } from "./use-arena-live";
+import { cancelLocationSheet, useLegacyGoLiveReadingRefresh } from "./go-live-location";
 import {
-  cancelLocationSheet,
-  goLiveWithLocation,
-  silentGoLiveReading,
-  useGoLiveReadingRefresh,
-} from "./go-live-location";
-import { GO_LIVE_FAILED_MESSAGE, showLocationOffGoLiveCta } from "./go-live-feedback";
+  GO_LIVE_FAILED_MESSAGE,
+  showLocationOffGoLiveCta,
+  showServerEndedLiveCta,
+} from "./go-live-feedback";
+import { goLiveFromTap, restoreFirstFrame, restoreLiveSilently } from "./location-ladder";
+import { useMatchProximityRequired } from "./location-flags";
 import {
   markMatchLocationRequired,
   readMatchLocationRequired,
   useMatchLocationRequired,
 } from "./match-location-flag";
+import { setDeviceLocationOwner, validDeviceTag } from "@/lib/location/device-location-store";
+import {
+  getPresenceCapability,
+  subscribePresenceCapability,
+} from "@/lib/location/presence-capability";
+import { getGoLiveDisplay, isInArenaMatch, setGoLiveDisplay } from "./arena-store";
 import { useLobbyIds, useLobbyKnown, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
 import { useActiveMatchOwner } from "../match-flow/active-match-store";
 
 const ARENA_KEEP_AWAKE_TAG = "arena-live";
+
+/**
+ * How often a live athlete in the foreground asks the server whether it
+ * still has them live (the 12 hour cap or an admin can end a session; the
+ * athletes row is not on realtime). One small read, never a reading.
+ */
+export const SERVER_LIVE_CHECK_MS = 3 * 60_000;
+
+/** Whether the backend predates the instant go-live migration (`legacy`). */
+function useLegacyBackend(): boolean {
+  const cap = React.useSyncExternalStore(subscribePresenceCapability, getPresenceCapability, getPresenceCapability);
+  return cap === "legacy";
+}
+
+/**
+ * The server ended the live session while the app is open (UX 019, 3j,
+ * C6): on every return to the foreground and every few minutes while live,
+ * read `looking_for_ranked`; a definite false drops the chip to GO LIVE at
+ * once with one toast whose tap runs the Go Live flow.
+ */
+function useServerEndedLiveCheck(
+  active: boolean,
+  check: () => Promise<boolean>,
+): void {
+  const checkRef = React.useRef(check);
+  checkRef.current = check;
+  React.useEffect(() => {
+    if (!active) return;
+    const run = () => {
+      if (AppState.currentState !== "active") return;
+      void checkRef
+        .current()
+        .then((dropped) => {
+          if (dropped) showServerEndedLiveCta();
+        })
+        .catch(() => undefined);
+    };
+    const t = setInterval(run, SERVER_LIVE_CHECK_MS);
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") run();
+    });
+    return () => {
+      clearInterval(t);
+      sub.remove();
+    };
+  }, [active]);
+}
 
 /**
  * Hold the screen awake while the athlete is live. Auto-lock backgrounds the
@@ -100,6 +154,21 @@ export function ArenaBootstrap() {
 }
 
 function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
+  // The device location store belongs to this athlete (an athlete switch
+  // clears the previous one's entry); read it into memory now.
+  React.useLayoutEffect(() => {
+    setDeviceLocationOwner(athlete.id);
+  }, [athlete.id]);
+  // Cold start while the server says live: draw the restore from the first
+  // frame (UX 019, 3h), before the arrival restore has read anything.
+  React.useLayoutEffect(() => {
+    if (athlete.looking_for_ranked && AppState.currentState === "active" && !isInArenaMatch()) {
+      setGoLiveDisplay(restoreFirstFrame(athlete.id));
+    }
+    return () => setGoLiveDisplay(null);
+    // Once, on arrival, like the arrival restore itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useLobbyPresence(athlete.id);
   const lobbyIds = useLobbyIds();
   // An empty set reads the same whether the lobby is empty or its channel is
@@ -122,6 +191,8 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   // match_location_required: Go Live needs a fresh go_live reading, and an
   // Arena start needs both athletes on one mat (contract-location-flag 6).
   const locationRequired = useMatchLocationRequired();
+  const locationRequiredRef = React.useRef(locationRequired);
+  locationRequiredRef.current = locationRequired;
   const live = useArenaLive({
     athleteId: athlete.id,
     displayName: athlete.display_name ?? "",
@@ -133,23 +204,33 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     initialRanked: athlete.looking_for_ranked ?? false,
     inMatch,
     onManualOffline: () => beginManualOfflineRef.current(),
-    // A restore the athlete did not tap: a silent reading first, so the
-    // server accepts the live write (it never asks or shows anything). With
-    // location permission gone (an iOS "Allow Once" grant lapses in the
-    // background) the live write would only be refused: skip it and offer
-    // the tap-to-go-live CTA instead (live location fixes 1b). Other reading
-    // failures still try the write, as before.
-    beforeAutoLive: async () => {
-      if (!(await readMatchLocationRequired())) return true;
-      if ((await silentGoLiveReading()) !== "permission") return true;
-      if (AppState.currentState === "active") showLocationOffGoLiveCta();
-      return false;
+    // A restore the athlete did not tap (foreground, after a match, cold
+    // start): the location ladder, silently (instant go-live 4.2). A valid
+    // stored tag puts the athlete back with no reading; without one, a
+    // silent fix only with permission already granted. Nothing lands: no
+    // live write (D12), one toast.
+    autoLive: (ctx) =>
+      restoreLiveSilently({
+        athleteId: athlete.id,
+        write: ctx.write,
+        lastRefusal: ctx.lastRefusal,
+        canWrite: ctx.canWrite,
+        locationRequiredHint: locationRequiredRef.current,
+      }),
+    // Leaving for the background while live with a valid tag: the chip is
+    // already drawn live for the return (UX 019, 3i).
+    onResumeParked: () => {
+      if (validDeviceTag(athlete.id)) setGoLiveDisplay("restore-live");
     },
   });
   // Read by the refresh handlers below and the controller (registered once).
   const liveRef = React.useRef(live);
   liveRef.current = live;
 
+  // match_proximity_required (seeded OFF): only with both on does an Arena
+  // start need a reading (instant go-live 4.3). An older backend without
+  // the flag that still gates on proximity is caught by its refusal.
+  const proximityFlag = useMatchProximityRequired();
   const challenge = useArenaChallenge({
     athleteId: athlete.id,
     athleteWeight: athlete.current_weight ?? null,
@@ -161,6 +242,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     // the hook refuses to send rather than skip the on-the-mat check (F13).
     lobbyIds: lobbyKnown ? lobbyIds : null,
     locationRequired,
+    proximityRequired: locationRequired && proximityFlag,
   });
   beginManualOfflineRef.current = challenge.beginManualOffline;
 
@@ -183,6 +265,13 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     onIncomingRead: challenge.noteIncomingRead,
   });
 
+  // A restore drawn live is for the tab roots; a match screen's header dot
+  // must never read it (the athlete is offline for the match).
+  React.useEffect(() => {
+    if (!inMatch) return;
+    const d = getGoLiveDisplay();
+    if (d === "restore-live" || d === "restore-finding") setGoLiveDisplay(null);
+  }, [inMatch]);
   const { isLive, isSaving } = live;
   const liveTransition = live.transition ?? null;
   const lastLiveWriteFailed = live.lastWriteFailed ?? false;
@@ -192,12 +281,13 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   const { incoming, outgoing, incomingCount, incomingTucked, isBusy, capReached } =
     challenge;
   useArenaLiveKeepAwake(isLive && !inMatch);
-  // Keep the go_live reading fresh while live so an Arena start finds one.
-  // Permission gone while live: the tap-to-go-live CTA, once per failure
-  // streak (1d). A tick that did not report may mean the server has expired
-  // the session meanwhile: then the app shows offline too (D7).
   const athleteId = athlete.id;
-  useGoLiveReadingRefresh(isLive && !inMatch && locationRequired, {
+  // No reading is refreshed while live (instant go-live 4.2: the 60 s
+  // refresh is gone; the server no longer expires a session for missing
+  // readings). Only against a backend WITHOUT that migration, whose 10
+  // minute expiry still needs it, the old refresh runs, as the build before.
+  const legacyBackend = useLegacyBackend();
+  useLegacyGoLiveReadingRefresh(isLive && !inMatch && locationRequired && legacyBackend, {
     onPermissionLost: showLocationOffGoLiveCta,
     onNotReady: (outcome) => {
       void liveRef.current
@@ -210,10 +300,17 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
         .catch(() => undefined);
     },
   });
+  // The server may still end a session by itself (the 12 hour cap, an
+  // admin): the chip drops at once with one toast (UX 019, 3j).
+  useServerEndedLiveCheck(isLive && !inMatch, () =>
+    liveRef.current.dropIfServerOffline(() => getMyLookingForRanked(supabase, athleteId)),
+  );
   // The challenger's reading while its challenge waits (pending or
-  // accepted): a challenger who is not live, or whose go_live reading went
-  // stale in the background, would otherwise fail the start's proximity gate.
-  useChallengerArenaReading(outgoing?.challengeId ?? null, locationRequired && !inMatch);
+  // accepted), only while an Arena start needs proximity (both flags on).
+  useChallengerArenaReading(
+    outgoing?.challengeId ?? null,
+    locationRequired && proximityFlag && !inMatch,
+  );
 
   // "Later" is only offered while something on screen can bring the prompt
   // back (the header chip registers itself, see useIncomingReopenSurface). If
@@ -261,6 +358,8 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   // always calls the latest callbacks.
   const challengeRef = React.useRef(challenge);
   challengeRef.current = challenge;
+  const athleteIdRef = React.useRef(athlete.id);
+  athleteIdRef.current = athlete.id;
   React.useEffect(() => {
     /**
      * Go live, through the location step when the flag is on. A flag read
@@ -274,10 +373,13 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
         if (ok || l.lastGoLiveRefusal() !== "location_required") return ok;
         markMatchLocationRequired(true);
       }
-      return goLiveWithLocation(
-        () => liveRef.current.goLive(),
-        () => liveRef.current.lastGoLiveRefusal(),
-      );
+      // The location ladder (instant go-live 4.2): server tag, device tag,
+      // OS cache, then a fresh fix (the only rung that may ask).
+      return goLiveFromTap({
+        athleteId: athleteIdRef.current,
+        write: () => liveRef.current.goLive(),
+        lastRefusal: () => liveRef.current.lastGoLiveRefusal(),
+      });
     };
     const unregister = registerArenaController({
       toggle: async () => {

@@ -16,8 +16,10 @@
  *   Motion: N static embers.
  * - Blade clash [04.1 + 11.1], Moment: the halves spread a hair apart and
  *   snap back together (ease-out back) with a small Signal Red spark at the
- *   crossing, when the athlete goes live (false to true, by their own tap,
- *   never a restore on launch, foreground or after a match: `goLive` haptic)
+ *   crossing, when the athlete goes live (false to true as drawn, so on the
+ *   tap itself when an optimistic go-live turns the chip green; by their own
+ *   tap only, once per attempt, never a restore on launch, foreground or
+ *   after a match: `goLive` haptic)
  *   and when the pending count increases after its first load (silent: the
  *   challenge prompt sheet already buzzes `challengeArrived` for every new
  *   challenge). Reduce Motion: no clash and no spark; the go-live haptic is
@@ -49,7 +51,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import Svg, { Line, Polyline } from "react-native-svg";
-import { isAthleteGoLiveFlip } from "@/lib/arena/arena-store";
+import { claimGoLiveMoment, isAthleteGoLiveFlip } from "@/lib/arena/arena-store";
 import { duration, easing, haptics, useAppActive, useReduceMotion } from "@/lib/motion";
 import { countableEmbers } from "@/lib/navigation/tab-badge";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -478,8 +480,10 @@ export function ArenaTabIcon({
     prevLiveRef.current = live;
     if (was || !live) return;
     // Only the athlete's own go-live while the app is in front: a restore on
-    // launch, foreground or after a match is not a moment.
-    if (!activeRef.current || !isAthleteGoLiveFlip()) return;
+    // launch, foreground or after a match is not a moment (UX 019, C5). Once
+    // per tapped attempt: a RECONNECTING beat followed by success, or a fall
+    // to a fresh fix, never fires it twice.
+    if (!activeRef.current || !isAthleteGoLiveFlip() || !claimGoLiveMoment()) return;
     void haptics.goLive();
     playClash();
   }, [live, playClash]);

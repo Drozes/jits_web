@@ -26,7 +26,7 @@ import { useAuth } from "@/lib/auth/hooks";
 import { useMatchToConfirm } from "@/lib/match-flow/active-match-store";
 import type { TabBadge } from "@/lib/navigation/tab-badge";
 import { useBellLoaded, useFreshIncomingCount } from "@/lib/notifications/bell-store";
-import { useArenaIncomingCount, useIsArenaLive } from "./arena-store";
+import { useArenaIncomingCount, useIsArenaDisplayLive } from "./arena-store";
 import { arenaTabBadge } from "./mat-board";
 
 /** What the Arena tab shows, read once for the badge and the icon. */
@@ -47,7 +47,9 @@ export function useArenaTabState(): ArenaTabState {
   // Primitive selectors: the tab bar is always mounted, and must not
   // re-render on every Arena store change (isBusy, outgoing, and so on).
   const incomingCount = useArenaIncomingCount();
-  const isLive = useIsArenaLive();
+  // Live as the athlete sees it (an optimistic go-live is green here too,
+  // so the tab dot and the blade clash land on the tap, UX 019).
+  const isLive = useIsArenaDisplayLive();
   const freshIncoming = useFreshIncomingCount();
   const hasConfirm = useMatchToConfirm(athlete?.id ?? null) !== null;
   const incomingKnown = useBellLoaded();

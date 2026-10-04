@@ -11,6 +11,7 @@ import type { DomainError } from "@jits/shared/api/errors";
 import { arenaProximityCopy, arenaProximityTitle, type ArenaChallengeRole } from "@jits/shared/utils";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "@/lib/invites/location";
+import { recordAcceptedReading } from "@/lib/location/device-location-store";
 
 export async function reportArenaReading(challengeId: string, opts: { ask: boolean }): Promise<void> {
   const loc = await readLocationOnce({ ask: opts.ask });
@@ -22,6 +23,8 @@ export async function reportArenaReading(challengeId: string, opts: { ask: boole
   const res = await reportArenaPresence(supabase, loc.reading, challengeId);
   if (!res.ok) console.warn("[location] arena reading failed:", res.error.hint, res.error.message);
   else if (!res.data.ok) console.warn("[location] arena reading refused:", res.data.code);
+  // Accepted: the athlete's last location on the device (instant go-live 4.1).
+  else recordAcceptedReading("arena", loc.reading, loc.capturedAt ?? Date.now(), res.data);
 }
 
 /** A `start_match_from_challenge` refusal from the proximity gate. */

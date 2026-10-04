@@ -52,6 +52,8 @@ import {
   useArenaState,
   publishNearbyOnMatCount,
   useIsInArenaMatch,
+  useGoLiveDisplay,
+  useIsArenaDisplayLive,
   useLiveSwitchDirection,
   useLiveSwitchPhase,
 } from "@/lib/arena/arena-store";
@@ -115,6 +117,10 @@ export default function ArenaScreen() {
   // Any live transition in flight, from any surface: no Challenge meanwhile.
   const liveSaving = switchPhase === "saving";
   const goingLive = useLiveSwitchDirection() === "going-live";
+  // What the live surfaces draw while a go-live resolves (UX 019): green on
+  // the tap with a valid tag, nothing pending for the first 240 ms.
+  const liveDisplay = useGoLiveDisplay();
+  const displayLive = useIsArenaDisplayLive();
   const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {
@@ -300,10 +306,16 @@ export default function ArenaScreen() {
 
       {/* Outside the scroll view, so it stays put (sticky, AC-A1). */}
       <MatControlBar
-        isLive={isLive}
+        isLive={displayLive}
         locked={switchLocked}
         saving={isSaving || liveSaving}
-        goingLive={goingLive}
+        goingLive={goingLive && liveDisplay !== "hold"}
+        pending={
+          liveDisplay === "going-live" ||
+          liveDisplay === "finding-you" ||
+          liveDisplay === "restore-finding" ||
+          liveDisplay === "recovering"
+        }
         counts={formatMatCounts(onMat, inBand)}
         onGoLive={goLive}
         onGoOffline={() => void goOfflineWithFeedback()}
@@ -320,7 +332,7 @@ export default function ArenaScreen() {
         }
       >
         {/* While live: ON AIR tally and the heartbeat on the tempo clock. */}
-        <OnAirStrip isLive={isLive} />
+        <OnAirStrip isLive={displayLive} />
 
         {strip.challenge === "incoming" && incoming ? (
           <IncomingStrip

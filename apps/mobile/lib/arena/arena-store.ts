@@ -148,6 +148,12 @@ export function publishArenaState(next: ArenaState): void {
   const keys = Object.keys(next) as (keyof ArenaState)[];
   if (keys.every((k) => next[k] === state[k])) return;
   state = next;
+  if (next.isLive) {
+    // Live landed: a display kept for it, or a stale OFFLINE · RETRY, goes.
+    if (clearDisplayOnLive || goLiveDisplay === "retry") goLiveDisplay = null;
+    clearDisplayOnLive = false;
+    needsLocation = false;
+  }
   emitArena();
 }
 
@@ -170,6 +176,205 @@ export function useIsArenaLive(): boolean {
  */
 export function useArenaIncomingCount(): number {
   return useSyncExternalStore(subscribe, getIncomingCount, getIncomingCount);
+}
+
+// ---------------------------------------------------------------------------
+// Go-live display (UX 019, instant go-live)
+// ---------------------------------------------------------------------------
+
+/**
+ * What the live surfaces DRAW while a go-live is resolving, on top of the
+ * committed `isLive` (which stays the server truth, for everything that acts
+ * on it). Null: draw `isLive` as is.
+ *  - `hold`: the first `PENDING_REVEAL_MS` after a tap, before any pending
+ *    state is drawn; looks offline, takes no taps;
+ *  - `optimistic`: the device holds a valid location tag, the write is in
+ *    flight; drawn exactly as live (UX 019, C1);
+ *  - `going-live`: GOING LIVE pending (no connection at the tap, or the OS
+ *    cache lookup still running at 240 ms);
+ *  - `finding-you`: FINDING YOU pending (a fresh fix is running);
+ *  - `recovering`: RECONNECTING (an optimistic write did not land at once);
+ *  - `retry`: OFFLINE · RETRY after the recovery window ran out;
+ *  - `restore-live` / `restore-finding`: an automatic restore (foreground,
+ *    after a match, cold start), drawn live from the first frame when the
+ *    device holds a valid tag, else FINDING YOU (UX 019, C2).
+ */
+export type GoLiveDisplay =
+  | "hold"
+  | "optimistic"
+  | "going-live"
+  | "finding-you"
+  | "recovering"
+  | "retry"
+  | "restore-live"
+  | "restore-finding";
+
+/** Time after a tap before any pending state is drawn (`duration.fast`). */
+export const PENDING_REVEAL_MS = 240;
+
+let goLiveDisplay: GoLiveDisplay | null = null;
+/** The last attempt ended for location (accessibility hint "Location needed to go live"). */
+let needsLocation = false;
+/** The go-live Moment (haptic + blade clash) of the current tapped attempt was spent. */
+let goLiveMomentSpent = false;
+
+export function getGoLiveDisplay(): GoLiveDisplay | null {
+  return goLiveDisplay;
+}
+
+let revealTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelReveal(): void {
+  if (revealTimer) clearTimeout(revealTimer);
+  revealTimer = null;
+}
+
+/**
+ * Set what the live surfaces draw. Any explicit set cancels a scheduled
+ * reveal: the flow knows more than the timer did.
+ */
+export function setGoLiveDisplay(next: GoLiveDisplay | null): void {
+  cancelReveal();
+  if (next === goLiveDisplay) return;
+  goLiveDisplay = next;
+  emitArena();
+}
+
+/**
+ * While the display is still `hold`, switch it to `kind` at `atMs` (ms
+ * epoch): the 240 ms pending reveal (UX 019, 2.3). Replaces a reveal
+ * already scheduled, keeping the flow's own clock. Already past: at once.
+ */
+export function scheduleGoLiveReveal(kind: GoLiveDisplay, atMs: number): void {
+  cancelReveal();
+  const fire = () => {
+    revealTimer = null;
+    if (goLiveDisplay !== "hold") return;
+    goLiveDisplay = kind;
+    emitArena();
+  };
+  const wait = atMs - Date.now();
+  if (wait <= 0) fire();
+  else revealTimer = setTimeout(fire, wait);
+}
+
+/** The display overlay, as a primitive. */
+export function useGoLiveDisplay(): GoLiveDisplay | null {
+  return useSyncExternalStore(subscribe, getGoLiveDisplay, getGoLiveDisplay);
+}
+
+/**
+ * A go-live landed but the owner has not published `isLive` yet (it does in
+ * an effect after the write): keep the display until it has, so no GO LIVE
+ * frame slips between the pending (or optimistic) chip and LIVE.
+ */
+let clearDisplayOnLive = false;
+let clearDisplayTimer: ReturnType<typeof setTimeout> | null = null;
+/** Longest a landed go-live keeps its display waiting for `isLive` to publish. */
+export const DISPLAY_LIVE_WAIT_MS = 1_000;
+
+function keepDisplayUntilLive(): void {
+  cancelReveal();
+  clearDisplayOnLive = true;
+  if (clearDisplayTimer) clearTimeout(clearDisplayTimer);
+  // Safety net: the owner publishes within a render; never leave a stale
+  // overlay up if it does not (unmounted, a test without an owner).
+  clearDisplayTimer = setTimeout(() => {
+    clearDisplayTimer = null;
+    if (!clearDisplayOnLive) return;
+    clearDisplayOnLive = false;
+    setGoLiveDisplay(null);
+  }, DISPLAY_LIVE_WAIT_MS);
+}
+
+/** Clear the display now if the store already says live, else as soon as it does. */
+export function clearGoLiveDisplayWhenLive(): void {
+  if (state.isLive) {
+    clearDisplayOnLive = false;
+    setGoLiveDisplay(null);
+    return;
+  }
+  keepDisplayUntilLive();
+}
+
+/** Whether a display kind is drawn as live. */
+export function displayDrawsLive(display: GoLiveDisplay | null, isLive: boolean): boolean {
+  if (display === "optimistic" || display === "restore-live") return true;
+  if (display === null) return isLive;
+  // Every other overlay is a not-yet-live (or failed) state; a committed
+  // live flag still wins (a late write that landed is the truth).
+  return isLive && display !== "hold";
+}
+
+function getDisplayLive(): boolean {
+  return displayDrawsLive(goLiveDisplay, state.isLive);
+}
+
+/**
+ * Live as the athlete SEES it (the chip, the Arena bar, the tab dot and
+ * icon): the committed flag, or an optimistic / restore overlay.
+ */
+export function useIsArenaDisplayLive(): boolean {
+  return useSyncExternalStore(subscribe, getDisplayLive, getDisplayLive);
+}
+
+export function setNeedsLocation(next: boolean): void {
+  if (next === needsLocation) return;
+  needsLocation = next;
+  emitArena();
+}
+
+function getNeedsLocation(): boolean {
+  return needsLocation;
+}
+
+export function useNeedsLocation(): boolean {
+  return useSyncExternalStore(subscribe, getNeedsLocation, getNeedsLocation);
+}
+
+/**
+ * The go-live Moment (the `goLive` haptic and the tab icon's blade clash)
+ * fires once per tapped attempt (UX 019, section 5): a RECONNECTING beat
+ * followed by success must not fire it again. True the first time it is
+ * claimed within the current attempt.
+ */
+export function claimGoLiveMoment(): boolean {
+  if (goLiveMomentSpent) return false;
+  goLiveMomentSpent = true;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// The live menu's open state (the drift sheet waits for it to close)
+// ---------------------------------------------------------------------------
+
+let liveMenusOpen = 0;
+const menuListeners = new Set<() => void>();
+
+/** The header live menu registers itself while it is open. */
+export function useRegisterLiveMenuOpen(open: boolean): void {
+  React.useEffect(() => {
+    if (!open) return;
+    liveMenusOpen += 1;
+    for (const l of [...menuListeners]) l();
+    return () => {
+      liveMenusOpen = Math.max(0, liveMenusOpen - 1);
+      for (const l of [...menuListeners]) l();
+    };
+  }, [open]);
+}
+
+export function useLiveMenuOpen(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      menuListeners.add(cb);
+      return () => {
+        menuListeners.delete(cb);
+      };
+    },
+    () => liveMenusOpen > 0,
+    () => liveMenusOpen > 0,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -338,8 +543,22 @@ let switchDirection: LiveSwitchDirection | null = null;
 let switchCooldown = false;
 let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
 
+/**
+ * An automatic restore is running its location ladder (instant go-live):
+ * the switch is "saving" toward live for its whole length, not only for the
+ * live write, so a tap can never race it (and a go-offline cannot be undone
+ * by its later write).
+ */
+let restoreInFlight = false;
+
+export function setRestoreInFlight(next: boolean): void {
+  if (next === restoreInFlight) return;
+  restoreInFlight = next;
+  emitArena();
+}
+
 function getLiveSwitchPhase(): LiveSwitchPhase {
-  if (state.isSaving || state.liveTransition || switchInFlight) return "saving";
+  if (state.isSaving || state.liveTransition || switchInFlight || restoreInFlight) return "saving";
   if (switchCooldown) return "cooldown";
   return "ready";
 }
@@ -358,6 +577,7 @@ function getLiveSwitchDirection(): LiveSwitchDirection | null {
   if (switchInFlight) return switchDirection;
   // A restore the app started knows where it is heading.
   if (state.liveTransition) return state.liveTransition;
+  if (restoreInFlight) return "going-live";
   // A toggle outside the guard cannot happen (arenaActions.toggle is
   // guarded), but `isSaving` alone still has a direction: away from now.
   if (state.isSaving) return state.isLive ? "going-offline" : "going-live";
@@ -397,10 +617,31 @@ async function runGuarded<T>(
   const current = controller;
   switchInFlight = true;
   switchDirection = direction;
+  // A tapped go-live: nothing pending is drawn for the first 240 ms (UX 019,
+  // 2.3); the flow replaces `hold` as soon as it knows more (optimistic,
+  // FINDING YOU, a sheet). Still `hold` at 240 ms: GOING LIVE.
+  if (direction === "going-offline" && goLiveDisplay === "retry") goLiveDisplay = null;
+  if (direction === "going-live") {
+    goLiveMomentSpent = false;
+    clearDisplayOnLive = false;
+    cancelReveal();
+    goLiveDisplay = "hold";
+    scheduleGoLiveReveal("going-live", Date.now() + PENDING_REVEAL_MS);
+  }
   emitArena();
+  let result: T | undefined;
   try {
-    return await work(current);
+    result = await work(current);
+    return result;
   } finally {
+    // The flow leaves `retry` up after a recovery window ran out; anything
+    // else it showed belongs to the attempt that just ended. A go-live that
+    // landed keeps its display until the store says live (no GO LIVE frame).
+    if (direction === "going-live") {
+      cancelReveal();
+      if (result === true && !state.isLive) keepDisplayUntilLive();
+      else if (goLiveDisplay !== "retry") goLiveDisplay = null;
+    }
     if (direction === "going-live") athleteGoLiveSettledAt = Date.now();
     switchInFlight = false;
     switchDirection = null;
@@ -722,6 +963,8 @@ export async function takeArenaOfflineBeforeSignOut(
   // Left matches belong to this athlete; the next one to sign in starts clean.
   leftMatchIds.clear();
   clearAthleteGoLive();
+  setGoLiveDisplay(null);
+  setNeedsLocation(false);
   // Not gated on `isLive`: a go-live still in flight has not flipped it yet,
   // and the reconcile queue turns an already-offline call into a no-op.
   if (!controller) return;
@@ -758,4 +1001,12 @@ export function __resetArenaStoreForTests(): void {
   reopenSurfaces = 0;
   reopenListeners.clear();
   incomingEndedListeners.clear();
+  cancelReveal();
+  goLiveDisplay = null;
+  clearDisplayOnLive = false;
+  needsLocation = false;
+  goLiveMomentSpent = false;
+  restoreInFlight = false;
+  liveMenusOpen = 0;
+  menuListeners.clear();
 }

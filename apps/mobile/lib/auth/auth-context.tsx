@@ -20,6 +20,8 @@ import { resetHighlightStore } from "../highlight/highlight-store";
 import { clearPushDeferral } from "../invites/pending-invite";
 import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
 import { resetMatchLocationRequired } from "../arena/match-location-flag";
+import { resetLocationFlags } from "../arena/location-flags";
+import { clearAllDeviceLocations } from "../location/device-location-store";
 import { cancelLocationSheet } from "../arena/go-live-location";
 
 type AuthError = { message: string };
@@ -343,6 +345,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void clearPushDeferral();
     resetInvitesEnabledCache();
     resetMatchLocationRequired();
+    resetLocationFlags();
+    // The athlete's last accepted location never outlives the session
+    // (instant go-live 4.1): the next account on this device starts clean.
+    clearAllDeviceLocations();
     // A Go Live waiting on the location sheet answers "cancel" (the live
     // switch must not stay locked for the next account).
     cancelLocationSheet();

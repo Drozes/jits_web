@@ -6,7 +6,7 @@
  * finds the Arena toggle by those): every chip label starts with
  * `Live status:` (AC-H13).
  */
-import type { LiveSwitchDirection, LiveSwitchPhase } from "./arena-store";
+import { displayDrawsLive, type GoLiveDisplay, type LiveSwitchDirection, type LiveSwitchPhase } from "./arena-store";
 import { freshRemainingMs } from "./incoming-challenges";
 import { formatCountdown, spokenCountdown } from "./fresh-countdown";
 import { formatBadgeCount } from "@/lib/navigation/tab-badge";
@@ -65,6 +65,7 @@ export const LIVE_DOT_PX = 6;
 export type ChipKind =
   | "offline"
   | "going-live"
+  | "finding-you"
   | "live"
   | "waiting"
   | "incoming"
@@ -116,7 +117,14 @@ export interface ChipModel {
   /** The athlete is live (the harness reads this as the chip's value). */
   live: boolean;
   accessibilityLabel: string;
+  /** Said after the label (offline after a location failure: "Location needed to go live"). */
+  accessibilityHint?: string;
 }
+
+/** The FINDING YOU chip's spoken label (UX 019, 4). */
+export const FINDING_YOU_LABEL = `${CHIP_LABEL_PREFIX} finding your location`;
+/** The offline chip's hint after an attempt ended for location (UX 019, 2.2). */
+export const NEEDS_LOCATION_HINT = "Location needed to go live";
 
 export interface ChipInput {
   isLive: boolean;
@@ -151,6 +159,14 @@ export interface ChipInput {
    * label does not say "Open Arena".
    */
   onArena?: boolean;
+  /**
+   * What a go-live in progress draws (instant go-live, UX 019): `hold`
+   * (no pending yet), `optimistic` / `restore-live` (drawn live), GOING
+   * LIVE, FINDING YOU, RECONNECTING, OFFLINE · RETRY. Null: `isLive` as is.
+   */
+  display?: GoLiveDisplay | null;
+  /** The last attempt ended for location: the offline chip says why to VoiceOver. */
+  needsLocation?: boolean;
   now: number;
 }
 
@@ -184,7 +200,11 @@ function remaining(
  * appended to base states only and never changes them.
  */
 export function describeHeaderChip(input: ChipInput): ChipModel {
-  const { isLive, phase, now } = input;
+  const { phase, now } = input;
+  const display = input.display ?? null;
+  // Live as the athlete sees it: the committed flag, or an optimistic /
+  // restore overlay (a valid tag is in hand and the write is in flight).
+  const isLive = displayDrawsLive(display, input.isLive);
   const saving = phase === "saving";
   // A go-live tap needs the switch ready AND an owner to run it: with no
   // controller registered the guarded call is a silent no-op.
@@ -269,7 +289,59 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
     live: isLive,
   });
 
-  if (!isLive && saving && input.direction === "going-live") {
+  // A go-live in progress (instant go-live display overlay, UX 019).
+  if (display === "hold" && !isLive) {
+    // The first 240 ms after the tap: nothing pending yet, and no taps.
+    const n = input.onMat;
+    return base({
+      kind: "offline",
+      tone: "neutral",
+      glyph: "○",
+      lead: n === null ? "GO LIVE" : `GO LIVE · ${formatBadgeCount(n)}`,
+      action: "none",
+      disabled: true,
+      accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Go live`,
+    });
+  }
+  if ((display === "finding-you" || display === "restore-finding") && !isLive) {
+    return base({
+      kind: "finding-you",
+      tone: "neutral",
+      glyph: "◌",
+      lead: "FINDING YOU",
+      action: "none",
+      disabled: true,
+      // No accessibilityValue (see `chipAccessibilityValue`).
+      accessibilityLabel: FINDING_YOU_LABEL,
+    });
+  }
+  if (display === "recovering" && !isLive) {
+    return base({
+      kind: "reconnecting",
+      tone: "neutral",
+      glyph: "◌",
+      lead: "RECONNECTING",
+      action: "popover",
+      // The write is still being retried: no live menu until it settles.
+      disabled: true,
+      accessibilityLabel: `${CHIP_LABEL_PREFIX} reconnecting. Open live menu`,
+    });
+  }
+  if (display === "retry" && !isLive) {
+    return base({
+      kind: "retry",
+      tone: "neutral",
+      glyph: "○",
+      lead: "OFFLINE · RETRY",
+      action: "go-live",
+      disabled: !canGoLive,
+      accessibilityLabel: `${CHIP_LABEL_PREFIX} going live failed. Retry going live`,
+    });
+  }
+  if (
+    !isLive &&
+    (display === "going-live" || (display === null && saving && input.direction === "going-live"))
+  ) {
     return base({
       kind: "going-live",
       tone: "neutral",
@@ -327,6 +399,7 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
     action: "go-live",
     disabled: !canGoLive,
     accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Go live`,
+    ...(input.needsLocation ? { accessibilityHint: NEEDS_LOCATION_HINT } : {}),
   });
 }
 
@@ -335,7 +408,7 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
  * reads it). GOING LIVE has none: "going live, offline" would contradict.
  */
 export function chipAccessibilityValue(m: ChipModel): { text: string } | undefined {
-  if (m.kind === "going-live") return undefined;
+  if (m.kind === "going-live" || m.kind === "finding-you") return undefined;
   return { text: m.live ? "live" : "offline" };
 }
 

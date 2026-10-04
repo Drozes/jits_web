@@ -15,7 +15,7 @@ import * as React from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useLiveSwitchLocked } from "@/lib/arena/arena-store";
+import { useLiveSwitchLocked, useRegisterLiveMenuOpen } from "@/lib/arena/arena-store";
 import { ARENA_HREF } from "@/lib/arena/constants";
 import { goOfflineWithFeedback } from "@/lib/arena/go-live-feedback";
 import { cn } from "@/lib/cn";
@@ -35,6 +35,8 @@ export function LiveMenuPopover({ visible, onClose }: LiveMenuPopoverProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const locked = useLiveSwitchLocked();
+  // The drift prompt waits while this menu is up.
+  useRegisterLiveMenuOpen(visible);
 
   const openArena = () => {
     onClose();

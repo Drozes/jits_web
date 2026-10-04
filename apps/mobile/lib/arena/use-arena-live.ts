@@ -82,6 +82,31 @@ export interface UseArenaLiveArgs {
    * CTA. Anything else goes ahead. Never rejects.
    */
   beforeAutoLive?: () => Promise<boolean | void>;
+  /**
+   * Instant go-live (jr_be 016 addendum 4.2): runs a WHOLE automatic
+   * restore, live writes included, through the location ladder (the server
+   * may refuse rung 1's write and the ladder then reports a tag and writes
+   * again). Replaces `beforeAutoLive` when given. `ctx.write` is the
+   * serialized live write; `ctx.canWrite` says whether a write may go out
+   * now ("parked": the app went to the background or into a match, hand the
+   * intent on; "cancelled": the athlete went offline meanwhile). The ladder
+   * shows its own toast on failure. Never rejects.
+   */
+  autoLive?: (ctx: AutoLiveContext) => Promise<"live" | "failed" | "parked" | "cancelled">;
+  /**
+   * The app went to the background and took a live athlete down, meaning to
+   * restore them on return (UX 019, 3i: the owner may draw the restore from
+   * the first frame back).
+   */
+  onResumeParked?: () => void;
+}
+
+export interface AutoLiveContext {
+  write: () => Promise<boolean>;
+  lastRefusal: () => "location_required" | null;
+  canWrite: () => "ok" | "parked" | "cancelled";
+  /** What brought the restore on. */
+  reason: "foreground" | "match" | "arrival";
 }
 
 export interface UseArenaLiveResult {
@@ -212,6 +237,8 @@ export function useArenaLive({
   inMatch = false,
   onManualOffline,
   beforeAutoLive,
+  autoLive,
+  onResumeParked,
 }: UseArenaLiveArgs): UseArenaLiveResult {
   const [isLive, setIsLive] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -248,6 +275,12 @@ export function useArenaLive({
   manualOfflineRef.current = onManualOffline;
   const beforeAutoLiveRef = React.useRef(beforeAutoLive);
   beforeAutoLiveRef.current = beforeAutoLive;
+  const autoLiveRef = React.useRef(autoLive);
+  autoLiveRef.current = autoLive;
+  const onResumeParkedRef = React.useRef(onResumeParked);
+  onResumeParkedRef.current = onResumeParked;
+  /** Bumped by every offline intent the athlete or the app set, so a restore can tell. */
+  const offlineIntentRef = React.useRef(0);
   /** The server's reason for the last refused go-live write, if it gave one. */
   const refusalRef = React.useRef<"location_required" | null>(null);
 
@@ -441,6 +474,7 @@ export function useArenaLive({
 
   const requestOffline = React.useCallback((): Promise<boolean> => {
     desiredRef.current = false;
+    offlineIntentRef.current += 1;
     return reconcile();
   }, [reconcile]);
 
@@ -527,11 +561,49 @@ export function useArenaLive({
   }, []);
 
   /**
+   * Run the owner's `autoLive` (the location ladder), with the write, the
+   * refusal reason and the gate it needs. "parked" hands the intent to the
+   * next foreground / the end of the match.
+   */
+  const runAutoLive = React.useCallback(
+    async (reason: AutoLiveContext["reason"]): Promise<"live" | "failed" | "parked" | "cancelled"> => {
+      const run = autoLiveRef.current;
+      if (!run) return "failed";
+      const offlineAtStart = offlineIntentRef.current;
+      try {
+        return await run({
+          write: () => requestLiveRef.current(),
+          lastRefusal: () => refusalRef.current,
+          canWrite: () => {
+            // Backgrounding and entering a match also set an offline
+            // intent: those park the restore, they do not cancel it.
+            if (AppState.currentState !== "active" || inMatchRef.current) return "parked";
+            if (offlineIntentRef.current !== offlineAtStart && !desiredRef.current) return "cancelled";
+            return "ok";
+          },
+          reason,
+        });
+      } catch (error: unknown) {
+        console.warn("[arena] restoring live failed:", error);
+        return "failed";
+      }
+    },
+    [],
+  );
+
+  /**
    * Put back a live state that the app, not the athlete, took away. A failure
    * is said out loud: the athlete believes they are live, and nothing else
    * on screen would tell them otherwise.
    */
-  const restoreLive = React.useCallback(async () => {
+  const restoreLive = React.useCallback(async (reason: AutoLiveContext["reason"] = "foreground") => {
+    if (autoLiveRef.current) {
+      const r = await runAutoLive(reason);
+      if (r !== "parked") return;
+      if (inMatchRef.current) resumeAfterMatchRef.current = true;
+      else resumeLiveRef.current = true;
+      return;
+    }
     const proceed = await runBeforeAutoLive();
     // Backgrounded (or into a match) during that reading: hand the intent
     // to the next foreground / the end of the match, never go live unseen.
@@ -545,7 +617,7 @@ export function useArenaLive({
     if (!proceed) return;
     const ok = await requestLiveRef.current();
     if (!ok) toast.info("You're offline. Go live again in the Arena.");
-  }, [runBeforeAutoLive]);
+  }, [runBeforeAutoLive, runAutoLive]);
 
   // Re-assert a flag the athlete arrived with. This hook is mounted once per
   // signed-in athlete (by `<ArenaBootstrap />`), so `initialRanked` is the row
@@ -589,6 +661,23 @@ export function useArenaLive({
     // uncommitted so the reconcile loop runs a full transition (flag AND
     // lobby) instead of seeing desired === actual and doing nothing.
     actualRef.current = false;
+    if (autoLiveRef.current) {
+      void runAutoLive("arrival").then((r) => {
+        if (r === "live" || r === "cancelled") return;
+        if (r === "parked") {
+          if (inMatchRef.current) resumeAfterMatchRef.current = true;
+          else resumeLiveRef.current = true;
+        }
+        // The arrived `true` is still committed in the database (presence is
+        // not): clear it, so nobody can challenge an athlete the app could
+        // not put back. Not when the athlete has tapped Go live meanwhile.
+        if (!desiredRef.current) {
+          actualRef.current = true;
+          void requestOfflineRef.current();
+        }
+      });
+      return;
+    }
     if (!beforeAutoLiveRef.current) {
       void requestLiveRef.current();
       return;
@@ -609,7 +698,7 @@ export function useArenaLive({
       }
       void requestLiveRef.current();
     });
-  }, [athleteId, runBeforeAutoLive]);
+  }, [athleteId, runBeforeAutoLive, runAutoLive]);
 
   // THE LIFECYCLE. Live belongs to the athlete, not to a screen:
   //  - Switching tabs or pushing a profile: still live. The header LIVE pill
@@ -640,6 +729,7 @@ export function useArenaLive({
       if (next === "background") {
         resumeLiveRef.current = resumeLiveRef.current || desiredRef.current;
         void requestOfflineRef.current();
+        if (resumeLiveRef.current && !inMatchRef.current) onResumeParkedRef.current?.();
         return;
       }
       // Put back exactly what the background took away. Without this the
@@ -653,7 +743,7 @@ export function useArenaLive({
         resumeAfterMatchRef.current = true;
         return;
       }
-      void restoreLive();
+      void restoreLive("foreground");
     };
     const sub = AppState.addEventListener("change", onChange);
     return () => sub.remove();
@@ -679,7 +769,7 @@ export function useArenaLive({
       resumeLiveRef.current = true;
       return;
     }
-    void restoreLive();
+    void restoreLive("match");
   }, [inMatch, restoreLive]);
 
   // A real teardown (sign-out, switching athlete, app shutdown) still clears.

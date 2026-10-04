@@ -1,15 +1,20 @@
 /**
- * Go Live with `match_location_required` ON (contract-location-flag 6): explain,
- * ask for foreground location, take a fresh reading, report it as `go_live`,
- * and only then flip live. The server refuses a go-live without a fresh
- * reading (HINT `location_required`), so this runs BEFORE the live write.
+ * Go Live with `match_location_required` ON: the location sheets, the flow
+ * lifetime, and the interactive location step (explain, the system prompt,
+ * denied with Retry, the failure sheets). The location LADDER that decides
+ * whether a fresh reading is needed at all (server tag, device tag, OS
+ * cache, fresh fix) is `location-ladder.ts` (jr_be 016 addendum, instant
+ * go-live 4.2); this module is its rung 4, and the whole flow when the
+ * backend predates the instant go-live migration (`presence-capability.ts`,
+ * "legacy": a fresh reading before every go-live, as the build before).
  *
  * The athlete-facing states (explain, denied, poor accuracy, Precise Location
  * off, no fix) are a small store read by `<GoLiveLocationSheet />`, which
  * `<ArenaBootstrap />` mounts once beside the challenge prompt. Each one
  * waits on the athlete's answer, outside the live hook's serialized queue,
  * so a background landing while the sheet is up still takes the athlete
- * offline at once.
+ * offline at once. While a sheet waits the chip draws `○ GO LIVE` under the
+ * scrim (`hold`); once Continue / Retry make it busy, `◌ FINDING YOU`.
  *
  * Live location fixes (jr_be 016 addendum, section 4):
  *  - 1a: permission that is not granted but can still be asked (never asked,
@@ -22,9 +27,11 @@
  *  - 3a: a reduced-precision reading gets the Precise Location copy.
  *  - 5: one `go_live_attempt` log per athlete-initiated flow, fire and forget.
  *
- * While live (foreground, not in a match) the reading is refreshed every
- * 60 s (`useGoLiveReadingRefresh`), so an Arena start finds a fresh one.
- * Coordinates are sent once per reading and never stored on the device.
+ * No reading is refreshed while live on a current backend (the 60 s refresh
+ * is gone, instant go-live 4.2). `useLegacyGoLiveReadingRefresh` keeps it
+ * only against a legacy backend, whose 10 minute expiry still needs it.
+ * A reading the server ACCEPTS is kept on the device as the athlete's last
+ * location (`lib/location/device-location-store.ts`); a refused one never is.
  */
 import * as React from "react";
 import { useSyncExternalStore } from "react";
@@ -34,10 +41,15 @@ import { reportGoLivePresence, type LocationEventOutcome } from "@jits/shared/ap
 import type { LocationReading } from "@jits/shared/api/invites";
 import { supabase } from "@/lib/supabase/client";
 import { permissionRequestInFlight, readLocationOnce } from "@/lib/invites/location";
-import type { LiveSwitchIgnored } from "./arena-store";
+import { recordAcceptedReading } from "@/lib/location/device-location-store";
+import { notePresenceAnswer } from "@/lib/location/presence-capability";
+import { setGoLiveDisplay, type LiveSwitchIgnored } from "./arena-store";
 import { logGoLiveAttempt } from "./location-telemetry";
 
-/** How often a live athlete's `go_live` reading is refreshed (contract 6). */
+/**
+ * How often a live athlete's `go_live` reading is refreshed against a
+ * LEGACY backend only (its 10 minute expiry needs it; contract 6).
+ */
 export const GO_LIVE_REFRESH_MS = 60_000;
 
 export type GoLiveLocationPhase = "explain" | "denied" | "accuracy" | "precise" | "unavailable" | "movement";
@@ -84,6 +96,9 @@ function present(
   // A previous wait still open (should not happen: callers are serialized
   // by the live switch guard) is answered "cancel" rather than leaked.
   resolver?.("cancel");
+  // The attempt is waiting on the athlete, not on a fix: no pending state
+  // under the scrim (UX 019, 3c step 3).
+  if (purpose === "go_live" && activeFlow) setGoLiveDisplay("hold");
   setSheet({ phase, busy: false, purpose });
   return new Promise((resolve) => {
     resolver = resolve;
@@ -111,7 +126,11 @@ export function answerGoLiveLocation(choice: Exclude<GoLiveLocationChoice, "back
   // The athlete's own tap on the sheet on screen, whatever its purpose.
   if (choice === "cancel") {
     if (sheet) setSheet(null);
-  } else if (sheet) setSheet({ ...sheet, busy: true });
+  } else if (sheet) {
+    // Continue / Retry: a fix is running now (FINDING YOU under the sheet).
+    if ((sheet.purpose ?? "go_live") === "go_live" && activeFlow) setGoLiveDisplay("finding-you");
+    setSheet({ ...sheet, busy: true });
+  }
   resolve?.(choice);
 }
 
@@ -149,6 +168,16 @@ export async function explainArenaLocation(): Promise<boolean> {
 /** The challenger's close: only its own `arena` sheet. */
 export function closeLocationSheet(): void {
   closeSheet("arena");
+}
+
+/** The ladder's rung 4 shows the no-fix sheet after a refused live write. */
+export function presentGoLiveLocation(phase: GoLiveLocationPhase): Promise<GoLiveLocationChoice> {
+  return present(phase);
+}
+
+/** Close the Go Live sheet (the flow is done with it). */
+export function closeGoLiveSheet(): void {
+  closeSheet("go_live");
 }
 
 /**
@@ -204,7 +233,7 @@ function newFlow(): GoLiveFlow {
   return flow;
 }
 
-function beginFlow(): GoLiveFlow {
+export function beginFlow(): GoLiveFlow {
   const flow = newFlow();
   activeFlow = flow;
   if (!appStateSub) {
@@ -231,7 +260,7 @@ export const ACTIVE_WAIT_MS = 1_500;
  * now, or comes back within `ms` (Android reports "active" again only after
  * the permission dialog has closed, which can trail its answer).
  */
-function waitForActive(flow: GoLiveFlow, ms = ACTIVE_WAIT_MS): Promise<boolean> {
+export function waitForActive(flow: GoLiveFlow, ms = ACTIVE_WAIT_MS): Promise<boolean> {
   if (AppState.currentState === "active") return Promise.resolve(true);
   return new Promise((resolve) => {
     let sub: { remove: () => void } | null = null;
@@ -248,7 +277,7 @@ function waitForActive(flow: GoLiveFlow, ms = ACTIVE_WAIT_MS): Promise<boolean> 
   });
 }
 
-function endFlow(flow: GoLiveFlow): void {
+export function endFlow(flow: GoLiveFlow): void {
   if (activeFlow !== flow) return;
   activeFlow = null;
   appStateSub?.remove();
@@ -259,7 +288,7 @@ function endFlow(flow: GoLiveFlow): void {
 // Reading
 // ---------------------------------------------------------------------------
 
-type ReadOutcome =
+export type ReadOutcome =
   | { kind: "ok"; reading: LocationReading }
   | { kind: "denied"; canAskAgain: boolean }
   /** No fix in 10 s, or the system prompt never answered (30 s). */
@@ -273,22 +302,19 @@ type ReadOutcome =
   | { kind: "error"; reading: LocationReading };
 
 /**
- * One reading (fast path: last known, Balanced, High), reported as
- * `go_live`. `ask`: the system prompt may show.
+ * Report a fresh reading as `go_live` (no capture time: the server uses its
+ * receive time, exactly the call an older backend accepts). The default
+ * reporter; the ladder passes one that retries through a network blip.
  */
-async function readAndReport(ask: boolean): Promise<ReadOutcome> {
-  const loc = await readLocationOnce({ ask, fast: true });
-  if (loc.status === "denied") return { kind: "denied", canAskAgain: loc.canAskAgain };
-  if (loc.status === "unavailable") return loc.reason === "timeout" ? { kind: "timeout" } : { kind: "unavailable" };
-  const reading = loc.reading;
-  // Kilometre-scale: the server would only refuse it, and the athlete needs
-  // the Precise Location setting, not a window.
-  if (loc.reducedPrecision) return { kind: "precise", reading };
+export type FreshReporter = (reading: LocationReading, capturedAt: number) => Promise<ReadOutcome>;
+
+export const reportFreshOnce: FreshReporter = async (reading, capturedAt) => {
   const res = await reportGoLivePresence(supabase, reading);
   if (!res.ok) {
     console.warn("[location] go_live report failed:", res.error.hint, res.error.message);
     return { kind: "error", reading };
   }
+  notePresenceAnswer(res.data);
   if (!res.data.ok) {
     if (res.data.code === "accuracy_too_low") return { kind: "accuracy", reading };
     // An implied speed over 50 m/s from the previous reading: say so, and
@@ -296,21 +322,58 @@ async function readAndReport(ask: boolean): Promise<ReadOutcome> {
     if (res.data.code === "implausible_movement") return { kind: "movement", reading };
     return { kind: "error", reading };
   }
+  recordAcceptedReading("go_live", reading, capturedAt, res.data);
   return { kind: "ok", reading };
+};
+
+export interface ReadOptions {
+  /** The ladder's rung 3 already looked at the OS cache. */
+  skipLastKnown?: boolean;
+  reporter?: FreshReporter;
 }
 
-interface PermissionState {
+/**
+ * One reading (fast path: last known, Balanced, High), reported as
+ * `go_live`. `ask`: the system prompt may show.
+ */
+async function readAndReport(ask: boolean, opts: ReadOptions = {}): Promise<ReadOutcome> {
+  const loc = await readLocationOnce({ ask, fast: true, ...(opts.skipLastKnown ? { skipLastKnown: true } : {}) });
+  if (loc.status === "denied") return { kind: "denied", canAskAgain: loc.canAskAgain };
+  if (loc.status === "unavailable") return loc.reason === "timeout" ? { kind: "timeout" } : { kind: "unavailable" };
+  const reading = loc.reading;
+  // Kilometre-scale: the server would only refuse it, and the athlete needs
+  // the Precise Location setting, not a window.
+  if (loc.reducedPrecision) return { kind: "precise", reading };
+  return (opts.reporter ?? reportFreshOnce)(reading, loc.capturedAt ?? Date.now());
+}
+
+export interface PermissionState {
   granted: boolean;
   canAskAgain: boolean;
+  /** Android approximate location only (no reading can pass 100 m). */
+  coarse?: boolean;
 }
 
-async function permissionState(): Promise<PermissionState> {
+/** The last permission state read, for synchronous first-frame decisions. */
+let lastPermission: PermissionState | null = null;
+
+export function lastKnownPermission(): PermissionState | null {
+  return lastPermission;
+}
+
+/** The foreground location permission, read (never asked). */
+export async function permissionState(): Promise<PermissionState> {
   try {
     const p = await Location.getForegroundPermissionsAsync();
-    return { granted: Boolean(p.granted), canAskAgain: Boolean(p.canAskAgain) };
+    lastPermission = {
+      granted: Boolean(p.granted),
+      canAskAgain: Boolean(p.canAskAgain),
+      ...((p as { android?: { accuracy?: string } }).android?.accuracy === "coarse" ? { coarse: true } : {}),
+    };
   } catch {
-    return { granted: false, canAskAgain: false };
+    lastPermission = { granted: false, canAskAgain: false };
   }
+  return lastPermission;
 }
 
 /**
@@ -348,16 +411,18 @@ const MAX_STEPS = 8;
  * (re-askable), denied with Retry (not re-askable), the reading, and a
  * failure sheet with Retry for each way a reading can fail.
  */
-export async function ensureGoLiveLocation(opts: { flow?: GoLiveFlow } = {}): Promise<GoLiveLocationResult> {
+export async function ensureGoLiveLocation(
+  opts: { flow?: GoLiveFlow } & ReadOptions = {},
+): Promise<GoLiveLocationResult> {
   const flow = opts.flow ?? beginFlow();
   try {
-    return await locationStep(flow);
+    return await locationStep(flow, opts);
   } finally {
     if (!opts.flow) endFlow(flow);
   }
 }
 
-async function locationStep(flow: GoLiveFlow): Promise<GoLiveLocationResult> {
+async function locationStep(flow: GoLiveFlow, opts: ReadOptions = {}): Promise<GoLiveLocationResult> {
   const end = (attempt: LocationEventOutcome, reading: LocationReading | null = null): GoLiveLocationResult => {
     closeSheet();
     return { outcome: "declined", attempt, reading };
@@ -385,7 +450,7 @@ async function locationStep(flow: GoLiveFlow): Promise<GoLiveLocationResult> {
     }
     // A background mid-reading resolves the flow at once (the chip goes back
     // to offline), not after the fix and the report finish.
-    const r = await Promise.race([readAndReport(true), flow.abortSignal]);
+    const r = await Promise.race([readAndReport(true, opts), flow.abortSignal]);
     if (r === "aborted" || flow.aborted) return end("dismissed", r !== "aborted" && "reading" in r ? r.reading : reading);
     if (r.kind === "ok") {
       closeSheet();
@@ -474,7 +539,7 @@ export async function goLiveWithLocation(
 }
 
 // ---------------------------------------------------------------------------
-// Silent readings (restores and the 60 s refresh)
+// Silent readings (legacy backend: restores and the 60 s refresh)
 // ---------------------------------------------------------------------------
 
 /**
@@ -486,15 +551,21 @@ export async function goLiveWithLocation(
 export type SilentReadingOutcome = "ready" | "permission" | "failed" | "unavailable";
 
 /**
- * A reading the athlete did not tap for (a restore, the 60 s refresh):
- * never asks and never shows anything. Not logged (decision D8).
+ * A reading the athlete did not tap for: never asks and never shows
+ * anything. Not logged (decision D8). `skipLastKnown`: the ladder's rung 3
+ * already looked at the OS cache.
  */
-export async function silentGoLiveReading(): Promise<SilentReadingOutcome> {
-  const r = await readAndReport(false);
+export async function silentGoLiveReading(opts: ReadOptions = {}): Promise<SilentReadingOutcome> {
+  const r = await readAndReport(false, opts);
   if (r.kind === "ok") return "ready";
   if (r.kind === "denied") return "permission";
   if (r.kind === "error") return "failed";
   return "unavailable";
+}
+
+/** The outcome of a silent fresh fix, with why it failed (the restore toasts). */
+export async function silentFreshFix(opts: ReadOptions = {}): Promise<ReadOutcome> {
+  return readAndReport(false, opts);
 }
 
 export interface GoLiveRefreshHandlers {
@@ -505,12 +576,15 @@ export interface GoLiveRefreshHandlers {
 }
 
 /**
- * Refresh the `go_live` reading every 60 s while `active` (live, flag on,
- * not in a match) and the app is in the foreground. Silent: never asks. A
- * lost permission calls `onPermissionLost` once per streak of failing ticks
- * (a tick that reports again ends the streak, and so does going offline).
+ * LEGACY BACKEND ONLY (`presence-capability.ts` says `legacy`): refresh the
+ * `go_live` reading every 60 s while `active` (live, flag on, not in a
+ * match) and the app is in the foreground, because an older server expires
+ * a live session after 10 minutes without one. A current backend has no
+ * such expiry, and this never runs against it (instant go-live 4.2 removed
+ * the refresh). Silent: never asks. A lost permission calls
+ * `onPermissionLost` once per streak of failing ticks.
  */
-export function useGoLiveReadingRefresh(active: boolean, handlers: GoLiveRefreshHandlers = {}): void {
+export function useLegacyGoLiveReadingRefresh(active: boolean, handlers: GoLiveRefreshHandlers = {}): void {
   const handlersRef = React.useRef(handlers);
   handlersRef.current = handlers;
   React.useEffect(() => {
