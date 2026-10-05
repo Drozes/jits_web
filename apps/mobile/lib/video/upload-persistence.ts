@@ -75,6 +75,29 @@ export interface PendingUploadJob {
    * (paused) job, which every trigger resumes.
    */
   needsUser: boolean;
+  /**
+   * Upload lifecycle (jits-n2im.11). 2 = reserve before bytes: the
+   * `match_videos` row is INSERTed at 'uploading' before the first byte and
+   * PATCHed to 'ready' after the last. 1 (or absent: a record written by the
+   * wave 1 build) = the old order, bytes first and one INSERT at 'ready'.
+   *
+   * Phases stay "bytes" | "row" for both on purpose: an OTA rollback to the
+   * wave 1 bundle validates `phase` strictly and DROPS a record it does not
+   * recognise, which would lose the clip. Wave 1 code finishing a v2 job
+   * still works: its INSERT hits 23505 and its fallback UPDATE to 'ready' is
+   * exactly the 'uploading' -> 'ready' transition the server guard allows.
+   */
+  protocol?: 1 | 2;
+  /**
+   * The reserved `match_videos.id` (v2 only). Null in phase "bytes" until the
+   * reservation lands; persisted the moment it does, so a kill and relaunch
+   * resumes the same row instead of reserving a second one.
+   */
+  videoId?: string | null;
+  /** Wall-clock the recorder started (ISO), sent once with the reservation. */
+  recordStartedAt?: string | null;
+  /** Recorder-measured clip length, sent once with the reservation. */
+  recordDurationMs?: number | null;
 }
 
 /**
@@ -197,6 +220,13 @@ function normaliseJob(job: PendingUploadJob): PendingUploadJob {
     // always auto-resumed, so it reads as paused.
     errorClass: typeof job.errorClass === "string" ? job.errorClass : null,
     needsUser: job.needsUser === true,
+    protocol: job.protocol === 2 ? 2 : 1,
+    videoId: typeof job.videoId === "string" && job.videoId.length > 0 ? job.videoId : null,
+    recordStartedAt: typeof job.recordStartedAt === "string" ? job.recordStartedAt : null,
+    recordDurationMs:
+      typeof job.recordDurationMs === "number" && Number.isFinite(job.recordDurationMs) && job.recordDurationMs > 0
+        ? job.recordDurationMs
+        : null,
     updatedAt:
       typeof job.updatedAt === "number" && Number.isFinite(job.updatedAt)
         ? job.updatedAt

@@ -75,6 +75,18 @@ export type RecordingState =
  */
 export type RecordingTruncation = "limit" | "interrupted";
 
+/** When the recorder started (epoch ms) and how long the clip ran. */
+interface RecordTiming {
+  startedAt: number | null;
+  durationMs: number | null;
+}
+
+function recordTimingOf(startedAt: number | null): RecordTiming {
+  if (startedAt == null) return { startedAt: null, durationMs: null };
+  const durationMs = Date.now() - startedAt;
+  return { startedAt, durationMs: durationMs > 0 ? durationMs : null };
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -308,7 +320,7 @@ export function useVideoRecorder(
     await requestMicPermission();
   }, [requestCameraPermission, requestMicPermission]);
 
-  const handleUpload = React.useCallback(async (fileUri: string) => {
+  const handleUpload = React.useCallback(async (fileUri: string, timing?: RecordTiming) => {
     if (!uploadEnabled) {
       // No-upload mode (practice): hand the clip to the caller, or delete it
       // right away if nobody is left to own it.
@@ -357,6 +369,10 @@ export function useVideoRecorder(
       fileUri,
       storagePath,
       truncation: truncationRef.current,
+      // Sent once with the reservation (jits-n2im.11): the server lines the
+      // angles up by start time until audio sync exists.
+      recordStartedAt: timing?.startedAt ?? null,
+      recordDurationMs: timing?.durationMs ?? null,
     });
     if (outcome.ok) transition("uploaded");
     // A PARKED upload is not a recorder failure. The job is on disk and the
@@ -462,12 +478,15 @@ export function useVideoRecorder(
         }
         try {
           const result = await promise;
+          // Wall-clock of the attempt that actually recorded, and how long it
+          // ran: the reservation carries both (jits-n2im.11).
+          const timing = recordTimingOf(recordStartedAtRef.current);
           // Once awaited here, the recording has stopped. Hand off to upload.
           if (stoppingRef.current) {
             stoppingRef.current = false;
             if (result?.uri) {
               console.log(`[video] ${logTag} recording stopped, uri ready; uploading`);
-              await handleUpload(result.uri);
+              await handleUpload(result.uri, timing);
             } else {
               console.warn(`[video] ${logTag} recordAsync resolved without a URI; clip skipped`);
               transition("idle");
@@ -488,7 +507,7 @@ export function useVideoRecorder(
               console.warn(
                 `[video] ${logTag} recordAsync settled without an explicit stop after ${Math.round(elapsedMs / 1000)}s (cap ${maxDurationSeconds}s); uploading the short clip anyway`,
               );
-              await handleUpload(result.uri);
+              await handleUpload(result.uri, timing);
             } else {
               // No file at all. This branch used to return with no
               // transition(), stranding the machine in 'recording' with

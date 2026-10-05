@@ -209,7 +209,36 @@ describe("useVideoRecorder", () => {
       fileUri: "file://clip.mp4",
       storagePath: "M/A/111.mp4",
       truncation: null,
+      recordStartedAt: expect.any(Number),
+      recordDurationMs: expect.any(Number),
     });
+  });
+
+  it("hands the record start time and duration to the reservation (jits-n2im.11)", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const nowSpy = jest.spyOn(Date, "now");
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    nowSpy.mockReturnValue(1_791_000_000_000);
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = result.current.start();
+    });
+    // The clip runs 6 minutes before the stop lands.
+    nowSpy.mockReturnValue(1_791_000_360_000);
+    await act(async () => {
+      await result.current.stop();
+      await startPromise;
+    });
+    nowSpy.mockRestore();
+
+    await waitFor(() => expect(result.current.state).toBe("uploaded"));
+    expect(mockStartUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ recordStartedAt: 1_791_000_000_000, recordDurationMs: 360_000 }),
+    );
   });
 
   it("does not retry the upload itself, because the runner owns that", async () => {
