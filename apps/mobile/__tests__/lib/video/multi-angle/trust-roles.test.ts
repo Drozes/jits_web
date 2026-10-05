@@ -41,10 +41,10 @@ describe("syncTrust (clock-only handling)", () => {
     expect(isHard("audio")).toBe(true);
     expect(isHard("clock")).toBe(false);
   });
-  it("offsetOf prefers the row's own offset, then the separate read", () => {
-    expect(offsetOf(vid("a", { sync_offset_ms: 5 }), { a: 9 })).toBe(5);
-    expect(offsetOf(vid("a"), { a: 9 })).toBe(9);
-    expect(offsetOf(vid("a"), {})).toBeNull();
+  it("offsetOf reads the row's own offset (get_match_details)", () => {
+    expect(offsetOf(vid("a", { sync_offset_ms: 5 }))).toBe(5);
+    expect(offsetOf(vid("a", { sync_offset_ms: 0 }))).toBe(0);
+    expect(offsetOf(vid("a"))).toBeNull();
   });
   it("referenceAngleId: the playable primary, else the entry", () => {
     expect(referenceAngleId([vid("a"), vid("b", { is_primary: true })], "a")).toBe("b");

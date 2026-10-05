@@ -29,7 +29,6 @@ jest.mock("@/lib/match-detail/use-match-detail", () => ({ useMatchDetail: (id: s
 const mockGetVideoAnalysis = jest.fn();
 jest.mock("@jits/shared/api/film-room", () => ({
   getVideoAnalysis: (...a: unknown[]) => mockGetVideoAnalysis(...a),
-  getVideoSyncOffsets: jest.fn(async () => ({})),
 }));
 const mockSign = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({ getMatchVideoPlaybackResult: (...a: unknown[]) => mockSign(...a) }));

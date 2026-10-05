@@ -71,7 +71,7 @@ afterEach(() => jest.restoreAllMocks());
 const P = { ref: 0, opp: 1, tk: 2 } as const;
 
 async function openAll(opts: { device?: MultiAngleInput["device"]; videos?: AngleVideo[] } = {}) {
-  const base: MultiAngleInput = { entryId: "ref", startS: null, videos: null, offsets: {}, device: opts.device ?? IOS };
+  const base: MultiAngleInput = { entryId: "ref", startS: null, videos: null, device: opts.device ?? IOS };
   const hook = renderHook((props: MultiAngleInput) => useMultiAnglePlayback(props), { initialProps: base });
   await waitFor(() => expect(fakePlayers[0].replaceAsync).toHaveBeenCalledWith({ uri: "https://s/ref.mp4" }));
   act(() => readyPlayer(0));

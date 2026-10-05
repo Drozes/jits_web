@@ -19,7 +19,7 @@ The multi-angle player replaces "one player, swap the source, seek" with one exp
 
 1. Build or use a development client (the dev flag only turns on when `__DEV__` is true): `cd apps/mobile && EXPO_PUBLIC_MULTI_ANGLE_PLAYER=1 npx expo start --dev-client`. A release bundle never turns it on, whatever the environment says.
 2. Fixtures: one real match with three angles, recorded with consent and never committed: two competitor phones that the slicer audio-synced (`sync_source = 'audio'`), and a timekeeper angle that is clock-only. Record each file's keyframe spacing first: `ffprobe -v error -select_streams v:0 -skip_frame nokey -show_entries frame=pts_time -of csv=p=0 <file>`. Run the matrix twice if the jr_be `feat/playback-encode` 1 s GOP lands mid-spike: once on the old encode, once on the new one.
-3. Until jr_be ships `sync_source` and `sync_confidence` on `get_match_details`, every non-Best angle is treated as clock-only (every switch is a dip). To exercise the lock-step path before then, point the dev build at a local stack whose `get_match_details` returns those keys.
+3. `get_match_details` already returns `sync_offset_ms`, `sync_source` and `sync_confidence` (jr_be wave A, `20261005100400`), and `getMatchDetailView` maps them. An angle the slicer has not audio-synced (all NULL, or `clock`) is clock-only, so every switch to it is a dip. Pick a fixture match whose angles the slicer audio-synced (or set them with `set_match_video_sync` on a local stack) to exercise the lock-step path.
 4. Watch the per-session Sentry event (`Video playback session`, tag `video.playback.mode:multi`). For the drift numbers, add a temporary on-screen overlay in the dev client (not committed) that prints each slave's last smoothed error.
 
 ## 3. Device matrix

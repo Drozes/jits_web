@@ -4,8 +4,6 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { NO_MATCH_COPY, buildKeyMoments, captionAt, formatClock, isNoMatch } from "@jits/shared/utils";
-import { getVideoSyncOffsets } from "@jits/shared/api/film-room";
-import { supabase } from "@/lib/supabase/client";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
 import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
@@ -64,7 +62,6 @@ export function MultiAnglePlayerBody({ id, start, device }: { id: string | undef
     () => (view ? [...(view.videos as AngleVideo[])].sort((a, b) => rowOrder(a) - rowOrder(b)) : null),
     [view],
   );
-  const [offsets, setOffsets] = React.useState<Record<string, number | null>>({});
   const nameOf = React.useCallback(
     (vid: string) => {
       const v = videos?.find((x) => x.id === vid);
@@ -77,7 +74,6 @@ export function MultiAnglePlayerBody({ id, start, device }: { id: string | undef
     entryId: id,
     startS: start,
     videos,
-    offsets,
     device: deviceInfo,
     reduceMotion,
     onSwitchLanded: (vid, approximate) => {
@@ -93,17 +89,6 @@ export function MultiAnglePlayerBody({ id, start, device }: { id: string | undef
     if (playback.matchId) setMatchKey(playback.matchId);
   }, [playback.matchId]);
 
-  const ids = videos && videos.length > 1 ? videos.map((v) => v.id).join(",") : "";
-  React.useEffect(() => {
-    if (!ids) return;
-    let cancelled = false;
-    void getVideoSyncOffsets(supabase, ids.split(",")).then((o) => {
-      if (!cancelled) setOffsets(o);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [ids]);
 
   const entry = videos?.find((v) => v.id === id);
   const angleMeta = entry ? telemetryAngle(entry) : null;

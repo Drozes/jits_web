@@ -15,30 +15,24 @@ import type { MatchDetailVideo } from "@jits/shared/api/queries";
  *              lock-stepped; a switch to or from it dips to black, it plays
  *              its own audio, and it wears "Approx. sync".
  *
- * `sync_source` / `sync_confidence` arrive on `get_match_details` videos
- * (jr_be feat/playback-encode). Until they do, every non-reference angle
- * is "clock": absence never upgrades trust.
+ * `sync_offset_ms`, `sync_source` and `sync_confidence` come with every
+ * `get_match_details` video (jr_be wave A, 20261005100400; mapped by
+ * `getMatchDetailView`). An angle the slicer has not synced (all NULL) or an
+ * older backend is "clock": absence never upgrades trust. This is stricter
+ * than the single player's `angleSyncExact` (it also needs a confidence),
+ * per the owner's clock-only rule for lock-step.
  */
 export type SyncTrust = "reference" | "audio" | "clock";
 
-/** The sync fields this player reads off a match video (all optional until jr_be ships them). */
-export interface SyncFields {
-  sync_offset_ms?: number | null;
-  sync_source?: string | null;
-  sync_confidence?: number | null;
-}
-
-export type AngleVideo = MatchDetailVideo & SyncFields;
+export type AngleVideo = MatchDetailVideo;
 
 function num(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
 }
 
-/** The offset to use for an angle: the row's own, else the separately read map (getVideoSyncOffsets). */
-export function offsetOf(v: AngleVideo, fallback: Record<string, number | null | undefined>): number | null {
-  if (num(v.sync_offset_ms)) return v.sync_offset_ms;
-  const f = fallback[v.id];
-  return num(f) ? f : null;
+/** The angle's sync offset (ms), or null when it has none. */
+export function offsetOf(v: AngleVideo): number | null {
+  return num(v.sync_offset_ms) ? v.sync_offset_ms : null;
 }
 
 export function syncTrust(v: AngleVideo, referenceId: string, offsets: Record<string, number | null | undefined>): SyncTrust {

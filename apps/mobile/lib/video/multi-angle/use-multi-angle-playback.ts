@@ -61,8 +61,6 @@ export interface MultiAngleInput {
   startS: number | null;
   /** `get_match_details` videos once loaded (null until then). */
   videos: AngleVideo[] | null;
-  /** Offsets read separately (getVideoSyncOffsets) for rows that do not carry them. */
-  offsets: Record<string, number | null>;
   device: DeviceInfo;
   /** Reduce Motion: dips become cuts. */
   reduceMotion?: boolean;
@@ -239,9 +237,9 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
   const videos = input.videos;
   const offsetsMap = React.useMemo(() => {
     const out: Record<string, number | null> = {};
-    for (const v of videos ?? []) out[v.id] = offsetOf(v, input.offsets);
+    for (const v of videos ?? []) out[v.id] = offsetOf(v);
     return out;
-  }, [videos, input.offsets]);
+  }, [videos]);
   const offsetsRef = React.useRef(offsetsMap);
   offsetsRef.current = offsetsMap;
 
