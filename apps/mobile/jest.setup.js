@@ -18,6 +18,27 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 );
 
 /**
+ * NetInfo's real JS module drives a native event emitter and a reachability
+ * probe, which under Jest throws asynchronously ("Cannot read properties of
+ * undefined (reading 'isInternetReachable')") and fails whatever suite was
+ * running. The match upload banner reads the connection type (it shows the
+ * clip size on cellular, jits-n2im.6), so every suite that renders a verdict
+ * now touches it. Default: online on wifi, no events. A suite that needs
+ * more (cellular, offline, reconnects) declares its own `jest.mock`.
+ */
+jest.mock("@react-native-community/netinfo", () => {
+  const state = { type: "wifi", isConnected: true, isInternetReachable: true, details: null };
+  const NetInfo = {
+    fetch: jest.fn(() => Promise.resolve(state)),
+    refresh: jest.fn(() => Promise.resolve(state)),
+    addEventListener: jest.fn(() => () => undefined),
+    configure: jest.fn(),
+    useNetInfo: jest.fn(() => state),
+  };
+  return { __esModule: true, default: NetInfo, ...NetInfo };
+});
+
+/**
  * expo-video's JS entry extends a native SharedObject class at module load,
  * which does not exist under Jest ("Cannot read properties of undefined
  * (reading 'prototype')"). The highlight card on match detail imports it, so
@@ -84,6 +105,32 @@ jest.mock("expo-video", () => {
     return R.createElement(RN.View, { testID: "expo-video-view", ...props });
   });
   return { useVideoPlayer, VideoView, createVideoPlayer: createPlayer };
+});
+
+/**
+ * @sentry/react-native ships untransformed ESM that Jest cannot parse, so no
+ * suite has ever loaded the real SDK: each one that reaches it mocks it (or
+ * the `lib/error-tracking/sentry` wrapper). The players now import playback
+ * telemetry (jits-n2im.21), which reaches the wrapper from every screen with
+ * a video, so this inert stand-in is the default. The wrapper never inits
+ * under Jest (no DSN), so nothing calls it; a suite that asserts on Sentry
+ * still declares its own `jest.mock`, which wins.
+ */
+jest.mock("@sentry/react-native", () => {
+  // A plain object (no Proxy): babel's import-star interop copies own keys
+  // only, and a Proxy fallback would also make the module thenable.
+  const noop = () => undefined;
+  return {
+    wrap: (c) => c,
+    init: noop,
+    captureException: noop,
+    captureMessage: noop,
+    addBreadcrumb: noop,
+    setUser: noop,
+    setTag: noop,
+    showFeedbackForm: noop,
+    feedbackIntegration: () => ({ name: "Feedback" }),
+  };
 });
 
 // The fake VideoView's fullscreen hook (see the expo-video mock above) never

@@ -12,6 +12,8 @@ import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { useMatchSyncContext, useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { rankStripText, useRankChange, useVerdictVideos } from "@/lib/match-flow/use-verdict-data";
 import type { UploadBannerState } from "@/lib/video/upload-banner-state";
+import { isTerminalUploadClass } from "@/lib/video/upload-errors";
+import { useUploadActions } from "@/lib/video/use-upload-actions";
 import { buildShareText, buildShareUrl } from "@jits/shared/utils";
 import { UploadProgressBanner } from "../upload-progress-banner";
 import { usePalette } from "@/lib/theme/palette";
@@ -25,6 +27,7 @@ import { HERO_HEIGHT, VerdictHero } from "./verdict-hero";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { useScrolledPast } from "../wizard-scroll";
 import { SummaryHighlightNote } from "../steps/summary-highlight-note";
+import { VerdictAngleRows } from "./verdict-angle-rows";
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;
@@ -149,8 +152,20 @@ export function VerdictStep(props: VerdictStepProps) {
   const oppShort = shortName(opponent.display_name);
 
   const uploadBusy = upload.kind === "uploading" || upload.kind === "stopping";
-  const filmExpected = videos.hasVideo || uploadBusy || uploadedVideoId != null;
-  const watchLabel = filmExpected ? "Watch film" : "Match details";
+  // A paused or failed UPLOAD (not a recorder failure, which has no class)
+  // can still deliver the film: it is expected, never "no film" (jits-n2im.4
+  // item 3). A terminal one cannot, so it is not.
+  const uploadOwed =
+    upload.kind === "paused" || (upload.kind === "error" && upload.errorClass != null && !isTerminalUploadClass(upload.errorClass));
+  const hasServerVideo = videos.hasVideo || uploadedVideoId != null;
+  const filmExpected = hasServerVideo || uploadBusy || uploadOwed;
+  // Deck rule 4 (overrides the bead's "disabled while uploading"): nothing
+  // offers playback of an angle that is not ready. "Open match" (always
+  // enabled: the match page has the upload card and its Try again) until an
+  // angle can play, then "Watch film".
+  const canWatch = videos.hasPlayable;
+  const watchLabel = canWatch ? "Watch film" : "Open match";
+  const uploadActions = useUploadActions(matchId);
   const watch = () => router.push(matchDetailHref(matchId));
   const back = () => exitMatchTo(router, exitHref);
 
@@ -183,6 +198,7 @@ export function VerdictStep(props: VerdictStepProps) {
         right={outcome === "loss" ? me.display_name : opponent.display_name}
         upload={upload}
         filmExpected={filmExpected}
+        hasServerVideo={hasServerVideo}
         topInset={insets.top}
       />
       {win ? <Confetti play={play} /> : null}
@@ -240,22 +256,27 @@ export function VerdictStep(props: VerdictStepProps) {
           <Mono size="micro" spacing="caps">{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. Heavier athlete’s ELO was adjusted.`}</Mono>
         ) : null}
 
-        {upload.kind !== "hidden" ? <UploadProgressBanner {...upload} /> : null}
+        {upload.kind !== "hidden" ? (
+          <UploadProgressBanner {...upload} onRetry={uploadActions.retry} onDiscard={uploadActions.discard} />
+        ) : null}
+
+        {/* The other athlete's angle, live (jits-n2im.12). */}
+        <VerdictAngleRows videos={videos.others} opponentName={opponent.display_name} />
 
         {/* A reel is on its way when THIS phone's clip landed or is still
             uploading (spec 015 section 16.6.4; the pre-redesign summary's
             videoId || videoPending). Not on a disputed result: the match is
             under admin review, so no reel is promised. */}
-        <SummaryHighlightNote hasVideo={(uploadedVideoId != null || uploadBusy) && !disputed} />
+        <SummaryHighlightNote hasVideo={(uploadedVideoId != null || uploadBusy || uploadOwed) && !disputed} />
 
         <View style={{ gap: 12 }}>
           <FightButton
             testID="summary-watch-film"
             variant="primary"
             label={watchLabel}
-            disabled={uploadBusy}
             onPress={watch}
-            icon={(c) => <Film size={16} color={c} />}
+            // "Open match" carries no film icon (deck nit 2).
+            icon={canWatch ? (c) => <Film size={16} color={c} /> : undefined}
           />
           <FightButton testID="summary-exit" variant="secondary" label={exitLabel} onPress={back} />
           {outcome && !disputed ? (

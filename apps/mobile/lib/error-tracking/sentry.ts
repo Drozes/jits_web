@@ -20,6 +20,33 @@ const appEnv =
 
 let initialized = false;
 
+/** Tag prefixes that mark a funnel telemetry event (playback, upload). */
+const TELEMETRY_TAG_PREFIXES = ["video.playback.", "video.upload."];
+
+interface ScrubbableEvent {
+  exception?: unknown;
+  tags?: Record<string, unknown>;
+  user?: { id?: string | number } & Record<string, unknown>;
+}
+
+/**
+ * Funnel telemetry (playback jits-n2im.21, upload jits-n2im.7) is product
+ * analytics riding on Sentry, so it carries only the athlete id, never the
+ * email, username or name the global scope holds for bug reports (and no IP).
+ * Identified by its tags and by having no exception; error events, including
+ * the upload abandon exception, are left exactly as they were.
+ */
+export function scrubTelemetryUser<E extends ScrubbableEvent>(event: E): E {
+  if (event.exception) return event;
+  const tags = event.tags ?? {};
+  const isTelemetry = Object.keys(tags).some((k) => TELEMETRY_TAG_PREFIXES.some((p) => k.startsWith(p)));
+  if (!isTelemetry || !event.user) return event;
+  const id = event.user.id;
+  // `ip_address: null` tells Sentry not to infer it from the connection.
+  event.user = (id != null ? { id, ip_address: null } : { ip_address: null }) as E["user"];
+  return event;
+}
+
 /**
  * On-brand styling for the Sentry feedback form. The app is dark-first (opens
  * dark, defaults to it), so the form is themed dark: Signal Red submit, sharp
@@ -71,6 +98,7 @@ export function initSentry(): void {
     environment: appEnv,
     enabled: !__DEV__,
     tracesSampleRate: 0.1,
+    beforeSend: (event) => scrubTelemetryUser(event),
     // Attach a screenshot of the screen at the moment an error is captured.
     attachScreenshot: true,
     attachStacktrace: true,
@@ -177,4 +205,34 @@ export function captureException(
   if (!initialized) return;
 
   Sentry.captureException(error, context ? { extra: context } : undefined);
+}
+
+/**
+ * Leave a breadcrumb on the current scope: attached to the next event this
+ * launch sends, never sent on its own. Safe to call before init.
+ */
+export function addBreadcrumb(crumb: {
+  category: string;
+  message: string;
+  level?: "debug" | "info" | "warning" | "error";
+  data?: Record<string, unknown>;
+}): void {
+  if (!initialized) return;
+  Sentry.addBreadcrumb({ level: "info", ...crumb });
+}
+
+/**
+ * Send one non-exception event (a funnel outcome such as an upload that
+ * landed). Safe to call before init; the call is dropped.
+ */
+export function captureMessage(
+  message: string,
+  options: { level?: "info" | "warning" | "error"; tags?: Record<string, string>; extra?: Record<string, unknown> } = {},
+): void {
+  if (!initialized) return;
+  Sentry.captureMessage(message, {
+    level: options.level ?? "info",
+    tags: options.tags,
+    extra: options.extra,
+  });
 }

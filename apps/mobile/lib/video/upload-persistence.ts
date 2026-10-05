@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { RecordingTruncation } from "./use-video-recorder";
+import type { UploadErrorClass } from "./upload-errors";
 
 /**
  * Disk-backed record of a match-video upload that has not finished yet
@@ -60,7 +61,43 @@ export interface PendingUploadJob {
   truncation: RecordingTruncation | null;
   createdAt: number;
   updatedAt: number;
+  /** Raw cause of the last failure. Telemetry and logs only, never shown. */
   lastError: string | null;
+  /**
+   * Class of the last failure (jits-n2im.5), so a relaunch can still say
+   * the right thing about a job that is not running.
+   */
+  errorClass: UploadErrorClass | null;
+  /**
+   * The job FAILED and waits for the athlete (jits-n2im.3): automatic
+   * resumes (foreground, reconnect, launch, the retry timer) skip it, and
+   * only `retryMatchVideoUpload` runs it again. Distinct from a parked
+   * (paused) job, which every trigger resumes.
+   */
+  needsUser: boolean;
+  /**
+   * Upload lifecycle (jits-n2im.11). 2 = reserve before bytes: the
+   * `match_videos` row is INSERTed at 'uploading' before the first byte and
+   * PATCHed to 'ready' after the last. 1 (or absent: a record written by the
+   * wave 1 build) = the old order, bytes first and one INSERT at 'ready'.
+   *
+   * Phases stay "bytes" | "row" for both on purpose: an OTA rollback to the
+   * wave 1 bundle validates `phase` strictly and DROPS a record it does not
+   * recognise, which would lose the clip. Wave 1 code finishing a v2 job
+   * still works: its INSERT hits 23505 and its fallback UPDATE to 'ready' is
+   * exactly the 'uploading' -> 'ready' transition the server guard allows.
+   */
+  protocol?: 1 | 2;
+  /**
+   * The reserved `match_videos.id` (v2 only). Null in phase "bytes" until the
+   * reservation lands; persisted the moment it does, so a kill and relaunch
+   * resumes the same row instead of reserving a second one.
+   */
+  videoId?: string | null;
+  /** Wall-clock the recorder started (ISO), sent once with the reservation. */
+  recordStartedAt?: string | null;
+  /** Recorder-measured clip length, sent once with the reservation. */
+  recordDurationMs?: number | null;
 }
 
 /**
@@ -68,7 +105,8 @@ export interface PendingUploadJob {
  * any plausible "I was on a plane" gap, and the recording file would have to
  * survive that long too.
  */
-export const UPLOAD_JOB_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const UPLOAD_JOB_RETENTION_DAYS = 7;
+export const UPLOAD_JOB_MAX_AGE_MS = UPLOAD_JOB_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 /**
  * Per-match write serialisation.
@@ -178,6 +216,17 @@ function normaliseJob(job: PendingUploadJob): PendingUploadJob {
     truncation:
       job.truncation === "limit" || job.truncation === "interrupted" ? job.truncation : null,
     lastError: typeof job.lastError === "string" ? job.lastError : null,
+    // Both absent on records written before jits-n2im.3/.5: such a job was
+    // always auto-resumed, so it reads as paused.
+    errorClass: typeof job.errorClass === "string" ? job.errorClass : null,
+    needsUser: job.needsUser === true,
+    protocol: job.protocol === 2 ? 2 : 1,
+    videoId: typeof job.videoId === "string" && job.videoId.length > 0 ? job.videoId : null,
+    recordStartedAt: typeof job.recordStartedAt === "string" ? job.recordStartedAt : null,
+    recordDurationMs:
+      typeof job.recordDurationMs === "number" && Number.isFinite(job.recordDurationMs) && job.recordDurationMs > 0
+        ? job.recordDurationMs
+        : null,
     updatedAt:
       typeof job.updatedAt === "number" && Number.isFinite(job.updatedAt)
         ? job.updatedAt
@@ -284,4 +333,75 @@ export async function patchUploadJob(
 /** True when the job is old enough that nothing is going to rescue it. */
 export function isJobExpired(job: PendingUploadJob, now = Date.now()): boolean {
   return now - job.createdAt > UPLOAD_JOB_MAX_AGE_MS;
+}
+
+// ---------------------------------------------------------------------------
+// Pending abandons (review minor 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * An `abandon_match_video_upload` the server has not answered yet. Written
+ * BEFORE the call, removed once it answers, and retried on the next resume
+ * sweep, so a Discard or an expiry made offline still reaches the server
+ * instead of leaving the row 'uploading' for the 7-day reaper (or, in phase
+ * "row", for the 5-minute landing cron to flip live).
+ */
+export interface PendingAbandon {
+  videoId: string;
+  uploaderAthleteId: string;
+  matchId: string;
+  storagePath: string;
+  /** "row": the bytes are in the bucket; delete them once the row gave up on them. */
+  phase: UploadJobPhase;
+  createdAt: number;
+}
+
+export const PENDING_ABANDON_PREFIX = "elo-video-abandon::";
+
+export async function savePendingAbandon(rec: PendingAbandon): Promise<void> {
+  try {
+    await AsyncStorage.setItem(`${PENDING_ABANDON_PREFIX}${rec.videoId}`, JSON.stringify(rec));
+  } catch (err) {
+    console.warn(`[video] could not persist the pending abandon of ${rec.videoId}:`, err);
+  }
+}
+
+export async function removePendingAbandon(videoId: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(`${PENDING_ABANDON_PREFIX}${videoId}`);
+  } catch {
+    /* retried harmlessly next sweep: the RPC is idempotent */
+  }
+}
+
+export async function loadPendingAbandons(): Promise<PendingAbandon[]> {
+  let keys: readonly string[];
+  try {
+    keys = await AsyncStorage.getAllKeys();
+  } catch {
+    return [];
+  }
+  const out: PendingAbandon[] = [];
+  for (const key of keys) {
+    if (!key.startsWith(PENDING_ABANDON_PREFIX)) continue;
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      const rec = raw ? (JSON.parse(raw) as Partial<PendingAbandon>) : null;
+      if (
+        rec &&
+        typeof rec.videoId === "string" &&
+        typeof rec.uploaderAthleteId === "string" &&
+        typeof rec.storagePath === "string" &&
+        (rec.phase === "bytes" || rec.phase === "row") &&
+        typeof rec.createdAt === "number"
+      ) {
+        out.push({ matchId: "", ...rec } as PendingAbandon);
+      } else {
+        await AsyncStorage.removeItem(key);
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
 }

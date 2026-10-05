@@ -8,6 +8,20 @@ import {
   upsertMatchVideo,
 } from "@jits/shared/api/mutations";
 import {
+  abandonMatchVideoUpload,
+  canUploadMatchVideo,
+  finalizeMatchVideoUpload,
+  getMatchVideoLifecycle,
+  reserveMatchVideoUpload,
+  touchMatchVideoUpload,
+  type AbandonMatchVideoResult,
+  type FinalizeMatchVideoOutcome,
+  type MatchVideoPreflight,
+  type ReservedMatchVideo,
+} from "@jits/shared/api/match-video-upload";
+import type { DomainError } from "@jits/shared/api/errors";
+import { describeUploadFailure, type UploadErrorClass } from "./upload-errors";
+import {
   AsyncStorageUrlStorage,
   ExpoFileReader,
   type TusFileInput,
@@ -20,8 +34,14 @@ import {
  *   bucket: "match-videos"
  *   path:   `<match_id>/<uploader_athlete_id>/<unix_ts>.<ext>`
  *
- * Web records WebM via `MediaRecorder`; native expo-camera produces MP4
- * (H.264/AAC) on both iOS and Android, so the extension differs.
+ * Web records WebM via `MediaRecorder`; native expo-camera produces an MP4
+ * container, so the extension differs. The CODEC inside differs by platform:
+ * iOS records HEVC (H.265) at 720p, about 4.7 Mbps in prod (the camera has
+ * `videoQuality="720p"` and no codec or bitrate set, and AVFoundation's
+ * default on HEVC-capable iPhones is HEVC), so every iOS upload goes through
+ * the slicer's normalize transcode to H.264/AAC before broad playback;
+ * Android records H.264/AAC. Keeping HEVC 720p is deliberate for now (about
+ * half the upload bytes of H.264); see jits-n2im.10 for the decision.
  */
 export const VIDEO_BUCKET = "match-videos";
 
@@ -53,38 +73,41 @@ export function contentTypeFor(ext: string): string {
 }
 
 /**
- * A server-side gate on `match_videos` INSERT (jr_be triggers, raised as
+ * A server-side gate on a `match_videos` write (jr_be triggers, raised as
  * P0001 with these HINTs). None of them is fixed by retrying seconds later,
- * so the upload manager parks the job on the first one instead of burning
- * its row budget, and the next foreground or reconnect tries again:
+ * so the upload manager stops on the first one instead of burning its row
+ * budget:
  *
- *   rate_limited   : HINT upload_rate_limited (rolling 24h per-athlete cap)
- *   disabled       : HINT video_upload_disabled (feature flag off)
- *   not_in_cohort  : HINT upload_not_in_cohort (uploader not allowlisted)
+ *   rate_limited   : HINT upload_rate_limited (rolling 24h per-athlete cap).
+ *                    PAUSED: it lifts as the window rolls, so foreground and
+ *                    reconnect keep trying.
+ *   disabled       : HINT video_upload_disabled (feature flag off). FAILED,
+ *                    Retry offered.
+ *   not_in_cohort  : HINT upload_not_in_cohort (uploader not allowlisted).
+ *                    FAILED, Retry offered.
+ *   reslice_limit  : HINT video_reslice_limit (re-upload ceiling on UPDATE
+ *                    of storage_path, jr_be 20260918020000). TERMINAL: it
+ *                    can never succeed, so it is not parked for 7 days
+ *                    (jits-gxok); the athlete is offered Discard.
+ *
+ * The copy for each lives in `upload-errors.ts`, with every other failure
+ * class, so there is one place that says what the athlete reads.
  */
-export type MatchVideoGate = "rate_limited" | "disabled" | "not_in_cohort";
+export type MatchVideoGate = "rate_limited" | "disabled" | "not_in_cohort" | "reslice_limit";
 
-const GATE_BY_HINT: Record<string, { gate: MatchVideoGate; message: string }> = {
-  upload_rate_limited: {
-    gate: "rate_limited",
-    message: "Daily video limit reached. It will upload automatically later.",
-  },
-  video_upload_disabled: {
-    gate: "disabled",
-    message: "Video uploads are turned off right now. The recording is saved on this device.",
-  },
-  upload_not_in_cohort: {
-    gate: "not_in_cohort",
-    message:
-      "Video uploads are not enabled for your account yet. The recording is saved on this device.",
-  },
+const GATE_BY_HINT: Record<string, { gate: MatchVideoGate; klass: UploadErrorClass }> = {
+  upload_rate_limited: { gate: "rate_limited", klass: "limit" },
+  video_upload_disabled: { gate: "disabled", klass: "disabled" },
+  upload_not_in_cohort: { gate: "not_in_cohort", klass: "not_in_cohort" },
+  video_reslice_limit: { gate: "reslice_limit", klass: "reslice_limit" },
 };
 
 /** The gate behind a `match_videos` write failure, if it was one. */
 export function matchVideoGateFor(
   hint: string | null | undefined,
 ): { gate: MatchVideoGate; message: string } | null {
-  return (hint && GATE_BY_HINT[hint]) || null;
+  const hit = hint ? GATE_BY_HINT[hint] : undefined;
+  return hit ? { gate: hit.gate, message: describeUploadFailure(hit.klass).message } : null;
 }
 
 /**
@@ -105,19 +128,39 @@ export class MatchVideoDbError extends Error {
   readonly storageObjectPersisted: boolean;
   /** The server-side gate that rejected the row, or null for any other failure. */
   readonly gate: MatchVideoGate | null;
+  /** Postgres / PostgREST error code (`42501`, `23505`, `P0001`), when there was one. */
+  readonly code: string | null;
+  /** The RAISE ... HINT (`invalid_storage_path`, a gate HINT), when there was one. */
+  readonly hint: string | null;
 
   constructor(
     message: string,
     path: string,
     storageObjectPersisted: boolean,
     gate: MatchVideoGate | null = null,
+    detail: { code?: string | null; hint?: string | null } = {},
   ) {
     super(message);
     this.name = "MatchVideoDbError";
     this.path = path;
     this.storageObjectPersisted = storageObjectPersisted;
     this.gate = gate;
+    this.code = detail.code || null;
+    this.hint = detail.hint || null;
   }
+}
+
+/** A `Result` failure as a `MatchVideoDbError`, keeping code, HINT and gate. */
+function dbErrorOf(error: DomainError, path: string, storageObjectPersisted: boolean): MatchVideoDbError {
+  const hint = error.raw?.hint ?? null;
+  const gated = matchVideoGateFor(hint);
+  return new MatchVideoDbError(
+    gated ? gated.message : error.message,
+    path,
+    storageObjectPersisted,
+    gated?.gate ?? null,
+    { code: error.raw?.code ?? null, hint },
+  );
 }
 
 /**
@@ -339,11 +382,105 @@ export async function writeMatchVideoRow({
     recordedBy: uploaderAthleteId,
   });
   if (!upserted.ok) {
-    const gated = matchVideoGateFor(upserted.error.raw?.hint);
-    if (gated) throw new MatchVideoDbError(gated.message, storagePath, true, gated.gate);
-    // The raw cause only: the upload manager adds the "Video uploaded, but
-    // saving the record failed" framing, and adding it here too doubled it.
-    throw new MatchVideoDbError(upserted.error.message, storagePath, true);
+    // The raw cause only (or the gate's final copy): the upload manager adds
+    // the "Video uploaded, but saving the record failed" framing, and adding
+    // it here too doubled it.
+    throw dbErrorOf(upserted.error, storagePath, true);
   }
   return upserted.data.id;
+}
+
+// ---------------------------------------------------------------------------
+// Reserve-before-bytes lifecycle (jits-n2im.11, jr_be INTEGRATION.md section 10)
+// ---------------------------------------------------------------------------
+
+/**
+ * `can_upload_match_video` for this athlete (jits-n2im.5). ADVISORY: null on
+ * any failure (offline, an older backend without the RPC), and the caller
+ * then goes straight to the reservation, whose triggers enforce the same
+ * predicates anyway.
+ */
+export async function preflightMatchVideoUpload(
+  matchId: string,
+  fileSizeBytes: number,
+): Promise<MatchVideoPreflight | null> {
+  const res = await canUploadMatchVideo(supabase, matchId, fileSizeBytes);
+  if (res.ok) return res.data;
+  console.warn(`[video] upload preflight for ${matchId} unavailable: ${res.error.message}`);
+  return null;
+}
+
+export interface ReserveRowParams {
+  matchId: string;
+  uploaderAthleteId: string;
+  storagePath: string;
+  fileSizeBytes: number;
+  recordStartedAt: string | null;
+  recordDurationMs: number | null;
+}
+
+/**
+ * INSERT the row at 'uploading' (or take the athlete's existing row over on
+ * 23505). Throws `MatchVideoDbError` carrying `code` / `hint` / `gate`; no
+ * bytes have been sent, so `storageObjectPersisted` is false.
+ */
+export async function reserveMatchVideoRow(params: ReserveRowParams): Promise<ReservedMatchVideo> {
+  const res = await reserveMatchVideoUpload(supabase, { ...params, transport: "tus" });
+  if (!res.ok) throw dbErrorOf(res.error, params.storagePath, false);
+  return res.data;
+}
+
+/**
+ * Heartbeat. Fire and forget: a failed touch only shortens the server's
+ * in-flight window, it never fails the upload.
+ */
+export async function touchMatchVideoRow(params: {
+  videoId: string;
+  bytesConfirmed: number;
+  bytesTotal: number;
+}): Promise<void> {
+  try {
+    const res = await touchMatchVideoUpload(supabase, { ...params, transport: "tus" });
+    if (!res.ok) console.warn(`[video] upload heartbeat for ${params.videoId} failed: ${res.error.message}`);
+  } catch (err) {
+    console.warn(`[video] upload heartbeat for ${params.videoId} failed:`, err);
+  }
+}
+
+/** PATCH 'uploading' -> 'ready'. Throws `MatchVideoDbError` on a failed write. */
+export async function finalizeMatchVideoRow(params: {
+  videoId: string;
+  storagePath: string;
+}): Promise<FinalizeMatchVideoOutcome> {
+  const res = await finalizeMatchVideoUpload(supabase, params);
+  if (!res.ok) throw dbErrorOf(res.error, params.storagePath, true);
+  return res.data;
+}
+
+/** `abandon_match_video_upload`, best effort: null when the call failed. */
+export async function abandonMatchVideoRow(videoId: string): Promise<AbandonMatchVideoResult | null> {
+  try {
+    const res = await abandonMatchVideoUpload(supabase, videoId);
+    if (res.ok) return res.data;
+    console.warn(`[video] abandon of ${videoId} failed: ${res.error.message}`);
+    captureException(new Error(`Match-video abandon failed: ${res.error.message}`), { videoId });
+  } catch (err) {
+    console.warn(`[video] abandon of ${videoId} failed:`, err);
+    captureException(err, { videoId });
+  }
+  return null;
+}
+
+/**
+ * The key a row points at now: a string (or null key), `null` when the row
+ * is gone, `undefined` when the read failed (unknown, try later).
+ */
+export async function readMatchVideoKey(videoId: string): Promise<string | null | undefined> {
+  try {
+    const res = await getMatchVideoLifecycle(supabase, videoId);
+    if (!res.ok) return undefined;
+    return res.data ? res.data.storagePath ?? "" : null;
+  } catch {
+    return undefined;
+  }
 }

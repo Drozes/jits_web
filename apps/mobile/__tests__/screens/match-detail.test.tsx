@@ -1,5 +1,10 @@
 import * as React from "react";
-import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { act, configure, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+
+// Same load-sensitivity guard as film-room.test.tsx: this suite timed out on
+// its 1 s waitFor under a loaded pre-commit run and passes alone in ~9 s.
+jest.setTimeout(30_000);
+configure({ asyncUtilTimeout: 5_000 });
 
 // ---- mocks ----
 
@@ -48,6 +53,12 @@ jest.mock("@/components/ui/skeleton", () => {
 });
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// Match-level match_videos realtime (jits-n2im.12): its own tests live in
+// packages/shared; here it is inert.
+const mockMatchVideosRealtime = jest.fn();
+jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
+  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a) ?? { subscribed: true },
+}));
 
 jest.mock("@/lib/auth/hooks", () => ({
   useAuth: () => ({ athlete: { id: "me-1" }, user: { id: "u" }, isLoading: false }),
@@ -325,12 +336,17 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     const utils = await renderLoaded(
       view({ videos: [video({ status: "uploading", playability: "processing" }), video({ ...OPP_VIDEO, status: "failed", playability: "failed" })] }),
     );
-    const processing = utils.getByLabelText("Processing");
+    // Review minor 3: a row that cannot play says what it is
+    // ("{label}, {tag}, {helper}"), not a blanket "Processing".
+    const processing = utils.getByLabelText("Your angle, Uploading");
     expect(processing.props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(processing);
     expect(mockPush).not.toHaveBeenCalled();
     expect(utils.getByText("UPLOADING")).toBeTruthy();
-    expect(utils.getByText("ANALYSIS FAILED · MAY STILL PLAY")).toBeTruthy();
+    // Another athlete's pipeline failure is grey "Not used" (deck 2c), and
+    // its original still plays.
+    expect(utils.getByText("NOT USED")).toBeTruthy();
+    expect(utils.getByText("This clip couldn't be processed.")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Watch Demo Red's recording"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-opp");
     // The selected angle (mine) cannot play yet, so the hero has no play.
@@ -353,7 +369,10 @@ describe("MatchDetailScreen (Film Room match page)", () => {
   it("falls back to both athletes on the plate until the still arrives", async () => {
     const utils = await renderLoaded(view());
     const plate = utils.getByTestId("match-hero-still-fallback");
-    expect(utils.getByText("STILL ARRIVES AFTER UPLOAD")).toBeTruthy();
+    // The video is on the server, so the upload is done: the still is
+    // waiting on processing, never "after upload" (jits-n2im.4 item 6).
+    expect(utils.getByText("PROCESSING FILM")).toBeTruthy();
+    expect(utils.queryByText(/STILL ARRIVES AFTER UPLOAD/)).toBeNull();
     expect(within(plate).getByLabelText("Demo Blue")).toBeTruthy();
     expect(within(plate).getByLabelText("Demo Red")).toBeTruthy();
   });
@@ -365,6 +384,60 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     const utils = await renderLoaded(view({ videos: [] }));
     expect(utils.getByText("UPLOADING 64% · STILL ARRIVES AFTER UPLOAD")).toBeTruthy();
     expect(utils.getByText("The breakdown starts once the film finishes uploading.")).toBeTruthy();
+  });
+
+  it("never says 'No video' while this phone is still uploading (jits-n2im.4 item 1)", async () => {
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "uploading", progress: 0.3, bytesTotal: 1000 });
+    });
+    const utils = await renderLoaded(view({ videos: [] }));
+    expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
+    expect(utils.getByTestId("upload-status-banner")).toBeTruthy();
+    expect(utils.getByText("Uploading match video")).toBeTruthy();
+  });
+
+  it("shows a paused upload with Retry on the match page (jits-n2im.3)", async () => {
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "paused", progress: 0.5, error: "Upload paused: no connection.", errorClass: "offline" });
+    });
+    const utils = await renderLoaded(view({ videos: [] }));
+    expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
+    expect(utils.getByText("UPLOAD PAUSED · 50%")).toBeTruthy();
+    expect(utils.getByTestId("upload-retry")).toBeTruthy();
+  });
+
+  it("shows this phone's failed upload beside the opponent's film", async () => {
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "error", error: "Upload failed.", errorClass: "not_allowed" });
+    });
+    const utils = await renderLoaded(view({ videos: [video({ uploaded_by: "opp" })] }));
+    expect(utils.getByTestId("upload-status-banner")).toBeTruthy();
+    expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
+  });
+
+  it("re-reads the match the moment this phone's upload lands (jits-n2im.4 item 2)", async () => {
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "uploading", progress: 0.9 });
+    });
+    const utils = await renderLoaded(view({ videos: [] }));
+    const reads = mockGetMatchDetailView.mock.calls.length;
+
+    mockGetMatchDetailView.mockResolvedValue(view({ videos: [video()] }));
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "uploaded", videoId: "v-mine", progress: 1 });
+    });
+
+    await waitFor(() => expect(mockGetMatchDetailView.mock.calls.length).toBe(reads + 1));
+    await waitFor(() => expect(utils.queryByTestId("upload-status-banner")).toBeNull());
+    expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
+  });
+
+  it("says why the hero cannot play a film that is still processing (jits-n2im.4 item 5)", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video({ poster_url: "https://signed/p.jpg", thumbnail_key: "k", playability: "processing", status: "processing" })] }),
+    );
+    expect(utils.queryByLabelText("Play match film")).toBeNull();
+    expect(utils.getByTestId("match-hero-play-hint")).toHaveTextContent("PROCESSING");
   });
 
   it("shows the no-video plate when nothing was recorded", async () => {
@@ -549,7 +622,9 @@ describe("MatchDetailScreen (Film Room match page)", () => {
   it("marks the match seen so the Film Room drops its NEW badge", async () => {
     expect(isMatchSeen(mockMatchId)).toBe(false);
     await renderLoaded(view());
-    expect(isMatchSeen(mockMatchId)).toBe(true);
+    // The mark is a passive effect of the ready render: under load it can
+    // trail the loading marker's removal, so wait for it.
+    await waitFor(() => expect(isMatchSeen(mockMatchId)).toBe(true));
   });
 
   it("explains NOT_PARTICIPANT and goes back", async () => {
@@ -691,5 +766,111 @@ describe("MatchDetailScreen (Film Room match page)", () => {
       expect(mockGetMatchDetailView.mock.calls.length).toBeGreaterThan(calls);
       expect(mockHighlightRefresh).toHaveBeenCalled();
     });
+  });
+});
+
+describe("wave 2: live angles, primary default, labels (jits-n2im.12 / .15)", () => {
+  it("shows the opponent's angle uploading with its percent, not watchable yet", async () => {
+    const utils = await renderLoaded(
+      view({
+        videos: [
+          video(),
+          video({
+            ...OPP_VIDEO,
+            status: "uploading",
+            playability: "processing",
+            upload_bytes_confirmed: 300,
+            upload_bytes_total: 1000,
+            upload_in_flight: true,
+          }),
+        ],
+      }),
+    );
+    const row = utils.getByTestId("match-video-watch-v-opp");
+    within(row).getByText("UPLOADING");
+    within(row).getByText("30%");
+    expect(row.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(row.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 30 });
+  });
+
+  it("says the opponent's upload is paused when the server stopped hearing from it", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video(), video({ ...OPP_VIDEO, status: "uploading", playability: "processing", upload_in_flight: false })] }),
+    );
+    const row = utils.getByTestId("match-video-watch-v-opp");
+    within(row).getByText("PAUSED");
+    within(row).getByText("We haven't heard from D. Red's phone for a few minutes. It picks up where it left off.");
+  });
+
+  it("re-reads when realtime reports a change: the angle turns ready", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video(), video({ ...OPP_VIDEO, status: "uploading", playability: "processing", upload_in_flight: true })] }),
+    );
+    within(utils.getByTestId("match-video-watch-v-opp")).getByText("UPLOADING");
+    mockGetMatchDetailView.mockResolvedValue(view({ videos: [video(), video({ ...OPP_VIDEO, normalized_path: "n.mp4" })] }));
+    const onChange = mockMatchVideosRealtime.mock.calls[mockMatchVideosRealtime.mock.calls.length - 1][2] as () => void;
+    await act(async () => {
+      onChange();
+    });
+    await waitFor(() => within(utils.getByTestId("match-video-watch-v-opp")).getByText("READY TO WATCH"));
+  });
+
+  it("defaults to the server-elected primary angle, not my own", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO, is_primary: true })] }));
+    expect(utils.getByLabelText("D. RED'S ANGLE").props.accessibilityState).toMatchObject({ selected: true });
+    expect(utils.getByLabelText("YOUR ANGLE").props.accessibilityState).toMatchObject({ selected: false });
+  });
+
+  it("falls back to my own angle while nothing is elected", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO })] }));
+    expect(utils.getByLabelText("YOUR ANGLE").props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it("labels a timekeeper's angle by name with the Timekeeper tag, never as the opponent", async () => {
+    const utils = await renderLoaded(
+      view({
+        videos: [
+          video(),
+          video({ ...OPP_VIDEO }),
+          video({ id: "v-tk", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, recording_type: "timekeeper", angle_label: "Jo Cruz's recording" }),
+        ],
+      }),
+    );
+    const tk = utils.getByTestId("match-video-watch-v-tk");
+    within(tk).getByText("J. CRUZ'S ANGLE");
+    within(tk).getByText("TIMEKEEPER");
+    utils.getByText("FILM · 3 ANGLES");
+    utils.getByLabelText("J. CRUZ'S ANGLE, TIMEKEEPER");
+  });
+
+  it("an abandoned upload is Didn't upload and cannot be played", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video(), video({ ...OPP_VIDEO, status: "failed", playability: "failed", failure_code: "upload_abandoned" })] }),
+    );
+    const row = utils.getByTestId("match-video-watch-v-opp");
+    within(row).getByText("DIDN'T UPLOAD");
+    expect(row.props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});
+
+describe("review minor 4: only playable angles are offered in the switcher", () => {
+  it("hides an uploading reservation and an abandoned row (the switcher drops under two)", async () => {
+    const utils = await renderLoaded(
+      view({
+        videos: [
+          video(),
+          video({ ...OPP_VIDEO, status: "uploading", playability: "processing" }),
+          video({ id: "v-tk", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, recording_type: "timekeeper", status: "failed", playability: "failed", failure_code: "upload_abandoned" }),
+        ],
+      }),
+    );
+    expect(utils.queryByTestId("angle-switcher")).toBeNull();
+    // The abandoned row is not counted as an angle (nit 1).
+    utils.getByText("FILM · 2 ANGLES");
+  });
+
+  it("keeps two playable angles switchable", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO })] }));
+    utils.getByTestId("angle-switcher");
   });
 });

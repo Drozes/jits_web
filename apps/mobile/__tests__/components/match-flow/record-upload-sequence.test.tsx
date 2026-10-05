@@ -18,7 +18,7 @@
  */
 import * as React from "react";
 import { completeHold } from "../../support/complete-hold";
-import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
+import { render, fireEvent, waitFor, act, within } from "@testing-library/react-native";
 
 // ---- native module stubs ----
 
@@ -163,18 +163,42 @@ jest.mock("tus-js-client/lib.es5/browser/index.js", () => ({
 
 const mockInsertSingle = jest.fn();
 const mockStorageRemove = jest.fn();
+/** The land PATCH ('uploading' -> 'ready', jits-n2im.11) and its re-read. */
+const mockLandSingle = jest.fn();
+/** Every RPC: the preflight, the heartbeat, get_match_details. */
+const mockRpc = jest.fn();
 
-jest.mock("@/lib/supabase/client", () => ({
-  supabase: {
-    auth: {
-      getSession: async () => ({ data: { session: { access_token: "tok" } } }),
+jest.mock("@/lib/supabase/client", () => {
+  const filtered = () => {
+    const chain: Record<string, unknown> = {};
+    chain.eq = () => chain;
+    chain.select = () => chain;
+    chain.single = () => mockLandSingle();
+    chain.maybeSingle = () => mockLandSingle();
+    return chain;
+  };
+  const channel: Record<string, unknown> = {};
+  channel.on = () => channel;
+  channel.subscribe = () => channel;
+  return {
+    supabase: {
+      auth: {
+        getSession: async () => ({ data: { session: { access_token: "tok" } } }),
+      },
+      from: () => ({
+        // The reservation INSERT at 'uploading' (wave 2) or the wave 1
+        // INSERT at 'ready': one shape, one mock.
+        insert: () => ({ select: () => ({ single: () => mockInsertSingle() }) }),
+        update: () => filtered(),
+        select: () => filtered(),
+      }),
+      rpc: (...a: unknown[]) => mockRpc(...a),
+      channel: () => channel,
+      removeChannel: async () => "ok",
+      storage: { from: () => ({ remove: (...a: unknown[]) => mockStorageRemove(...a) }) },
     },
-    from: () => ({
-      insert: () => ({ select: () => ({ single: () => mockInsertSingle() }) }),
-    }),
-    storage: { from: () => ({ remove: (...a: unknown[]) => mockStorageRemove(...a) }) },
-  },
-}));
+  };
+});
 
 jest.mock("@/lib/env", () => ({
   env: { supabaseUrl: "https://example.supabase.co", supabaseAnonKey: "anon-key" },
@@ -430,7 +454,13 @@ beforeEach(() => {
   mockTusCalls.length = 0;
   mockTusFailure.current = null;
   mockStorageRemove.mockResolvedValue({ data: [{ name: "x" }], error: null });
-  mockInsertSingle.mockResolvedValue({ data: { id: "VID-1" }, error: null });
+  mockInsertSingle.mockResolvedValue({ data: { id: "VID-1", status: "uploading", failure_code: null }, error: null });
+  mockLandSingle.mockResolvedValue({ data: { id: "VID-1", status: "ready", failure_code: null }, error: null });
+  mockRpc.mockImplementation(async (name: string) =>
+    name === "can_upload_match_video"
+      ? { data: { allowed: true, reason: null }, error: null }
+      : { data: null, error: null },
+  );
   // "Record from my phone" is ON for these (it is OFF on first use).
   __resetRecordingOptInForTests(true);
 });
@@ -617,30 +647,49 @@ describe("record, end, upload, across the step boundary", () => {
   }
 
   it("shows a FAILED upload after the live step is gone", async () => {
-    // The database write fails the way production fails it: a RESOLVED
-    // response carrying an error. Both the first attempt and the automatic
-    // retry hit it.
-    mockInsertSingle.mockResolvedValue(RLS_DENIAL);
+    // The database write AFTER the bytes (wave 2: the land PATCH on the
+    // reserved row) fails the way production fails it: a RESOLVED response
+    // carrying an error. Both the first attempt and the automatic retry hit
+    // it.
+    mockLandSingle.mockResolvedValue(RLS_DENIAL);
 
     const live = renderWizard("in_progress");
     await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
-    const { getByText, getByTestId } = await endThenOpenVerdict(live);
+    const { getByText, getByTestId, queryByText } = await endThenOpenVerdict(live);
 
     // ... and the failure still reaches the user, on the verdict card.
     await waitFor(() => {
-      expect(getByText(/saving the record failed/i)).toBeTruthy();
+      expect(getByText(/isn't attached to the match yet/i)).toBeTruthy();
     });
     getByTestId("upload-status-banner");
-    getByText(/row-level security/i);
+    // Paused, not failed (jits-n2im.3), and in friendly copy: the raw
+    // Postgrest text goes to telemetry, never the screen (jits-n2im.5).
+    within(getByTestId("upload-status-banner")).getByText(/upload paused/i);
+    expect(queryByText(/row-level security/i)).toBeNull();
     // The copy tells the user it is not over, because it is not: the job
     // is parked in phase "row" and the next foreground retries the write.
-    getByText(/retry automatically/i);
+    getByText(/Trying again shortly/i);
 
     // THE BYTES WENT UP ONCE: the row is retried on its own budget and the
     // object is left alone.
     expect(mockTusCalls).toHaveLength(1);
-    await waitFor(() => expect(mockInsertSingle.mock.calls.length).toBeGreaterThan(1));
+    await waitFor(() => expect(mockLandSingle.mock.calls.length).toBeGreaterThan(1));
+    // One reservation: the row is reserved once and only its PATCH retries.
+    expect(mockInsertSingle).toHaveBeenCalledTimes(1);
     expect(mockStorageRemove).not.toHaveBeenCalled();
+  });
+
+  it("a reservation the server refuses sends no bytes at all (jits-n2im.11)", async () => {
+    // Wave 2 reserves the row BEFORE the first byte, so a refusal there
+    // costs the athlete no data.
+    mockInsertSingle.mockResolvedValue(RLS_DENIAL);
+    const live = renderWizard("in_progress");
+    await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
+    const { getByTestId, queryByText } = await endThenOpenVerdict(live);
+
+    await waitFor(() => within(getByTestId("upload-status-banner")).getByText(/didn't upload/i));
+    expect(mockTusCalls).toHaveLength(0);
+    expect(queryByText(/row-level security/i)).toBeNull();
   });
 
   it("shows success after the live step is gone", async () => {

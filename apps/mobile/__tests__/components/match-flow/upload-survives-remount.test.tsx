@@ -258,6 +258,23 @@ jest.mock("@jits/shared/hooks/use-session-match-timer", () => ({
 // shape production can emit. The PostgREST-level version of the same path
 // is covered against the real mutation in record-upload-sequence.test.tsx.
 const mockUpsertMatchVideo = jest.fn();
+// Wave 2 (jits-n2im.11) reserves the row before the bytes and PATCHes it to
+// 'ready' after. Here the reservation succeeds and the land PATCH reports the
+// row "missing", which falls back to the wave 1 INSERT at 'ready': the
+// row-write timing this file is about (held open, failing, finishing after
+// the recorder is gone) still runs through `upsertMatchVideo`. The reserved
+// lifecycle itself is pinned in video-upload-manager.test.ts and, against
+// PostgREST shapes, in record-upload-sequence.test.tsx.
+jest.mock("@jits/shared/api/match-video-upload", () => ({
+  canUploadMatchVideo: async () => ({ ok: true, data: { allowed: true, reason: null } }),
+  reserveMatchVideoUpload: async (_sb: unknown, p: { storagePath: string }) => ({
+    ok: true,
+    data: { id: "RES-1", status: "uploading", storagePath: p.storagePath, failureCode: null, resumed: false },
+  }),
+  touchMatchVideoUpload: async () => ({ ok: true, data: { status: "uploading", updated: true } }),
+  finalizeMatchVideoUpload: async () => ({ ok: true, data: { outcome: "missing" } }),
+  abandonMatchVideoUpload: async () => ({ ok: true, data: { status: "failed", abandoned: true } }),
+}));
 jest.mock("@jits/shared/api/mutations", () => ({
   buildMatchVideoStoragePath: (matchId: string, uploader: string, ext = "mp4") =>
     `${matchId}/${uploader}/1700000000000.${ext}`,
@@ -496,8 +513,9 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
     // refresh() rebuilt the recorder idle here and the chip vanished.
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     screen.getByTestId("upload-status-banner");
-    screen.getByText(/saving the record failed/i);
-    screen.getByText(/row-level security/i);
+    screen.getByText(/isn't attached to the match yet/i);
+    // Friendly copy only: the raw server text is telemetry (jits-n2im.5).
+    expect(screen.queryByText(/row-level security/i)).toBeNull();
   });
 
   it("still offers Watch film on the verdict after the row completes", async () => {
@@ -511,7 +529,8 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
     // videoId lived only on the recorder before, so the remount lost it and
     // the verdict offered no film for a video that exists in storage.
     await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
-    screen.getByText("Watch film");
+    // Open match until an angle can play (deck rule 4); never a dead end.
+    screen.getByText("Open match");
     expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(false);
   });
 
@@ -524,7 +543,7 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
 
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
-    screen.getByText("Watch film");
+    screen.getByText("Open match");
   });
 });
 
@@ -572,8 +591,8 @@ describe("an upload that finishes LATE still reaches the summary", () => {
     await completeMatch();
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     screen.getByText(/uploading match video/i);
-    // Pending, not a dead link: Watch film waits for the id.
-    expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(true);
+    // Open match works throughout: the match page shows the upload card.
+    expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(false);
 
     // NOW the upload lands, long after the recorder that started it.
     await act(async () => {
@@ -599,7 +618,7 @@ describe("an upload that finishes LATE still reaches the summary", () => {
       held.release();
     });
 
-    await waitFor(() => expect(screen.getByText(/saving the record failed/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/isn't attached to the match yet/i)).toBeTruthy());
     screen.getByTestId("upload-status-banner");
   });
 });

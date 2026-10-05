@@ -13,8 +13,11 @@ import {
   MAX_TRACKED_MATCHES,
   beginMatchUploadAttempt,
   clearMatchUpload,
+  getActiveMatchUploads,
   getMatchUpload,
+  isOutstandingUpload,
   resetMatchUploadStore,
+  useActiveMatchUploads,
   setMatchUpload,
   subscribeMatchUpload,
   useMatchUpload,
@@ -362,5 +365,50 @@ describe("deriveUploadBannerState", () => {
     expect(
       deriveUploadBannerState("error", null, entry({ status: "error", error: "boom" })).message,
     ).toBe("boom");
+  });
+});
+
+describe("paused and the active-uploads selector (jits-n2im.2 prep, .3)", () => {
+  it("lists uploading, paused and failed entries, newest first, and nothing settled", () => {
+    let clock = 1_000;
+    const now = jest.spyOn(Date, "now").mockImplementation(() => (clock += 10));
+    setMatchUpload("M1", { status: "uploading" });
+    setMatchUpload("M2", { status: "uploaded", videoId: "V" });
+    setMatchUpload("M3", { status: "paused", error: "paused copy" });
+    setMatchUpload("M4", { status: "error", error: "failed copy" });
+    setMatchUpload("M5", { status: "pending" });
+    expect(getActiveMatchUploads().map((e) => e.matchId)).toEqual(["M4", "M3", "M1"]);
+    now.mockRestore();
+  });
+
+  it("returns the same array until one of those entries changes (a stable snapshot)", () => {
+    setMatchUpload("M1", { status: "uploading", progress: 0.1 });
+    const first = getActiveMatchUploads();
+    setMatchUpload("M9", { status: "uploaded" });
+    expect(getActiveMatchUploads()).toBe(first);
+    setMatchUpload("M1", { progress: 0.2 });
+    expect(getActiveMatchUploads()).not.toBe(first);
+  });
+
+  it("re-renders a subscriber when an upload starts or settles", () => {
+    const { result } = renderHook(() => useActiveMatchUploads());
+    expect(result.current).toEqual([]);
+    act(() => {
+      setMatchUpload("M1", { status: "paused" });
+    });
+    expect(result.current.map((e) => e.matchId)).toEqual(["M1"]);
+    act(() => {
+      setMatchUpload("M1", { status: "uploaded" });
+    });
+    expect(result.current).toEqual([]);
+  });
+
+  it("never evicts a paused or failed entry, which is still owed to the server", () => {
+    setMatchUpload("OWED-P", { status: "paused" });
+    setMatchUpload("OWED-E", { status: "error" });
+    for (let i = 0; i < MAX_TRACKED_MATCHES + 4; i++) setMatchUpload(`S${i}`, { status: "uploaded" });
+    expect(getMatchUpload("OWED-P")).not.toBeNull();
+    expect(getMatchUpload("OWED-E")).not.toBeNull();
+    expect(isOutstandingUpload(getMatchUpload("OWED-P"))).toBe(true);
   });
 });

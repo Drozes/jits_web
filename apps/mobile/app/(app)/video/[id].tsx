@@ -1,9 +1,9 @@
 import * as React from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Audio, ResizeMode, Video, type AVPlaybackStatus } from "expo-av";
+import { VideoView } from "expo-video";
 import { NO_MATCH_COPY, buildKeyMoments, captionAt, formatClock, isNoMatch, translateAngleTime } from "@jits/shared/utils";
 import { getVideoSyncOffsets } from "@jits/shared/api/film-room";
 import { supabase } from "@/lib/supabase/client";
@@ -33,8 +33,10 @@ const CURRENT_HOLD_S = 10;
  *
  * `useVideoPlayback` signs a 1-hour URL (normalized MP4 preferred), re-signs
  * silently once when the player errors and resumes where it was. The player is
- * expo-av's Video because that module is embedded in the field build, so this
- * screen ships over OTA (no new native module).
+ * expo-video (jits-n2im.19), linked in the field build since the reels, so
+ * this screen ships over OTA (no new native module). The poster covers the
+ * frame until the current item has drawn one. Each viewing session sends one
+ * playback telemetry event (jits-n2im.21).
  *
  * The `video-player-state` marker exposes the phase to the match-loop harness
  * as "Video state: <state>".
@@ -52,18 +54,12 @@ const APPROX_NOTE_MS = 5000;
 function PlayerBody({ id, start, approximate }: { id: string | undefined; start: number | null; approximate: boolean }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { phase, source, stateLabel, videoRef, retry, onPlayerError, onPlayerStatus } = useVideoPlayback(id, start);
+  const playback = useVideoPlayback(id, start);
+  const { phase, source, stateLabel, player, retry, positionS, durationS, playing, seek, toggle, telemetry } = playback;
   const details = useMatchDetail(source?.matchId ?? undefined);
   const { analysis } = useVideoAnalysis(id ?? null);
-  const [positionS, setPositionS] = React.useState(start ?? 0);
-  const [durationS, setDurationS] = React.useState(0);
-  const [playing, setPlaying] = React.useState(true);
-  const [speed, setSpeed] = React.useState(1);
   const [offsets, setOffsets] = React.useState<Record<string, number | null>>({});
   const [showApprox, setShowApprox] = React.useState(approximate);
-  // The first loaded status of each source still reports the pre-seek
-  // position (the ?t= or resume seek lands after it): do not show it.
-  const seenGeneration = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     if (!showApprox) return;
@@ -71,34 +67,14 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
     return () => clearTimeout(timer);
   }, [showApprox]);
 
-  // iOS routes audio through the ringer switch by default; play through it
-  // while this screen is up, then hand the session back.
-  React.useEffect(() => {
-    void Audio.setAudioModeAsync({ playsInSilentModeIOS: true }).catch(() => undefined);
-    return () => {
-      void Audio.setAudioModeAsync({ playsInSilentModeIOS: false }).catch(() => undefined);
-    };
-  }, []);
-
-  const onStatus = React.useCallback(
-    (status: AVPlaybackStatus) => {
-      onPlayerStatus(status);
-      if (!status.isLoaded) return;
-      const generation = source?.generation ?? null;
-      if (seenGeneration.current !== generation) {
-        seenGeneration.current = generation;
-        if (status.durationMillis) setDurationS(status.durationMillis / 1000);
-        return;
-      }
-      setPositionS(status.positionMillis / 1000);
-      if (status.durationMillis) setDurationS(status.durationMillis / 1000);
-      if (status.didJustFinish) setPlaying(false);
-    },
-    [onPlayerStatus, source?.generation],
-  );
-
   const duration = durationS || source?.durationSeconds || 0;
   const view = details.state === "ready" ? details.data : null;
+  const thisAngle = view?.videos.find((v) => v.id === id);
+  const angleMeta = thisAngle ? (thisAngle.is_mine ? "mine" : "opponent") : null;
+  const angleCount = view ? view.videos.length : null;
+  React.useEffect(() => {
+    if (angleMeta) telemetry.setMeta({ angle: angleMeta, angleCount });
+  }, [telemetry, angleMeta, angleCount]);
   const angleIds = view && view.videos.length > 1 ? view.videos.map((v) => v.id).join(",") : "";
   React.useEffect(() => {
     if (!angleIds) return;
@@ -119,15 +95,6 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   const caption = captionAt(moments, analysis?.positions, positionS);
   const current = [...moments].reverse().find((m) => m.t <= positionS + 0.25 && positionS - m.t < CURRENT_HOLD_S);
 
-  const seek = (seconds: number) => {
-    const clamped = Math.max(0, duration > 0 ? Math.min(duration, seconds) : seconds);
-    setPositionS(clamped);
-    videoRef.current?.setPositionAsync(clamped * 1000).catch(() => undefined);
-  };
-  const toggle = () => {
-    if (!playing && duration > 0 && positionS >= duration - 0.5) seek(0);
-    setPlaying((p) => !p);
-  };
   const title = view
     ? `${shortName(view.me.display_name)} vs ${shortName(view.opponent?.display_name)}`
     : "Match film";
@@ -148,23 +115,27 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
       <StatusBar style="light" />
       {phase === "ready" && source ? (
         <>
-          <Video
-            key={`${source.generation}:${source.url}`}
-            ref={videoRef}
-            source={{ uri: source.url }}
-            posterSource={source.posterUrl ? { uri: source.posterUrl } : undefined}
-            usePoster={!!source.posterUrl}
+          {/* The row read and the sign both succeeded, so the recording
+              exists: a player error is an expired URL or the network
+              (useVideoPlayback re-signs). */}
+          <VideoView
+            testID="video-player"
+            player={player}
             style={StyleSheet.absoluteFill}
-            resizeMode={ResizeMode.CONTAIN}
-            shouldPlay={playing}
-            rate={speed}
-            shouldCorrectPitch
-            progressUpdateIntervalMillis={250}
-            onPlaybackStatusUpdate={onStatus}
-            // The row read and the sign both succeeded, so the recording
-            // exists: an error here is an expired URL or the network.
-            onError={onPlayerError}
+            contentFit="contain"
+            nativeControls={false}
+            allowsPictureInPicture={false}
+            onFirstFrameRender={playback.onFirstFrameRender}
           />
+          {source.posterUrl && !playback.frameShown ? (
+            <Image
+              testID="video-poster"
+              source={{ uri: source.posterUrl }}
+              resizeMode="contain"
+              style={StyleSheet.absoluteFill}
+              accessibilityIgnoresInvertColors
+            />
+          ) : null}
           <FilmScrim stops={[[0, 0.75], [1, 0]]} style={{ left: 0, right: 0, top: 0, height: insets.top + 150 }} />
           <FilmScrim stops={[[0, 0], [1, 0.9]]} style={{ left: 0, right: 0, bottom: 0, height: "45%" }} />
           {topBar}
@@ -221,8 +192,8 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                 ) : null}
               </View>
             </View>
-            <Transport playing={playing} speed={speed} onToggle={toggle} onSkip={(d) => seek(positionS + d)} onSpeed={() => setSpeed(nextSpeed)} />
-            <MomentChips moments={moments} currentT={current?.t ?? null} onJump={(tt) => { seek(tt); setPlaying(true); }} />
+            <Transport playing={playing} speed={playback.rate} onToggle={toggle} onSkip={(d) => seek(positionS + d)} onSpeed={() => playback.setRate(nextSpeed)} />
+            <MomentChips moments={moments} currentT={current?.t ?? null} onJump={(tt) => { seek(tt); playback.setPlaying(true); }} />
           </View>
         </>
       ) : phase === "loading" || phase === "ready" ? (

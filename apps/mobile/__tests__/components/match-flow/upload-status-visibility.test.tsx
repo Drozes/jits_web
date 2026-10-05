@@ -20,7 +20,7 @@
  * failure, is covered in `record-upload-sequence.test.tsx`.
  */
 import * as React from "react";
-import { render, fireEvent, act } from "@testing-library/react-native";
+import { render, fireEvent, act, within } from "@testing-library/react-native";
 import type { RecordingState, RecordingTruncation } from "@/lib/video/use-video-recorder";
 
 // ---- the recorder under the wizard ----
@@ -93,6 +93,12 @@ jest.mock("@/lib/theme/use-theme", () => ({
 }));
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// Match-level match_videos realtime (jits-n2im.12): its own tests live in
+// packages/shared; here it is inert.
+const mockMatchVideosRealtime = jest.fn();
+jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
+  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a) ?? { subscribed: true },
+}));
 
 jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
@@ -264,8 +270,9 @@ describe("upload status survives the step that started it", () => {
     });
 
     getByTestId("upload-status-banner");
-    // The card, and the hero where the still will be.
-    getByText(/finishing recording\.\.\./i);
+    // The card ("Finishing recording", deck strip copy), and the hero where
+    // the still will be.
+    within(getByTestId("upload-status-banner")).getByText("Finishing recording");
     getByText("FINISHING RECORDING");
   });
 
@@ -282,14 +289,14 @@ describe("upload status survives the step that started it", () => {
   it("shows a FAILED upload on the summary step, with the reason", () => {
     // The worst case of the defect: the user was never told the upload
     // failed, because the only surface that could say so had unmounted.
-    const { getByTestId, getByText } = renderSummary({
+    const { getByTestId } = renderSummary({
       status: "error",
       error: "Upload failed: Video uploaded but saving the record failed: permission denied",
     });
 
-    getByTestId("upload-status-banner");
-    getByText(/upload failed/i);
-    getByText(/permission denied/i);
+    const banner = within(getByTestId("upload-status-banner"));
+    banner.getByText(/upload failed/i);
+    banner.getByText(/permission denied/i);
   });
 
   it("does not congratulate the user on a truncated clip", () => {
@@ -305,17 +312,29 @@ describe("upload status survives the step that started it", () => {
     expect(queryByText(/^match video uploaded$/i)).toBeNull();
   });
 
+  it("tells a truncated clip whose upload FAILED both facts (jits-5tj9.5)", () => {
+    const { getByTestId } = renderSummary({
+      status: "error",
+      error: "Upload failed: the server didn't accept this video.",
+      errorClass: "not_allowed",
+      truncation: "limit",
+    });
+    const banner = within(getByTestId("upload-status-banner"));
+    banner.getByText(/server didn't accept this video/i);
+    banner.getByText(/recording hit its time limit/i);
+  });
+
   it("says nothing at all when no recording was made", () => {
     const { queryByTestId } = renderSummary(null);
     expect(queryByTestId("upload-status-banner")).toBeNull();
   });
 
   it("keeps reporting the upload on a DISPUTED match's summary", () => {
-    const { getByText } = renderSummary(
+    const { getByTestId } = renderSummary(
       { status: "error", error: "Upload failed: network died" },
       { status: "disputed" },
     );
-    getByText(/upload failed/i);
+    within(getByTestId("upload-status-banner")).getByText(/upload failed/i);
   });
 });
 
@@ -323,22 +342,23 @@ describe("watching the match back from the verdict (jits-p75q)", () => {
   // The verdict's Watch film opens the match page, which lists (and plays)
   // every angle from the server: both athletes' recordings, a reopened
   // match with an empty upload store, and a disputed match alike.
-  it("offers Watch film once this phone's clip has landed", async () => {
+  it("opens the match once this phone's clip has landed (Open match until an angle plays, deck rule 4)", async () => {
     const { getByTestId, getByText } = renderSummary({ status: "uploaded", videoId: "VID-1" });
     await act(async () => {
       await Promise.resolve();
     });
-    getByText("Watch film");
+    getByText("Open match");
     fireEvent.press(getByTestId("summary-watch-film"));
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
-  it("holds Watch film while the upload is still running (never a 404)", () => {
-    const { getByTestId } = renderSummary({ status: "uploading" });
+  it("while the upload runs, Open match goes to the match page (keyed by match id, never a 404)", () => {
+    const { getByTestId, queryByText } = renderSummary({ status: "uploading" });
     const watch = getByTestId("summary-watch-film");
-    expect(watch.props.accessibilityState.disabled).toBe(true);
+    expect(watch.props.accessibilityState.disabled).toBe(false);
+    expect(queryByText("Watch film")).toBeNull();
     fireEvent.press(watch);
-    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
   it("offers it on a DISPUTED match, which Past Match Videos cannot reach", () => {
@@ -347,10 +367,10 @@ describe("watching the match back from the verdict (jits-p75q)", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
-  it("with no video and none coming it is Match details, still to the match page", () => {
+  it("with no video and none coming it is Open match, still to the match page", () => {
     const { getByText, queryByText } = renderSummary(null);
     expect(queryByText("Watch film")).toBeNull();
-    fireEvent.press(getByText("Match details"));
+    fireEvent.press(getByText("Open match"));
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 });

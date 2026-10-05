@@ -1,16 +1,15 @@
 import * as React from "react";
 import { supabase } from "@/lib/supabase/client";
-import { getMatchDetailView } from "@jits/shared/api/queries";
+import { getMatchDetailView, type MatchDetailVideo } from "@jits/shared/api/queries";
+import { useMatchVideosRealtime } from "@jits/shared/hooks/use-match-videos-realtime";
+import { defaultMatchAngle } from "@jits/shared/utils";
 import { getMatchRankChange, type MatchRankChange } from "@jits/shared/api/match-rank-change";
-
-/** Re-read the match's videos this often while a poster is still missing. */
-export const POSTER_POLL_MS = 20_000;
-/** ...at most this many times per verdict (the slicer takes a while). */
-export const POSTER_POLL_LIMIT = 6;
 
 export interface VerdictVideos {
   /** Any `match_videos` row on this match, from either athlete. */
   hasVideo: boolean;
+  /** At least one angle can be played now (deck rule 4: only then "Watch film"). */
+  hasPlayable: boolean;
   /** Signed opening still (the slicer poster), when one exists yet. */
   posterUrl: string | null;
   /**
@@ -22,20 +21,40 @@ export interface VerdictVideos {
    * (thumbnail_key is optional in the type) and for hand-built fixtures.
    */
   posterKey: string | null;
+  /**
+   * The other athletes' angles (the opponent's, the timekeeper's), in deck
+   * row order, for the verdict's angle rows (jits-n2im.12). The viewer's own
+   * angle is not here: this phone's upload card speaks for it.
+   */
+  others: MatchDetailVideo[];
 }
 
-const EMPTY: VerdictVideos = { hasVideo: false, posterUrl: null, posterKey: null };
+/** How often the verdict re-reads while realtime is not connected. */
+export const VERDICT_FALLBACK_REFETCH_MS = 60_000;
+
+const EMPTY: VerdictVideos = { hasVideo: false, hasPlayable: false, posterUrl: null, posterKey: null, others: [] };
 
 /**
- * The verdict's opening still: the match's videos via `getMatchDetailView`
+ * The opening still: the server-elected primary's poster when it has one
+ * (jits-n2im.15), else the first angle that has one.
+ */
+function posterSource(list: MatchDetailVideo[]): MatchDetailVideo | null {
+  const primary = defaultMatchAngle(list);
+  if (primary?.is_primary && primary.poster_url) return primary;
+  return list.find((v) => v.poster_url) ?? null;
+}
+
+/**
+ * The verdict's videos: the match's angles via `getMatchDetailView`
  * (participant-gated, posters signed). Re-read when this device's upload
- * lands (`uploadedKey` changes) and on a bounded poll while a video exists
- * without a poster. Any failure keeps what is in hand.
+ * lands (`uploadedKey` changes) and on every `match_videos` change for the
+ * match over realtime (jits-n2im.12): the other athlete's angle being
+ * reserved, its upload %, the poster and the pipeline arriving. This
+ * replaced the backing-off poster poll. Any failure keeps what is in hand.
  */
 export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey: string | null): VerdictVideos {
   const [videos, setVideos] = React.useState<VerdictVideos>(EMPTY);
   const [tick, setTick] = React.useState(0);
-  const pollsRef = React.useRef(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -45,11 +64,13 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
       .then((res) => {
         if (cancelled || !res.ok) return;
         const list = res.data.videos;
-        const withPoster = list.find((v) => v.poster_url);
+        const withPoster = posterSource(list);
         setVideos({
           hasVideo: list.length > 0,
+          hasPlayable: list.some((v) => v.playability === "playable"),
           posterUrl: withPoster?.poster_url ?? null,
           posterKey: withPoster ? (withPoster.thumbnail_key ?? withPoster.id) : null,
+          others: list.filter((v) => !v.is_mine),
         });
       })
       .catch(() => undefined);
@@ -58,15 +79,16 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
     };
   }, [matchId, viewerId, uploadedKey, tick]);
 
-  const needsPoll = videos.posterUrl == null && (videos.hasVideo || uploadedKey != null);
+  const refetch = React.useCallback(() => setTick((n) => n + 1), []);
+  const { subscribed } = useMatchVideosRealtime(supabase, matchId, refetch);
+
+  // Review minor 9: realtime is the only refresh now, so while the channel
+  // has not joined (or dropped) a slow re-read keeps the verdict moving.
   React.useEffect(() => {
-    if (!needsPoll || pollsRef.current >= POSTER_POLL_LIMIT) return;
-    const t = setTimeout(() => {
-      pollsRef.current += 1;
-      setTick((n) => n + 1);
-    }, POSTER_POLL_MS);
-    return () => clearTimeout(t);
-  }, [needsPoll, tick]);
+    if (subscribed) return;
+    const id = setInterval(refetch, VERDICT_FALLBACK_REFETCH_MS);
+    return () => clearInterval(id);
+  }, [subscribed, refetch]);
 
   return videos;
 }

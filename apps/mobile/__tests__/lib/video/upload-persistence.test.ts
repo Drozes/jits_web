@@ -58,6 +58,8 @@ function job(overrides: Partial<PendingUploadJob> = {}): PendingUploadJob {
     createdAt: 1_700_000_000_000,
     updatedAt: 1_700_000_000_000,
     lastError: null,
+    errorClass: null,
+    needsUser: false,
     ...overrides,
   };
 }
@@ -288,5 +290,37 @@ describe("isJobExpired", () => {
     expect(isJobExpired(job({ createdAt: created }), created + UPLOAD_JOB_MAX_AGE_MS + 1)).toBe(
       true,
     );
+  });
+});
+
+describe("reserve-before-bytes fields (jits-n2im.11)", () => {
+  it("round-trips a protocol 2 job with its reserved id and record timing", async () => {
+    await saveUploadJob(
+      job({ protocol: 2, videoId: "VID-9", recordStartedAt: "2026-10-05T10:00:00.000Z", recordDurationMs: 360_000 }),
+    );
+    expect(await loadUploadJob("M1")).toMatchObject({
+      protocol: 2,
+      videoId: "VID-9",
+      recordStartedAt: "2026-10-05T10:00:00.000Z",
+      recordDurationMs: 360_000,
+    });
+  });
+
+  it("reads a wave 1 record (no protocol) as protocol 1 with no reservation, without dropping it", async () => {
+    const legacy = job();
+    delete (legacy as Partial<PendingUploadJob>).protocol;
+    await saveUploadJob(legacy);
+    expect(await loadUploadJob("M1")).toMatchObject({
+      protocol: 1,
+      videoId: null,
+      recordStartedAt: null,
+      recordDurationMs: null,
+      phase: "bytes",
+    });
+  });
+
+  it("normalises junk in the new fields instead of dropping the clip", async () => {
+    await saveUploadJob(job({ protocol: 7 as never, videoId: "" , recordDurationMs: -5 }));
+    expect(await loadUploadJob("M1")).toMatchObject({ protocol: 1, videoId: null, recordDurationMs: null });
   });
 });

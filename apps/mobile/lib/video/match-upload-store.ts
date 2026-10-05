@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { RecordingTruncation } from "./use-video-recorder";
+import type { UploadErrorClass } from "./upload-errors";
 
 /**
  * Match-scoped store for the outcome of a match-video upload (jits-od3).
@@ -76,7 +77,19 @@ export type MatchUploadStatus =
   | "uploading"
   /** Storage object and match_videos row both landed. */
   | "uploaded"
-  /** The upload is over and it failed. `error` says why. */
+  /**
+   * Parked, and it WILL retry on its own (jits-n2im.3): backoff exhausted on
+   * a retryable failure, a daily-limit gate, a row write that keeps failing.
+   * The job is on disk; foreground, reconnect and the foreground retry
+   * timer resume it, and Retry runs it now. `error` is friendly copy.
+   */
+  | "paused"
+  /**
+   * FAILED: nothing happens until the athlete acts (Retry, or Discard when
+   * `errorClass` is terminal). Kept as "error" rather than renamed to
+   * "failed" so every reader that already treats "error" as a failure
+   * keeps working. `error` is friendly copy (lib/video/upload-errors.ts).
+   */
   | "error";
 
 export interface MatchUploadEntry {
@@ -84,8 +97,12 @@ export interface MatchUploadEntry {
   status: MatchUploadStatus;
   /** `match_videos.id`, once the row lands. The handle playback needs. */
   videoId: string | null;
-  /** User-facing failure reason. Null unless `status` is "error". */
+  /** User-facing failure copy. Null unless `status` is "paused" or "error". */
   error: string | null;
+  /** Class of the failure behind `error` (drives Retry vs Discard). */
+  errorClass: UploadErrorClass | null;
+  /** Byte size of the clip being sent, when known (cellular size hint). */
+  bytesTotal: number | null;
   /** Set when the clip does not cover the whole match (jits-2zpe). */
   truncation: RecordingTruncation | null;
   /**
@@ -135,9 +152,11 @@ function evictIfNeeded(): void {
   if (entries.size <= MAX_TRACKED_MATCHES) return;
   // Only settled entries are candidates. An in-flight upload still needs
   // its storagePath (retry key) and its truncation, and would otherwise be
-  // re-created wrong when it lands. See MAX_TRACKED_MATCHES.
+  // re-created wrong when it lands. See MAX_TRACKED_MATCHES. A paused or
+  // failed one is still owed to the server and still has a job on disk;
+  // evicting it would make every surface forget it until the next launch.
   const evictable = [...entries.values()]
-    .filter((entry) => entry.status !== "uploading")
+    .filter((entry) => !isOutstandingUpload(entry))
     .sort((a, b) => a.updatedAt - b.updatedAt);
   for (const entry of evictable.slice(0, entries.size - MAX_TRACKED_MATCHES)) {
     entries.delete(entry.matchId);
@@ -167,6 +186,8 @@ export function setMatchUpload(
     status: prev?.status ?? "pending",
     videoId: prev?.videoId ?? null,
     error: prev?.error ?? null,
+    errorClass: prev?.errorClass ?? null,
+    bytesTotal: prev?.bytesTotal ?? null,
     truncation: prev?.truncation ?? null,
     storagePath: prev?.storagePath ?? null,
     progress: prev?.progress ?? null,
@@ -200,6 +221,8 @@ export function beginMatchUploadAttempt(matchId: string): MatchUploadEntry {
     status: "pending",
     videoId: null,
     error: null,
+    errorClass: null,
+    bytesTotal: null,
     truncation: null,
     storagePath: null,
     progress: null,
@@ -212,20 +235,56 @@ export function beginMatchUploadAttempt(matchId: string): MatchUploadEntry {
 }
 
 /**
- * Forget a match entirely. Nothing in this branch calls it: a failed
- * upload stays visible on purpose, because "it failed" remains true until
- * something re-drives it. It exists so jits-341p's retry has a way to
- * reset an entry it is about to replace, and so tests start clean.
+ * Forget a match entirely. A failed upload stays visible on purpose,
+ * because "it failed" remains true until something re-drives it; the one
+ * app caller is Discard (`discardMatchVideoUpload`), which removes the job
+ * and the clip, so there is nothing left to describe.
  */
 export function clearMatchUpload(matchId: string): void {
   if (!entries.delete(matchId)) return;
   emit();
 }
 
-/** Test-only reset. Never called from app code. */
+/**
+ * Forget every entry. Called on sign-out (the entries describe the previous
+ * account's uploads, and the next account must never see them) and by tests.
+ */
 export function resetMatchUploadStore(): void {
   entries.clear();
   emit();
+}
+
+/** Statuses where this phone still owes the server a video. */
+const OUTSTANDING: ReadonlySet<MatchUploadStatus> = new Set(["uploading", "paused", "error"]);
+
+/** True while this entry is an upload that has not landed (any surface may say so). */
+export function isOutstandingUpload(entry: MatchUploadEntry | null | undefined): boolean {
+  return entry != null && OUTSTANDING.has(entry.status);
+}
+
+let activeCache: { source: MatchUploadEntry[]; result: MatchUploadEntry[] } | null = null;
+
+/**
+ * Every entry whose upload is uploading, paused or failed, most recently
+ * touched first. The selector the app-wide upload indicator (jits-n2im.2,
+ * waiting on design) reads. The returned array is STABLE between store
+ * writes that change none of these entries, so it is safe as a
+ * `useSyncExternalStore` snapshot.
+ */
+export function getActiveMatchUploads(): MatchUploadEntry[] {
+  const source = [...entries.values()].filter(isOutstandingUpload);
+  const prev = activeCache;
+  if (prev && prev.source.length === source.length && prev.source.every((e) => source.includes(e))) {
+    return prev.result;
+  }
+  const result = [...source].sort((a, b) => b.updatedAt - a.updatedAt);
+  activeCache = { source, result };
+  return result;
+}
+
+/** Subscribe a component to every outstanding upload (see `getActiveMatchUploads`). */
+export function useActiveMatchUploads(): MatchUploadEntry[] {
+  return React.useSyncExternalStore(subscribeMatchUpload, getActiveMatchUploads, getActiveMatchUploads);
 }
 
 export function subscribeMatchUpload(listener: () => void): () => void {

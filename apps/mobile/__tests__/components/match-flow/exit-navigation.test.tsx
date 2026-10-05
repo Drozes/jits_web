@@ -54,6 +54,12 @@ jest.mock("@/lib/theme/use-theme", () => ({
 }));
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// Match-level match_videos realtime (jits-n2im.12): its own tests live in
+// packages/shared; here it is inert.
+const mockMatchVideosRealtime = jest.fn();
+jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
+  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a) ?? { subscribed: true },
+}));
 
 jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
@@ -611,7 +617,7 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
       />,
     );
     fireEvent.press(getByText(ARENA_LABEL));
-    fireEvent.press(getByText("Match details"));
+    fireEvent.press(getByText("Open match"));
 
     expect(mockRouterDismissTo.mock.calls.length).toBeGreaterThan(0);
     for (const [href] of mockRouterDismissTo.mock.calls) {

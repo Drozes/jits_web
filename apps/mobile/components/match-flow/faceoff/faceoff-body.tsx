@@ -3,6 +3,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
 import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
 import { setRecordingOptIn } from "@/lib/match-flow/recording-optin";
+import { useRecordingSpaceWarning } from "@/lib/video/recording-space";
 import { usePalette } from "@/lib/theme/palette";
 import { Switch } from "@/components/ui/switch";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
@@ -16,6 +17,8 @@ interface FaceoffBodyProps {
   phase: "weight" | "ready";
   me: FaceoffAthlete;
   opponent: FaceoffAthlete;
+  /** The match length, for the recording's free-space estimate. */
+  durationSeconds?: number | null;
 }
 
 /**
@@ -90,7 +93,7 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
   );
 }
 
-function ReadyCheck({ opponent }: FaceoffBodyProps) {
+function ReadyCheck({ opponent, durationSeconds }: FaceoffBodyProps) {
   const f = useFaceoffContext();
   const p = usePalette();
   const oppName = shortName(opponent.display_name).toUpperCase();
@@ -105,7 +108,7 @@ function ReadyCheck({ opponent }: FaceoffBodyProps) {
           <Mono>CAMERA OFF ON THIS PHONE</Mono>
         </View>
       )}
-      <RecordingPanel oppName={oppName} />
+      <RecordingPanel oppName={oppName} durationSeconds={durationSeconds ?? null} />
       <View style={{ flexDirection: "row", gap: 12 }}>
         <StatusPlate label={f.myReady ? "YOU · READY" : "YOU · NOT READY"} done={f.myReady} accessibilityLabel={`You, ${f.myReady ? "ready" : "waiting"}`} />
         {/* The testID and the "Opponent, ready|waiting" label stay fixed: the
@@ -150,9 +153,11 @@ function ReadyCheck({ opponent }: FaceoffBodyProps) {
 }
 
 /** "Record from my phone" plus the opponent's choice (decision 5). */
-function RecordingPanel({ oppName }: { oppName: string }) {
+function RecordingPanel({ oppName, durationSeconds }: { oppName: string; durationSeconds: number | null }) {
   const f = useFaceoffContext();
   const p = usePalette();
+  // Said before recording starts, not as a failed recording (jits-n2im.6).
+  const lowSpace = useRecordingSpaceWarning(f.recording, durationSeconds);
   const nobody = !f.recording && f.opponentRecording === false;
   const oppLabel =
     f.opponentRecording == null ? `${oppName} · CHOOSING` : f.opponentRecording ? `${oppName} RECORDING` : `${oppName} NOT RECORDING`;
@@ -187,6 +192,17 @@ function RecordingPanel({ oppName }: { oppName: string }) {
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.amber }} />
           <Text className="font-body" style={[typeStep("body"), { flex: 1, color: p.amber }]}>
             No one is recording this match
+          </Text>
+        </View>
+      ) : null}
+      {lowSpace ? (
+        <View
+          testID="faceoff-low-storage"
+          accessibilityRole="alert"
+          style={{ minHeight: 40, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: p.amber, borderRadius: FIGHT_RADIUS.button }}
+        >
+          <Text className="font-body" style={[typeStep("body"), { color: p.amber }]}>
+            {lowSpace}
           </Text>
         </View>
       ) : null}

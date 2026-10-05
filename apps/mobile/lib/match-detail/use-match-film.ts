@@ -1,12 +1,12 @@
 import * as React from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useVideoProgress } from "@jits/shared/hooks/use-video-progress";
-import { buildKeyMoments, isNoMatch, type KeyMoment } from "@jits/shared/utils";
+import { buildKeyMoments, defaultMatchAngle, isNoMatch, type KeyMoment } from "@jits/shared/utils";
 import type { MatchDetailView, MatchDetailVideo } from "@jits/shared/api/queries";
-import { useMatchUpload } from "@/lib/video/match-upload-store";
+import { useMatchUpload, type MatchUploadEntry } from "@/lib/video/match-upload-store";
 import type { VideoAnalysis } from "@jits/shared/api/film-room";
 import { useVideoAnalysis, type AnalysisState } from "@/lib/film-room/use-video-analysis";
-import { uploadingLabel } from "@/lib/film-room/card-status";
+import { filmStillCaption } from "@/lib/video/upload-copy";
 
 /** What the AI BREAKDOWN plate shows for the selected angle. */
 export type BreakdownPhase =
@@ -26,19 +26,25 @@ export interface MatchFilm {
   tags: string[];
   /** Hero fallback caption. */
   fallbackLabel: string;
+  /** This phone's upload entry for the match (null when none). */
+  localUpload: MatchUploadEntry | null;
+  /** Why the hero has no play button while the film exists, else null. */
+  playHint: string | null;
   retryAnalysis: () => void;
 }
 
 /**
  * Everything the match page derives from its recordings: the selected angle
- * (the viewer's own first), live analysis progress while it runs (re-reading
+ * (the server-elected primary, else the viewer's own first), live analysis progress while it runs (re-reading
  * the breakdown the moment the merge lands), the breakdown itself, its key
  * moments and technique tags, and the hero's fallback caption.
  */
 export function useMatchFilm(view: MatchDetailView | null, matchId: string): MatchFilm {
   const videos = view?.videos ?? [];
   const [activeId, setActiveId] = React.useState<string | null>(null);
-  const active = videos.find((v) => v.id === activeId) ?? videos[0] ?? null;
+  // The server-elected primary angle is the default (jits-n2im.15), else the
+  // viewer's own, then the server's order. A pick by the athlete wins.
+  const active = videos.find((v) => v.id === activeId) ?? defaultMatchAngle(videos);
 
   const watching =
     !!active && !active.has_analysis && active.playability === "playable" && PIPELINE.has(active.status);
@@ -81,11 +87,10 @@ export function useMatchFilm(view: MatchDetailView | null, matchId: string): Mat
     } else phase = { kind: "analysis", state: "none", analysis: null };
   } else if (uploading) phase = { kind: "uploading" };
 
-  const fallbackLabel = uploading
-    ? `${uploadingLabel(upload?.progress ?? null)} · STILL ARRIVES AFTER UPLOAD`
-    : videos.length === 0
-      ? "NO FILM RECORDED"
-      : "STILL ARRIVES AFTER UPLOAD";
+  // Once the bytes are in, the still is waiting on processing, never on
+  // the upload (jits-n2im.4 item 6).
+  const fallbackLabel = filmStillCaption(upload, videos.length > 0, "NO FILM RECORDED");
+  const playHint = active && active.playability === "processing" ? (active.status === "uploading" ? "UPLOADING" : "PROCESSING") : null;
 
-  return { active, setActiveId, phase, moments, tags, fallbackLabel, retryAnalysis: retry };
+  return { active, setActiveId, phase, moments, tags, fallbackLabel, localUpload: upload, playHint, retryAnalysis: retry };
 }
