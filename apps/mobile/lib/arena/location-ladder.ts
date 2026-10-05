@@ -89,6 +89,8 @@ import {
   setNeedsLocation,
   beginRestoreRun,
   registerGoLiveCanceller,
+  currentGoLiveAttemptSeq,
+  isGoLiveAttemptSuperseded,
   setAppLiveIntent,
   type LiveSwitchIgnored,
 } from "./arena-store";
@@ -196,11 +198,26 @@ class Attempt {
 
   /** The athlete chose offline while this attempt was in flight (QA A). */
   cancelled = false;
+  /** The choice this attempt runs for (tapped attempts; null for a restore). */
+  readonly seq: number | null;
 
   constructor(
     readonly tapped: boolean,
     readonly flow: GoLiveFlow | null,
-  ) {}
+  ) {
+    this.seq = tapped ? currentGoLiveAttemptSeq() : null;
+  }
+
+  /** A newer choice overtook this attempt: it draws no OFFLINE · RETRY (round 4, QA 2). */
+  superseded(): boolean {
+    return isGoLiveAttemptSuperseded(this.seq);
+  }
+
+  /** OFFLINE · RETRY, unless overtaken or cancelled. */
+  drawRetry(): void {
+    if (this.aborted() || this.superseded()) return;
+    setGoLiveDisplay("retry");
+  }
 
   /** Backgrounded (a tapped flow) or cancelled by a go-offline. */
   aborted(): boolean {
@@ -214,7 +231,7 @@ class Attempt {
    * when live lands); a failure is only said once the write actually failed.
    */
   windowEnded(): void {
-    if (!this.tapped || this.aborted()) return;
+    if (!this.tapped || this.aborted() || this.superseded()) return;
     const d = getGoLiveDisplay();
     if (d === "optimistic" || d === "recovering" || d === "going-live" || d === "finding-you" || d === "hold") {
       this.green = false;
@@ -563,7 +580,7 @@ export async function goLiveFromTap(w: LiveWriter): Promise<boolean | LiveSwitch
   };
   const giveUp = (): false => {
     attempt = "error";
-    setGoLiveDisplay("retry");
+    a.drawRetry();
     return false;
   };
   const dismissed = (): LiveSwitchIgnored => {
@@ -667,7 +684,7 @@ export async function goLiveFromTap(w: LiveWriter): Promise<boolean | LiveSwitch
       if (a.aborted()) return dismissed();
       if (ready.outcome !== "ready") {
         attempt = ready.attempt;
-        setGoLiveDisplay("retry");
+        a.drawRetry();
         return false;
       }
       const wr = await writeLive(a, w);

@@ -105,6 +105,11 @@ export interface ArenaController {
    * flight. Optional: `goOffline` is used without it.
    */
   ensureOffline?: () => Promise<boolean>;
+  /**
+   * Sign-out (round 4, R1): an unconditional `false` write now, whatever the
+   * owner believes is committed. Optional: `goOffline` is used without it.
+   */
+  signOutOffline?: () => Promise<boolean>;
 }
 
 export const IDLE_ARENA_STATE: ArenaState = Object.freeze({
@@ -321,6 +326,11 @@ export function displayDrawsLive(display: GoLiveDisplay | null, isLive: boolean)
   // Every other overlay is a not-yet-live (or failed) state; a committed
   // live flag still wins (a late write that landed is the truth).
   return isLive && display !== "hold" && display !== "leaving";
+}
+
+/** Live as the athlete sees it, read without a render (the own-row check compares it with the server). */
+export function getArenaDisplayLive(): boolean {
+  return getDisplayLive();
 }
 
 function getDisplayLive(): boolean {
@@ -802,6 +812,28 @@ function committedLive(c: ArenaController): boolean | null {
  * driven here: it goes out at once (`chooseOffline`), serialized behind any
  * write in flight by `useArenaLive`.
  */
+/**
+ * The intent the driver's current go-live attempt was started for (null:
+ * none, or a restore). A tapped attempt that the athlete has since overtaken
+ * (`isGoLiveAttemptSuperseded`) never draws anything (round 4, QA 2).
+ */
+let runningAttemptSeq: number | null = null;
+
+/** The intent sequence of the go-live attempt being run now, or null. Read once, when an attempt starts. */
+export function currentGoLiveAttemptSeq(): number | null {
+  return runningAttemptSeq;
+}
+
+/** Whether a tapped attempt started for `seq` has been overtaken by a newer choice. */
+export function isGoLiveAttemptSuperseded(seq: number | null): boolean {
+  return seq !== null && intent.seq !== seq;
+}
+
+/** Anything of the go-live driver in flight (a choice waiting, an attempt, a restore). */
+export function isLiveDriverBusy(): boolean {
+  return driving || switchInFlight || restoreInFlight();
+}
+
 async function drive(): Promise<void> {
   if (driving) return;
   driving = true;
@@ -846,10 +878,13 @@ async function drive(): Promise<void> {
       }
       emitArena();
       let r: boolean | LiveSwitchIgnored;
+      runningAttemptSeq = target.seq;
       try {
         r = await c.goLive();
       } catch {
         r = false;
+      } finally {
+        if (runningAttemptSeq === target.seq) runningAttemptSeq = null;
       }
       // An older generation (the owner changed meanwhile): not ours to settle.
       if (gen !== driverGen) return;
@@ -859,9 +894,12 @@ async function drive(): Promise<void> {
       cancelReveal();
       markTransition();
       if (intent.seq !== target.seq) {
-        // Overtaken: its caller already heard "ignored". An offline choice
-        // draws offline by itself; a newer live choice loops on.
-        if (!intent.live && getGoLiveDisplay() !== "retry") goLiveDisplay = null;
+        // Overtaken: its caller already heard "ignored", and it draws
+        // nothing (QA 2). An offline choice draws offline by itself; a newer
+        // live choice loops on (adopting this attempt's write if it landed),
+        // shown pending meanwhile, never OFFLINE · RETRY.
+        if (!intent.live) goLiveDisplay = null;
+        else if (r !== true && committedLive(c) !== true) goLiveDisplay = "going-live";
         emitArena();
         continue;
       }
@@ -1280,7 +1318,12 @@ export async function takeArenaOfflineBeforeSignOut(
     timer = setTimeout(resolve, timeoutMs);
   });
   try {
-    await Promise.race([controller.goOffline().then(() => undefined), timeout]);
+    // Always a `false` write (R1): a failed clear can leave the server live
+    // while the app reads offline, and a plain go-offline would then see
+    // nothing to do.
+    const c = controller;
+    const run = c.signOutOffline ? c.signOutOffline() : c.goOffline();
+    await Promise.race([run.then(() => undefined), timeout]);
   } catch (error: unknown) {
     console.warn("[arena] going offline before sign-out failed:", error);
   } finally {
@@ -1307,6 +1350,7 @@ export function __resetArenaStoreForTests(): void {
   cooldownTimer = null;
   lastTransitionAt = 0;
   driving = false;
+  runningAttemptSeq = null;
   driverGen += 1;
   liveWritesBlocked = false;
   intentWaiters.clear();

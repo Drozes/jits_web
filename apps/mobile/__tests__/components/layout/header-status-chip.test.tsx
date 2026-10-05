@@ -57,7 +57,12 @@ import {
   type NavigationProp,
   type ParamListBase,
 } from "@react-navigation/native";
-import { CHIP_PENDING_TEST_ID, CHIP_RING_TEST_ID, HeaderStatusChip } from "@/components/layout/header-status-chip";
+import {
+  CHIP_DOUBLE_TAP_GUARD_MS,
+  CHIP_PENDING_TEST_ID,
+  CHIP_RING_TEST_ID,
+  HeaderStatusChip,
+} from "@/components/layout/header-status-chip";
 import {
   CHIP_HEIGHT,
   CHIP_MAX_FONT_SCALE,
@@ -70,6 +75,7 @@ import {
   chipAccessibilityValue,
   chipCopy,
   describeHeaderChip,
+  liveSwitchPending,
   estimateChipWidth,
   layoutChip,
   type ChipInput,
@@ -132,6 +138,41 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 // Pure model
 // ---------------------------------------------------------------------------
+
+describe("round 4 (QA 4): the chip and the Arena bar draw pending from one rule", () => {
+  it("for every combination, the chip shows a pending state exactly when liveSwitchPending says so", () => {
+    const displays = [null, "hold", "leaving", "optimistic", "going-live", "finding-you", "restore-live", "restore-finding", "recovering", "retry"] as const;
+    const phases = ["ready", "cooldown", "saving"] as const;
+    const directions = [null, "going-live", "going-offline"] as const;
+    const intents = [null, { decided: false, live: false }, { decided: true, live: true }, { decided: true, live: false }];
+    let checked = 0;
+    for (const display of displays)
+      for (const phase of phases)
+        for (const direction of directions)
+          for (const intent of intents)
+            for (const isLive of [false, true]) {
+              const m = describeHeaderChip(input({ display, phase, direction, intent, isLive, reconnecting: false }));
+              const pending = liveSwitchPending({ intent, display, drawnLive: m.live, phase, direction });
+              const chipPending = m.kind === "going-live" || m.kind === "finding-you" || (m.kind === "reconnecting" && !m.live);
+              expect({ display, phase, direction, intent, isLive, chipPending }).toEqual({
+                display,
+                phase,
+                direction,
+                intent,
+                isLive,
+                chipPending: pending,
+              });
+              checked++;
+            }
+    expect(checked).toBe(720);
+  });
+
+  it("the ~100 ms mash frame: no overlay yet, a go-live saving, the chip says GOING LIVE and the bar is pending too", () => {
+    const at = { display: null, phase: "saving" as const, direction: "going-live" as const, intent: { decided: true, live: true } };
+    expect(describeHeaderChip(input({ ...at, isLive: false })).kind).toBe("going-live");
+    expect(liveSwitchPending({ ...at, drawnLive: false })).toBe(true);
+  });
+});
 
 describe("describeHeaderChip copy (spec 4.3)", () => {
   it("offline shows the lobby count and goes live on tap (AC-H2)", () => {
@@ -936,6 +977,26 @@ describe("HeaderStatusChip", () => {
     expect(getByTestId("header-status-chip").props.accessibilityState).toEqual(
       expect.objectContaining({ disabled: false }),
     );
+  });
+
+  it("round 4: a second tap within 300 ms of a go-live tap never opens the live menu; later it does", async () => {
+    // The go-live lands at once: the chip turns LIVE under the finger.
+    const { getByTestId, queryByTestId } = render(<HeaderStatusChip />);
+    await act(async () => {
+      fireEvent.press(getByTestId("header-status-chip"));
+    });
+    expect(ctl.goLive).toHaveBeenCalledTimes(1);
+    act(() => setArena({ isLive: true }));
+    act(() => {
+      jest.advanceTimersByTime(CHIP_DOUBLE_TAP_GUARD_MS - 50);
+    });
+    fireEvent.press(getByTestId("header-status-chip"));
+    expect(queryByTestId("live-menu")).toBeNull();
+    act(() => {
+      jest.advanceTimersByTime(60);
+    });
+    fireEvent.press(getByTestId("header-status-chip"));
+    expect(getByTestId("live-menu")).toBeTruthy();
   });
 
   it("a go-live that throws does not surface an unhandled rejection", async () => {

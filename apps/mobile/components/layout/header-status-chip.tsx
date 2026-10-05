@@ -128,6 +128,9 @@ const TEXT_STYLE = { fontVariant: ["tabular-nums" as const] };
  * The interactive chip for a tab-root header. Reads the app-wide stores, so
  * it needs no props and no Provider.
  */
+/** How long a second chip tap after a go-live tap is ignored (round 4). */
+export const CHIP_DOUBLE_TAP_GUARD_MS = 300;
+
 export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}) {
   const router = useRouter();
   const arena = useArenaState();
@@ -183,10 +186,17 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
     if (!menuAllowed) setMenuOpen(false);
   }, [menuAllowed]);
 
+  // A second chip tap right after a tap that started a go-live is the same
+  // finger twice (the chip turned green under it): swallowed, so the live
+  // menu does not pop open on an accidental double tap (round 4).
+  const lastGoLiveTapAt = React.useRef<number | null>(null);
   const onPress = () => {
+    const now = Date.now();
+    if (lastGoLiveTapAt.current !== null && now - lastGoLiveTapAt.current < CHIP_DOUBLE_TAP_GUARD_MS) return;
     if (model.disabled) return;
     switch (model.action) {
       case "go-live":
+        lastGoLiveTapAt.current = now;
         // A failure shows as OFFLINE · RETRY; a throw must not surface as an
         // unhandled rejection from a header tap.
         void arenaActions.goLive().catch(() => undefined);

@@ -240,6 +240,7 @@ describe("ArenaBootstrap", () => {
       autoLive: expect.any(Function),
       onResumeParked: expect.any(Function),
       loadPersistedIntent: expect.any(Function),
+      onOfflineLanded: expect.any(Function),
     });
     expect(mockActiveMatchOwner).toHaveBeenCalledWith("me-1");
     expect(mockUseArenaChallenge).toHaveBeenLastCalledWith(

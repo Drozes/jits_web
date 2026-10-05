@@ -57,6 +57,14 @@ Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) an
 - `report_match_presence` calls are aborted after 15 s (`PRESENCE_REPORT_TIMEOUT_MS`); the live write is never aborted.
 - Seeded randomized test of the intent model (`live-intent-property.test.ts`, 3,000 sequences by default).
 
+**Fixed (review round 4)**
+- A failed clear no longer leaves the athlete advertised: while the server may still say live, every offline intent writes `false` again; failed clears keep retrying with backoff in the foreground; sign-out always sends an immediate `false` within its 4 s bound.
+- Cold start over a stale `true` after an offline choice is drawn GO LIVE from the first frame and cleared; an offline choice whose clear landed means a newer session (web) and is adopted. The persisted choice is now `{ live, at, confirmed }`.
+- The 30 s own-row check runs in the foreground whatever is drawn and corrects any disagreement with the server.
+- An overtaken go-live attempt never draws OFFLINE · RETRY; the chip and the Arena bar share one pending rule; a double tap on the chip within 300 ms never opens the live menu.
+- The cold start waits at most 1 s for the stored choice; deleting the account forgets it.
+- The randomized test models committed-after-kill writes, lost answers, location refusals, server-ended sessions, web go-lives and the own-row check, and runs a random seed base plus the 777,000 regression range.
+
 ### Live location fixes: Allow Once rejoin, GOING LIVE feedback, Precise Location copy, platform header, attempt logging (jits-3i0n.1 to .6)
 
 Built to jr_be `specs/016-invites/addendum-live-location-fixes.md` section 4. JS-only on mobile (OTA-eligible: no native dependency, no `app.json` / `app.config.js` change; `expo-location`, `expo-application` and `expo-updates` are already in build 25). Item 3b (the Swift accuracy module and `NSLocationTemporaryUsageDescriptionDictionary`) is NOT in this slice and needs a TestFlight build.

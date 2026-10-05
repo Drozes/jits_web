@@ -201,6 +201,32 @@ function remaining(
 }
 
 /**
+ * Whether a go-live is drawn as pending (GOING LIVE, FINDING YOU,
+ * RECONNECTING), from one snapshot of the stores. The chip and the Arena's
+ * OFFLINE / LIVE bar both draw from this, so they never disagree, even for a
+ * frame (round 4, QA 4).
+ */
+export function liveSwitchPending(input: {
+  intent?: { decided: boolean; live: boolean } | null;
+  display?: GoLiveDisplay | null;
+  /** Live as drawn (`useIsArenaDisplayLive`, or the chip's own `isLive`). */
+  drawnLive: boolean;
+  phase: LiveSwitchPhase;
+  direction: LiveSwitchDirection | null;
+}): boolean {
+  const display = input.display ?? null;
+  if (input.intent && input.intent.decided && !input.intent.live) return false;
+  if (input.drawnLive) return false;
+  return (
+    display === "going-live" ||
+    display === "finding-you" ||
+    display === "restore-finding" ||
+    display === "recovering" ||
+    (display === null && input.phase === "saving" && input.direction === "going-live")
+  );
+}
+
+/**
  * The chip, as a pure function of the stores (spec 4.3). Precedence, highest
  * first: several incoming or one tucked away, then waiting on my outgoing
  * challenge, then the base live/offline state. The CONFIRM marker is
@@ -374,8 +400,8 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
     });
   }
   if (
-    !isLive &&
-    (display === "going-live" || (display === null && saving && input.direction === "going-live"))
+    (display === "going-live" || display === null) &&
+    liveSwitchPending({ intent: input.intent, display, drawnLive: isLive, phase, direction: input.direction })
   ) {
     return base({
       kind: "going-live",

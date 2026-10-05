@@ -80,7 +80,13 @@ import {
   setAppLiveIntent,
   setGoLiveDisplay,
 } from "./arena-store";
-import { loadPersistedLiveIntent, persistLiveIntent } from "./live-intent-persist";
+import {
+  arrivalDecision,
+  confirmPersistedOffline,
+  loadPersistedLiveIntent,
+  peekPersistedLiveIntent,
+  persistLiveIntent,
+} from "./live-intent-persist";
 import { useLobbyIds, useLobbyKnown, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
 import { useActiveMatchOwner } from "../match-flow/active-match-store";
@@ -131,7 +137,7 @@ function useLegacyBackend(): boolean {
  */
 function useServerEndedLiveCheck(
   active: boolean,
-  check: () => Promise<boolean>,
+  check: () => Promise<boolean | "dropped" | "cleared" | "adopted" | null>,
 ): void {
   const checkRef = React.useRef(check);
   checkRef.current = check;
@@ -141,10 +147,12 @@ function useServerEndedLiveCheck(
       if (AppState.currentState !== "active") return;
       void checkRef
         .current()
-        .then((dropped) => {
-          if (!dropped) return;
-          // The server ended it: held offline until the athlete chooses again.
+        .then((r) => {
+          if (r !== true && r !== "dropped") return;
+          // The server ended it (or never had it: a stale overlay drawn
+          // live): held offline until the athlete chooses again.
           setAppLiveIntent(false);
+          setGoLiveDisplay(null);
           showServerEndedLiveCta();
         })
         .catch(() => undefined);
@@ -155,7 +163,7 @@ function useServerEndedLiveCheck(
     });
     return () => {
       clearInterval(t);
-      sub.remove();
+      sub?.remove();
     };
   }, [active]);
 }
@@ -215,7 +223,12 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   // Cold start while the server says live: draw the restore from the first
   // frame (UX 019, 3h), before the arrival restore has read anything.
   React.useLayoutEffect(() => {
-    if (athlete.looking_for_ranked && AppState.currentState === "active" && !isInArenaMatch()) {
+    // Not over a stale `true` the athlete's last choice (offline, its clear
+    // never landed) says to clear: drawn GO LIVE from the first frame, no
+    // LIVE frame at all (round 4). The choice is read into memory when the
+    // athlete row loads (auth), so it is known here.
+    const stale = arrivalDecision(peekPersistedLiveIntent(athlete.id)) === "clear";
+    if (athlete.looking_for_ranked && !stale && AppState.currentState === "active" && !isInArenaMatch()) {
       // The owner's flag hint (review nit): flag known off draws the plain
       // write live at once, never GO LIVE then LIVE.
       setGoLiveDisplay(restoreFirstFrame(athlete.id, locationFlagHint()));
@@ -282,6 +295,9 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     // The athlete's last choice, persisted: offline means a cold start clears
     // a stale `true` instead of restoring (review round 3).
     loadPersistedIntent: () => loadPersistedLiveIntent(athlete.id),
+    // A `false` landed: the persisted offline choice is acknowledged, so a
+    // later server `true` reads as a newer session (round 4, R2).
+    onOfflineLanded: () => confirmPersistedOffline(athlete.id),
   });
   // Read by the refresh handlers below and the controller (registered once).
   const liveRef = React.useRef(live);
@@ -367,9 +383,16 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   // admin): the chip drops at once with one toast (UX 019, 3j).
   // (A legacy backend keeps exactly the old behaviour: its 60 s refresh
   // above already asks the server after every failing tick.)
-  useServerEndedLiveCheck(isLive && !inMatch && !legacyBackend, () =>
-    liveRef.current.dropIfServerOffline(() => getMyLookingForRanked(supabase, athleteId)),
-  );
+  // Round 4: every 30 s in the foreground (not only while live), ANY
+  // disagreement between what is drawn and the server is corrected: drawn
+  // live but the server off (dropped, one toast), an offline choice the
+  // server still has live (cleared), a session started elsewhere (adopted).
+  useServerEndedLiveCheck(!inMatch && !legacyBackend, () => {
+    const l = liveRef.current;
+    const read = () => getMyLookingForRanked(supabase, athleteId);
+    if (typeof l.checkServer === "function") return l.checkServer(read);
+    return isLive ? l.dropIfServerOffline(read) : Promise.resolve(null);
+  });
   // The drift check (flag live_location_drift_check, seeded OFF).
   useLiveDriftCheck({ athleteId, isLive, inMatch, locationRequired });
   // The challenger's reading while its challenge waits (pending or
@@ -473,6 +496,10 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
         return liveRef.current.toggle();
       },
       goOffline: () => liveRef.current.goOffline(),
+      signOutOffline: () => {
+        const l = liveRef.current;
+        return typeof l.signOutOffline === "function" ? l.signOutOffline() : l.goOffline();
+      },
       ensureOffline: () => {
         const l = liveRef.current;
         return typeof l.ensureOffline === "function" ? l.ensureOffline() : l.goOffline();

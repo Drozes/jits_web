@@ -12,6 +12,7 @@ import { typeSize } from "@/lib/typography";
 import { supabase } from "@/lib/supabase/client";
 import { DELETE_CONFIRM_WORD, deleteAccount, isDeleteConfirmed } from "@/lib/account/delete-account";
 import { clearAllDeviceLocations } from "@/lib/location/device-location-store";
+import { clearAllPersistedLiveIntents } from "@/lib/arena/live-intent-persist";
 
 const FAILED = "We couldn't delete your account. Check your connection and try again.";
 const MATCH_LIVE = "Finish your match first. You can delete your account once it ends.";
@@ -54,6 +55,9 @@ export default function DeleteAccountScreen() {
     // (instant go-live 4.1); sign-out clears it too.
     clearAllDeviceLocations();
     await signOut();
+    // The deleted athlete's last live choice too (round 4). After sign-out,
+    // which records one; nothing is recorded for them again.
+    await clearAllPersistedLiveIntents();
     toast.success("Your account was deleted.");
     router.replace("/login");
   }, [deleting, typed, signOut, router]);

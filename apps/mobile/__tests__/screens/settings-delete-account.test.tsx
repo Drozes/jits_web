@@ -27,6 +27,10 @@ const mockClearLocations = jest.fn();
 jest.mock("@/lib/location/device-location-store", () => ({
   clearAllDeviceLocations: () => mockClearLocations(),
 }));
+const mockClearIntents = jest.fn(() => Promise.resolve());
+jest.mock("@/lib/arena/live-intent-persist", () => ({
+  clearAllPersistedLiveIntents: () => mockClearIntents(),
+}));
 const mockDelete = jest.fn();
 jest.mock("@/lib/account/delete-account", () => {
   const actual = jest.requireActual("@/lib/account/delete-account");
@@ -65,6 +69,9 @@ it("signs out and returns to login on success", async () => {
   // The stored last location goes before sign-out (instant go-live 4.1).
   expect(mockClearLocations).toHaveBeenCalled();
   expect(mockClearLocations.mock.invocationCallOrder[0]).toBeLessThan(mockSignOut.mock.invocationCallOrder[0]);
+  // The persisted live choice goes too, after the sign-out that records one.
+  expect(mockClearIntents).toHaveBeenCalledTimes(1);
+  expect(mockClearIntents.mock.invocationCallOrder[0]).toBeGreaterThan(mockSignOut.mock.invocationCallOrder[0]);
 });
 
 it("a failed deletion keeps the stored location (the account still exists)", async () => {

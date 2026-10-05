@@ -192,6 +192,11 @@ import {
   useIsArenaDisplayLive,
 } from "@/lib/arena/arena-store";
 import { __resetGoLiveLocationForTests } from "@/lib/arena/go-live-location";
+import {
+  __resetPersistedLiveIntentForTests,
+  confirmPersistedOffline,
+  persistLiveIntent,
+} from "@/lib/arena/live-intent-persist";
 import { goLiveWithFeedback } from "@/lib/arena/go-live-feedback";
 import {
   __resetLocationLadderForTests,
@@ -298,6 +303,7 @@ beforeEach(() => {
   __resetArenaStoreForTests();
   __resetGoLiveLocationForTests();
   __resetLocationLadderForTests();
+  __resetPersistedLiveIntentForTests();
   __resetDeviceLocationStoreForTests();
   __resetPresenceCapabilityForTests();
   __resetChallengerArenaReadingForTests();
@@ -747,6 +753,40 @@ describe("RECONNECTING and OFFLINE · RETRY (UX 019, 3g)", () => {
     expect(lead()).toBe("OFFLINE · RETRY");
     expect(mockToastInfo).not.toHaveBeenCalled();
     expect(logged()).toEqual([expect.objectContaining({ outcome: "error" })]);
+  });
+
+  it("round 4 (QA 2): an attempt overtaken by a newer Go live never draws OFFLINE · RETRY; only the current one may", async () => {
+    jest.useFakeTimers();
+    seedTag(5 * MIN);
+    mockWrite.mockResolvedValue(false);
+    mount();
+    let first!: Promise<unknown>;
+    act(() => {
+      first = arenaActions.goLive();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1_500);
+    });
+    // A newer live choice while the first attempt is still trying.
+    let second!: Promise<unknown>;
+    act(() => {
+      second = arenaActions.goLive();
+    });
+    expect(await first).toBe("ignored");
+    // The first attempt's window ends and its writes give up: nothing drawn.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(RECOVERY_WINDOW_MS);
+    });
+    expect(frames.some((f) => f.startsWith("retry:"))).toBe(false);
+    expect(lead()).not.toBe("OFFLINE · RETRY");
+    // The newer attempt runs its own window, and only it says RETRY.
+    let r: unknown;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(RECOVERY_WINDOW_MS + 5_000);
+      r = await second;
+    });
+    expect(r).toBe(false);
+    expect(lead()).toBe("OFFLINE · RETRY");
   });
 
   it("from an Arena surface the same failure toasts once", async () => {
@@ -1505,6 +1545,29 @@ describe("QA E and the cold-start flag hint: a restore's first frame", () => {
     expect(frames[0]).toBe("none:off");
     // The layout effect draws before the first paint: no hold frame.
     expect(frames).not.toContain("hold:off");
+    expect(lead()).toBe("LIVE");
+  });
+
+  it("round 4 (QA cold start): last choice offline, its clear never landed, server true: GO LIVE from the first frame, no LIVE frame at all", () => {
+    mockFlagPeek = false;
+    mockLocationRequired = false;
+    mockAthlete = { ...ACTIVE, looking_for_ranked: true };
+    mockWrite.mockReturnValue(new Promise(() => undefined));
+    // Read into memory when the athlete row loaded (auth).
+    persistLiveIntent("me-1", false);
+    mount();
+    expect(frames.some((f) => f.endsWith(":live"))).toBe(false);
+    expect(lead()).toMatch(/^GO LIVE/);
+  });
+
+  it("round 4 (R2): last choice offline and its clear LANDED, server true (a newer session, e.g. web): adopted, LIVE from the first frame", () => {
+    mockFlagPeek = false;
+    mockLocationRequired = false;
+    mockAthlete = { ...ACTIVE, looking_for_ranked: true };
+    mockWrite.mockReturnValue(new Promise(() => undefined));
+    persistLiveIntent("me-1", false);
+    confirmPersistedOffline("me-1");
+    mount();
     expect(lead()).toBe("LIVE");
   });
 

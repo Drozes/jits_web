@@ -805,3 +805,27 @@ describe("isAthleteGoLiveFlip (Arena tab blade clash, Adding Flare)", () => {
     expect(isAthleteGoLiveFlip()).toBe(false);
   });
 });
+
+describe("round 4 (R1): sign-out always writes false", () => {
+  it("uses the owner's unconditional sign-out write when it has one", async () => {
+    __resetArenaStoreForTests();
+    const signOutOffline = jest.fn(() => Promise.resolve(true));
+    const goOffline = jest.fn(() => Promise.resolve(true));
+    registerArenaController({
+      toggle: jest.fn(),
+      goOffline,
+      goLive: jest.fn(),
+      signOutOffline,
+      sendChallenge: jest.fn(),
+      cancelOutgoing: jest.fn(),
+      clearCap: jest.fn(),
+      tuckIncoming: jest.fn(),
+      reopenIncoming: jest.fn(),
+    } as unknown as ArenaController);
+    await act(async () => {
+      await takeArenaOfflineBeforeSignOut(10);
+    });
+    expect(signOutOffline).toHaveBeenCalledTimes(1);
+    expect(goOffline).not.toHaveBeenCalled();
+  });
+});

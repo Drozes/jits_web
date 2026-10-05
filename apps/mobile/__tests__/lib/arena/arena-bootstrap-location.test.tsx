@@ -111,10 +111,12 @@ const mockGoLive = jest.fn();
 const mockDropIfServerOffline = jest.fn();
 let mockRefusal: string | null = null;
 const mockLiveArgs = jest.fn();
+let mockCheckServer: jest.Mock | null = null;
 jest.mock("@/lib/arena/use-arena-live", () => ({
   useArenaLive: (args: unknown) => {
     mockLiveArgs(args);
     return {
+      ...(mockCheckServer ? { checkServer: mockCheckServer } : {}),
       isLive: mockIsLive,
       isSaving: false,
       transition: null,
@@ -164,7 +166,14 @@ jest.mock("@/lib/arena/use-arena-challenge", () => ({
 jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({ usePendingChallengeRecovery: () => {} }));
 
 import { ArenaBootstrap, SERVER_LIVE_CHECK_MS } from "@/lib/arena/arena-bootstrap";
-import { __resetArenaStoreForTests, arenaActions, useArenaMatchScreen } from "@/lib/arena/arena-store";
+import {
+  __resetArenaStoreForTests,
+  arenaActions,
+  getGoLiveDisplay,
+  getLiveIntent,
+  setGoLiveDisplay,
+  useArenaMatchScreen,
+} from "@/lib/arena/arena-store";
 import { GO_LIVE_REFRESH_MS, __resetGoLiveLocationForTests } from "@/lib/arena/go-live-location";
 import { __resetLocationLadderForTests, RECOVERY_WINDOW_MS } from "@/lib/arena/location-ladder";
 import { __resetChallengerArenaReadingForTests } from "@/lib/arena/use-challenger-arena-reading";
@@ -576,6 +585,34 @@ describe("the server ends a live session while the app is open (UX 019, 3j)", ()
       expect.objectContaining({ text1: "You're offline now. Tap to go live again." }),
     );
     expect(SERVER_LIVE_CHECK_MS).toBe(30_000);
+  });
+
+  it("round 4: every 30 s even while drawn offline; a stale LIVE overlay the server contradicts is dropped with one toast", async () => {
+    jest.useFakeTimers();
+    mockIsLive = false;
+    mockCheckServer = jest.fn(() => Promise.resolve("dropped"));
+    try {
+      render(<ArenaBootstrap />);
+      act(() => setGoLiveDisplay("restore-live"));
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SERVER_LIVE_CHECK_MS);
+      });
+      expect(mockCheckServer).toHaveBeenCalledTimes(1);
+      expect(getGoLiveDisplay()).toBeNull();
+      expect(getLiveIntent()).toMatchObject({ decided: true, live: false });
+      expect(mockToastInfo).toHaveBeenCalledWith(
+        expect.objectContaining({ text1: "You're offline now. Tap to go live again." }),
+      );
+      // "cleared" / "adopted" are corrections the athlete is not told about.
+      mockToastInfo.mockClear();
+      mockCheckServer.mockResolvedValue("cleared");
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SERVER_LIVE_CHECK_MS);
+      });
+      expect(mockToastInfo).not.toHaveBeenCalled();
+    } finally {
+      mockCheckServer = null;
+    }
   });
 
   it("a server that still has the athlete live: nothing changes, nothing is said", async () => {

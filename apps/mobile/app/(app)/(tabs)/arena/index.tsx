@@ -86,6 +86,7 @@ import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
 import { useBookings } from "@/lib/invites/use-bookings";
 import { loadMatchLocationRequired, useMatchLocationFlag } from "@/lib/arena/match-location-flag";
 import { arenaMatchHref } from "@/lib/arena/constants";
+import { liveSwitchPending } from "@/lib/arena/header-chip-model";
 
 /**
  * The tab bar sits below the screen and pads its own inset, so the shared
@@ -120,7 +121,8 @@ export default function ArenaScreen() {
   const switchPhase = useLiveSwitchPhase();
   // Any live transition in flight, from any surface: no Challenge meanwhile.
   const liveSaving = switchPhase === "saving";
-  const goingLive = useLiveSwitchDirection() === "going-live";
+  const switchDirection = useLiveSwitchDirection();
+  const goingLive = switchDirection === "going-live";
   // What the live surfaces draw while a go-live resolves (UX 019): green on
   // the tap with a valid tag, nothing pending for the first 240 ms.
   const liveDisplay = useGoLiveDisplay();
@@ -132,13 +134,14 @@ export default function ArenaScreen() {
   // The athlete chose live and it is on its way (QA 4): LIVE shows pending,
   // OFFLINE stays selectable.
   const intent = useLiveIntent();
-  const livePending =
-    !displayLive &&
-    !(intent.decided && !intent.live) &&
-    (liveDisplay === "going-live" ||
-      liveDisplay === "finding-you" ||
-      liveDisplay === "restore-finding" ||
-      liveDisplay === "recovering");
+  // The same rule, from the same snapshot, as the header chip (QA 4).
+  const livePending = liveSwitchPending({
+    intent,
+    display: liveDisplay,
+    drawnLive: displayLive,
+    phase: switchPhase,
+    direction: switchDirection,
+  });
   const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {

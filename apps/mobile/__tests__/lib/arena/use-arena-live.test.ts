@@ -50,12 +50,14 @@ jest.mock("@/components/ui/toast", () => ({
 // mock above, because that is the call that wraps `channel.untrack()`.
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
-import { CLEAR_RETRY_MS, useArenaLive, type UseArenaLiveArgs } from "@/lib/arena/use-arena-live";
+import { CLEAR_RETRY_MAX_MS, CLEAR_RETRY_MS, useArenaLive, type UseArenaLiveArgs } from "@/lib/arena/use-arena-live";
 import { GO_OFFLINE_FAILED_MESSAGE } from "@/lib/arena/constants";
 import {
   __resetArenaStoreForTests,
+  getLiveIntent,
   liveSwitch,
   registerArenaController,
+  setAppLiveIntent,
   takeArenaOfflineBeforeSignOut,
 } from "@/lib/arena/arena-store";
 
@@ -988,7 +990,11 @@ describe("last write failed (AC-H11, `OFFLINE · RETRY`)", () => {
       out = await retry;
       await flush();
     });
-    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    // No live write. Round 4 (R1): the failed go-live may have committed
+    // (its answer was lost), so the background's offline pass writes false.
+    expect(
+      mockToggleMatchPreferences.mock.calls.every((c) => !(c[2] as { lookingForRanked: boolean }).lookingForRanked),
+    ).toBe(true);
     expect(result.current.isLive).toBe(false);
     expect(out).toBe(true);
   });
@@ -2046,17 +2052,60 @@ describe("round 3: the athlete's last choice decides every resume", () => {
 
   it("kill and relaunch after choosing offline: the persisted choice clears the stale true, never restores", async () => {
     const autoLive = jest.fn(async () => "live" as const);
-    mount({ initialRanked: true, autoLive, loadPersistedIntent: () => Promise.resolve(false) });
+    const { result } = mount({
+      initialRanked: true,
+      autoLive,
+      loadPersistedIntent: () => Promise.resolve({ live: false, at: 1, confirmed: false }),
+    });
+    wire(result);
     await act(async () => {
       await flush();
     });
     expect(autoLive).not.toHaveBeenCalled();
     expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+    // Round 4 (QA cold start): held offline in the app too, not only on the server.
+    expect(getLiveIntent()).toMatchObject({ decided: true, live: false });
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("round 4 (R2): an offline choice whose clear LANDED, then a server true (a newer session, e.g. web): adopted, restored", async () => {
+    const autoLive = jest.fn(async () => "live" as const);
+    mount({
+      initialRanked: true,
+      autoLive,
+      loadPersistedIntent: () => Promise.resolve({ live: false, at: 1, confirmed: true }),
+    });
+    await act(async () => {
+      await flush();
+    });
+    expect(autoLive).toHaveBeenCalledTimes(1);
+  });
+
+  it("round 4 nit: a stored-choice read that hangs is given up after 1 s (restores as unknown)", async () => {
+    jest.useFakeTimers();
+    try {
+      const autoLive = jest.fn(async () => "live" as const);
+      mount({ initialRanked: true, autoLive, loadPersistedIntent: () => new Promise(() => undefined) });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(999);
+      });
+      expect(autoLive).not.toHaveBeenCalled();
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1);
+      });
+      expect(autoLive).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("kill and relaunch after choosing live: restored as before", async () => {
     const autoLive = jest.fn(async () => "live" as const);
-    mount({ initialRanked: true, autoLive, loadPersistedIntent: () => Promise.resolve(true) });
+    mount({
+      initialRanked: true,
+      autoLive,
+      loadPersistedIntent: () => Promise.resolve({ live: true, at: 1, confirmed: false }),
+    });
     await act(async () => {
       await flush();
     });
@@ -2089,5 +2138,197 @@ describe("round 3: the athlete's last choice decides every resume", () => {
     });
     expect(ok).toBe(false);
     expect(mockToggleMatchPreferences.mock.calls.some((c) => (c[2] as { lookingForRanked: boolean }).lookingForRanked)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review round 4: the server may still say live after a failed clear (R1)
+// ---------------------------------------------------------------------------
+
+describe("round 4 (R1): a failed clear never leaves the athlete advertised", () => {
+  const DOWN = { ok: false, error: { code: "UNKNOWN", message: "down" } };
+  const OK = { ok: true, data: undefined };
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  async function liveThenFailedClear() {
+    const hook = mount();
+    await act(async () => {
+      await hook.result.current.goLive();
+    });
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      await hook.result.current.goOffline();
+    });
+    mockToggleMatchPreferences.mockResolvedValue(OK);
+    return hook;
+  }
+
+  const falseWrites = () =>
+    mockToggleMatchPreferences.mock.calls.filter((c) => !(c[2] as { lookingForRanked: boolean }).lookingForRanked).length;
+
+  it("a later go-offline tap writes false again (never 'desired equals committed')", async () => {
+    jest.useFakeTimers();
+    const { result } = await liveThenFailedClear();
+    expect(result.current.committed().settled).toBe(false);
+    const before = falseWrites();
+    await act(async () => {
+      expect(await result.current.goOffline()).toBe(true);
+    });
+    expect(falseWrites()).toBe(before + 1);
+    expect(result.current.committed()).toEqual({ live: false, settled: true });
+  });
+
+  it("sign-out writes false unconditionally, at once (seed 777102)", async () => {
+    jest.useFakeTimers();
+    const { result } = await liveThenFailedClear();
+    const before = falseWrites();
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.signOutOffline();
+    });
+    expect(ok).toBe(true);
+    expect(falseWrites()).toBeGreaterThan(before);
+  });
+
+  it("sign-out writes false even when the hook believes it is already offline and settled", async () => {
+    const { result } = mount();
+    const before = falseWrites();
+    await act(async () => {
+      await result.current.signOutOffline();
+    });
+    expect(falseWrites()).toBeGreaterThan(before);
+  });
+
+  it("keeps retrying a failed clear with backoff while in front, until it lands", async () => {
+    jest.useFakeTimers();
+    const { result } = await liveThenFailedClear();
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    const at = (ms: number) =>
+      act(async () => {
+        await jest.advanceTimersByTimeAsync(ms);
+      });
+    const before = falseWrites();
+    await at(CLEAR_RETRY_MS);
+    expect(falseWrites()).toBe(before + 2); // one retry (two attempts inside writeLookingFlag)
+    await at(2 * CLEAR_RETRY_MS);
+    expect(falseWrites()).toBe(before + 4);
+    mockToggleMatchPreferences.mockResolvedValue(OK);
+    await at(4 * CLEAR_RETRY_MS);
+    expect(falseWrites()).toBe(before + 5);
+    expect(result.current.committed().settled).toBe(true);
+    await at(10 * CLEAR_RETRY_MAX_MS);
+    expect(falseWrites()).toBe(before + 5);
+  });
+
+  it("a go-live write that failed without a refusal may have committed: the offline that follows writes false", async () => {
+    const { result } = mount();
+    mockToggleMatchPreferences.mockResolvedValue(DOWN);
+    await act(async () => {
+      expect(await result.current.goLive()).toBe(false);
+    });
+    mockToggleMatchPreferences.mockResolvedValue(OK);
+    const before = falseWrites();
+    await act(async () => {
+      await result.current.ensureOffline();
+    });
+    expect(falseWrites()).toBe(before + 1);
+  });
+
+  it("a false that lands is reported (the owner confirms a persisted offline choice)", async () => {
+    const onOfflineLanded = jest.fn();
+    const { result } = mount({ onOfflineLanded });
+    await act(async () => {
+      await result.current.goLive();
+      await result.current.goOffline();
+    });
+    expect(onOfflineLanded).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("round 4: the own-row check corrects any disagreement", () => {
+  it("drawn and committed live, server false: dropped", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    let r: unknown;
+    await act(async () => {
+      r = await result.current.checkServer(() => Promise.resolve(false));
+    });
+    expect(r).toBe("dropped");
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("an offline choice the server still has live (its clear never landed): a clear goes out", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    mockToggleMatchPreferences.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "down" } });
+    await act(async () => {
+      await result.current.goOffline();
+    });
+    mockToggleMatchPreferences.mockResolvedValue({ ok: true, data: undefined });
+    act(() => {
+      setAppLiveIntent(false);
+    });
+    await act(async () => {
+      await flush();
+    });
+    // The follow-up clear has not run yet (a timer): the server still says live.
+    const before = mockToggleMatchPreferences.mock.calls.length;
+    let r: unknown;
+    await act(async () => {
+      r = await result.current.checkServer(() => Promise.resolve(true));
+      await flush();
+    });
+    expect(r).toBe("cleared");
+    expect(mockToggleMatchPreferences.mock.calls.length).toBeGreaterThan(before);
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+  });
+
+  it("an offline choice the server acknowledged, then the server live (web went live after it): adopted", async () => {
+    const autoLive = jest.fn(async (ctx: { write: () => Promise<boolean> }) =>
+      (await ctx.write()) ? ("live" as const) : ("failed" as const),
+    );
+    const { result } = mount({ autoLive });
+    act(() => {
+      setAppLiveIntent(false);
+    });
+    let r: unknown;
+    await act(async () => {
+      r = await result.current.checkServer(() => Promise.resolve(true));
+      await flush();
+    });
+    expect(r).toBe("adopted");
+    expect(getLiveIntent()).toMatchObject({ decided: true, live: true });
+    expect(autoLive).toHaveBeenCalledTimes(1);
+  });
+
+  it("agreement (offline, server false): nothing", async () => {
+    const { result } = mount();
+    let r: unknown;
+    await act(async () => {
+      r = await result.current.checkServer(() => Promise.resolve(false));
+    });
+    expect(r).toBeNull();
+  });
+
+  it("a read failure or a transition during the read changes nothing", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    let r: unknown;
+    await act(async () => {
+      r = await result.current.checkServer(async () => {
+        void result.current.goOffline();
+        return false;
+      });
+    });
+    expect(r).toBeNull();
   });
 });
