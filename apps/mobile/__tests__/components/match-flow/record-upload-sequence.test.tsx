@@ -18,7 +18,7 @@
  */
 import * as React from "react";
 import { completeHold } from "../../support/complete-hold";
-import { render, fireEvent, waitFor, act } from "@testing-library/react-native";
+import { render, fireEvent, waitFor, act, within } from "@testing-library/react-native";
 
 // ---- native module stubs ----
 
@@ -624,17 +624,20 @@ describe("record, end, upload, across the step boundary", () => {
 
     const live = renderWizard("in_progress");
     await waitFor(() => expect(mockCamera.recordAsync).toHaveBeenCalledTimes(1));
-    const { getByText, getByTestId } = await endThenOpenVerdict(live);
+    const { getByText, getByTestId, queryByText } = await endThenOpenVerdict(live);
 
     // ... and the failure still reaches the user, on the verdict card.
     await waitFor(() => {
-      expect(getByText(/saving the record failed/i)).toBeTruthy();
+      expect(getByText(/isn't attached to the match yet/i)).toBeTruthy();
     });
     getByTestId("upload-status-banner");
-    getByText(/row-level security/i);
+    // Paused, not failed (jits-n2im.3), and in friendly copy: the raw
+    // Postgrest text goes to telemetry, never the screen (jits-n2im.5).
+    within(getByTestId("upload-status-banner")).getByText(/upload paused/i);
+    expect(queryByText(/row-level security/i)).toBeNull();
     // The copy tells the user it is not over, because it is not: the job
     // is parked in phase "row" and the next foreground retries the write.
-    getByText(/retry automatically/i);
+    getByText(/Trying again shortly/i);
 
     // THE BYTES WENT UP ONCE: the row is retried on its own budget and the
     // object is left alone.

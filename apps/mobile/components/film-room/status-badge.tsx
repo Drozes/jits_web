@@ -4,7 +4,7 @@ import { ON_MEDIA } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import type { CardStatus } from "@/lib/film-room/card-status";
 
-type Tone = "light" | "amber" | "outline" | "red";
+type Tone = "light" | "amber" | "outline" | "red" | "muted";
 
 /**
  * Badges sit over the poster (a photo, or the themed plate when there is no
@@ -15,11 +15,16 @@ const TONES: Record<Tone, { bg: string; fg: string; border: string }> = {
   amber: { bg: ON_MEDIA.badge, fg: ON_MEDIA.amber, border: ON_MEDIA.amberRule },
   outline: { bg: ON_MEDIA.badge, fg: ON_MEDIA.text, border: ON_MEDIA.strong },
   red: { bg: ON_MEDIA.badge, fg: ON_MEDIA.red, border: ON_MEDIA.redRule },
+  // Grey "info" (deck 0.6): a final state nobody can act on.
+  muted: { bg: ON_MEDIA.badge, fg: ON_MEDIA.text2, border: ON_MEDIA.strong },
 };
 
 export function toneFor(status: CardStatus): Tone {
   if (status.kind === "new") return "light";
   if (status.kind === "failed") return "red";
+  // DIDN'T UPLOAD is red only while Try again can work; a terminal one is
+  // grey (deck 0.6: red only when the viewer can act).
+  if (status.kind === "upload_failed") return status.terminal ? "muted" : "red";
   if (status.kind === "ready") return "outline";
   return "amber";
 }

@@ -3,10 +3,10 @@ import { supabase } from "@/lib/supabase/client";
 import { useVideoProgress } from "@jits/shared/hooks/use-video-progress";
 import { buildKeyMoments, isNoMatch, type KeyMoment } from "@jits/shared/utils";
 import type { MatchDetailView, MatchDetailVideo } from "@jits/shared/api/queries";
-import { useMatchUpload } from "@/lib/video/match-upload-store";
+import { useMatchUpload, type MatchUploadEntry } from "@/lib/video/match-upload-store";
 import type { VideoAnalysis } from "@jits/shared/api/film-room";
 import { useVideoAnalysis, type AnalysisState } from "@/lib/film-room/use-video-analysis";
-import { uploadingLabel } from "@/lib/film-room/card-status";
+import { filmStillCaption } from "@/lib/video/upload-copy";
 
 /** What the AI BREAKDOWN plate shows for the selected angle. */
 export type BreakdownPhase =
@@ -26,6 +26,10 @@ export interface MatchFilm {
   tags: string[];
   /** Hero fallback caption. */
   fallbackLabel: string;
+  /** This phone's upload entry for the match (null when none). */
+  localUpload: MatchUploadEntry | null;
+  /** Why the hero has no play button while the film exists, else null. */
+  playHint: string | null;
   retryAnalysis: () => void;
 }
 
@@ -81,11 +85,10 @@ export function useMatchFilm(view: MatchDetailView | null, matchId: string): Mat
     } else phase = { kind: "analysis", state: "none", analysis: null };
   } else if (uploading) phase = { kind: "uploading" };
 
-  const fallbackLabel = uploading
-    ? `${uploadingLabel(upload?.progress ?? null)} · STILL ARRIVES AFTER UPLOAD`
-    : videos.length === 0
-      ? "NO FILM RECORDED"
-      : "STILL ARRIVES AFTER UPLOAD";
+  // Once the bytes are in, the still is waiting on processing, never on
+  // the upload (jits-n2im.4 item 6).
+  const fallbackLabel = filmStillCaption(upload, videos.length > 0, "NO FILM RECORDED");
+  const playHint = active && active.playability === "processing" ? (active.status === "uploading" ? "UPLOADING" : "PROCESSING") : null;
 
-  return { active, setActiveId, phase, moments, tags, fallbackLabel, retryAnalysis: retry };
+  return { active, setActiveId, phase, moments, tags, fallbackLabel, localUpload: upload, playHint, retryAnalysis: retry };
 }

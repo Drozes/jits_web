@@ -1,11 +1,11 @@
-import { deriveCardStatus, statusBadgeLabel, uploadingLabel, NEW_WINDOW_MS } from "@/lib/film-room/card-status";
+import { cardOffersRetry, deriveCardStatus, statusBadgeLabel, uploadingLabel, NEW_WINDOW_MS } from "@/lib/film-room/card-status";
 import type { MatchUploadEntry } from "@/lib/video/match-upload-store";
 import { libItem, libVideo } from "../../support/film-fixtures";
 
 const NOW = Date.parse("2026-09-27T12:00:00Z");
 
 function upload(over: Partial<MatchUploadEntry> = {}): MatchUploadEntry {
-  return { matchId: "m-1", status: "uploading", videoId: null, error: null, truncation: null, storagePath: null, progress: 0.64, updatedAt: 0, ...over };
+  return { matchId: "m-1", status: "uploading", videoId: null, error: null, errorClass: null, bytesTotal: null, truncation: null, storagePath: null, progress: 0.64, updatedAt: 0, ...over };
 }
 
 describe("deriveCardStatus", () => {
@@ -64,5 +64,46 @@ describe("labels", () => {
     expect(uploadingLabel(0.644)).toBe("UPLOADING 64%");
     expect(uploadingLabel(1.3)).toBe("UPLOADING 100%");
     expect(uploadingLabel(null)).toBe("UPLOADING");
+  });
+});
+
+describe("this phone's paused, failed and just-landed uploads (jits-n2im.3/.4)", () => {
+  it("shows a paused upload with its progress, even over the opponent's film", () => {
+    expect(deriveCardStatus(libItem(), upload({ status: "paused", progress: 0.3 }), true, NOW)).toEqual({
+      kind: "paused",
+      progress: 0.3,
+    });
+  });
+
+  it("shows a failed upload, flagging the ones a retry cannot fix", () => {
+    expect(deriveCardStatus(libItem(), upload({ status: "error", errorClass: "not_allowed" }), true, NOW)).toEqual({
+      kind: "upload_failed",
+      terminal: false,
+    });
+    expect(deriveCardStatus(libItem(), upload({ status: "error", errorClass: "too_large" }), true, NOW)).toEqual({
+      kind: "upload_failed",
+      terminal: true,
+    });
+  });
+
+  it("offers Retry only where a retry can help", () => {
+    expect(cardOffersRetry({ kind: "paused", progress: null })).toBe(true);
+    expect(cardOffersRetry({ kind: "upload_failed", terminal: false })).toBe(true);
+    expect(cardOffersRetry({ kind: "upload_failed", terminal: true })).toBe(false);
+    expect(cardOffersRetry({ kind: "uploading", progress: 0.5 })).toBe(false);
+  });
+
+  it("never says no film for a clip that just landed before the library re-read", () => {
+    expect(deriveCardStatus(libItem({ videos: [] }), upload({ status: "uploaded", videoId: "V" }), true, NOW)).toEqual({
+      kind: "processing",
+    });
+    expect(deriveCardStatus(libItem({ videos: [] }), null, true, NOW)).toEqual({ kind: "none" });
+  });
+
+  it("labels each distinctly", () => {
+    expect(statusBadgeLabel({ kind: "paused", progress: null })).toBe("UPLOAD PAUSED");
+    expect(statusBadgeLabel({ kind: "upload_failed", terminal: false })).toBe("DIDN'T UPLOAD");
+    // Processing is never a card badge (deck B1.1); the caption says it.
+    expect(statusBadgeLabel({ kind: "processing" })).toBeNull();
   });
 });

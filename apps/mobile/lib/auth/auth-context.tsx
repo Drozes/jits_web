@@ -21,6 +21,7 @@ import { clearPushDeferral } from "../invites/pending-invite";
 import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
 import { resetMatchLocationRequired } from "../arena/match-location-flag";
 import { cancelLocationSheet } from "../arena/go-live-location";
+import { stopMatchUploadsForSignOut } from "../video/upload-control";
 
 type AuthError = { message: string };
 
@@ -309,6 +310,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = React.useCallback(async () => {
+    // Match-video uploads belong to the athlete who is leaving (jits-n2im.6):
+    // stop every runner now, while its token is still good (each tus offset
+    // stays on the server, so the same athlete resumes where they left off),
+    // and scope resumes to nobody until the next sign-in. The confirm prompt
+    // for pending uploads lives in the sign-out buttons (lib/video/sign-out-guard.ts).
+    stopMatchUploadsForSignOut();
     // Clear `looking_for_ranked` while the session can still write it; once
     // signed out, RLS refuses the write and the athlete stays advertised.
     // Both only work while the session can still write (the push row can only

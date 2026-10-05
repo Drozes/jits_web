@@ -8,6 +8,8 @@ import { statusBadgeLabel, uploadingLabel, type CardStatus } from "@/lib/film-ro
 import { OpeningStill, type StillAthlete } from "./opening-still";
 import { FilmScrim } from "./film-scrim";
 import { FilmBadge, toneFor } from "./status-badge";
+import { Button } from "@/components/ui/elo-system/button";
+import { TRY_AGAIN_A11Y, TRY_AGAIN_LABEL } from "@/lib/video/use-upload-actions";
 
 type Letter = "W" | "L" | "D";
 interface CardInk {
@@ -52,6 +54,8 @@ interface PosterCardProps {
   accessibilityLabel?: string;
   /** "compact" (the 120 pt Profile preview) uses short badge labels. */
   variant?: "grid" | "compact";
+  /** Retry this phone's paused or failed upload (grid only, jits-n2im.3). */
+  onRetry?: () => void;
 }
 
 /** Short badge copy for the narrow Profile preview tiles. */
@@ -59,6 +63,11 @@ export function compactBadgeLabel(status: CardStatus): string | null {
   switch (status.kind) {
     case "failed":
       return "FAILED";
+    case "upload_failed":
+      // Not "FAILED": that is the server's processing failure (m11).
+      return "DIDN'T UPLOAD";
+    case "paused":
+      return "PAUSED";
     case "analyzing":
       return status.total ? `${status.done ?? 0}/${status.total}` : "ANALYZING";
     case "new":
@@ -72,9 +81,14 @@ export function compactBadgeLabel(status: CardStatus): string | null {
 
 function fallbackLabel(item: MatchLibraryItem, status: CardStatus): string {
   if (status.kind === "uploading") return uploadingLabel(status.progress);
+  if (status.kind === "paused") return "UPLOAD PAUSED";
+  if (status.kind === "upload_failed") return "DIDN'T UPLOAD";
+  if (status.kind === "processing") return "PROCESSING FILM";
   if (item.videos.length === 0) return "NO FILM RECORDED";
   if (status.kind === "failed") return "FILM FAILED TO PROCESS";
-  return "STILL ARRIVES AFTER UPLOAD";
+  // The film is on the server and its still is not cut yet: the upload is
+  // done, so never "after upload" here (jits-n2im.4 item 6).
+  return "PROCESSING FILM";
 }
 
 /**
@@ -83,7 +97,7 @@ function fallbackLabel(item: MatchLibraryItem, status: CardStatus): string {
  * and a top-right badge column (status, DISPUTED, angles) stacked so no two
  * badges share a row even on a narrow card.
  */
-export const PosterCard = React.memo(function PosterCard({ item, status, viewer, onPress, testID, accessibilityLabel, variant = "grid" }: PosterCardProps) {
+export const PosterCard = React.memo(function PosterCard({ item, status, viewer, onPress, testID, accessibilityLabel, variant = "grid", onRetry }: PosterCardProps) {
   const p = usePalette();
   const compact = variant === "compact";
   const letter = outcomeLetter(item.outcome);
@@ -97,6 +111,9 @@ export const PosterCard = React.memo(function PosterCard({ item, status, viewer,
   const date = shortDate(item.completed_at);
   const progress = uploading && status.progress != null ? Math.min(1, Math.max(0, status.progress)) : null;
   const c = poster ? ON_PHOTO : onPlate(p);
+  // Try again is a grid affordance only; the 120 pt Profile tile opens the
+  // match page, which has the full card.
+  const retry = onRetry && !compact ? onRetry : null;
 
   return (
     <Pressable
@@ -106,6 +123,10 @@ export const PosterCard = React.memo(function PosterCard({ item, status, viewer,
         .filter(Boolean)
         .join(", ")}
       onPress={onPress}
+      accessibilityActions={retry ? [{ name: "retry", label: TRY_AGAIN_A11Y }] : undefined}
+      onAccessibilityAction={retry ? (e) => {
+        if (e.nativeEvent.actionName === "retry") retry();
+      } : undefined}
       className="flex-1 overflow-hidden active:opacity-80"
       style={{ aspectRatio: 3 / 4, borderRadius: 3, borderWidth: 1, borderColor: p.hairline, backgroundColor: p.plate }}
     >
@@ -126,6 +147,21 @@ export const PosterCard = React.memo(function PosterCard({ item, status, viewer,
           {badge ? <FilmBadge testID="film-card-badge" label={badge} tone={toneFor(status)} /> : null}
           {disputed ? <FilmBadge testID="film-card-disputed" label="DISPUTED" tone="amber" /> : null}
           {angles ? <FilmBadge testID="film-card-angles" label={angles} tone="outline" /> : null}
+        </View>
+      ) : null}
+      {retry ? (
+        // A real 44 pt control where the uploading overlay sits (deck
+        // convention 10). VoiceOver treats the whole card as one element, so
+        // the same action is also an accessibilityAction on the card (M2).
+        <View style={{ position: "absolute", left: 10, right: 10, top: "34%", alignItems: "center" }}>
+          <Button
+            testID="film-card-retry"
+            variant="secondary"
+            height={44}
+            label={TRY_AGAIN_LABEL}
+            accessibilityLabel={TRY_AGAIN_A11Y}
+            onPress={retry}
+          />
         </View>
       ) : null}
       {uploading && poster ? (

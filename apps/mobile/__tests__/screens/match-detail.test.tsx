@@ -353,7 +353,10 @@ describe("MatchDetailScreen (Film Room match page)", () => {
   it("falls back to both athletes on the plate until the still arrives", async () => {
     const utils = await renderLoaded(view());
     const plate = utils.getByTestId("match-hero-still-fallback");
-    expect(utils.getByText("STILL ARRIVES AFTER UPLOAD")).toBeTruthy();
+    // The video is on the server, so the upload is done: the still is
+    // waiting on processing, never "after upload" (jits-n2im.4 item 6).
+    expect(utils.getByText("PROCESSING FILM")).toBeTruthy();
+    expect(utils.queryByText(/STILL ARRIVES AFTER UPLOAD/)).toBeNull();
     expect(within(plate).getByLabelText("Demo Blue")).toBeTruthy();
     expect(within(plate).getByLabelText("Demo Red")).toBeTruthy();
   });
@@ -365,6 +368,60 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     const utils = await renderLoaded(view({ videos: [] }));
     expect(utils.getByText("UPLOADING 64% · STILL ARRIVES AFTER UPLOAD")).toBeTruthy();
     expect(utils.getByText("The breakdown starts once the film finishes uploading.")).toBeTruthy();
+  });
+
+  it("never says 'No video' while this phone is still uploading (jits-n2im.4 item 1)", async () => {
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "uploading", progress: 0.3, bytesTotal: 1000 });
+    });
+    const utils = await renderLoaded(view({ videos: [] }));
+    expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
+    expect(utils.getByTestId("upload-status-banner")).toBeTruthy();
+    expect(utils.getByText("Uploading match video")).toBeTruthy();
+  });
+
+  it("shows a paused upload with Retry on the match page (jits-n2im.3)", async () => {
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "paused", progress: 0.5, error: "Upload paused: no connection.", errorClass: "offline" });
+    });
+    const utils = await renderLoaded(view({ videos: [] }));
+    expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
+    expect(utils.getByText("UPLOAD PAUSED · 50%")).toBeTruthy();
+    expect(utils.getByTestId("upload-retry")).toBeTruthy();
+  });
+
+  it("shows this phone's failed upload beside the opponent's film", async () => {
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "error", error: "Upload failed.", errorClass: "not_allowed" });
+    });
+    const utils = await renderLoaded(view({ videos: [video({ uploaded_by: "opp" })] }));
+    expect(utils.getByTestId("upload-status-banner")).toBeTruthy();
+    expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
+  });
+
+  it("re-reads the match the moment this phone's upload lands (jits-n2im.4 item 2)", async () => {
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "uploading", progress: 0.9 });
+    });
+    const utils = await renderLoaded(view({ videos: [] }));
+    const reads = mockGetMatchDetailView.mock.calls.length;
+
+    mockGetMatchDetailView.mockResolvedValue(view({ videos: [video()] }));
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "uploaded", videoId: "v-mine", progress: 1 });
+    });
+
+    await waitFor(() => expect(mockGetMatchDetailView.mock.calls.length).toBe(reads + 1));
+    await waitFor(() => expect(utils.queryByTestId("upload-status-banner")).toBeNull());
+    expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
+  });
+
+  it("says why the hero cannot play a film that is still processing (jits-n2im.4 item 5)", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video({ poster_url: "https://signed/p.jpg", thumbnail_key: "k", playability: "processing", status: "processing" })] }),
+    );
+    expect(utils.queryByLabelText("Play match film")).toBeNull();
+    expect(utils.getByTestId("match-hero-play-hint")).toHaveTextContent("PROCESSING");
   });
 
   it("shows the no-video plate when nothing was recorded", async () => {

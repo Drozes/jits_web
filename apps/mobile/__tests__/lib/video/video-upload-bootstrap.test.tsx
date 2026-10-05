@@ -2,10 +2,10 @@
  * The backup-exclusion telemetry wired at bootstrap (jits-vjbq, F1).
  *
  * WHY THIS IS TESTED AT ALL. The exclusion is set by a NATIVE module, and
- * JS ships over the air while native code does not. `expo.version` is 0.2.0
- * with a `runtimeVersion` policy of `appVersion`, so the TestFlight build
- * that adds the module and every already-installed 0.2.0 binary share a
- * runtime version and accept the same OTA. After that build there will be
+ * JS ships over the air while native code does not. The `runtimeVersion`
+ * policy is `appVersion`, so the TestFlight build that adds the module and
+ * every already-installed binary of the same version share a runtime
+ * version and accept the same OTA. After that build there will be
  * two populations running byte-identical JS, one of which is silently
  * sending 300-600 MB clips to iCloud. This tag is the only thing that tells
  * them apart, so a regression that drops it is invisible by construction:
@@ -14,8 +14,12 @@
 const mockSetSentryTag = jest.fn();
 const mockResumeUploads = jest.fn(async () => undefined);
 const mockEnsureListeners = jest.fn(() => () => undefined);
+const mockSetUploadOwner = jest.fn();
+const mockStopUploads = jest.fn();
+const mockBindKeepAwake = jest.fn();
+const mockBindNotice = jest.fn();
 const mockStatus = { current: "active" as string };
-const mockAuth = { current: { user: null } as { user: { id: string } | null } };
+const mockAuth = { current: { athlete: null } as { athlete: { id: string } | null } };
 
 jest.mock("@/lib/error-tracking/sentry", () => ({
   setSentryTag: (...args: unknown[]) => mockSetSentryTag(...(args as [string, string])),
@@ -30,6 +34,16 @@ jest.mock("@/modules/backup-exclusion", () => ({
 jest.mock("@/lib/video/video-upload-manager", () => ({
   ensureUploadListeners: () => mockEnsureListeners(),
   resumeMatchVideoUploads: () => mockResumeUploads(),
+  setUploadOwner: (id: string | null) => mockSetUploadOwner(id),
+  stopMatchVideoUploadsForSignOut: () => mockStopUploads(),
+}));
+
+jest.mock("@/lib/video/upload-keep-awake", () => ({
+  bindUploadKeepAwake: () => mockBindKeepAwake(),
+}));
+
+jest.mock("@/lib/video/upload-background-notice", () => ({
+  bindUploadBackgroundNotice: () => mockBindNotice(),
 }));
 
 jest.mock("@/lib/auth/hooks", () => ({
@@ -44,7 +58,7 @@ let logSpy: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
   mockStatus.current = "active";
-  mockAuth.current = { user: null };
+  mockAuth.current = { athlete: null };
   logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
 });
 
@@ -62,7 +76,7 @@ describe("backup-exclusion telemetry", () => {
     // It is a fact about the binary, not about the session, and an error
     // raised before sign-in should carry it too. The resume sweep beside it
     // IS auth-gated, so it is easy to gate this by accident.
-    mockAuth.current = { user: null };
+    mockAuth.current = { athlete: null };
     render(<VideoUploadBootstrap />);
     expect(mockSetSentryTag).toHaveBeenCalledTimes(1);
     expect(mockResumeUploads).not.toHaveBeenCalled();
@@ -86,23 +100,70 @@ describe("backup-exclusion telemetry", () => {
     expect(mockSetSentryTag).toHaveBeenCalledWith("video.backup_exclusion", "not-applicable");
   });
 
-  it("logs it too, because the release Sentry DSN is not wired yet", () => {
+  it("logs it too, for device consoles where Sentry may not be wired", () => {
     render(<VideoUploadBootstrap />);
     expect(logSpy).toHaveBeenCalledWith("[video] backup exclusion: active");
   });
 
   it("reports once per launch, not once per auth change", () => {
     const view = render(<VideoUploadBootstrap />);
-    mockAuth.current = { user: { id: "u1" } };
+    mockAuth.current = { athlete: { id: "a1" } };
     view.rerender(<VideoUploadBootstrap />);
     expect(mockSetSentryTag).toHaveBeenCalledTimes(1);
   });
 
   it("still resumes uploads once a user is present", () => {
     // The tag must not have displaced what this component is actually for.
-    mockAuth.current = { user: { id: "u1" } };
+    mockAuth.current = { athlete: { id: "a1" } };
     render(<VideoUploadBootstrap />);
     expect(mockEnsureListeners).toHaveBeenCalled();
     expect(mockResumeUploads).toHaveBeenCalled();
+  });
+});
+
+describe("upload scope and app-wide bindings (jits-n2im.1, .6)", () => {
+  it("scopes resumes to the signed-in athlete before sweeping", () => {
+    mockAuth.current = { athlete: { id: "a1" } };
+    render(<VideoUploadBootstrap />);
+    expect(mockSetUploadOwner).toHaveBeenCalledWith("a1");
+    expect(mockSetUploadOwner.mock.invocationCallOrder[0]).toBeLessThan(
+      mockResumeUploads.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("re-scopes when a different athlete signs in", () => {
+    mockAuth.current = { athlete: { id: "a1" } };
+    const view = render(<VideoUploadBootstrap />);
+    mockAuth.current = { athlete: { id: "b2" } };
+    view.rerender(<VideoUploadBootstrap />);
+    expect(mockSetUploadOwner).toHaveBeenLastCalledWith("b2");
+    expect(mockResumeUploads).toHaveBeenCalledTimes(2);
+    // A's runners stop before B is scoped (m3).
+    expect(mockStopUploads).toHaveBeenCalledTimes(1);
+    expect(mockStopUploads.mock.invocationCallOrder[0]).toBeLessThan(mockSetUploadOwner.mock.invocationCallOrder[1]);
+  });
+
+  it("stops the uploads when the session ends without signOut() (m3)", () => {
+    mockAuth.current = { athlete: { id: "a1" } };
+    const view = render(<VideoUploadBootstrap />);
+    expect(mockStopUploads).not.toHaveBeenCalled();
+    mockAuth.current = { athlete: null };
+    view.rerender(<VideoUploadBootstrap />);
+    expect(mockStopUploads).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not stop anything on the first sign-in", () => {
+    const view = render(<VideoUploadBootstrap />);
+    mockAuth.current = { athlete: { id: "a1" } };
+    view.rerender(<VideoUploadBootstrap />);
+    expect(mockStopUploads).not.toHaveBeenCalled();
+  });
+
+  it("binds the upload keep-awake and the backgrounding notice once, signed in or not", () => {
+    const view = render(<VideoUploadBootstrap />);
+    mockAuth.current = { athlete: { id: "a1" } };
+    view.rerender(<VideoUploadBootstrap />);
+    expect(mockBindKeepAwake).toHaveBeenCalledTimes(1);
+    expect(mockBindNotice).toHaveBeenCalledTimes(1);
   });
 });

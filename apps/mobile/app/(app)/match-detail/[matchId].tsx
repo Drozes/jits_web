@@ -15,6 +15,9 @@ import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { AngleSwitcher } from "@/components/film-room/angle-switcher";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useMatchFilm } from "@/lib/match-detail/use-match-film";
+import { deriveFilmSection } from "@/lib/match-detail/film-section";
+import { MatchUploadCard } from "@/components/match-detail/match-upload-card";
+import { useRefetchOnUploadSettled } from "@/lib/profile/use-my-match-videos";
 import { markMatchSeen } from "@/lib/film-room/seen-store";
 import { videoHref } from "@/lib/film-room/href";
 import { usePalette } from "@/lib/theme/palette";
@@ -40,6 +43,10 @@ export default function MatchDetailScreen() {
   const [pastHero, setPastHero] = React.useState(false);
   const { state, data, error, refreshing, refetch } = useMatchDetail(matchId);
   const film = useMatchFilm(state === "ready" ? data : null, matchId ?? "");
+  // The row lands when the upload settles, usually while this page is open:
+  // re-read then instead of waiting for a focus or a pull (jits-n2im.4).
+  const settledIds = React.useMemo(() => (matchId ? [matchId] : []), [matchId]);
+  useRefetchOnUploadSettled(settledIds, refetch);
   // Pull-to-refresh also re-reads (and if needed re-signs) the highlight cards.
   const [highlightReload, setHighlightReload] = React.useState(0);
   const onRefresh = React.useCallback(() => {
@@ -63,6 +70,7 @@ export default function MatchDetailScreen() {
 
   const play = (videoId: string, t?: number) => router.push(videoHref(videoId, t));
   const active = film.active;
+  const section = deriveFilmSection(film.localUpload, state === "ready" && data ? data.videos.length : 0);
 
   return (
     <View className="flex-1 bg-surface">
@@ -83,6 +91,7 @@ export default function MatchDetailScreen() {
             me={{ name: data.me.display_name, photoUrl: data.me.profile_photo_url }}
             opponent={data.opponent ? { name: data.opponent.display_name, photoUrl: data.opponent.profile_photo_url } : null}
             fallbackLabel={film.fallbackLabel}
+            playHint={film.playHint}
             clockSeconds={data.match.duration_seconds}
             onPlay={active && active.playability !== "processing" ? () => play(active.id) : null}
           />
@@ -105,11 +114,11 @@ export default function MatchDetailScreen() {
                 onJump={(t) => play(active.id, t)}
               />
             ) : null}
-            {data.videos.length > 0 ? (
+            {section.upload && film.localUpload ? <MatchUploadCard matchId={data.match.id} entry={film.localUpload} /> : null}
+            {section.films ? (
               <FilmAngles videos={data.videos} opponentName={data.opponent?.display_name ?? null} onWatch={(id) => play(id)} />
-            ) : (
-              <MatchNoVideo />
-            )}
+            ) : null}
+            {section.noVideo ? <MatchNoVideo /> : null}
             {/* The viewer's own reel of each recording, under the film. */}
             <HighlightSection videos={data.videos} reloadToken={highlightReload} />
             {data.opponent ? (
