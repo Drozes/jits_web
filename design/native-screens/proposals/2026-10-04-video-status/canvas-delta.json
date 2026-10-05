@@ -1,0 +1,243 @@
+{
+  "pages_append": [
+    {
+      "id": "video-status",
+      "name": "Proposed (Oct 4 video status)"
+    }
+  ],
+  "boards_add": {
+    "P-VS-00-Map.dc.html": {
+      "h": 1670,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Video status placement map (states x surfaces)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "P-VS-01-Indicator-Home.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Upload strip on Home, uploading",
+      "w": 390,
+      "x": 0,
+      "y": 2013
+    },
+    "P-VS-02-Indicator-States.dc.html": {
+      "h": 1400,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Upload strip and match flow line, all states",
+      "w": 390,
+      "x": 470,
+      "y": 2013
+    },
+    "P-VS-03-Verdict-1-Angle.dc.html": {
+      "h": 1150,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Verdict, one angle uploading (CTA Open match)",
+      "w": 390,
+      "x": 940,
+      "y": 2013
+    },
+    "P-VS-04-Verdict-2-Angles.dc.html": {
+      "h": 1200,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Verdict, two angles, waiting for the other",
+      "w": 390,
+      "x": 1410,
+      "y": 2013
+    },
+    "P-VS-05-Verdict-States.dc.html": {
+      "h": 2270,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Verdict Film block, every state",
+      "w": 390,
+      "x": 1880,
+      "y": 2013
+    },
+    "P-VS-06-Match-Detail.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Match detail, three angles, waiting for 2 more",
+      "w": 390,
+      "x": 2350,
+      "y": 2013
+    },
+    "P-VS-07-Match-Detail.dc.html": {
+      "h": 910,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Match detail, my upload paused (retry), nothing playable",
+      "w": 390,
+      "x": 2820,
+      "y": 2013
+    },
+    "P-VS-08-Film-Status-Phases.dc.html": {
+      "h": 5780,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Film status, every match phase (competitor and timekeeper)",
+      "w": 390,
+      "x": 3290,
+      "y": 2013
+    },
+    "P-VS-09-Angle-Rows.dc.html": {
+      "h": 3020,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Film status rows, every angle state x viewer",
+      "w": 390,
+      "x": 3760,
+      "y": 2013
+    },
+    "P-VS-10-Film-Room.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Film Room card states",
+      "w": 390,
+      "x": 0,
+      "y": 8136
+    },
+    "P-VS-11-Push-Bell.dc.html": {
+      "h": 1380,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Push and bell, one per athlete per match",
+      "w": 390,
+      "x": 470,
+      "y": 8136
+    },
+    "P-VS-18-Reel-Card.dc.html": {
+      "h": 3120,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Highlight card, mute, building, failed, fallback, late angle",
+      "w": 390,
+      "x": 940,
+      "y": 8136
+    },
+    "P-VS-12-Faceoff-Timekeeper.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Face-off, add a timekeeper",
+      "w": 390,
+      "x": 1410,
+      "y": 8136
+    },
+    "P-VS-13-Timekeeper-Sheet.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Face-off, timekeeper QR and code sheet",
+      "w": 390,
+      "x": 1880,
+      "y": 8136
+    },
+    "P-VS-14-Timekeeper-Join.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper, join by QR or code",
+      "w": 390,
+      "x": 2350,
+      "y": 8136
+    },
+    "P-VS-15-Timekeeper-Joined.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper joined, record only",
+      "w": 390,
+      "x": 2820,
+      "y": 8136
+    },
+    "P-VS-16-Timekeeper-Recording.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper recording (record only, no clock control)",
+      "w": 390,
+      "x": 3290,
+      "y": 8136
+    },
+    "P-VS-17-Timekeeper-After.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper after the match, upload status",
+      "w": 390,
+      "x": 3760,
+      "y": 8136
+    },
+    "P-VS-19-Timekeeper-States.dc.html": {
+      "h": 1030,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper, other states (joined, denied, leave, cancelled)",
+      "w": 390,
+      "x": 4230,
+      "y": 8136
+    }
+  },
+  "notes_add": {
+    "vs-row-0": {
+      "kind": "title1",
+      "maxW": 1440,
+      "page": "video-status",
+      "text": "Oct 4 video status: placement map",
+      "w": 240,
+      "x": 0,
+      "y": -280
+    },
+    "vs-row-1": {
+      "kind": "title1",
+      "maxW": 4150,
+      "page": "video-status",
+      "text": "Upload strip, verdict, match detail Film status",
+      "w": 240,
+      "x": 0,
+      "y": 1733
+    },
+    "vs-row-2": {
+      "kind": "title1",
+      "maxW": 4620,
+      "page": "video-status",
+      "text": "Film Room, push and bell, highlight card, timekeeper",
+      "w": 240,
+      "x": 0,
+      "y": 7856
+    }
+  },
+  "order_append": [
+    "P-VS-00-Map.dc.html",
+    "P-VS-01-Indicator-Home.dc.html",
+    "P-VS-02-Indicator-States.dc.html",
+    "P-VS-03-Verdict-1-Angle.dc.html",
+    "P-VS-04-Verdict-2-Angles.dc.html",
+    "P-VS-05-Verdict-States.dc.html",
+    "P-VS-06-Match-Detail.dc.html",
+    "P-VS-07-Match-Detail.dc.html",
+    "P-VS-08-Film-Status-Phases.dc.html",
+    "P-VS-09-Angle-Rows.dc.html",
+    "P-VS-10-Film-Room.dc.html",
+    "P-VS-11-Push-Bell.dc.html",
+    "P-VS-18-Reel-Card.dc.html",
+    "P-VS-12-Faceoff-Timekeeper.dc.html",
+    "P-VS-13-Timekeeper-Sheet.dc.html",
+    "P-VS-14-Timekeeper-Join.dc.html",
+    "P-VS-15-Timekeeper-Joined.dc.html",
+    "P-VS-16-Timekeeper-Recording.dc.html",
+    "P-VS-17-Timekeeper-After.dc.html",
+    "P-VS-19-Timekeeper-States.dc.html"
+  ],
+  "based_on_canvas_version": "1790970841-9c7a",
+  "note": "Additive only: no existing board, note, page or key changes. Re-read project/canvas.json right before publishing and merge these keys into the fresh copy."
+}
