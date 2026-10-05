@@ -12,7 +12,8 @@ import { supabase } from "../supabase/client";
 import { SecureStoreAdapter } from "../supabase/secure-storage";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
-import { takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
+import { resetLiveOverlayState, takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
+import { loadPersistedLiveIntent } from "../arena/live-intent-persist";
 import { clearShareCache } from "../highlight-share";
 import { resetNotificationRouterReady } from "../notifications/handlers";
 import { unregisterPushDeviceOnSignOut } from "../notifications/register-push";
@@ -20,6 +21,9 @@ import { resetHighlightStore } from "../highlight/highlight-store";
 import { clearPushDeferral } from "../invites/pending-invite";
 import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
 import { resetMatchLocationRequired } from "../arena/match-location-flag";
+import { resetLocationFlags } from "../arena/location-flags";
+import { clearAllDeviceLocations, loadDeviceLocation } from "../location/device-location-store";
+import { readLocationPermission } from "../location/permission-cache";
 import { cancelLocationSheet } from "../arena/go-live-location";
 import { stopMatchUploadsForSignOut } from "../video/upload-control";
 
@@ -153,6 +157,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resetNotificationRouterReady();
         resetHighlightStore();
         void clearShareCache().catch(() => undefined);
+        // The athlete's last accepted location and the instant go-live
+        // flags never outlive the session either (review round 1, S4), nor
+        // does any go-live overlay (a stale OFFLINE · RETRY, review round 3).
+        clearAllDeviceLocations();
+        resetLocationFlags();
+        resetLiveOverlayState();
       } else if (needsAthleteLoad(nextUser.id, loadedAthleteForUserId.current)) {
         // Freshly signed-in user whose athlete row we have NOT loaded yet. Hold
         // the gate on "Loading..." (synchronously, in the same render that sets
@@ -190,6 +200,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await readAthlete(uid);
       if (cancelled) return;
       if (result.ok) {
+        // Start reading the stored go-live tag now, before the Arena owner
+        // mounts, so a cold-start restore decides its first frame from it
+        // (review round 1, S1). Never awaited; a failed read is "no tag".
+        if (result.data?.id) {
+          void loadDeviceLocation(result.data.id);
+          // And the athlete's last live choice (review round 3).
+          void loadPersistedLiveIntent(result.data.id);
+          // And the permission (read, never asked), for the same first frame
+          // (QA E: FINDING YOU at once when there is no tag).
+          void readLocationPermission();
+        }
         setAthlete(result.data);
         loadedAthleteForUserId.current = uid;
         setAthleteLoadFailed(false);
@@ -350,6 +371,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void clearPushDeferral();
     resetInvitesEnabledCache();
     resetMatchLocationRequired();
+    resetLocationFlags();
+    // The athlete's last accepted location never outlives the session
+    // (instant go-live 4.1): the next account on this device starts clean.
+    clearAllDeviceLocations();
     // A Go Live waiting on the location sheet answers "cancel" (the live
     // switch must not stay locked for the next account).
     cancelLocationSheet();

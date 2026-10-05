@@ -322,16 +322,19 @@ export function revokeInviteErrorMessage(hint: string): string {
 // match_location_required (016 addendum)
 // ---------------------------------------------------------------------------
 
-/** Shown before the location permission prompt on Go Live (flag on). */
+/**
+ * Shown before the location permission prompt on Go Live (flag on). The
+ * match-start location check is off (instant go-live, decision 3), so the
+ * copy no longer claims location is only used to start matches (UX 019, C7).
+ */
 export const GO_LIVE_LOCATION_EXPLAIN_COPY =
-  "ELO RATED checks you're on the same mat as your opponent. Your location is only used to start matches.";
+  "ELO RATED uses your location to put you on the mat with athletes near you. We only check it when you go live.";
 
 /** Go Live with a reading too coarse to use (flag on). */
 export const GO_LIVE_ACCURACY_COPY = "Can't pin your location. Try near a window.";
 
 /** Go Live with location off (denied, or the server's `location_required`). */
-export const GO_LIVE_LOCATION_DENIED_COPY =
-  "Location is off. ELO RATED checks you're on the same mat as your opponent before a match starts. Turn it on in Settings to go live.";
+export const GO_LIVE_LOCATION_DENIED_COPY = "Location is off for ELO RATED. Turn it on in Settings to go live.";
 
 /**
  * Go Live with iOS Precise Location off (or Android approximate location):
@@ -341,14 +344,34 @@ export const GO_LIVE_LOCATION_DENIED_COPY =
  */
 export const PRECISE_LOCATION_TITLE = "Turn on Precise Location for ELO RATED";
 export const PRECISE_LOCATION_COPY =
-  "Settings > ELO RATED > Location > Precise Location. We use it only to confirm you're on the same mat. Already on? Move near a window or turn on Wi-Fi, then Retry.";
+  "Settings > ELO RATED > Location > Precise Location. Already on? Move near a window or turn on Wi-Fi, then Retry.";
 
 /**
- * A live restore the athlete did not tap (foreground, after a match, the
- * 60 s refresh) found location permission gone (an iOS "Allow Once" grant
- * lapses in the background). A tap runs the full Go Live flow.
+ * A live restore the athlete did not tap (cold start, a return from the
+ * background after the tag expired) found no valid location tag and
+ * location permission gone (an iOS "Allow Once" grant lapses in the
+ * background). A tap runs the full Go Live flow. Never shown while a valid
+ * tag exists (the tag alone restores the athlete).
  */
 export const LOCATION_OFF_GO_LIVE_CTA_COPY = "Location is off for ELO RATED. Tap to go live again.";
+
+/**
+ * A live restore with no valid tag whose silent fresh fix failed (timeout,
+ * too coarse). A tap runs the full Go Live flow (UX 019, C3).
+ */
+export const LOCATION_FIX_FAILED_GO_LIVE_CTA_COPY = "Couldn't find your location. Tap to go live again.";
+
+/**
+ * The server ended the live session while the app was open (the 12 hour
+ * cap, an admin): the chip drops to GO LIVE and this toast says why. A tap
+ * runs the full Go Live flow (UX 019, C6).
+ */
+export const SERVER_ENDED_LIVE_CTA_COPY = "You're offline now. Tap to go live again.";
+
+/** The drift prompt (instant go-live 4.4, flag `live_location_drift_check`). */
+export const DRIFT_PROMPT_TITLE = "Still on the same mat?";
+export const DRIFT_PROMPT_BODY =
+  "You've moved since you went live. Update your location so people nearby can find you.";
 
 /** An Arena start refused with `proximity_required` / `proximity_failed`. */
 export function arenaProximityMessage(opponentName: string | null | undefined): string {

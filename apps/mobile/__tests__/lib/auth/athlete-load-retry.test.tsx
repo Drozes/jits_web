@@ -44,8 +44,24 @@ jest.mock("@/lib/supabase/secure-storage", () => ({
 jest.mock("@/lib/splash/elo-cache", () => ({ setCachedElo: jest.fn(() => Promise.resolve()) }));
 // eslint-disable-next-line no-var
 var mockArenaOffline = jest.fn(() => Promise.resolve());
+const mockResetOverlay = jest.fn();
 jest.mock("@/lib/arena/arena-store", () => ({
   takeArenaOfflineBeforeSignOut: () => mockArenaOffline(),
+  resetLiveOverlayState: () => mockResetOverlay(),
+}));
+const mockClearLocations = jest.fn();
+const mockLoadLocation = jest.fn((_id: string) => Promise.resolve(null));
+jest.mock("@/lib/location/device-location-store", () => ({
+  clearAllDeviceLocations: () => mockClearLocations(),
+  loadDeviceLocation: (id: string) => mockLoadLocation(id),
+}));
+const mockReadPermission = jest.fn(() => Promise.resolve({ granted: true, canAskAgain: true }));
+jest.mock("@/lib/location/permission-cache", () => ({
+  readLocationPermission: () => mockReadPermission(),
+}));
+const mockResetLocationFlags = jest.fn();
+jest.mock("@/lib/arena/location-flags", () => ({
+  resetLocationFlags: () => mockResetLocationFlags(),
 }));
 const mockResetHighlights = jest.fn();
 jest.mock("@/lib/highlight/highlight-store", () => ({
@@ -231,6 +247,39 @@ describe("cold-start athlete load", () => {
     });
     expect(r.getByTestId("redirect").props.children).toBe("/login");
     expect(mockRemoveItem).toHaveBeenCalledWith("sb-test-auth-token");
+  });
+
+  it("clears the stored last location and the instant go-live flags on sign-out (4.1)", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    expect(mockClearLocations).not.toHaveBeenCalled();
+    await act(async () => {
+      await signOut!();
+    });
+    expect(mockClearLocations).toHaveBeenCalledTimes(1);
+    expect(mockResetLocationFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it("S4: an involuntary sign-out (SIGNED_OUT from the auth listener) clears the stored location too", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    expect(mockClearLocations).not.toHaveBeenCalled();
+    await act(async () => {
+      mockAuthCallback?.("SIGNED_OUT", null);
+    });
+    expect(mockClearLocations).toHaveBeenCalledTimes(1);
+    expect(mockResetLocationFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it("S1: the stored tag is read as soon as the athlete row loads", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    expect(mockLoadLocation).toHaveBeenCalledWith(ACTIVE.id);
+    // And the permission (read, never asked), for the same first frame (QA E).
+    expect(mockReadPermission).toHaveBeenCalled();
   });
 
   it("clears the downloaded-highlight share cache on sign-out, even when it rejects", async () => {

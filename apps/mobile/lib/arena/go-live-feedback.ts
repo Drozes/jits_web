@@ -18,9 +18,14 @@
  *  - `"ignored"`: the switch was locked or busy and nothing was attempted,
  *    so stay silent.
  */
-import { LOCATION_OFF_GO_LIVE_CTA_COPY } from "@jits/shared/utils";
+import {
+  LOCATION_FIX_FAILED_GO_LIVE_CTA_COPY,
+  LOCATION_OFF_GO_LIVE_CTA_COPY,
+  SERVER_ENDED_LIVE_CTA_COPY,
+} from "@jits/shared/utils";
 import { toast } from "@/components/ui/toast";
 import { arenaActions } from "./arena-store";
+import { ANNOUNCE_OFFLINE, announce } from "./go-live-announce";
 import { GO_OFFLINE_FAILED_MESSAGE } from "./constants";
 
 export const GO_LIVE_FAILED_MESSAGE = "Couldn't take you live. Try again.";
@@ -48,13 +53,17 @@ export { GO_OFFLINE_FAILED_MESSAGE };
  * challenge tucked into the chip without declining it, decision Q3), with
  * the same reporting as `goLiveWithFeedback`.
  */
-export function goOfflineWithFeedback(): Promise<void> {
+export function goOfflineWithFeedback(): Promise<boolean | "ignored"> {
   return arenaActions.goOffline().then(
     (r) => {
+      // The app is offline either way (a failed clear retries by itself).
+      if (r !== "ignored") announce(ANNOUNCE_OFFLINE);
       if (r === false) toast.info(GO_OFFLINE_FAILED_MESSAGE);
+      return r;
     },
     () => {
       toast.info(GO_OFFLINE_FAILED_MESSAGE);
+      return false;
     },
   );
 }
@@ -63,20 +72,49 @@ export function goOfflineWithFeedback(): Promise<void> {
 export const LOCATION_OFF_CTA_VISIBLE_MS = 8_000;
 
 /**
- * A live restore or refresh the athlete did not tap found location
- * permission gone (live location fixes 1b, 1d): a non-blocking toast whose
- * tap runs the full Go Live flow (explain, the system prompt, the reading,
- * the live write). It never opens the system dialog by itself: only the
- * athlete's tap does. The header chip's GO LIVE stays the way back after
- * the toast has gone.
+ * An automatic restore whose write failed after recovery, with a valid tag
+ * (UX 019, 3i step 3): no tap action.
  */
-export function showLocationOffGoLiveCta(): void {
+export const RESTORE_FAILED_MESSAGE = "You're offline. Go live again in the Arena.";
+
+/**
+ * A non-blocking toast whose tap runs the full Go Live flow (explain, the
+ * system prompt, the reading, the live write). It never opens the system
+ * dialog by itself: only the athlete's tap does. One go-live toast at a
+ * time: a new one replaces the one up (UX 019, edge case 4).
+ */
+function showGoLiveCta(text: string): void {
+  toast.hide();
   toast.info({
-    text1: LOCATION_OFF_GO_LIVE_CTA_COPY,
+    text1: text,
     visibilityTime: LOCATION_OFF_CTA_VISIBLE_MS,
     onPress: () => {
       toast.hide();
       void goLiveWithFeedback();
     },
   });
+}
+
+/**
+ * An automatic restore found no valid location tag and location permission
+ * gone (live location fixes 1b). Never shown while a valid tag exists.
+ */
+export function showLocationOffGoLiveCta(): void {
+  showGoLiveCta(LOCATION_OFF_GO_LIVE_CTA_COPY);
+}
+
+/** An automatic restore with no valid tag whose silent fresh fix failed (UX 019, C3). */
+export function showLocationFixFailedGoLiveCta(): void {
+  showGoLiveCta(LOCATION_FIX_FAILED_GO_LIVE_CTA_COPY);
+}
+
+/** The server ended the live session while the app was open (UX 019, C6). */
+export function showServerEndedLiveCta(): void {
+  showGoLiveCta(SERVER_ENDED_LIVE_CTA_COPY);
+}
+
+/** A restore write that failed after recovery (valid tag): plain, no action. */
+export function showRestoreFailedToast(): void {
+  toast.hide();
+  toast.info(RESTORE_FAILED_MESSAGE);
 }

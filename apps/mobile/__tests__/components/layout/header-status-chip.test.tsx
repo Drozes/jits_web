@@ -57,7 +57,12 @@ import {
   type NavigationProp,
   type ParamListBase,
 } from "@react-navigation/native";
-import { CHIP_PENDING_TEST_ID, CHIP_RING_TEST_ID, HeaderStatusChip } from "@/components/layout/header-status-chip";
+import {
+  CHIP_DOUBLE_TAP_GUARD_MS,
+  CHIP_PENDING_TEST_ID,
+  CHIP_RING_TEST_ID,
+  HeaderStatusChip,
+} from "@/components/layout/header-status-chip";
 import {
   CHIP_HEIGHT,
   CHIP_MAX_FONT_SCALE,
@@ -70,6 +75,7 @@ import {
   chipAccessibilityValue,
   chipCopy,
   describeHeaderChip,
+  liveSwitchPending,
   estimateChipWidth,
   layoutChip,
   type ChipInput,
@@ -79,11 +85,15 @@ import { LIVE_MENU_COPY } from "@/components/layout/live-menu-popover";
 import { GO_OFFLINE_FAILED_MESSAGE } from "@/lib/arena/go-live-feedback";
 import {
   IDLE_ARENA_STATE,
+  PENDING_REVEAL_MS,
   __resetArenaStoreForTests,
   publishArenaSelfId,
   publishArenaState,
   registerArenaController,
+  setAppLiveIntent,
+  setGoLiveDisplay,
   useHasIncomingReopenSurface,
+  useLiveSurface,
   type ArenaController,
   type ArenaState,
 } from "@/lib/arena/arena-store";
@@ -132,6 +142,41 @@ beforeEach(() => {
 // Pure model
 // ---------------------------------------------------------------------------
 
+describe("round 4 (QA 4): the chip and the Arena bar draw pending from one rule", () => {
+  it("for every combination, the chip shows a pending state exactly when liveSwitchPending says so", () => {
+    const displays = [null, "hold", "leaving", "optimistic", "going-live", "finding-you", "restore-live", "restore-finding", "recovering", "retry"] as const;
+    const phases = ["ready", "cooldown", "saving"] as const;
+    const directions = [null, "going-live", "going-offline"] as const;
+    const intents = [null, { decided: false, live: false }, { decided: true, live: true }, { decided: true, live: false }];
+    let checked = 0;
+    for (const display of displays)
+      for (const phase of phases)
+        for (const direction of directions)
+          for (const intent of intents)
+            for (const isLive of [false, true]) {
+              const m = describeHeaderChip(input({ display, phase, direction, intent, isLive, reconnecting: false }));
+              const pending = liveSwitchPending({ intent, display, drawnLive: m.live, phase, direction });
+              const chipPending = m.kind === "going-live" || m.kind === "finding-you" || (m.kind === "reconnecting" && !m.live);
+              expect({ display, phase, direction, intent, isLive, chipPending }).toEqual({
+                display,
+                phase,
+                direction,
+                intent,
+                isLive,
+                chipPending: pending,
+              });
+              checked++;
+            }
+    expect(checked).toBe(720);
+  });
+
+  it("the ~100 ms mash frame: no overlay yet, a go-live saving, the chip says GOING LIVE and the bar is pending too", () => {
+    const at = { display: null, phase: "saving" as const, direction: "going-live" as const, intent: { decided: true, live: true } };
+    expect(describeHeaderChip(input({ ...at, isLive: false })).kind).toBe("going-live");
+    expect(liveSwitchPending({ ...at, drawnLive: false })).toBe(true);
+  });
+});
+
 describe("describeHeaderChip copy (spec 4.3)", () => {
   it("offline shows the lobby count and goes live on tap (AC-H2)", () => {
     const m = describeHeaderChip(input());
@@ -165,10 +210,25 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     expect(m.action).toBe("none");
   });
 
-  it("offline during the cooldown is disabled (AC-H4)", () => {
+  it("offline during the cooldown takes the tap, which is queued (QA D; was AC-H4 ignored)", () => {
     const m = describeHeaderChip(input({ phase: "cooldown" }));
     expect(chipCopy(m)).toBe("○ GO LIVE · 12");
-    expect(m.disabled).toBe(true);
+    expect(m.disabled).toBe(false);
+    // Never locked by work in flight either (review round 3): the choice is
+    // recorded at once and the server follows.
+    expect(describeHeaderChip(input({ phase: "saving" })).disabled).toBe(false);
+  });
+
+  it("QA A: the optimistic LIVE chip and RECONNECTING open the live menu when the go-live can be cancelled", () => {
+    const live = describeHeaderChip(input({ phase: "saving", display: "optimistic", cancellable: true }));
+    expect(live.kind).toBe("live");
+    expect(live.disabled).toBe(false);
+    const rec = describeHeaderChip(input({ phase: "saving", display: "recovering", cancellable: true }));
+    expect(rec.kind).toBe("reconnecting");
+    expect(rec.action).toBe("popover");
+    expect(rec.disabled).toBe(false);
+    // Always open (review round 3), with or without anything to cancel.
+    expect(describeHeaderChip(input({ phase: "saving", display: "optimistic" })).disabled).toBe(false);
   });
 
   it("live shows the count in green and opens the popover (AC-H5)", () => {
@@ -184,13 +244,27 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     );
   });
 
-  it("a go-offline in flight keeps the live styling but takes no taps", () => {
+  it("an offline choice is drawn at once, while the server still says live (review round 3)", () => {
     const m = describeHeaderChip(
-      input({ isLive: true, phase: "saving", direction: "going-offline" }),
+      input({
+        isLive: true,
+        phase: "saving",
+        direction: "going-offline",
+        intent: { decided: true, live: false },
+      }),
     );
-    expect(chipCopy(m)).toBe("● LIVE · 12");
-    expect(m.tone).toBe("live");
-    expect(m.disabled).toBe(true);
+    expect(chipCopy(m)).toBe("○ GO LIVE · 12");
+    expect(m.action).toBe("go-live");
+    // The way back is one tap away.
+    expect(m.disabled).toBe(false);
+  });
+
+  it("QA 6: OFFLINE · RETRY takes the tap while a hung write is still in flight", () => {
+    const m = describeHeaderChip(
+      input({ phase: "saving", display: "retry", intent: { decided: true, live: true } }),
+    );
+    expect(chipCopy(m)).toBe("○ OFFLINE · RETRY");
+    expect(m.disabled).toBe(false);
   });
 
   it("waiting counts down the outgoing challenge's fresh window (AC-H7)", () => {
@@ -375,8 +449,9 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     expect(m.tone).toBe("neutral");
     expect(m.action).toBe("go-live");
     expect(m.disabled).toBe(false);
+    // In the cooldown the retry is queued (QA D), so it takes the tap.
     expect(describeHeaderChip(input({ lastLiveWriteFailed: true, phase: "cooldown" })).disabled).toBe(
-      true,
+      false,
     );
   });
 
@@ -907,6 +982,69 @@ describe("HeaderStatusChip", () => {
     );
   });
 
+  it("round 5 (cosmetic): the end of a superseded attempt, a pending ring still set while the write has landed: chip and bar both read LIVE, from one snapshot", () => {
+    let surface: { drawnLive: boolean; pending: boolean } | null = null;
+    function Bar() {
+      surface = useLiveSurface();
+      return null;
+    }
+    const { getByTestId } = render(
+      <>
+        <HeaderStatusChip />
+        <Bar />
+      </>,
+    );
+    act(() => setGoLiveDisplay("going-live"));
+    expect(chipText(getByTestId)).toBe("GOING LIVE");
+    expect(surface).toMatchObject({ drawnLive: false, pending: true });
+    // The overtaken attempt's write lands before the driver clears the ring.
+    setArena({ isLive: true });
+    expect(chipText(getByTestId)).toMatch(/^LIVE/);
+    expect(surface).toMatchObject({ drawnLive: true, pending: false });
+  });
+
+  it("round 6 (QA cosmetic): a restore or adoption finding a fix: the chip reads FINDING YOU and the bar shows LIVE pending, from one snapshot", () => {
+    let surface: { drawnLive: boolean; pending: boolean } | null = null;
+    function Bar() {
+      surface = useLiveSurface();
+      return null;
+    }
+    const { getByTestId } = render(
+      <>
+        <HeaderStatusChip />
+        <Bar />
+      </>,
+    );
+    // No choice made yet (a foreground restore), then an adoption (the app
+    // decided live).
+    act(() => setGoLiveDisplay("restore-finding"));
+    expect(chipText(getByTestId)).toBe("FINDING YOU");
+    expect(surface).toMatchObject({ drawnLive: false, pending: true });
+    act(() => setAppLiveIntent(true));
+    expect(chipText(getByTestId)).toBe("FINDING YOU");
+    expect(surface).toMatchObject({ drawnLive: false, pending: true });
+  });
+
+  it("round 4: a second tap within 300 ms of a go-live tap never opens the live menu; later it does", async () => {
+    // The go-live lands at once: the chip turns LIVE under the finger.
+    const { getByTestId, queryByTestId } = render(<HeaderStatusChip />);
+    await act(async () => {
+      fireEvent.press(getByTestId("header-status-chip"));
+    });
+    expect(ctl.goLive).toHaveBeenCalledTimes(1);
+    act(() => setArena({ isLive: true }));
+    act(() => {
+      jest.advanceTimersByTime(CHIP_DOUBLE_TAP_GUARD_MS - 50);
+    });
+    fireEvent.press(getByTestId("header-status-chip"));
+    expect(queryByTestId("live-menu")).toBeNull();
+    act(() => {
+      jest.advanceTimersByTime(60);
+    });
+    fireEvent.press(getByTestId("header-status-chip"));
+    expect(getByTestId("live-menu")).toBeTruthy();
+  });
+
   it("a go-live that throws does not surface an unhandled rejection", async () => {
     __resetArenaStoreForTests();
     const boom = controller({ goLive: jest.fn(async () => Promise.reject(new Error("boom"))) });
@@ -1027,7 +1165,7 @@ describe("HeaderStatusChip", () => {
     expect(queryByTestId("live-menu")).toBeNull();
   });
 
-  it("popover: Go offline is disabled during the cooldown", async () => {
+  it("popover: Go offline right after a go-live (inside the cooldown) goes out at once (round 3)", async () => {
     setArena({ isLive: true });
     const { getByTestId, getByLabelText } = render(<HeaderStatusChip />);
     // A go-live just landed through the guard: cooldown.
@@ -1037,11 +1175,14 @@ describe("HeaderStatusChip", () => {
     });
     fireEvent.press(getByTestId("header-status-chip"));
     const off = getByLabelText("Live menu: go offline");
-    expect(off.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(off.props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
     await act(async () => {
       fireEvent.press(off);
     });
-    expect(ctl.goOffline).not.toHaveBeenCalled();
+    // Recorded and written at once (an offline write is never held back),
+    // drawn offline at once.
+    expect(ctl.goOffline).toHaveBeenCalledTimes(1);
+    expect(chipText(getByTestId)).toContain("GO LIVE · 12");
   });
 
   it("live with nobody else reads JUST YOU (AC-H5)", () => {
@@ -1585,6 +1726,17 @@ describe("HeaderStatusChip", () => {
     );
     const { getByTestId } = render(<HeaderStatusChip />);
     fireEvent.press(getByTestId("header-status-chip"));
+    // Nothing pending is drawn for the first 240 ms (UX 019, 2.3): the chip
+    // keeps its offline look, but takes no taps.
+    expect(getByTestId("header-status-chip").props.accessibilityLabel).toBe(
+      "Live status: 12 on the mat. Go live",
+    );
+    expect(getByTestId("header-status-chip").props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+    act(() => {
+      jest.advanceTimersByTime(PENDING_REVEAL_MS);
+    });
     expect(getByTestId("header-status-chip").props.accessibilityLabel).toBe(
       "Live status: going live",
     );

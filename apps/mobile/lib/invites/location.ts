@@ -1,22 +1,31 @@
 /**
  * One fresh foreground location reading for the invite proximity check
- * (contract 6: `Accuracy.High`, 10 s timeout). Never throws; coordinates are
- * sent to the server once and never stored on the device.
+ * (contract 6: `Accuracy.High`, 10 s timeout). Never throws. This module
+ * stores nothing; a reading the server ACCEPTS may be kept on the device by
+ * the caller as the athlete's last location (instant go-live 4.1,
+ * `lib/location/device-location-store.ts`), never a refused one.
  *
  * `fast` (Go Live and the face-off re-poll, live location fixes 4.2): a last
  * known position under 60 s old and 100 m or better is used as is (it is a
  * real, recent position, so the server's movement rule still holds);
  * otherwise `Accuracy.Balanced`, and `Accuracy.High` only when Balanced is
- * worse than 100 m, all inside the same 10 s budget.
+ * worse than 100 m, all inside the same 10 s budget. `skipLastKnown`: the
+ * location ladder already looked at the OS cache (rung 3), so go straight to
+ * a live fix.
+ *
+ * Every `ok` result carries `capturedAt`, the fix's own timestamp (ms epoch).
  */
 import { Platform } from "react-native";
 import * as Location from "expo-location";
 import type { LocationReading } from "@jits/shared/api/invites";
+import { takeDevFix } from "@/lib/arena/dev-go-live-hooks";
 
 export type ReadingResult =
   | {
       status: "ok";
       reading: LocationReading;
+      /** When the fix was taken (the OS timestamp, ms epoch; callers fall back to now). */
+      capturedAt?: number;
       /**
        * Reduced precision: iOS Precise Location off (heuristic, a reading of
        * 1000 m or worse) or Android approximate location only. The server
@@ -91,8 +100,11 @@ function toResult(p: Location.LocationObject, coarsePermission: boolean): Readin
   const raw = accuracyOf(p);
   const reducedPrecision =
     coarsePermission || (Platform.OS === "ios" && raw !== null && raw >= REDUCED_PRECISION_ACCURACY_M);
+  const ts = typeof p.timestamp === "number" && Number.isFinite(p.timestamp) ? p.timestamp : Date.now();
   return {
     status: "ok",
+    // Never later than now: a fix stamped in the future is a clock quirk.
+    capturedAt: Math.min(ts, Date.now()),
     reading: {
       lat: p.coords.latitude,
       lng: p.coords.longitude,
@@ -104,17 +116,19 @@ function toResult(p: Location.LocationObject, coarsePermission: boolean): Readin
 }
 
 /** Last known, then Balanced, then High; all inside one 10 s budget. */
-async function fastFix(): Promise<Location.LocationObject | "timeout" | "error"> {
+async function fastFix(skipLastKnown = false): Promise<Location.LocationObject | "timeout" | "error"> {
   const deadline = Date.now() + READING_TIMEOUT_MS;
   const left = () => deadline - Date.now();
-  try {
-    const last = await within(
-      () => Location.getLastKnownPositionAsync({ maxAge: LAST_KNOWN_MAX_AGE_MS, requiredAccuracy: GOOD_ACCURACY_M }),
-      left(),
-    );
-    if (last !== TIMED_OUT && last && acceptLastKnown(last, Date.now())) return last;
-  } catch {
-    // No last known position: take a live fix.
+  if (!skipLastKnown) {
+    try {
+      const last = await within(
+        () => Location.getLastKnownPositionAsync({ maxAge: LAST_KNOWN_MAX_AGE_MS, requiredAccuracy: GOOD_ACCURACY_M }),
+        left(),
+      );
+      if (last !== TIMED_OUT && last && acceptLastKnown(last, Date.now())) return last;
+    } catch {
+      // No last known position: take a live fix.
+    }
   }
   let balanced: Location.LocationObject | null = null;
   let failed = false;
@@ -144,7 +158,7 @@ async function fastFix(): Promise<Location.LocationObject | "timeout" | "error">
 }
 
 export async function readLocationOnce(
-  opts: { ask: boolean; fast?: boolean } = { ask: true },
+  opts: { ask: boolean; fast?: boolean; skipLastKnown?: boolean } = { ask: true },
 ): Promise<ReadingResult> {
   try {
     const current = await Location.getForegroundPermissionsAsync();
@@ -165,18 +179,57 @@ export async function readLocationOnce(
       coarse = asked.android?.accuracy === "coarse";
     }
     if (!granted) return { status: "denied", canAskAgain: Boolean(canAskAgain) };
+    // DEV ONLY (QA): a forced timeout or accuracy for this fix; null in production.
+    const devFix = takeDevFix();
+    if (devFix?.kind === "timeout") return { status: "unavailable", reason: "timeout" };
+    const patch = (p: Location.LocationObject): Location.LocationObject =>
+      devFix?.kind === "accuracy" ? { ...p, coords: { ...p.coords, accuracy: devFix.accuracyM } } : p;
     if (opts.fast) {
-      const fix = await fastFix();
+      const fix = await fastFix(opts.skipLastKnown === true);
       if (fix === "timeout" || fix === "error") return { status: "unavailable", reason: fix };
-      return toResult(fix, coarse);
+      return toResult(patch(fix), coarse);
     }
     const position = await within(
       () => Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
       READING_TIMEOUT_MS,
     );
     if (position === TIMED_OUT) return { status: "unavailable", reason: "timeout" };
-    return toResult(position, coarse);
+    return toResult(patch(position), coarse);
   } catch {
     return { status: "unavailable", reason: "error" };
+  }
+}
+
+/**
+ * The OS cached fix for the location ladder's rung 3 (instant go-live 4.2):
+ * `getLastKnownPositionAsync` with a 4 hour (minus margin) max age and
+ * 100 m, accepted only when its own timestamp and accuracy pass the same
+ * checks (the OS may ignore the options) and it is not reduced precision.
+ * Only with permission ALREADY granted (the caller checks; this never asks).
+ * Bounded by `budgetMs`; null when absent, too old, too coarse or late.
+ */
+export async function readOsCachedFix(
+  maxAgeMs: number,
+  budgetMs: number,
+  coarsePermission = false,
+): Promise<{ reading: LocationReading; capturedAt: number } | null> {
+  if (coarsePermission) return null;
+  try {
+    const last = await within(
+      () => Location.getLastKnownPositionAsync({ maxAge: maxAgeMs, requiredAccuracy: GOOD_ACCURACY_M }),
+      budgetMs,
+    );
+    if (last === TIMED_OUT || !last) return null;
+    const a = accuracyOf(last);
+    const now = Date.now();
+    const age = now - last.timestamp;
+    if (a === null || a > GOOD_ACCURACY_M) return null;
+    if (!Number.isFinite(age) || age < 0 || age >= maxAgeMs) return null;
+    return {
+      reading: { lat: last.coords.latitude, lng: last.coords.longitude, accuracyM: a },
+      capturedAt: last.timestamp,
+    };
+  } catch {
+    return null;
   }
 }

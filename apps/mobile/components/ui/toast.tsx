@@ -5,7 +5,62 @@ import RNToast, {
   type ToastConfigParams,
   type ToastShowParams,
 } from "react-native-toast-message";
+import * as SafeArea from "react-native-safe-area-context";
 import { cn } from "@/lib/cn";
+
+/** The header bar's height below the safe area (`BrandHeader`, `TabHeader`, `AppHeader`). */
+const HEADER_BAR_HEIGHT = 56;
+
+/**
+ * Where toasts sit: below the status bar AND the header bar, so a toast never
+ * covers the wordmark or the header status chip it is often about (review
+ * round 1, UX defect 6). The library default (40 pt) sat under the Dynamic
+ * Island and over the header. No safe area provider (tests): just the bar.
+ */
+/** Read once: a test double of the library may not export the context. */
+const InsetsContext: React.Context<{ top: number } | null> =
+  (SafeArea as { SafeAreaInsetsContext?: React.Context<{ top: number } | null> }).SafeAreaInsetsContext ??
+  React.createContext<{ top: number } | null>(null);
+
+/**
+ * Extra room a screen asks for below the header (QA C: the Arena's sticky
+ * OFFLINE / LIVE control bar). The focused screen sets it; 0 elsewhere.
+ */
+let extraTop = 0;
+const extraListeners = new Set<() => void>();
+
+function subscribeExtra(cb: () => void): () => void {
+  extraListeners.add(cb);
+  return () => {
+    extraListeners.delete(cb);
+  };
+}
+
+function getExtra(): number {
+  return extraTop;
+}
+
+/**
+ * While `active` (the screen is focused), toasts sit `px` lower, below the
+ * screen's own sticky bar. Released on blur and unmount.
+ */
+export function useToastBelowScreenBar(active: boolean, px: number): void {
+  React.useEffect(() => {
+    if (!active) return;
+    extraTop = px;
+    for (const l of [...extraListeners]) l();
+    return () => {
+      if (extraTop === px) extraTop = 0;
+      for (const l of [...extraListeners]) l();
+    };
+  }, [active, px]);
+}
+
+export function useToastTopOffset(): number {
+  const insets = React.useContext(InsetsContext);
+  const extra = React.useSyncExternalStore(subscribeExtra, getExtra, getExtra);
+  return (insets?.top ?? 0) + HEADER_BAR_HEIGHT + extra + 4;
+}
 
 /**
  * Toast wrapper around `react-native-toast-message`. Mirrors the `sonner` API
@@ -162,7 +217,7 @@ export const toastConfig: ToastConfig = {
 
 /** The library host, pre-wired with the branded config. */
 export function Toaster() {
-  return <RNToast config={toastConfig} />;
+  return <RNToast config={toastConfig} topOffset={useToastTopOffset()} />;
 }
 
 /**
@@ -192,7 +247,7 @@ export function ModalToaster() {
       }, 0);
     };
   }, []);
-  return <RNToast config={toastConfig} />;
+  return <RNToast config={toastConfig} topOffset={useToastTopOffset()} />;
 }
 
 export default toast;

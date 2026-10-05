@@ -16,7 +16,11 @@ import {
   arenaActions,
   useArenaSelfId,
   useArenaState,
+  useGoLiveCancellable,
+  useLiveIntent,
+  useLiveSurface,
   useHasArenaController,
+  useNeedsLocation,
   useIncomingReopenSurface,
   useLiveSwitchDirection,
   useLiveSwitchPhase,
@@ -102,7 +106,7 @@ const TEXT_TONE: Record<ChipTone, string> = {
 
 /** The offline ring (`○`), drawn as a View. */
 export const CHIP_RING_TEST_ID = "header-status-chip-ring";
-/** The GOING LIVE pulse (live location fixes 4.2), drawn in the glyph's slot. */
+/** The GOING LIVE / FINDING YOU pulse (UX 019), drawn in the glyph's slot. */
 export const CHIP_PENDING_TEST_ID = "header-status-chip-pending";
 
 const BORDER_TONE: Record<ChipTone, string> = {
@@ -124,6 +128,9 @@ const TEXT_STYLE = { fontVariant: ["tabular-nums" as const] };
  * The interactive chip for a tab-root header. Reads the app-wide stores, so
  * it needs no props and no Provider.
  */
+/** How long a second chip tap after a go-live tap is ignored (round 4). */
+export const CHIP_DOUBLE_TAP_GUARD_MS = 300;
+
 export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}) {
   const router = useRouter();
   const arena = useArenaState();
@@ -133,6 +140,13 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
   const onMat = useOnMatCount(selfId);
   const toConfirm = useMatchToConfirm(selfId);
   const controllerReady = useHasArenaController();
+  // Live as drawn, the overlay and pending: ONE snapshot, shared with the
+  // Arena bar (rounds 5 and 6), restores and adoptions included.
+  const surface = useLiveSurface();
+  const display = surface.display;
+  const needsLocation = useNeedsLocation();
+  const cancellable = useGoLiveCancellable();
+  const intent = useLiveIntent();
   const focused = useScreenFocused();
   // While on screen the chip can bring a tucked challenge back, so the prompt
   // may offer Later (AC-S4). Tab roots stay mounted (blurred) under pushed
@@ -145,6 +159,7 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
 
   const model = describeHeaderChip({
     isLive: arena.isLive,
+    drawnLive: surface.drawnLive,
     phase,
     direction,
     reconnecting: arena.reconnecting,
@@ -157,6 +172,10 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
     confirm: toConfirm !== null,
     controllerReady,
     onArena,
+    display,
+    needsLocation,
+    cancellable,
+    intent,
     now: Date.now(),
   });
 
@@ -171,10 +190,17 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
     if (!menuAllowed) setMenuOpen(false);
   }, [menuAllowed]);
 
+  // A second chip tap right after a tap that started a go-live is the same
+  // finger twice (the chip turned green under it): swallowed, so the live
+  // menu does not pop open on an accidental double tap (round 4).
+  const lastGoLiveTapAt = React.useRef<number | null>(null);
   const onPress = () => {
+    const now = Date.now();
+    if (lastGoLiveTapAt.current !== null && now - lastGoLiveTapAt.current < CHIP_DOUBLE_TAP_GUARD_MS) return;
     if (model.disabled) return;
     switch (model.action) {
       case "go-live":
+        lastGoLiveTapAt.current = now;
         // A failure shows as OFFLINE · RETRY; a throw must not surface as an
         // unhandled rejection from a header tap.
         void arenaActions.goLive().catch(() => undefined);
@@ -255,6 +281,7 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
           // as text, never as a button that does nothing.
           accessibilityRole={model.action === "none" && !model.disabled ? "text" : "button"}
           accessibilityLabel={model.accessibilityLabel}
+          accessibilityHint={model.accessibilityHint}
           accessibilityValue={chipAccessibilityValue(model)}
           accessibilityState={{ disabled: model.disabled }}
           disabled={model.disabled}
@@ -271,10 +298,10 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
             gap: GLYPH_GAP,
           }}
         >
-          {model.kind === "going-live" ? (
-            // From the Go Live tap until the flow resolves (permission,
-            // location fix, report, live write): never a still chip that
-            // reads as a dead tap. Same 6pt slot as the other dots.
+          {model.kind === "going-live" || model.kind === "finding-you" ? (
+            // GOING LIVE (a network wait) or FINDING YOU (a fresh fix),
+            // revealed 240 ms after the tap: never a still chip that reads
+            // as a dead tap. Same 6pt slot as the other dots.
             <PendingDot size={LIVE_DOT_PX} testID={CHIP_PENDING_TEST_ID} />
           ) : model.glyph === "●" ? (
             <LiveDot size={LIVE_DOT_PX} />

@@ -46,6 +46,36 @@ import { supabase } from "../supabase/client";
 import { joinLobby, leaveLobby } from "./use-lobby-presence";
 import type { LiveSwitchDirection } from "./arena-store";
 import { GO_OFFLINE_FAILED_MESSAGE } from "./constants";
+import {
+  abandonTappedGoLive,
+  areLiveWritesBlocked,
+  getArenaDisplayLive,
+  getLiveIntent,
+  isLiveDriverBusy,
+  isTappedGoLiveInFlight,
+  setAppLiveIntent,
+} from "./arena-store";
+import {
+  arrivalDecision,
+  PERSISTED_INTENT_READ_BOUND_MS,
+  type PersistedLiveIntent,
+} from "./live-intent-persist";
+
+/** The athlete's (or the app's) last choice is offline: nothing may put them back live. */
+function intentHoldsOffline(): boolean {
+  const i = getLiveIntent();
+  return i.decided && !i.live;
+}
+
+/**
+ * Whether a resume (foreground, after a match) should put the athlete back:
+ * the decided intent when there is one (review round 3: the athlete's last
+ * choice), else what the app was doing (`fallback`).
+ */
+function resumeFromIntent(fallback: boolean): boolean {
+  const i = getLiveIntent();
+  return i.decided ? i.live : fallback;
+}
 
 export interface UseArenaLiveArgs {
   athleteId: string;
@@ -82,6 +112,53 @@ export interface UseArenaLiveArgs {
    * CTA. Anything else goes ahead. Never rejects.
    */
   beforeAutoLive?: () => Promise<boolean | void>;
+  /**
+   * The athlete's last choice persisted for this athlete (review rounds 3
+   * and 4). A cold start that finds `looking_for_ranked` true clears it
+   * (and is drawn offline from the first frame) when that choice was offline
+   * and its clear never landed; otherwise (live, unknown, or an offline whose
+   * clear landed, so the server's session is newer, e.g. web) it restores.
+   * Waited on for at most `PERSISTED_INTENT_READ_BOUND_MS`. Never rejects.
+   */
+  loadPersistedIntent?: () => Promise<PersistedLiveIntent | null>;
+  /**
+   * A `looking_for_ranked = false` write landed (the owner confirms a
+   * persisted offline choice with it, round 4).
+   */
+  onOfflineLanded?: () => void;
+  /**
+   * Whether following a live session started elsewhere (the own-row check's
+   * "adopted") is likely to succeed without asking anything: a valid stored
+   * tag or reading, location permission already granted, or the location
+   * flag known off (round 5, A1). False: the session is declined at once,
+   * with no ladder and no toast. Omitted: assumed likely.
+   */
+  canAdopt?: () => boolean;
+  /**
+   * Instant go-live (jr_be 016 addendum 4.2): runs a WHOLE automatic
+   * restore, live writes included, through the location ladder (the server
+   * may refuse rung 1's write and the ladder then reports a tag and writes
+   * again). Replaces `beforeAutoLive` when given. `ctx.write` is the
+   * serialized live write; `ctx.canWrite` says whether a write may go out
+   * now ("parked": the app went to the background or into a match, hand the
+   * intent on; "cancelled": the athlete went offline meanwhile). The ladder
+   * shows its own toast on failure. Never rejects.
+   */
+  autoLive?: (ctx: AutoLiveContext) => Promise<"live" | "failed" | "parked" | "cancelled">;
+  /**
+   * The app went to the background and took a live athlete down, meaning to
+   * restore them on return (UX 019, 3i: the owner may draw the restore from
+   * the first frame back).
+   */
+  onResumeParked?: () => void;
+}
+
+export interface AutoLiveContext {
+  write: () => Promise<boolean>;
+  lastRefusal: () => "location_required" | null;
+  canWrite: () => "ok" | "parked" | "cancelled";
+  /** What brought the restore on. */
+  reason: "foreground" | "match" | "arrival";
 }
 
 export interface UseArenaLiveResult {
@@ -137,15 +214,49 @@ export interface UseArenaLiveResult {
    * for an athlete nobody can challenge. Resolves true when it dropped.
    */
   dropIfServerOffline: (read: () => Promise<boolean | null>) => Promise<boolean>;
+  /**
+   * What is committed on the server: `live`, and `settled` (nothing in flight
+   * and the request matches it). The intent driver reads it (review round 3).
+   */
+  committed: () => { live: boolean; settled: boolean };
+  /** Bring the server offline (an app decision: no manual go-offline side effects). */
+  ensureOffline: () => Promise<boolean>;
+  /**
+   * Sign-out (round 4, R1): ALWAYS writes `false` at once, whatever the hook
+   * believes is committed (a failed clear can leave the server live while
+   * the app reads offline), plus the usual serialized go-offline behind any
+   * write in flight. Resolves with the immediate write's outcome.
+   */
+  signOutOffline: () => Promise<boolean>;
+  /**
+   * The periodic own-row check (round 4): with nothing in flight, read the
+   * server's `looking_for_ranked` and correct ANY disagreement with what is
+   * drawn. "dropped": drawn (or committed) live, server false, now offline
+   * (the caller says so). "cleared": the last choice is offline but the
+   * server still says live, a clear went out. "adopted": no offline choice,
+   * the app offline, the server live (a session started elsewhere): put back
+   * live. Null: nothing to correct, or something moved during the read.
+   */
+  checkServer: (read: () => Promise<boolean | null>) => Promise<"dropped" | "cleared" | "adopted" | null>;
+  /**
+   * Whether the server's current live session (started elsewhere) was
+   * declined: the phone could not follow it and will not try again until the
+   * server reads false or the athlete chooses here (round 5, A1). The phone
+   * then draws offline while the server is live elsewhere, by design.
+   */
+  adoptionDeclined: () => boolean;
 }
 
 /**
- * How long after a failed flag clear the one follow-up clear goes out. The
+ * How long after a failed flag clear the first follow-up clear goes out. The
  * app is already offline (presence untracked, grey chip), but the column
  * still says "looking", so other athletes and web keep listing this athlete
- * until it lands. A later foreground tries again if this one fails too.
+ * until it lands. Round 4 (R1): it keeps retrying while in the foreground,
+ * doubling up to `CLEAR_RETRY_MAX_MS`; every foreground tries again at once.
  */
-export const CLEAR_RETRY_MS = 15_000;
+export const CLEAR_RETRY_MS = 5_000;
+/** The longest wait between follow-up clears. */
+export const CLEAR_RETRY_MAX_MS = 60_000;
 
 /** Longest a transition waits on joining the lobby's presence. */
 const LOBBY_CALL_BOUND_MS = 12_000;
@@ -187,6 +298,7 @@ async function writeLookingFlag(
   athleteId: string,
   ranked: boolean,
   onRefused?: (reason: "location_required") => void,
+  onIndefinite?: () => void,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await toggleMatchPreferences(supabase, athleteId, {
@@ -200,6 +312,9 @@ async function writeLookingFlag(
       onRefused?.("location_required");
       return false;
     }
+    // No definite answer: this attempt may have committed all the same
+    // (round 6, F1: whichever attempt it was, not only the last).
+    onIndefinite?.();
   }
   return false;
 }
@@ -212,6 +327,11 @@ export function useArenaLive({
   inMatch = false,
   onManualOffline,
   beforeAutoLive,
+  autoLive,
+  onResumeParked,
+  loadPersistedIntent,
+  onOfflineLanded,
+  canAdopt,
 }: UseArenaLiveArgs): UseArenaLiveResult {
   const [isLive, setIsLive] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -248,45 +368,73 @@ export function useArenaLive({
   manualOfflineRef.current = onManualOffline;
   const beforeAutoLiveRef = React.useRef(beforeAutoLive);
   beforeAutoLiveRef.current = beforeAutoLive;
+  const autoLiveRef = React.useRef(autoLive);
+  autoLiveRef.current = autoLive;
+  const onResumeParkedRef = React.useRef(onResumeParked);
+  const loadPersistedIntentRef = React.useRef(loadPersistedIntent);
+  loadPersistedIntentRef.current = loadPersistedIntent;
+  const onOfflineLandedRef = React.useRef(onOfflineLanded);
+  onOfflineLandedRef.current = onOfflineLanded;
+  const canAdoptRef = React.useRef(canAdopt);
+  canAdoptRef.current = canAdopt;
+  /**
+   * A live session started elsewhere that this phone declined to follow
+   * (round 5, A1): the intent sequence at which it was declined, or null.
+   * Not adopted again until the server reads false or the athlete makes a
+   * new choice here (an explicit intent newer than it).
+   */
+  const adoptDeclinedAtRef = React.useRef<number | null>(null);
+  onResumeParkedRef.current = onResumeParked;
+  /**
+   * Bumped only by a go-offline the ATHLETE asked for (`manualOffline`: the
+   * toggle, the popover, the Arena bar, sign-out), so a restore in flight can
+   * tell "cancelled" from the app's own offline writes (background, a match),
+   * which park it instead (review round 1, B2).
+   */
+  const offlineIntentRef = React.useRef(0);
+  /** Automatic restores (`autoLive`) running: single-flight (SF1), so 0 or 1. */
+  const restoreInFlightRef = React.useRef(0);
   /** The server's reason for the last refused go-live write, if it gave one. */
   const refusalRef = React.useRef<"location_required" | null>(null);
 
   /**
-   * The last flag clear failed (twice, see `writeLookingFlag`), so the
-   * column may still read "looking" while the app is offline. Cleared by a
-   * clear or a go-live write that lands.
+   * The server may still say "looking" while the app holds offline (round 4,
+   * R1): a clear failed, a go-live write failed without a definite refusal
+   * (it may have committed all the same), or the athlete arrived with a
+   * `true`. While set, an offline intent always writes `false` again (never
+   * "desired equals committed, nothing to do"). Cleared by a write that
+   * lands, either way.
    */
-  const clearFailedRef = React.useRef(false);
+  const clearFailedRef = React.useRef(initialRanked);
   const clearRetryTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  /**
-   * Queue one follow-up clear, serialized behind any transition, and only
-   * while the athlete still means to be offline. Called by a timer after a
-   * failed clear and on the next foreground.
-   */
-  const retryFailedClear = React.useCallback(() => {
+  const clearRetryDelayRef = React.useRef(CLEAR_RETRY_MS);
+  const retryFailedClearRef = React.useRef<() => void>(() => undefined);
+  /** A `false` write landed: the server is offline, and a persisted offline choice is confirmed. */
+  const offlineLanded = React.useCallback(() => {
+    clearFailedRef.current = false;
+    clearRetryDelayRef.current = CLEAR_RETRY_MS;
     if (clearRetryTimerRef.current) {
       clearTimeout(clearRetryTimerRef.current);
       clearRetryTimerRef.current = null;
     }
-    if (!clearFailedRef.current || desiredRef.current) return;
-    queueRef.current = queueRef.current
-      .then(async () => {
-        const id = identityRef.current.athleteId;
-        if (!id || !clearFailedRef.current || desiredRef.current || actualRef.current) return;
-        if (await writeLookingFlag(id, false)) clearFailedRef.current = false;
-      })
-      .then(
-        () => undefined,
-        () => undefined,
-      );
+    try {
+      onOfflineLandedRef.current?.();
+    } catch {
+      // Best effort.
+    }
   }, []);
+  /** Next follow-up clear, with backoff, only while in front (the foreground handler retries at once). */
   const scheduleClearRetry = React.useCallback(() => {
     if (clearRetryTimerRef.current) clearTimeout(clearRetryTimerRef.current);
+    clearRetryTimerRef.current = null;
+    if (AppState.currentState === "background") return;
+    const delay = clearRetryDelayRef.current;
+    clearRetryDelayRef.current = Math.min(delay * 2, CLEAR_RETRY_MAX_MS);
     clearRetryTimerRef.current = setTimeout(() => {
       clearRetryTimerRef.current = null;
-      retryFailedClear();
-    }, CLEAR_RETRY_MS);
-  }, [retryFailedClear]);
+      retryFailedClearRef.current();
+    }, delay);
+  }, []);
   React.useEffect(
     () => () => {
       if (clearRetryTimerRef.current) clearTimeout(clearRetryTimerRef.current);
@@ -305,15 +453,34 @@ export function useArenaLive({
       // "Online now" for people who already hold the roster, while
       // `get_arena_data` omits them for everyone loading it fresh.
       refusalRef.current = null;
-      const ok = await writeLookingFlag(id, true, (reason) => {
-        refusalRef.current = reason;
-      });
+      // Sign-out has started, or the last choice is offline: no live write,
+      // ever (review round 3). The intent is the one source of truth.
+      if (areLiveWritesBlocked() || intentHoldsOffline()) {
+        desiredRef.current = false;
+        return false;
+      }
+      let indefinite = false;
+      const ok = await writeLookingFlag(
+        id,
+        true,
+        (reason) => {
+          refusalRef.current = reason;
+        },
+        () => {
+          indefinite = true;
+        },
+      );
       if (!ok) {
         desiredRef.current = false;
+        // Any attempt without a definite answer may have committed (its
+        // answer was lost), even when a later one was refused: the server
+        // may say live (R1; round 6, F1).
+        if (indefinite) clearFailedRef.current = true;
         return false;
       }
       actualRef.current = true;
       clearFailedRef.current = false;
+      clearRetryDelayRef.current = CLEAR_RETRY_MS;
       setIsLive(true);
 
       // Intent can flip during that round trip. Tracking now would raise a
@@ -359,11 +526,15 @@ export function useArenaLive({
     });
     const cleared = await writeLookingFlag(id, false);
     // A failed clear still commits offline here (above), so nothing in the
-    // UI offers a go-offline to retry it: retry it in the background.
-    clearFailedRef.current = !cleared;
-    if (!cleared) scheduleClearRetry();
+    // UI offers a go-offline to retry it: retry it in the background, and
+    // every later offline intent writes again (R1).
+    if (cleared) offlineLanded();
+    else {
+      clearFailedRef.current = true;
+      scheduleClearRetry();
+    }
     return cleared;
-  }, [scheduleClearRetry]);
+  }, [scheduleClearRetry, offlineLanded]);
 
   /** Reconcile passes queued or running (for `transition`). */
   const pendingRef = React.useRef(0);
@@ -405,7 +576,16 @@ export function useArenaLive({
       if (!intent && !desiredRef.current) setLastWriteFailed(false);
       // Bounded, because a pass that keeps finding new intent means someone
       // holding down the toggle, not a loop that cannot settle.
-      for (let i = 0; i < 4 && desiredRef.current !== actualRef.current; i++) {
+      // A pass enqueued for an offline intent, while the server may still say
+      // live, writes `false` once whatever is committed locally (R1). (A
+      // failed go-live does not clear in its own pass: the offline intent
+      // that follows it does.)
+      let forcedClear = false;
+      const needsWrite = () =>
+        desiredRef.current !== actualRef.current ||
+        (!intent && !desiredRef.current && clearFailedRef.current && !forcedClear);
+      for (let i = 0; i < 4 && needsWrite(); i++) {
+        if (!desiredRef.current) forcedClear = true;
         syncTransition();
         const goingLive = desiredRef.current;
         ok = await step();
@@ -434,6 +614,32 @@ export function useArenaLive({
     return run;
   }, [step, syncTransition, setLastWriteFailed]);
 
+  /**
+   * Clear a stale `looking_for_ranked = true` the athlete arrived with and
+   * that the app did not put back: one write of false, serialized behind any
+   * transition, skipped if the athlete has chosen live by the time it runs
+   * (their live write sets the flag anyway). It never pretends the flag is
+   * live (review round 3: a forced `actualRef` could leave the executor
+   * believing a flag the server no longer had).
+   */
+  const clearStaleArrival = React.useCallback((): Promise<void> => {
+    const run = queueRef.current.then(async () => {
+      const id = identityRef.current.athleteId;
+      if (!id || desiredRef.current || actualRef.current) return;
+      if (await writeLookingFlag(id, false)) offlineLanded();
+      else {
+        clearFailedRef.current = true;
+        scheduleClearRetry();
+      }
+    });
+    const settled = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    queueRef.current = settled;
+    return settled;
+  }, [scheduleClearRetry, offlineLanded]);
+
   const requestLive = React.useCallback((): Promise<boolean> => {
     desiredRef.current = true;
     return reconcile();
@@ -443,6 +649,20 @@ export function useArenaLive({
     desiredRef.current = false;
     return reconcile();
   }, [reconcile]);
+
+  /**
+   * The follow-up clear: an offline intent while the server may still say
+   * live. Through the reconcile loop, so it is serialized like every write.
+   */
+  retryFailedClearRef.current = () => {
+    if (clearRetryTimerRef.current) {
+      clearTimeout(clearRetryTimerRef.current);
+      clearRetryTimerRef.current = null;
+    }
+    if (!clearFailedRef.current || desiredRef.current) return;
+    void reconcile();
+  };
+  const retryFailedClear = React.useCallback(() => retryFailedClearRef.current(), []);
 
   /**
    * A go-offline the athlete asked for. The hook is told before (so nothing
@@ -455,6 +675,14 @@ export function useArenaLive({
    * (the intent flipped back to live meanwhile) keeps it.
    */
   const manualOffline = React.useCallback(async (): Promise<boolean> => {
+    // The athlete's own go-offline: a restore in flight is cancelled by it,
+    // and nothing parked earlier may put them back live (review round 3, X1).
+    offlineIntentRef.current += 1;
+    resumeLiveRef.current = false;
+    resumeAfterMatchRef.current = false;
+    // The server is known live elsewhere (a declined session): the athlete's
+    // offline here is the last choice and writes false, ending it (round 6).
+    if (adoptDeclinedAtRef.current !== null) clearFailedRef.current = true;
     const settle = manualOfflineRef.current?.();
     let ok = false;
     try {
@@ -489,6 +717,30 @@ export function useArenaLive({
       setIsSaving(false);
     }
   }, [requestLive, manualOffline]);
+
+  /** Sign-out (R1): an unconditional `false` now, plus the serialized go-offline. */
+  const signOutOffline = React.useCallback(async (): Promise<boolean> => {
+    const id = identityRef.current.athleteId;
+    // Whatever is committed locally, the server may say live: the queued
+    // pass below writes `false` too, behind any write in flight.
+    clearFailedRef.current = true;
+    desiredRef.current = false;
+    const queued = manualOffline();
+    if (!id) return queued;
+    const direct = writeLookingFlag(id, false).then(
+      (ok) => {
+        if (ok) offlineLanded();
+        return ok;
+      },
+      () => false,
+    );
+    // Both: the immediate `false` and the serialized clear behind any write
+    // in flight (round 5, A2); the caller bounds the wait (4 s).
+    const [d, q] = await Promise.allSettled([direct, queued]);
+    const directOk = d.status === "fulfilled" && d.value;
+    const queuedOk = q.status === "fulfilled" && q.value;
+    return directOk || queuedOk;
+  }, [manualOffline, offlineLanded]);
 
   const requestOfflineRef = React.useRef(requestOffline);
   requestOfflineRef.current = requestOffline;
@@ -527,11 +779,98 @@ export function useArenaLive({
   }, []);
 
   /**
+   * Run the owner's `autoLive` (the location ladder), with the write, the
+   * refusal reason and the gate it needs. "parked" hands the intent to the
+   * next foreground / the end of the match.
+   */
+  const runAutoLive = React.useCallback(
+    async (reason: AutoLiveContext["reason"]): Promise<"live" | "failed" | "parked" | "cancelled"> => {
+      const run = autoLiveRef.current;
+      if (!run) return "failed";
+      // The last choice is offline: never put back live (review round 3).
+      if (intentHoldsOffline()) return "cancelled";
+      const offlineAtStart = offlineIntentRef.current;
+      restoreInFlightRef.current += 1;
+      try {
+        return await run({
+          write: () => requestLiveRef.current(),
+          lastRefusal: () => refusalRef.current,
+          canWrite: () => {
+            // Backgrounding and entering a match park the restore; only the
+            // athlete's own go-offline cancels it.
+            if (AppState.currentState !== "active" || inMatchRef.current) return "parked";
+            if (offlineIntentRef.current !== offlineAtStart && !desiredRef.current) return "cancelled";
+            if (intentHoldsOffline() || areLiveWritesBlocked()) return "cancelled";
+            return "ok";
+          },
+          reason,
+        });
+      } catch (error: unknown) {
+        console.warn("[arena] restoring live failed:", error);
+        return "failed";
+      } finally {
+        restoreInFlightRef.current -= 1;
+      }
+    },
+    [],
+  );
+
+  /**
+   * A restore run ended without putting the athlete live (cancelled by an
+   * earlier offline choice, or parked), but the athlete's LAST choice is live
+   * and nothing is moving: resume it now (in front, out of a match) or at the
+   * next foreground (review round 3: the intent decides, never a stale run).
+   */
+  const restoreLiveRef = React.useRef<(reason: AutoLiveContext["reason"]) => Promise<void>>(async () => {});
+  const resumeIfUnmet = React.useCallback(() => {
+    const i = getLiveIntent();
+    if (!i.decided || !i.live || actualRef.current || desiredRef.current) return;
+    if (restoreInFlightRef.current > 0) return;
+    if (AppState.currentState !== "active" || inMatchRef.current) {
+      if (inMatchRef.current) resumeAfterMatchRef.current = true;
+      else resumeLiveRef.current = true;
+      return;
+    }
+    void restoreLiveRef.current("foreground");
+  }, []);
+
+  /**
    * Put back a live state that the app, not the athlete, took away. A failure
    * is said out loud: the athlete believes they are live, and nothing else
    * on screen would tell them otherwise.
    */
-  const restoreLive = React.useCallback(async () => {
+  const restoreLive = React.useCallback(async (reason: AutoLiveContext["reason"] = "foreground") => {
+    if (autoLiveRef.current) {
+      let r = await runAutoLive(reason);
+      // Not met though it should be: parked (the app went away mid-step), or
+      // a "live" whose write was overtaken by the app's own offline write
+      // (the background) so nothing landed. Back in front and out of a
+      // match (the "active" handler left it to this run, SF1): carry on,
+      // here; still away: hand it to the next foreground.
+      for (let i = 0; i < 2; i++) {
+        const unmet = r === "parked" || (r === "live" && !actualRef.current);
+        if (!unmet || intentHoldsOffline()) break;
+        if (AppState.currentState === "active" && !inMatchRef.current) {
+          r = await runAutoLive(reason);
+          continue;
+        }
+        r = "parked";
+        break;
+      }
+      // Failed while the app was not in front: the ladder could say nothing
+      // (no toast in the background), so the live intent is not dropped
+      // silently; the next foreground tries again, and says it then.
+      const notInFront = r === "failed" && AppState.currentState !== "active";
+      if (r === "cancelled") {
+        // Cancelled by an earlier offline choice: a later live choice wins.
+        resumeIfUnmet();
+        return;
+      }
+      if (r !== "parked" && !notInFront) return;
+      if (inMatchRef.current) resumeAfterMatchRef.current = true;
+      else resumeLiveRef.current = true;
+      return;
+    }
     const proceed = await runBeforeAutoLive();
     // Backgrounded (or into a match) during that reading: hand the intent
     // to the next foreground / the end of the match, never go live unseen.
@@ -545,7 +884,8 @@ export function useArenaLive({
     if (!proceed) return;
     const ok = await requestLiveRef.current();
     if (!ok) toast.info("You're offline. Go live again in the Arena.");
-  }, [runBeforeAutoLive]);
+  }, [runBeforeAutoLive, runAutoLive, resumeIfUnmet]);
+  restoreLiveRef.current = restoreLive;
 
   // Re-assert a flag the athlete arrived with. This hook is mounted once per
   // signed-in athlete (by `<ArenaBootstrap />`), so `initialRanked` is the row
@@ -587,8 +927,63 @@ export function useArenaLive({
     }
     // Only the flag is committed; presence has not been joined. Mark it
     // uncommitted so the reconcile loop runs a full transition (flag AND
-    // lobby) instead of seeing desired === actual and doing nothing.
+    // lobby) instead of seeing desired === actual and doing nothing. The
+    // server still says live (`clearFailedRef`, seeded from the row), so an
+    // offline choice meanwhile still writes `false` (R1).
     actualRef.current = false;
+    if (autoLiveRef.current) {
+      void (async () => {
+        // The athlete's last choice before the kill was offline and its
+        // clear never landed: the `true` is stale. Held offline (drawn
+        // offline, no LIVE frame) and cleared, never restored (round 4).
+        // An offline whose clear landed means the server's live session is
+        // newer (web): adopted, restored like any server-live arrival.
+        let persisted: PersistedLiveIntent | null = null;
+        const load = loadPersistedIntentRef.current;
+        if (load) {
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          try {
+            persisted = await Promise.race([
+              load().catch(() => null),
+              new Promise<null>((resolve) => {
+                timer = setTimeout(() => resolve(null), PERSISTED_INTENT_READ_BOUND_MS);
+              }),
+            ]);
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+        if (arrivalDecision(persisted) === "clear") {
+          if (!getLiveIntent().decided) setAppLiveIntent(false);
+          return "cancelled" as const;
+        }
+        let r = await runAutoLive("arrival");
+        // Came back in front while the run was mid-step: carry on once (SF1).
+        if (r === "parked" && AppState.currentState === "active" && !inMatchRef.current) {
+          r = await runAutoLive("arrival");
+        }
+        return r;
+      })().then((r) => {
+        // Live, and it really is: done. (A "live" whose write the app's own
+        // offline write overtook, the background, is not.)
+        if (r === "live" && actualRef.current) return;
+        const notInFront = r === "failed" && AppState.currentState !== "active";
+        if (r === "parked" || notInFront) {
+          if (inMatchRef.current) resumeAfterMatchRef.current = true;
+          else resumeLiveRef.current = true;
+        }
+        // Every other outcome (failed, parked, cancelled): the arrived `true`
+        // is still committed in the database (presence is not). Clear it, so
+        // nobody can challenge an athlete the app could not put back (B2).
+        // Not when the athlete has tapped Go live meanwhile: that intent wins.
+        if (!desiredRef.current) {
+          // Then the athlete's last choice decides (a live choice made after
+          // an earlier offline one that cancelled this restore wins).
+          void clearStaleArrival().then(() => resumeIfUnmet());
+        }
+      });
+      return;
+    }
     if (!beforeAutoLiveRef.current) {
       void requestLiveRef.current();
       return;
@@ -609,7 +1004,7 @@ export function useArenaLive({
       }
       void requestLiveRef.current();
     });
-  }, [athleteId, runBeforeAutoLive]);
+  }, [athleteId, runBeforeAutoLive, runAutoLive, resumeIfUnmet, clearStaleArrival]);
 
   // THE LIFECYCLE. Live belongs to the athlete, not to a screen:
   //  - Switching tabs or pushing a profile: still live. The header LIVE pill
@@ -638,8 +1033,18 @@ export function useArenaLive({
       // alert and a half-swiped app switcher, none of which mean the athlete
       // left.
       if (next === "background") {
-        resumeLiveRef.current = resumeLiveRef.current || desiredRef.current;
+        // A restore still running (a silent fix) has not set the intent yet:
+        // the background must not lose it (B2).
+        // A tapped go-live that has not landed is cancelled by the
+        // background (its flow aborts), never restored on return (QA B).
+        if (isTappedGoLiveInFlight() && !actualRef.current) abandonTappedGoLive();
+        // Derived from the athlete's last choice (review round 3): offline
+        // (even if not written yet) never resumes.
+        resumeLiveRef.current = resumeFromIntent(
+          resumeLiveRef.current || desiredRef.current || restoreInFlightRef.current > 0,
+        );
         void requestOfflineRef.current();
+        if (resumeLiveRef.current && !inMatchRef.current) onResumeParkedRef.current?.();
         return;
       }
       // Put back exactly what the background took away. Without this the
@@ -647,13 +1052,23 @@ export function useArenaLive({
       // live-capable, and nothing else can fix it: this handler ignores
       // "active" otherwise and the arrival effect is one-shot.
       if (next === "active") retryFailedClear();
-      if (next !== "active" || !resumeLiveRef.current) return;
+      if (next !== "active") return;
+      // A live choice that is not met (it was still waiting when the app
+      // went away) resumes too: the intent, not a stale ref, decides.
+      const i = getLiveIntent();
+      const unmetChoice = i.decided && i.live && !actualRef.current && !desiredRef.current;
+      if (!resumeLiveRef.current && !unmetChoice) return;
       resumeLiveRef.current = false;
+      if (intentHoldsOffline()) return;
       if (inMatchRef.current) {
         resumeAfterMatchRef.current = true;
         return;
       }
-      void restoreLive();
+      // Single-flight (SF1): a restore still running (the app went away and
+      // came back before it finished) carries on now that it may write; a
+      // second one alongside it would race it.
+      if (restoreInFlightRef.current > 0) return;
+      void restoreLive("foreground");
     };
     const sub = AppState.addEventListener("change", onChange);
     return () => sub.remove();
@@ -665,21 +1080,25 @@ export function useArenaLive({
     if (inMatch === wasInMatchRef.current) return;
     wasInMatchRef.current = inMatch;
     if (inMatch) {
-      resumeAfterMatchRef.current =
-        resumeAfterMatchRef.current || desiredRef.current || resumeLiveRef.current;
+      // A tapped go-live that has not landed is dropped by the match.
+      if (isTappedGoLiveInFlight() && !actualRef.current) abandonTappedGoLive();
+      resumeAfterMatchRef.current = resumeFromIntent(
+        resumeAfterMatchRef.current || desiredRef.current || resumeLiveRef.current,
+      );
       resumeLiveRef.current = false;
       void requestOfflineRef.current();
       return;
     }
     if (!resumeAfterMatchRef.current) return;
     resumeAfterMatchRef.current = false;
+    if (intentHoldsOffline()) return;
     // Left the match while backgrounded is not possible, but a match screen
     // unmounted by a sign-out teardown is: never go live without a screen.
     if (AppState.currentState !== "active") {
       resumeLiveRef.current = true;
       return;
     }
-    void restoreLive();
+    void restoreLive("match");
   }, [inMatch, restoreLive]);
 
   // A real teardown (sign-out, switching athlete, app shutdown) still clears.
@@ -719,6 +1138,90 @@ export function useArenaLive({
     [setLastWriteFailed],
   );
 
+  const checkServer = React.useCallback(
+    async (read: () => Promise<boolean | null>): Promise<"dropped" | "cleared" | "adopted" | null> => {
+      const idle = () =>
+        pendingRef.current === 0 && restoreInFlightRef.current === 0 && !isLiveDriverBusy() && !inMatchRef.current;
+      if (!idle()) return null;
+      const generation = generationRef.current;
+      let serverLive: boolean | null = null;
+      try {
+        serverLive = await read();
+      } catch {
+        return null;
+      }
+      if (serverLive === null || generation !== generationRef.current || !idle()) return null;
+      const i = getLiveIntent();
+      if (serverLive === false) {
+        // The server's live session is over: a declined one is forgotten.
+        adoptDeclinedAtRef.current = null;
+        // The server is offline: anything we feared it still said, it does not.
+        if (!desiredRef.current) {
+          clearFailedRef.current = false;
+          clearRetryDelayRef.current = CLEAR_RETRY_MS;
+        }
+        const drawnLive = getArenaDisplayLive();
+        if (!actualRef.current && !drawnLive) return null;
+        // Drawn (or committed) live, the server says no: offline now.
+        desiredRef.current = false;
+        actualRef.current = false;
+        resumeLiveRef.current = false;
+        setIsLive(false);
+        setLastWriteFailed(false);
+        void leaveLobby().catch((error: unknown) => {
+          console.warn("[arena] leaving the lobby failed:", error);
+        });
+        return "dropped";
+      }
+      // The server says live.
+      if (actualRef.current && desiredRef.current) return null;
+      if (i.decided && !i.live && clearFailedRef.current) {
+        // An offline choice whose clear has not landed: the `true` is ours,
+        // stale. Cleared.
+        void requestOffline();
+        return "cleared";
+      }
+      if (AppState.currentState !== "active") return null;
+      // The app offline (any offline choice acknowledged by the server), the
+      // server live: a session started after it, elsewhere (web). The newer
+      // choice wins, as on arrival (R2): the app follows it, silently.
+      // Round 5 (A1): at most once per server session. A session declined
+      // (the phone could not meet it) is not adopted again until the server
+      // reads false or the athlete chooses again here.
+      const declinedAt = adoptDeclinedAtRef.current;
+      if (declinedAt !== null) {
+        // Only a new explicit LIVE choice here ends a decline (an offline
+        // one writes false instead, ending the web session: round 6).
+        if (!(i.explicit && i.live && i.seq > declinedAt)) return null;
+        adoptDeclinedAtRef.current = null;
+      }
+      const decline = () => {
+        adoptDeclinedAtRef.current = getLiveIntent().seq;
+      };
+      // Only when it is likely to work without asking (a valid tag, the
+      // permission already granted, or the flag off): otherwise declined at
+      // once, with no ladder and no toast.
+      let likely = true;
+      try {
+        likely = canAdoptRef.current ? canAdoptRef.current() : true;
+      } catch {
+        likely = false;
+      }
+      if (!likely) {
+        decline();
+        return null;
+      }
+      if (i.decided && !i.live) setAppLiveIntent(true);
+      void restoreLive("foreground").then(() => {
+        // Not met and held offline (the restore failed in front and said so
+        // once): this server session is declined.
+        if (!actualRef.current && intentHoldsOffline()) decline();
+      });
+      return "adopted";
+    },
+    [requestOffline, restoreLive, setLastWriteFailed],
+  );
+
   return {
     isLive,
     isSaving,
@@ -729,5 +1232,20 @@ export function useArenaLive({
     goLive: requestLive,
     lastGoLiveRefusal: React.useCallback(() => refusalRef.current, []),
     dropIfServerOffline,
+    ensureOffline: requestOffline,
+    signOutOffline,
+    checkServer,
+    adoptionDeclined: React.useCallback(() => adoptDeclinedAtRef.current !== null, []),
+    committed: React.useCallback(
+      () => ({
+        live: actualRef.current,
+        // Offline with the server possibly still live is not settled (R1).
+        settled:
+          pendingRef.current === 0 &&
+          desiredRef.current === actualRef.current &&
+          !(!desiredRef.current && clearFailedRef.current),
+      }),
+      [],
+    ),
   };
 }

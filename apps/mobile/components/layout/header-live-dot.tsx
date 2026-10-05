@@ -1,7 +1,7 @@
 import * as React from "react";
 import { View } from "react-native";
 import Animated from "react-native-reanimated";
-import { useIsArenaLive } from "@/lib/arena/arena-store";
+import { useIsArenaDisplayLive } from "@/lib/arena/arena-store";
 import { useLivePulseStyle } from "@/lib/arena/arena-tempo";
 
 export const HEADER_LIVE_DOT_TEST_ID = "header-live-dot";
@@ -22,7 +22,7 @@ export const HEADER_LIVE_DOT_MARK_TEST_ID = "header-live-dot-mark";
  * reads "not live" outside the signed-in app (auth screens, profile setup).
  */
 export function HeaderLiveDot() {
-  const isLive = useIsArenaLive();
+  const isLive = useIsArenaDisplayLive();
   if (!isLive) return null;
   return <LiveMark />;
 }

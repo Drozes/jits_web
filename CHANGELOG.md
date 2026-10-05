@@ -2,6 +2,80 @@
 
 ## [Unreleased]
 
+### Instant go-live: location ladder, device location store, optimistic chip, proximity flag, drift check (jits-jko7.1 to .4)
+
+Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) and the UX spec `research/019-optimistic-go-live-ux.md` (which wins on UX and copy; orchestrator rulings C1 to C7). JS-only on mobile (OTA-eligible: no dependency, no `app.json` / `app.config.js` change; `expo-secure-store`, `expo-location` and `@react-native-community/netinfo` are already in the binary). Safe before the jr_be migration `20261004100000_instant_go_live.sql`: a `PGRST202` for `p_captured_at` flips the app to the old fresh-reading flow and keeps the 60 s refresh for that backend.
+
+**Added**
+- `apps/mobile/lib/arena/location-ladder.ts`: the location ladder for a tapped go-live (server tag, device tag, OS cache, fresh fix) and for restores (silent, no prompt, no write when no rung lands), the optimistic chip with RECONNECTING / OFFLINE · RETRY recovery (5 s confirm, 15 s window, backoff), the one silent background refresh after a cached rung, `go_live_attempt` with `source`.
+- `apps/mobile/lib/location/device-location-store.ts`: the last server-accepted location per athlete in SecureStore (go_live, browse, arena; the server's `captured_at`), deleted at 4 h, cleared on sign-out, athlete switch and account deletion.
+- `apps/mobile/lib/location/presence-capability.ts`: tells a current backend from a legacy one (`captured_at` in the go_live answer, `PGRST202` for `p_captured_at`).
+- `apps/mobile/lib/network/connectivity.ts`: a synchronous "known offline" for the tap (no optimistic flip without a connection).
+- `apps/mobile/lib/arena/location-flags.ts`: `match_proximity_required` and `live_location_drift_check` flag stores (missing rows read off).
+- `apps/mobile/lib/arena/use-live-drift-check.ts` and `apps/mobile/components/arena/drift-prompt-sheet.tsx`: the drift check and "Still on the same mat?" bottom sheet, behind `live_location_drift_check` (OFF).
+- `apps/mobile/lib/arena/go-live-announce.ts`: VoiceOver announcements (You're live, Finding your location, Reconnecting, You're offline).
+- `packages/shared/src/constants/go-live.ts`: tag windows, drift constants, `isGoLiveTagValid`, `haversineM`, `isDrifted`.
+- Header chip `◌ FINDING YOU` state; the "Location needed to go live" hint after a location failure; the server-ended toast (C6) and the restore fix-failed toast (C3).
+
+**Changed**
+- Go Live with `match_location_required` ON no longer waits on GPS when a tag exists: the chip turns green on the tap with a valid stored tag or OS cached fix and the server confirms in the background; nothing pending is drawn for the first 240 ms; GOING LIVE only for a network wait.
+- Restores (foreground, after a match, cold start) draw LIVE from the first frame with a valid tag, FINDING YOU without one; a restore with no landing rung makes no live write (D12) and shows one toast.
+- The Arena accept path takes no location reading unless `match_proximity_required` is also ON; a proximity refusal marks that flag ON and takes the reading once more; the challenger's waiting reading runs only with both flags ON.
+- `reportGoLivePresence` takes an optional capture time (`p_captured_at`); `logLocationEvent` sends `p_source` and retries without it on an older backend; `InviteRpcError` keeps the PostgREST `code`.
+- Copy (C7, `packages/shared/src/utils/invite-copy.ts`): the explain, denied and Precise Location bodies drop the match-start claims (web shows the same strings).
+- The Arena tab icon's go-live haptic and blade clash fire once per tapped attempt (never on a restore or after RECONNECTING); DESIGN.md Motion registry updated.
+
+**Removed**
+- The 60 s go-live reading refresh while live (`useGoLiveReadingRefresh`); it remains only as `useLegacyGoLiveReadingRefresh` against a backend without the migration.
+
+**Fixed (review round 1)**
+- The 15 s recovery window restarts after any sheet, system dialog or fix, and an in-flight report or write is always awaited: a slow answer can no longer leave the tag stored without the live write, or say "failed" and then turn LIVE.
+- Only the athlete's own go-offline cancels a restore; a background or match parks it, a failure while away keeps the resume intent, and a cold-start restore that does not land always clears the stale `looking_for_ranked = true`.
+- The device store keeps the go-live tag apart from browse / arena readings (memory only), so browse reports neither overwrite the tag nor write the keychain; readings are stored only for the athlete the request was made for; involuntary sign-outs clear it too; it is read as soon as the athlete row loads.
+- Restores never draw a provisional LIVE or a GOING LIVE flash (hold instead), and the flag read is bounded at 3 s.
+- No RECONNECTING flicker on foreground (2 s grace, never over a restore); the server-ended check runs every 30 s; toasts sit below the header (`components/ui/toast.tsx`).
+- Drift logs `retagged` only once the server took the new tag; the challenger's fallback start retries with a reading like the accepter.
+- Dev-only QA hooks (`apps/mobile/lib/arena/dev-go-live-hooks.ts`, dev menu "Go live: ..." items and `__goLiveDev`), inert in production; documented in `research/019-optimistic-go-live-ux.md` appendix A.
+
+**Fixed (review round 2)**
+- Restores are single-flight; a run owns its switch lock (`beginRestoreRun`), and a parked run that finds the app back in front carries on once.
+- Go offline during a go-live in flight (optimistic chip, RECONNECTING, a restore drawn live, the Arena OFFLINE segment) cancels it quietly; the server always ends offline.
+- A tapped go-live abandoned by the background ends quietly (GO LIVE, no toast, logged dismissed) and is never resumed.
+- Taps during the 2 s cooldown are queued (last choice wins) with immediate feedback.
+- OFFLINE · RETRY shows at 15 s while a write is still in flight; a late success still lands LIVE; the failure toast only follows an actual failure.
+- A restore's first frame is FINDING YOU when the store is read, there is no tag and permission is believed granted (permission read at athlete load, `lib/location/permission-cache.ts`); LIVE at once on a cold start with the flag known off.
+- On the Arena, toasts sit below the control bar (`useToastBelowScreenBar`).
+- The drift prompt's Go offline goes through the same path and is logged only when it happened.
+- UX spec appendix B records the settled behaviour.
+
+**Fixed (review round 3)**
+- One source of truth for the athlete's live intent (`arena-store`): every tap sets it at once and is drawn at once; one serialized loop drives the server toward the latest choice; the cooldown only paces live writes and never drops, delays or disables a choice. Replaces the round 2 cooldown queue.
+- The live hook refuses any live write while the intent is offline or after sign-out has started; resumes (foreground, after a match, cold start) are derived from the last choice, which is persisted per athlete (`lib/arena/live-intent-persist.ts`) so a relaunch after choosing offline clears a stale `true` instead of restoring.
+- Sign-out, the background (for an unlanded tapped go-live) and match entry drop pending live choices and cancel work in flight; sign-out clears every overlay (no stale OFFLINE · RETRY).
+- RECONNECTING draws LIVE pending on the Arena bar with OFFLINE tappable; after a cancel the athlete can choose again at once; RETRY is tappable at 15 s; a cancelled write that lands never flashes LIVE.
+- A parked restore with an aged tag and permission granted is drawn FINDING YOU while away (no GO LIVE frame on return).
+- `report_match_presence` calls are aborted after 15 s (`PRESENCE_REPORT_TIMEOUT_MS`); the live write is never aborted.
+- Seeded randomized test of the intent model (`live-intent-property.test.ts`, 3,000 sequences by default).
+
+**Fixed (review round 4)**
+- A failed clear no longer leaves the athlete advertised: while the server may still say live, every offline intent writes `false` again; failed clears keep retrying with backoff in the foreground; sign-out always sends an immediate `false` within its 4 s bound.
+- Cold start over a stale `true` after an offline choice is drawn GO LIVE from the first frame and cleared; an offline choice whose clear landed means a newer session (web) and is adopted. The persisted choice is now `{ live, at, confirmed }`.
+- The 30 s own-row check runs in the foreground whatever is drawn and corrects any disagreement with the server.
+- An overtaken go-live attempt never draws OFFLINE · RETRY; the chip and the Arena bar share one pending rule; a double tap on the chip within 300 ms never opens the live menu.
+- The cold start waits at most 1 s for the stored choice; deleting the account forgets it.
+- The randomized test models committed-after-kill writes, lost answers, location refusals, server-ended sessions, web go-lives and the own-row check, and runs a random seed base plus the 777,000 regression range.
+
+**Fixed (review round 5)**
+- The own-row check follows a session started elsewhere at most once per server session, and only when it can without asking (valid tag, permission granted, or the flag off); otherwise, or after a failed attempt, that session is declined until the server reads offline or the athlete chooses again (no 30 s retry loop, at most one toast).
+- Sign-out waits for both its immediate `false` and the serialized clear (inside the 4 s bound).
+- The header chip and the Arena bar read live and pending from one store snapshot (`useLiveSurface`).
+
+**Fixed (review round 6)**
+- A go-live write whose earlier attempt had no answer (it may have committed) and whose retry was refused for location now still counts as possibly live, so the offline after it writes `false`.
+- An explicit OFFLINE on the phone while it declines a session started elsewhere writes `false` and does not make the phone follow it; only a server offline read or an explicit LIVE ends the decline.
+- The chip reads its overlay from the same snapshot as the Arena bar, so restores and follows draw FINDING YOU and LIVE pending together.
+- The randomized test tracks where each server `true` came from, and runs a second regression range (31,337,000).
+
 ### Match video OTA wave 2: reserve before bytes, preflight, recording intent, live angles, primary angle (jits-n2im.11, .5 preflight, .14, .12, .15)
 
 JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): no native dependency, no `app.json` / `app.config.js` / `eas.json` / metro / babel change, and no native API beyond what build 25 already links (tus over the existing `expo-file-system/legacy` reader, supabase-js realtime over the existing WebSocket). **Needs the jr_be wave A migrations `20261005100000` to `20261005100700` (live in prod, 2026-10-05).** Contract: jr_be `specs/013-chunked-video-pipeline/INTEGRATION.md` section 10.

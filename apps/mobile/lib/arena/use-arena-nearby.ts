@@ -27,6 +27,7 @@ import {
 } from "@jits/shared/api/location";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "@/lib/invites/location";
+import { getDeviceLocationOwner, recordAcceptedReading } from "@/lib/location/device-location-store";
 import { markMatchLocationRequired } from "./match-location-flag";
 
 /** How often the nearby lists are re-read while the Arena is focused. */
@@ -65,12 +66,16 @@ async function reportBrowseReading(): Promise<void> {
   if (Date.now() - lastBrowseAt < BROWSE_MIN_INTERVAL_MS) return;
   if (!(await permissionGranted())) return;
   lastBrowseAt = Date.now();
+  // Stored only for the athlete the request was made for (N2).
+  const athleteId = getDeviceLocationOwner();
   const loc = await readLocationOnce({ ask: false });
   if (loc.status !== "ok") return;
   const res = await reportBrowsePresence(supabase, loc.reading);
   // A refusal (accuracy, rate limit, implausible jump) leaves no fresh
   // reading: the nearby read then says `no_location`, which is today's list.
   if (!res.ok) console.warn("[location] browse reading failed:", res.error.hint, res.error.message);
+  // Accepted: the athlete's last location on the device (instant go-live 4.1).
+  else recordAcceptedReading("browse", loc.reading, loc.capturedAt ?? Date.now(), res.data, athleteId);
 }
 
 export interface UseArenaNearbyInput {

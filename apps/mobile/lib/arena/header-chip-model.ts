@@ -6,7 +6,13 @@
  * finds the Arena toggle by those): every chip label starts with
  * `Live status:` (AC-H13).
  */
-import type { LiveSwitchDirection, LiveSwitchPhase } from "./arena-store";
+import {
+  displayDrawsLive,
+  liveSwitchPending,
+  type GoLiveDisplay,
+  type LiveSwitchDirection,
+  type LiveSwitchPhase,
+} from "./arena-store";
 import { freshRemainingMs } from "./incoming-challenges";
 import { formatCountdown, spokenCountdown } from "./fresh-countdown";
 import { formatBadgeCount } from "@/lib/navigation/tab-badge";
@@ -65,6 +71,7 @@ export const LIVE_DOT_PX = 6;
 export type ChipKind =
   | "offline"
   | "going-live"
+  | "finding-you"
   | "live"
   | "waiting"
   | "incoming"
@@ -116,10 +123,23 @@ export interface ChipModel {
   /** The athlete is live (the harness reads this as the chip's value). */
   live: boolean;
   accessibilityLabel: string;
+  /** Said after the label (offline after a location failure: "Location needed to go live"). */
+  accessibilityHint?: string;
 }
+
+/** The FINDING YOU chip's spoken label (UX 019, 4). */
+export const FINDING_YOU_LABEL = `${CHIP_LABEL_PREFIX} finding your location`;
+/** The offline chip's hint after an attempt ended for location (UX 019, 2.2). */
+export const NEEDS_LOCATION_HINT = "Location needed to go live";
 
 export interface ChipInput {
   isLive: boolean;
+  /**
+   * Live as drawn, from the store's one snapshot (`useLiveSurface`). When
+   * given it is used as is, so the chip and the Arena bar can never read
+   * different frames (round 5). Otherwise derived from the other inputs.
+   */
+  drawnLive?: boolean;
   phase: LiveSwitchPhase;
   direction: LiveSwitchDirection | null;
   reconnecting: boolean;
@@ -151,6 +171,21 @@ export interface ChipInput {
    * label does not say "Open Arena".
    */
   onArena?: boolean;
+  /**
+   * What a go-live in progress draws (instant go-live, UX 019): `hold`
+   * (no pending yet), `optimistic` / `restore-live` (drawn live), GOING
+   * LIVE, FINDING YOU, RECONNECTING, OFFLINE · RETRY. Null: `isLive` as is.
+   */
+  display?: GoLiveDisplay | null;
+  /** The last attempt ended for location: the offline chip says why to VoiceOver. */
+  needsLocation?: boolean;
+  /** Kept for callers; an offline choice is always possible now (review round 3). */
+  cancellable?: boolean;
+  /**
+   * The athlete's last choice (review round 3): a decided offline choice is
+   * drawn offline at once, whatever the server still says or is doing.
+   */
+  intent?: { decided: boolean; live: boolean } | null;
   now: number;
 }
 
@@ -177,6 +212,9 @@ function remaining(
   return ms > 0 ? ms : false;
 }
 
+/** The pending rule lives with the store (one snapshot for chip and bar); re-exported here. */
+export { liveSwitchPending } from "./arena-store";
+
 /**
  * The chip, as a pure function of the stores (spec 4.3). Precedence, highest
  * first: several incoming or one tucked away, then waiting on my outgoing
@@ -184,11 +222,18 @@ function remaining(
  * appended to base states only and never changes them.
  */
 export function describeHeaderChip(input: ChipInput): ChipModel {
-  const { isLive, phase, now } = input;
+  const { phase, now } = input;
+  const display = input.display ?? null;
+  const intendedOffline = !!input.intent && input.intent.decided && !input.intent.live;
+  // Live as the athlete sees it: their offline choice first; else the
+  // committed flag, or an optimistic / restore overlay.
+  const isLive =
+    input.drawnLive !== undefined ? input.drawnLive : intendedOffline ? false : displayDrawsLive(display, input.isLive);
   const saving = phase === "saving";
-  // A go-live tap needs the switch ready AND an owner to run it: with no
-  // controller registered the guarded call is a silent no-op.
-  const canGoLive = phase === "ready" && input.controllerReady;
+  // A choice only needs an owner to run it (with no controller registered
+  // the call is a silent no-op). Nothing in flight ever locks the opposite
+  // choice: it is recorded at once and the server follows (review round 3).
+  const canGoLive = input.controllerReady;
 
   // Someone wants you.
   if (input.incoming && input.incomingCount >= 2) {
@@ -269,7 +314,85 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
     live: isLive,
   });
 
-  if (!isLive && saving && input.direction === "going-live") {
+  // The last choice is offline: drawn offline now, the way back one tap away.
+  if (intendedOffline) {
+    const n = input.onMat;
+    if (display === "retry" || input.lastLiveWriteFailed) {
+      return base({
+        kind: "retry",
+        tone: "neutral",
+        glyph: "○",
+        lead: "OFFLINE · RETRY",
+        action: "go-live",
+        disabled: !canGoLive,
+        accessibilityLabel: `${CHIP_LABEL_PREFIX} going live failed. Retry going live`,
+      });
+    }
+    return base({
+      kind: "offline",
+      tone: "neutral",
+      glyph: "○",
+      lead: n === null ? "GO LIVE" : `GO LIVE · ${formatBadgeCount(n)}`,
+      action: "go-live",
+      disabled: !canGoLive,
+      accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Go live`,
+      ...(input.needsLocation ? { accessibilityHint: NEEDS_LOCATION_HINT } : {}),
+    });
+  }
+
+  // A go-live in progress (instant go-live display overlay, UX 019).
+  if ((display === "hold" || display === "leaving") && !isLive) {
+    // The first 240 ms after the tap: nothing pending yet, and no taps.
+    const n = input.onMat;
+    return base({
+      kind: "offline",
+      tone: "neutral",
+      glyph: "○",
+      lead: n === null ? "GO LIVE" : `GO LIVE · ${formatBadgeCount(n)}`,
+      action: "none",
+      disabled: true,
+      accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Go live`,
+    });
+  }
+  if ((display === "finding-you" || display === "restore-finding") && !isLive) {
+    return base({
+      kind: "finding-you",
+      tone: "neutral",
+      glyph: "◌",
+      lead: "FINDING YOU",
+      action: "none",
+      disabled: true,
+      // No accessibilityValue (see `chipAccessibilityValue`).
+      accessibilityLabel: FINDING_YOU_LABEL,
+    });
+  }
+  if (display === "recovering" && !isLive) {
+    return base({
+      kind: "reconnecting",
+      tone: "neutral",
+      glyph: "◌",
+      lead: "RECONNECTING",
+      action: "popover",
+      // The live menu's Go offline is always there (QA 4, appendix B2).
+      disabled: !input.controllerReady,
+      accessibilityLabel: `${CHIP_LABEL_PREFIX} reconnecting. Open live menu`,
+    });
+  }
+  if (display === "retry" && !isLive) {
+    return base({
+      kind: "retry",
+      tone: "neutral",
+      glyph: "○",
+      lead: "OFFLINE · RETRY",
+      action: "go-live",
+      disabled: !canGoLive,
+      accessibilityLabel: `${CHIP_LABEL_PREFIX} going live failed. Retry going live`,
+    });
+  }
+  if (
+    (display === "going-live" || display === null) &&
+    liveSwitchPending({ intent: input.intent, display, drawnLive: isLive, phase, direction: input.direction })
+  ) {
     return base({
       kind: "going-live",
       tone: "neutral",
@@ -281,14 +404,16 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
       accessibilityLabel: `${CHIP_LABEL_PREFIX} going live`,
     });
   }
-  if (isLive && input.reconnecting) {
+  // Never over a restore drawn live: the lobby rejoining after a foreground
+  // return is part of the restore, not a reconnect (UX defect 2).
+  if (isLive && input.reconnecting && display !== "restore-live" && display !== "optimistic") {
     return base({
       kind: "reconnecting",
       tone: "neutral",
       glyph: "◌",
       lead: "RECONNECTING",
       action: "popover",
-      disabled: saving,
+      disabled: !input.controllerReady,
       accessibilityLabel: `${CHIP_LABEL_PREFIX} reconnecting. Open live menu`,
     });
   }
@@ -299,9 +424,9 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
       tone: "live",
       glyph: "●",
       lead: n === null ? "LIVE" : n === 0 ? "LIVE · JUST YOU" : `LIVE · ${formatBadgeCount(n)}`,
+      // The live menu (and its Go offline) is always one tap away.
       action: "popover",
-      // A go-offline in flight keeps the live styling but takes no taps.
-      disabled: saving,
+      disabled: !input.controllerReady,
       accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Open live menu`,
     });
   }
@@ -327,6 +452,7 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
     action: "go-live",
     disabled: !canGoLive,
     accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Go live`,
+    ...(input.needsLocation ? { accessibilityHint: NEEDS_LOCATION_HINT } : {}),
   });
 }
 
@@ -335,7 +461,7 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
  * reads it). GOING LIVE has none: "going live, offline" would contradict.
  */
 export function chipAccessibilityValue(m: ChipModel): { text: string } | undefined {
-  if (m.kind === "going-live") return undefined;
+  if (m.kind === "going-live" || m.kind === "finding-you") return undefined;
   return { text: m.live ? "live" : "offline" };
 }
 

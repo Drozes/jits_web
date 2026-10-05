@@ -52,6 +52,10 @@ import {
   useArenaState,
   publishNearbyOnMatCount,
   useIsInArenaMatch,
+  useCanGoLive,
+  useCanGoOffline,
+  useGoLiveDisplay,
+  useLiveSurface,
   useLiveSwitchDirection,
   useLiveSwitchPhase,
 } from "@/lib/arena/arena-store";
@@ -72,7 +76,8 @@ import { OnAirStrip } from "@/components/arena/on-air-strip";
 import { useFirstLoadEntering } from "@/lib/motion";
 import { CapPlate, RosterErrorPlate } from "@/components/arena/arena-plates";
 import { Button } from "@/components/ui/elo-system/button";
-import { toast } from "@/components/ui/toast";
+import { toast, useToastBelowScreenBar } from "@/components/ui/toast";
+import { MAT_CONTROL_BAR_HEIGHT } from "@/components/arena/mat-board";
 import { BookedStrip } from "@/components/invite/booked-strip";
 import { sortFriendsFirst } from "@jits/shared/api/friends";
 import { useFriendIds } from "@/lib/invites/use-friend-ids";
@@ -109,12 +114,27 @@ export default function ArenaScreen() {
     capReached,
   } = useArenaState();
   const { sendChallenge, cancelOutgoing, clearCap } = arenaActions;
-  // The switch guard (saving + cooldown): show it disabled, not dead.
+  // A transition in flight (for Challenge only): a live choice itself is
+  // never locked (review round 3).
   const switchPhase = useLiveSwitchPhase();
-  const switchLocked = switchPhase !== "ready";
   // Any live transition in flight, from any surface: no Challenge meanwhile.
   const liveSaving = switchPhase === "saving";
-  const goingLive = useLiveSwitchDirection() === "going-live";
+  const switchDirection = useLiveSwitchDirection();
+  const goingLive = switchDirection === "going-live";
+  // What the live surfaces draw while a go-live resolves (UX 019): green on
+  // the tap with a valid tag, nothing pending for the first 240 ms.
+  const liveDisplay = useGoLiveDisplay();
+  // Live and pending from ONE store snapshot, shared with the header chip
+  // (round 5): the bar and the chip never read different frames.
+  const surface = useLiveSurface();
+  const displayLive = surface.drawnLive;
+  // Both choices are always open with an owner mounted (review round 3).
+  const canGoLive = useCanGoLive();
+  const canGoOffline = useCanGoOffline();
+  const switchLocked = !canGoLive;
+  // The athlete chose live and it is on its way (QA 4): LIVE shows pending,
+  // OFFLINE stays selectable.
+  const livePending = surface.pending;
   const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {
@@ -133,6 +153,8 @@ export default function ArenaScreen() {
   const rosterIds = React.useMemo(() => competitors.map((c) => c.id), [competitors]);
   // Unfocused (another tab or a pushed profile), read nothing; catch up on return.
   const isFocused = useIsFocused();
+  // Toasts sit below the sticky control bar here, never over OFFLINE / LIVE (QA C).
+  useToastBelowScreenBar(isFocused, MAT_CONTROL_BAR_HEIGHT);
   useRosterLobbySync({
     rosterIds,
     lobbyIds,
@@ -300,10 +322,12 @@ export default function ArenaScreen() {
 
       {/* Outside the scroll view, so it stays put (sticky, AC-A1). */}
       <MatControlBar
-        isLive={isLive}
-        locked={switchLocked}
+        isLive={displayLive}
+        locked={!canGoLive}
+        offlineLocked={!canGoOffline}
         saving={isSaving || liveSaving}
-        goingLive={goingLive}
+        goingLive={goingLive && liveDisplay !== "hold"}
+        pending={livePending}
         counts={formatMatCounts(onMat, inBand)}
         onGoLive={goLive}
         onGoOffline={() => void goOfflineWithFeedback()}
@@ -320,7 +344,7 @@ export default function ArenaScreen() {
         }
       >
         {/* While live: ON AIR tally and the heartbeat on the tempo clock. */}
-        <OnAirStrip isLive={isLive} />
+        <OnAirStrip isLive={displayLive} />
 
         {strip.challenge === "incoming" && incoming ? (
           <IncomingStrip
