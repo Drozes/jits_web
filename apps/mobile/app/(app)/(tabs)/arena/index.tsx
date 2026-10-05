@@ -52,6 +52,8 @@ import {
   useArenaState,
   publishNearbyOnMatCount,
   useIsInArenaMatch,
+  useCanGoLive,
+  useCanGoOffline,
   useGoLiveDisplay,
   useIsArenaDisplayLive,
   useLiveSwitchDirection,
@@ -74,7 +76,8 @@ import { OnAirStrip } from "@/components/arena/on-air-strip";
 import { useFirstLoadEntering } from "@/lib/motion";
 import { CapPlate, RosterErrorPlate } from "@/components/arena/arena-plates";
 import { Button } from "@/components/ui/elo-system/button";
-import { toast } from "@/components/ui/toast";
+import { toast, useToastBelowScreenBar } from "@/components/ui/toast";
+import { MAT_CONTROL_BAR_HEIGHT } from "@/components/arena/mat-board";
 import { BookedStrip } from "@/components/invite/booked-strip";
 import { sortFriendsFirst } from "@jits/shared/api/friends";
 import { useFriendIds } from "@/lib/invites/use-friend-ids";
@@ -121,6 +124,10 @@ export default function ArenaScreen() {
   // the tap with a valid tag, nothing pending for the first 240 ms.
   const liveDisplay = useGoLiveDisplay();
   const displayLive = useIsArenaDisplayLive();
+  // Per segment (QA A, D): LIVE is queued during the cooldown; OFFLINE also
+  // cancels a go-live in flight.
+  const canGoLive = useCanGoLive();
+  const canGoOffline = useCanGoOffline();
   const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {
@@ -139,6 +146,8 @@ export default function ArenaScreen() {
   const rosterIds = React.useMemo(() => competitors.map((c) => c.id), [competitors]);
   // Unfocused (another tab or a pushed profile), read nothing; catch up on return.
   const isFocused = useIsFocused();
+  // Toasts sit below the sticky control bar here, never over OFFLINE / LIVE (QA C).
+  useToastBelowScreenBar(isFocused, MAT_CONTROL_BAR_HEIGHT);
   useRosterLobbySync({
     rosterIds,
     lobbyIds,
@@ -307,7 +316,8 @@ export default function ArenaScreen() {
       {/* Outside the scroll view, so it stays put (sticky, AC-A1). */}
       <MatControlBar
         isLive={displayLive}
-        locked={switchLocked}
+        locked={!canGoLive}
+        offlineLocked={!canGoOffline}
         saving={isSaving || liveSaving}
         goingLive={goingLive && liveDisplay !== "hold"}
         pending={

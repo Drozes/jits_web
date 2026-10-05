@@ -167,6 +167,11 @@ export interface ChipInput {
   display?: GoLiveDisplay | null;
   /** The last attempt ended for location: the offline chip says why to VoiceOver. */
   needsLocation?: boolean;
+  /**
+   * A go-live in flight can be cancelled by a go-offline (QA A): the
+   * optimistic LIVE chip and RECONNECTING open the live menu meanwhile.
+   */
+  cancellable?: boolean;
   now: number;
 }
 
@@ -206,9 +211,11 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
   // restore overlay (a valid tag is in hand and the write is in flight).
   const isLive = displayDrawsLive(display, input.isLive);
   const saving = phase === "saving";
-  // A go-live tap needs the switch ready AND an owner to run it: with no
-  // controller registered the guarded call is a silent no-op.
-  const canGoLive = phase === "ready" && input.controllerReady;
+  // A go-live tap needs an owner to run it (with no controller registered
+  // the call is a silent no-op) and no transition in flight. During the
+  // cooldown the tap is queued, last choice wins (QA D).
+  const canGoLive = phase !== "saving" && input.controllerReady;
+  const cancellable = input.cancellable === true;
 
   // Someone wants you.
   if (input.incoming && input.incomingCount >= 2) {
@@ -290,7 +297,7 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
   });
 
   // A go-live in progress (instant go-live display overlay, UX 019).
-  if (display === "hold" && !isLive) {
+  if ((display === "hold" || display === "leaving") && !isLive) {
     // The first 240 ms after the tap: nothing pending yet, and no taps.
     const n = input.onMat;
     return base({
@@ -322,8 +329,8 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
       glyph: "◌",
       lead: "RECONNECTING",
       action: "popover",
-      // The write is still being retried: no live menu until it settles.
-      disabled: true,
+      // The live menu's Go offline cancels the go-live in flight (QA A).
+      disabled: !cancellable,
       accessibilityLabel: `${CHIP_LABEL_PREFIX} reconnecting. Open live menu`,
     });
   }
@@ -374,8 +381,10 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
       glyph: "●",
       lead: n === null ? "LIVE" : n === 0 ? "LIVE · JUST YOU" : `LIVE · ${formatBadgeCount(n)}`,
       action: "popover",
-      // A go-offline in flight keeps the live styling but takes no taps.
-      disabled: saving,
+      // A go-offline in flight keeps the live styling but takes no taps; a
+      // go-live in flight (drawn live) opens the menu, whose Go offline
+      // cancels it (QA A).
+      disabled: saving && !cancellable,
       accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Open live menu`,
     });
   }

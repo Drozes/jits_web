@@ -53,6 +53,10 @@ jest.mock("@/lib/location/device-location-store", () => ({
   clearAllDeviceLocations: () => mockClearLocations(),
   loadDeviceLocation: (id: string) => mockLoadLocation(id),
 }));
+const mockReadPermission = jest.fn(() => Promise.resolve({ granted: true, canAskAgain: true }));
+jest.mock("@/lib/location/permission-cache", () => ({
+  readLocationPermission: () => mockReadPermission(),
+}));
 const mockResetLocationFlags = jest.fn();
 jest.mock("@/lib/arena/location-flags", () => ({
   resetLocationFlags: () => mockResetLocationFlags(),
@@ -272,6 +276,8 @@ describe("cold-start athlete load", () => {
     render(<App />);
     await flush();
     expect(mockLoadLocation).toHaveBeenCalledWith(ACTIVE.id);
+    // And the permission (read, never asked), for the same first frame (QA E).
+    expect(mockReadPermission).toHaveBeenCalled();
   });
 
   it("clears the downloaded-highlight share cache on sign-out, even when it rejects", async () => {

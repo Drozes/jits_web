@@ -37,6 +37,17 @@ Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) an
 - Drift logs `retagged` only once the server took the new tag; the challenger's fallback start retries with a reading like the accepter.
 - Dev-only QA hooks (`apps/mobile/lib/arena/dev-go-live-hooks.ts`, dev menu "Go live: ..." items and `__goLiveDev`), inert in production; documented in `research/019-optimistic-go-live-ux.md` appendix A.
 
+**Fixed (review round 2)**
+- Restores are single-flight; a run owns its switch lock (`beginRestoreRun`), and a parked run that finds the app back in front carries on once.
+- Go offline during a go-live in flight (optimistic chip, RECONNECTING, a restore drawn live, the Arena OFFLINE segment) cancels it quietly; the server always ends offline.
+- A tapped go-live abandoned by the background ends quietly (GO LIVE, no toast, logged dismissed) and is never resumed.
+- Taps during the 2 s cooldown are queued (last choice wins) with immediate feedback.
+- OFFLINE · RETRY shows at 15 s while a write is still in flight; a late success still lands LIVE; the failure toast only follows an actual failure.
+- A restore's first frame is FINDING YOU when the store is read, there is no tag and permission is believed granted (permission read at athlete load, `lib/location/permission-cache.ts`); LIVE at once on a cold start with the flag known off.
+- On the Arena, toasts sit below the control bar (`useToastBelowScreenBar`).
+- The drift prompt's Go offline goes through the same path and is logged only when it happened.
+- UX spec appendix B records the settled behaviour.
+
 ### Live location fixes: Allow Once rejoin, GOING LIVE feedback, Precise Location copy, platform header, attempt logging (jits-3i0n.1 to .6)
 
 Built to jr_be `specs/016-invites/addendum-live-location-fixes.md` section 4. JS-only on mobile (OTA-eligible: no native dependency, no `app.json` / `app.config.js` change; `expo-location`, `expo-application` and `expo-updates` are already in build 25). Item 3b (the Swift accuracy module and `NSLocationTemporaryUsageDescriptionDictionary`) is NOT in this slice and needs a TestFlight build.

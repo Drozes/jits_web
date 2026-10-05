@@ -72,7 +72,8 @@ describe.each([
 
   it("says so when the action rejects, and never rejects itself", async () => {
     action.mockRejectedValue(new Error("network"));
-    await expect(run()).resolves.toBeUndefined();
+    // Never rejects: resolves (nothing for go-live, false for go-offline).
+    await expect(run()).resolves.toBeFalsy();
     expectNeutralFailure(message);
   });
 });

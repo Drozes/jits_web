@@ -52,6 +52,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 import { CLEAR_RETRY_MS, useArenaLive, type UseArenaLiveArgs } from "@/lib/arena/use-arena-live";
 import { GO_OFFLINE_FAILED_MESSAGE } from "@/lib/arena/constants";
+import { __resetArenaStoreForTests, liveSwitch, registerArenaController } from "@/lib/arena/arena-store";
 
 // ---- fixtures ----
 
@@ -104,6 +105,7 @@ function setAppState(state: AppStateStatus) {
 }
 
 beforeEach(() => {
+  __resetArenaStoreForTests();
   setAppState("active");
   mockCalls.length = 0;
   jest.clearAllMocks();
@@ -1791,6 +1793,11 @@ describe("autoLive (instant go-live restores): runAutoLive and canWrite", () => 
       expect(calls).toHaveLength(1);
       expect(calls[0].ctx.reason).toBe("arrival");
       await act(async () => {
+        // Parked means the app went away mid-restore.
+        if (outcome === "parked") {
+          setAppState("background");
+          appStateHandler?.("background");
+        }
         calls[0].answer.resolve(outcome);
         await flush();
       });
@@ -1830,5 +1837,154 @@ describe("autoLive (instant go-live restores): runAutoLive and canWrite", () => 
     });
     expect(mockToggleMatchPreferences.mock.calls.length).toBe(writes);
     expect(result.current.isLive).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review round 2
+// ---------------------------------------------------------------------------
+
+describe("round 2: single-flight restores, cancel races, an abandoned tap", () => {
+  type Ctx = Parameters<NonNullable<UseArenaLiveArgs["autoLive"]>>[0];
+  type Outcome = "live" | "failed" | "parked" | "cancelled";
+
+  function controlledAutoLive() {
+    const calls: { ctx: Ctx; answer: ReturnType<typeof deferred<Outcome>> }[] = [];
+    const autoLive = jest.fn((ctx: Ctx) => {
+      const answer = deferred<Outcome>();
+      calls.push({ ctx, answer });
+      return answer.promise;
+    });
+    return { autoLive, calls };
+  }
+
+  async function away() {
+    setAppState("background");
+    appStateHandler?.("background");
+    await flush();
+  }
+  async function back() {
+    setAppState("active");
+    appStateHandler?.("active");
+    await flush();
+  }
+
+  it("SF1: background then foreground before the restore's first canWrite starts NO second restore; the first carries on", async () => {
+    const { autoLive, calls } = controlledAutoLive();
+    const { result } = mount({ autoLive });
+    await act(async () => {
+      await result.current.goLive();
+      await away();
+      await back();
+    });
+    expect(calls).toHaveLength(1);
+    await act(async () => {
+      await away();
+      await back();
+    });
+    // Still one run: no concurrent restore.
+    expect(calls).toHaveLength(1);
+    // The running one may write now.
+    expect(calls[0].ctx.canWrite()).toBe("ok");
+    await act(async () => {
+      const ok = await calls[0].ctx.write();
+      expect(ok).toBe(true);
+      calls[0].answer.resolve("live");
+      await flush();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("SF1: a run that saw the background (parked) but finds the app back in front carries on once more", async () => {
+    const { autoLive, calls } = controlledAutoLive();
+    const { result } = mount({ autoLive });
+    await act(async () => {
+      await result.current.goLive();
+      await away();
+      await back();
+      await away();
+      await back();
+    });
+    expect(calls).toHaveLength(1);
+    await act(async () => {
+      calls[0].answer.resolve("parked");
+      await flush();
+    });
+    // Re-run once, from the run itself (the "active" handler left it to it).
+    expect(calls).toHaveLength(2);
+  });
+
+  it("QA A: offline chosen while the live write is in flight: the final write is offline", async () => {
+    const write = deferred<{ ok: true; data: undefined }>();
+    mockToggleMatchPreferences.mockReturnValueOnce(write.promise);
+    const { result } = mount();
+    let live!: Promise<boolean>;
+    act(() => {
+      live = result.current.goLive();
+    });
+    // The live write is out (in flight) before the athlete chooses offline.
+    await act(async () => {
+      await flush();
+    });
+    expect(mockToggleMatchPreferences).toHaveBeenCalledTimes(1);
+    let off!: Promise<boolean>;
+    act(() => {
+      off = result.current.goOffline();
+    });
+    await act(async () => {
+      write.resolve({ ok: true, data: undefined });
+      await live;
+      await off;
+    });
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("QA A: the write lands first, then offline: the final write is offline too", async () => {
+    const { result } = mount();
+    await act(async () => {
+      await result.current.goLive();
+    });
+    expect(result.current.isLive).toBe(true);
+    await act(async () => {
+      await result.current.goOffline();
+    });
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+    expect(result.current.isLive).toBe(false);
+  });
+
+  it("QA B: a tapped go-live abandoned by the background is not restored on return, and ends offline", async () => {
+    const { autoLive, calls } = controlledAutoLive();
+    const write = deferred<{ ok: true; data: undefined }>();
+    mockToggleMatchPreferences.mockReturnValueOnce(write.promise);
+    const { result } = mount({ autoLive });
+    // The athlete's own tapped go-live, through the guard, write in flight.
+    registerArenaController({
+      toggle: jest.fn(),
+      goOffline: () => result.current.goOffline(),
+      goLive: () => result.current.goLive(),
+      sendChallenge: jest.fn(),
+      cancelOutgoing: jest.fn(),
+      clearCap: jest.fn(),
+      tuckIncoming: jest.fn(),
+      reopenIncoming: jest.fn(),
+    });
+    let tap!: Promise<unknown>;
+    act(() => {
+      tap = liveSwitch.goLive();
+    });
+    await act(async () => {
+      await flush();
+      await away();
+      // The write lands while the app is away.
+      write.resolve({ ok: true, data: undefined });
+      await tap;
+      await flush();
+      await back();
+    });
+    // Not restored on return (spec 2.2: pending flows are cancelled).
+    expect(calls).toHaveLength(0);
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
   });
 });

@@ -53,15 +53,17 @@ export { GO_OFFLINE_FAILED_MESSAGE };
  * challenge tucked into the chip without declining it, decision Q3), with
  * the same reporting as `goLiveWithFeedback`.
  */
-export function goOfflineWithFeedback(): Promise<void> {
+export function goOfflineWithFeedback(): Promise<boolean | "ignored"> {
   return arenaActions.goOffline().then(
     (r) => {
       // The app is offline either way (a failed clear retries by itself).
       if (r !== "ignored") announce(ANNOUNCE_OFFLINE);
       if (r === false) toast.info(GO_OFFLINE_FAILED_MESSAGE);
+      return r;
     },
     () => {
       toast.info(GO_OFFLINE_FAILED_MESSAGE);
+      return false;
     },
   );
 }

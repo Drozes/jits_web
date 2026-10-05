@@ -94,8 +94,10 @@ export async function answerDriftPrompt(choice: "update" | "offline" | "dismiss"
   }
   if (choice === "offline") {
     setPrompt(null);
-    logDriftPrompt("went_offline");
-    await goOfflineWithFeedback();
+    // The same path as every go-offline (it works while a go-live is in
+    // flight, or queued in the cooldown); logged only if it went ahead.
+    const r = await goOfflineWithFeedback();
+    if (r !== "ignored") logDriftPrompt("went_offline");
     return;
   }
   setPrompt({ ...current, busy: true });

@@ -87,7 +87,8 @@ import {
   scheduleGoLiveReveal,
   setGoLiveDisplay,
   setNeedsLocation,
-  setRestoreInFlight,
+  beginRestoreRun,
+  registerGoLiveCanceller,
   type LiveSwitchIgnored,
 } from "./arena-store";
 import { ANNOUNCE_FINDING, ANNOUNCE_LIVE, ANNOUNCE_RECONNECTING, announce } from "./go-live-announce";
@@ -97,7 +98,9 @@ import {
   showRestoreFailedToast,
 } from "./go-live-feedback";
 import {
+  abortActiveGoLiveFlow,
   beginFlow,
+  cancelLocationSheet,
   closeGoLiveSheet,
   endFlow,
   ensureGoLiveLocation,
@@ -190,13 +193,32 @@ class Attempt {
   private announcedFinding = false;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
+  /** The athlete chose offline while this attempt was in flight (QA A). */
+  cancelled = false;
+
   constructor(
     readonly tapped: boolean,
     readonly flow: GoLiveFlow | null,
   ) {}
 
+  /** Backgrounded (a tapped flow) or cancelled by a go-offline. */
   aborted(): boolean {
-    return this.flow?.aborted ?? false;
+    return this.cancelled || (this.flow?.aborted ?? false);
+  }
+
+  /**
+   * The recovery window ran out while a write is still in flight: a tapped
+   * attempt draws OFFLINE · RETRY now (spec 3g, 15 s), but keeps waiting on
+   * the write. A late success still lands LIVE (the store clears `retry`
+   * when live lands); a failure is only said once the write actually failed.
+   */
+  windowEnded(): void {
+    if (!this.tapped || this.aborted()) return;
+    const d = getGoLiveDisplay();
+    if (d === "optimistic" || d === "recovering" || d === "going-live" || d === "finding-you" || d === "hold") {
+      this.green = false;
+      setGoLiveDisplay("retry");
+    }
   }
 
   timeLeft(): number {
@@ -316,8 +338,20 @@ async function writeLive(a: Attempt, w: LiveWriter, canWrite?: () => "ok" | "par
       if (c !== "ok") return c;
     }
     // Never raced against the window: the write in flight is always awaited
-    // and its answer is final (a late success is a success, B1).
-    const r = await withDevFault("write", () => w.write().catch(() => false), false);
+    // and its answer is final (a late success is a success, B1). At the
+    // window's end the chip says OFFLINE · RETRY meanwhile (spec 3g).
+    const windowTimer = setTimeout(() => a.windowEnded(), Math.max(0, a.timeLeft()));
+    let r: boolean;
+    try {
+      r = await withDevFault("write", () => w.write().catch(() => false), false);
+    } finally {
+      clearTimeout(windowTimer);
+    }
+    // The athlete chose offline (or backgrounded a tapped flow) while the
+    // write was in flight: this attempt is over, whatever it answered. The
+    // clear is serialized behind the write, so the server ends offline.
+    if (a.aborted()) return "aborted";
+    if (r && canWrite && canWrite() === "cancelled") return "cancelled";
     if (r) return "ok";
     if (w.lastRefusal() === "location_required") return "refused";
     if (a.timeLeft() <= 0) return "network";
@@ -356,6 +390,8 @@ async function reportTag(
       () => reportGoLivePresence(supabase, reading, { capturedAt: sendCapturedAt }),
       { ok: false as const, error: { hint: "unknown", message: "network" } },
     );
+    // Cancelled or backgrounded meanwhile (QA A, B): stop here, quietly.
+    if (a.aborted()) return { kind: "aborted" };
     if (!res.ok) {
       // The older backend has no `p_captured_at`: never resend without it
       // (it would store a replayed location as fresh). Fresh reading instead.
@@ -491,10 +527,21 @@ export async function goLiveFromTap(w: LiveWriter): Promise<boolean | LiveSwitch
   if (getPresenceCapability() === "legacy") {
     // The backend predates the ladder: the old flow, a fresh reading first.
     scheduleGoLiveReveal("finding-you", Date.now() + PENDING_REVEAL_MS);
-    return goLiveWithLocation(w.write, w.lastRefusal);
+    const unregister = registerGoLiveCanceller(() => abortActiveGoLiveFlow());
+    try {
+      return await goLiveWithLocation(w.write, w.lastRefusal);
+    } finally {
+      unregister();
+    }
   }
   const flow = beginFlow();
   const a = new Attempt(true, flow);
+  // A go-offline while this attempt is in flight cancels it quietly (QA A).
+  const unregisterCancel = registerGoLiveCanceller(() => {
+    a.cancelled = true;
+    flow.abort();
+    cancelLocationSheet("go_live");
+  });
   let attempt: LocationEventOutcome = "error";
   let source: GoLiveTagSource | null = null;
   let reading: LocationReading | null = null;
@@ -606,9 +653,16 @@ export async function goLiveFromTap(w: LiveWriter): Promise<boolean | LiveSwitch
       });
       reading = ready.reading ?? reading;
       if (ready.reading) freshReading = true;
+      // A sheet the athlete answered keeps its own reason.
+      if (ready.outcome === "declined") {
+        attempt = ready.attempt;
+        return "ignored";
+      }
+      // Backgrounded or cancelled while the fix or its report ran (QA B):
+      // the attempt ends quietly, never OFFLINE · RETRY or a toast later.
+      if (a.aborted()) return dismissed();
       if (ready.outcome !== "ready") {
         attempt = ready.attempt;
-        if (ready.outcome === "declined") return "ignored";
         setGoLiveDisplay("retry");
         return false;
       }
@@ -632,8 +686,12 @@ export async function goLiveFromTap(w: LiveWriter): Promise<boolean | LiveSwitch
     closeGoLiveSheet();
     return false;
   } finally {
+    unregisterCancel();
     a.dispose();
     endFlow(flow);
+    // Cancelled by the athlete's go-offline: logged as dismissed (a sheet's
+    // own reason, decided before a later background, is kept).
+    if (a.cancelled && attempt !== "ok") attempt = "dismissed";
     if (attempt !== "ok") {
       // Ended for location (denied, or the explain closed without
       // permission): the offline chip tells VoiceOver why.
@@ -699,8 +757,16 @@ async function boundedFlagRead(hint: boolean): Promise<boolean> {
 export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutcome> {
   const hint = w.locationRequiredHint ?? true;
   setGoLiveDisplay(restoreFirstFrame(w.athleteId, hint));
-  setRestoreInFlight(true);
+  // Owned by this run (SF1): another run ending never unlocks the switch.
+  const endRun = beginRestoreRun();
   const a = new Attempt(false, null);
+  // A go-offline while this restore runs cancels it quietly (QA A).
+  const unregisterCancel = registerGoLiveCanceller(() => {
+    a.cancelled = true;
+  });
+  const outerCanWrite = w.canWrite;
+  const canWrite = (): "ok" | "parked" | "cancelled" => (a.cancelled ? "cancelled" : outerCanWrite());
+  w = { ...w, canWrite };
   let outcome: RestoreOutcome = "failed";
   const active = () => AppState.currentState === "active";
   const fail = (toast: () => void): RestoreOutcome => {
@@ -710,7 +776,8 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
   const fromWrite = (r: WriteResult): RestoreOutcome | null => {
     if (r === "ok") return "live";
     if (r === "parked" || r === "cancelled") return r;
-    if (r === "network" || r === "aborted") return fail(showRestoreFailedToast);
+    if (r === "aborted") return "cancelled";
+    if (r === "network") return fail(showRestoreFailedToast);
     return null;
   };
   try {
@@ -753,7 +820,8 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
     const stopped = (r: ReplayResult): RestoreOutcome | null => {
       if (r.kind === "live") return "live";
       if (r.kind === "parked" || r.kind === "cancelled") return r.kind;
-      if (r.kind === "network" || r.kind === "aborted") return fail(showRestoreFailedToast);
+      if (r.kind === "aborted") return "cancelled";
+      if (r.kind === "network") return fail(showRestoreFailedToast);
       return null;
     };
 
@@ -798,6 +866,7 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
       skipLastKnown: osLooked,
       reporter: freshReporter(a, w.athleteId),
     });
+    if (a.cancelled) return (outcome = "cancelled");
     if (fresh.kind === "ok") {
       outcome = fromWrite(await writeLive(a, w, w.canWrite)) ?? fail(showRestoreFailedToast);
       return outcome;
@@ -810,7 +879,8 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
     return (outcome = fail(showLocationFixFailedGoLiveCta));
   } finally {
     a.dispose();
-    setRestoreInFlight(false);
+    unregisterCancel();
+    endRun();
     if (outcome === "live") {
       setNeedsLocation(false);
       // Kept until the store says live, so no GO LIVE frame slips between.

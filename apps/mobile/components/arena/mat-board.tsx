@@ -139,10 +139,18 @@ export function MatSectionLabel({ label, right }: { label: string; right?: strin
 // Control bar
 // ---------------------------------------------------------------------------
 
+/** The control bar's drawn height (`h-14`: 3.5 rem at the 14 px native rem). */
+export const MAT_CONTROL_BAR_HEIGHT = 49;
+
 interface ControlBarProps {
   isLive: boolean;
-  /** The live switch guard: saving or cooling down. Both segments disable. */
+  /** The LIVE segment cannot be chosen now (a transition in flight). */
   locked: boolean;
+  /**
+   * The OFFLINE segment cannot be chosen now. Defaults to `locked`; it stays
+   * open while a go-live in flight can be cancelled (QA A).
+   */
+  offlineLocked?: boolean;
   /** A transition is in flight (announced as busy). */
   saving: boolean;
   /**
@@ -174,13 +182,15 @@ export function MatControlBar({
   saving,
   goingLive = false,
   pending = false,
+  offlineLocked,
   counts,
   onGoLive,
   onGoOffline,
 }: ControlBarProps) {
   const segment = (live: boolean) => {
     const selected = isLive === live;
-    const disabled = selected || locked;
+    const segmentLocked = live ? locked : (offlineLocked ?? locked);
+    const disabled = selected || segmentLocked;
     return (
       <PressableScale
         testID={live ? "arena-segment-live" : "arena-segment-offline"}
@@ -196,7 +206,7 @@ export function MatControlBar({
           "h-8 flex-row items-center gap-1.5 px-3",
           selected ? "bg-surface-4" : "active:bg-surface-3",
         )}
-        style={!selected && locked ? { opacity: 0.6 } : undefined}
+        style={!selected && segmentLocked ? { opacity: 0.6 } : undefined}
       >
         {live && ((saving && goingLive) || pending) && !selected ? (
           // Going live (live location fixes 4.2): the pulse from the tap

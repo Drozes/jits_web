@@ -22,9 +22,44 @@ const InsetsContext: React.Context<{ top: number } | null> =
   (SafeArea as { SafeAreaInsetsContext?: React.Context<{ top: number } | null> }).SafeAreaInsetsContext ??
   React.createContext<{ top: number } | null>(null);
 
+/**
+ * Extra room a screen asks for below the header (QA C: the Arena's sticky
+ * OFFLINE / LIVE control bar). The focused screen sets it; 0 elsewhere.
+ */
+let extraTop = 0;
+const extraListeners = new Set<() => void>();
+
+function subscribeExtra(cb: () => void): () => void {
+  extraListeners.add(cb);
+  return () => {
+    extraListeners.delete(cb);
+  };
+}
+
+function getExtra(): number {
+  return extraTop;
+}
+
+/**
+ * While `active` (the screen is focused), toasts sit `px` lower, below the
+ * screen's own sticky bar. Released on blur and unmount.
+ */
+export function useToastBelowScreenBar(active: boolean, px: number): void {
+  React.useEffect(() => {
+    if (!active) return;
+    extraTop = px;
+    for (const l of [...extraListeners]) l();
+    return () => {
+      if (extraTop === px) extraTop = 0;
+      for (const l of [...extraListeners]) l();
+    };
+  }, [active, px]);
+}
+
 export function useToastTopOffset(): number {
   const insets = React.useContext(InsetsContext);
-  return (insets?.top ?? 0) + HEADER_BAR_HEIGHT + 4;
+  const extra = React.useSyncExternalStore(subscribeExtra, getExtra, getExtra);
+  return (insets?.top ?? 0) + HEADER_BAR_HEIGHT + extra + 4;
 }
 
 /**

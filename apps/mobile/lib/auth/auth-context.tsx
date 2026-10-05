@@ -22,6 +22,7 @@ import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
 import { resetMatchLocationRequired } from "../arena/match-location-flag";
 import { resetLocationFlags } from "../arena/location-flags";
 import { clearAllDeviceLocations, loadDeviceLocation } from "../location/device-location-store";
+import { readLocationPermission } from "../location/permission-cache";
 import { cancelLocationSheet } from "../arena/go-live-location";
 
 type AuthError = { message: string };
@@ -198,7 +199,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Start reading the stored go-live tag now, before the Arena owner
         // mounts, so a cold-start restore decides its first frame from it
         // (review round 1, S1). Never awaited; a failed read is "no tag".
-        if (result.data?.id) void loadDeviceLocation(result.data.id);
+        if (result.data?.id) {
+          void loadDeviceLocation(result.data.id);
+          // And the permission (read, never asked), for the same first frame
+          // (QA E: FINDING YOU at once when there is no tag).
+          void readLocationPermission();
+        }
         setAthlete(result.data);
         loadedAthleteForUserId.current = uid;
         setAthleteLoadFailed(false);

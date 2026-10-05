@@ -166,10 +166,24 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     expect(m.action).toBe("none");
   });
 
-  it("offline during the cooldown is disabled (AC-H4)", () => {
+  it("offline during the cooldown takes the tap, which is queued (QA D; was AC-H4 ignored)", () => {
     const m = describeHeaderChip(input({ phase: "cooldown" }));
     expect(chipCopy(m)).toBe("○ GO LIVE · 12");
-    expect(m.disabled).toBe(true);
+    expect(m.disabled).toBe(false);
+    // Still locked while a transition is in flight.
+    expect(describeHeaderChip(input({ phase: "saving" })).disabled).toBe(true);
+  });
+
+  it("QA A: the optimistic LIVE chip and RECONNECTING open the live menu when the go-live can be cancelled", () => {
+    const live = describeHeaderChip(input({ phase: "saving", display: "optimistic", cancellable: true }));
+    expect(live.kind).toBe("live");
+    expect(live.disabled).toBe(false);
+    const rec = describeHeaderChip(input({ phase: "saving", display: "recovering", cancellable: true }));
+    expect(rec.kind).toBe("reconnecting");
+    expect(rec.action).toBe("popover");
+    expect(rec.disabled).toBe(false);
+    // Nothing to cancel: locked, as before.
+    expect(describeHeaderChip(input({ phase: "saving", display: "optimistic" })).disabled).toBe(true);
   });
 
   it("live shows the count in green and opens the popover (AC-H5)", () => {
@@ -376,8 +390,9 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     expect(m.tone).toBe("neutral");
     expect(m.action).toBe("go-live");
     expect(m.disabled).toBe(false);
+    // In the cooldown the retry is queued (QA D), so it takes the tap.
     expect(describeHeaderChip(input({ lastLiveWriteFailed: true, phase: "cooldown" })).disabled).toBe(
-      true,
+      false,
     );
   });
 
@@ -1028,7 +1043,7 @@ describe("HeaderStatusChip", () => {
     expect(queryByTestId("live-menu")).toBeNull();
   });
 
-  it("popover: Go offline is disabled during the cooldown", async () => {
+  it("popover: Go offline during the cooldown is queued and runs when it ends (QA D)", async () => {
     setArena({ isLive: true });
     const { getByTestId, getByLabelText } = render(<HeaderStatusChip />);
     // A go-live just landed through the guard: cooldown.
@@ -1038,11 +1053,17 @@ describe("HeaderStatusChip", () => {
     });
     fireEvent.press(getByTestId("header-status-chip"));
     const off = getByLabelText("Live menu: go offline");
-    expect(off.props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(off.props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
     await act(async () => {
       fireEvent.press(off);
     });
     expect(ctl.goOffline).not.toHaveBeenCalled();
+    // Drawn offline at once.
+    expect(chipText(getByTestId)).toContain("GO LIVE · 12");
+    await act(async () => {
+      jest.advanceTimersByTime(LIVE_SWITCH_COOLDOWN_MS);
+    });
+    expect(ctl.goOffline).toHaveBeenCalledTimes(1);
   });
 
   it("live with nobody else reads JUST YOU (AC-H5)", () => {

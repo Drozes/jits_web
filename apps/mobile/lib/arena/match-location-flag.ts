@@ -67,6 +67,11 @@ export function loadMatchLocationRequired(): Promise<boolean> {
   return inflight;
 }
 
+/** The flag synchronously: the known value, or null while unknown. */
+export function peekMatchLocationRequired(): boolean | null {
+  return known ? value : null;
+}
+
 /** The flag for imperative callers: the known value, else one read. */
 export function readMatchLocationRequired(): Promise<boolean> {
   return known ? Promise.resolve(value) : loadMatchLocationRequired();

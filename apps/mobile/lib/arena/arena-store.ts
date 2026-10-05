@@ -207,7 +207,12 @@ export type GoLiveDisplay =
   | "recovering"
   | "retry"
   | "restore-live"
-  | "restore-finding";
+  | "restore-finding"
+  /**
+   * A go-offline the athlete chose during the post-transition cooldown,
+   * queued until it ends (QA D): drawn offline at once, takes no taps.
+   */
+  | "leaving";
 
 /** Time after a tap before any pending state is drawn (`duration.fast`). */
 export const PENDING_REVEAL_MS = 240;
@@ -303,7 +308,7 @@ export function displayDrawsLive(display: GoLiveDisplay | null, isLive: boolean)
   if (display === null) return isLive;
   // Every other overlay is a not-yet-live (or failed) state; a committed
   // live flag still wins (a late write that landed is the truth).
-  return isLive && display !== "hold";
+  return isLive && display !== "hold" && display !== "leaving";
 }
 
 function getDisplayLive(): boolean {
@@ -544,21 +549,82 @@ let switchCooldown = false;
 let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * An automatic restore is running its location ladder (instant go-live):
- * the switch is "saving" toward live for its whole length, not only for the
- * live write, so a tap can never race it (and a go-offline cannot be undone
- * by its later write).
+ * Automatic restores running their location ladder (instant go-live): the
+ * switch is "saving" toward live for their whole length, not only for the
+ * live write. A count owned by each run (review round 2, SF1): a run that
+ * ends never unlocks the switch for another one still running.
  */
-let restoreInFlight = false;
+let restoreRuns = 0;
 
-export function setRestoreInFlight(next: boolean): void {
-  if (next === restoreInFlight) return;
-  restoreInFlight = next;
+/** Mark a restore run as started; call the returned function once when it ends. */
+export function beginRestoreRun(): () => void {
+  restoreRuns += 1;
   emitArena();
+  let ended = false;
+  return () => {
+    if (ended) return;
+    ended = true;
+    restoreRuns = Math.max(0, restoreRuns - 1);
+    emitArena();
+  };
+}
+
+function restoreInFlight(): boolean {
+  return restoreRuns > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Cancelling a go-live in flight (review round 2, QA A)
+// ---------------------------------------------------------------------------
+
+/**
+ * The go-live in flight (a tapped attempt or a restore) registers how to
+ * cancel itself. A go-offline the athlete chooses meanwhile calls it, so the
+ * optimistic LIVE chip, RECONNECTING and a restore drawn live always have a
+ * way out (UX 019, 2.2 and 6.8).
+ */
+let goLiveCanceller: (() => void) | null = null;
+
+/** Register the cancel for the go-live now in flight; returns the unregister. */
+export function registerGoLiveCanceller(cancel: () => void): () => void {
+  goLiveCanceller = cancel;
+  emitArena();
+  return () => {
+    if (goLiveCanceller === cancel) {
+      goLiveCanceller = null;
+      emitArena();
+    }
+  };
+}
+
+function getGoLiveCancellable(): boolean {
+  return goLiveCanceller !== null;
+}
+
+/** A go-live in flight can be cancelled by a go-offline now. */
+export function useGoLiveCancellable(): boolean {
+  return useSyncExternalStore(subscribe, getGoLiveCancellable, getGoLiveCancellable);
+}
+
+/** Cancel the go-live in flight, quietly: the chip goes straight to GO LIVE. */
+function cancelGoLiveInFlight(): boolean {
+  const cancel = goLiveCanceller;
+  if (!cancel) return false;
+  goLiveCanceller = null;
+  try {
+    cancel();
+  } catch {
+    // The flow unwinds on its own.
+  }
+  clearDisplayOnLive = false;
+  // Drawn offline at once (GO LIVE, no taps) until the cancelled attempt
+  // unwinds; its write in flight still settles first (never GOING LIVE).
+  setGoLiveDisplay("leaving");
+  return true;
 }
 
 function getLiveSwitchPhase(): LiveSwitchPhase {
-  if (state.isSaving || state.liveTransition || switchInFlight || restoreInFlight) return "saving";
+  if (state.isSaving || state.liveTransition || switchInFlight || restoreInFlight()) return "saving";
   if (switchCooldown) return "cooldown";
   return "ready";
 }
@@ -577,7 +643,7 @@ function getLiveSwitchDirection(): LiveSwitchDirection | null {
   if (switchInFlight) return switchDirection;
   // A restore the app started knows where it is heading.
   if (state.liveTransition) return state.liveTransition;
-  if (restoreInFlight) return "going-live";
+  if (restoreInFlight()) return "going-live";
   // A toggle outside the guard cannot happen (arenaActions.toggle is
   // guarded), but `isSaving` alone still has a direction: away from now.
   if (state.isSaving) return state.isLive ? "going-offline" : "going-live";
@@ -625,8 +691,11 @@ async function runGuarded<T>(
     goLiveMomentSpent = false;
     clearDisplayOnLive = false;
     cancelReveal();
-    goLiveDisplay = "hold";
-    scheduleGoLiveReveal("going-live", Date.now() + PENDING_REVEAL_MS);
+    // A queued go-live already shows its pending ring: keep it.
+    if (goLiveDisplay !== "going-live") {
+      goLiveDisplay = "hold";
+      scheduleGoLiveReveal("going-live", Date.now() + PENDING_REVEAL_MS);
+    }
   }
   emitArena();
   let result: T | undefined;
@@ -651,9 +720,114 @@ async function runGuarded<T>(
       cooldownTimer = null;
       switchCooldown = false;
       emitArena();
+      runQueuedIntent();
     }, LIVE_SWITCH_COOLDOWN_MS);
     emitArena();
   }
+}
+
+// ---------------------------------------------------------------------------
+// The cooldown queue (review round 2, QA D)
+// ---------------------------------------------------------------------------
+
+/**
+ * A choice made during the 2 s cooldown is queued, not dropped: the LAST
+ * choice wins and runs when the cooldown ends (the cooldown itself stays,
+ * for the presence rate limit, jits-fa9x). Its feedback is immediate: a
+ * queued go-offline draws offline (`leaving`), a queued go-live its pending
+ * ring. A choice that matches where the athlete already is clears the queue.
+ */
+interface QueuedIntent {
+  direction: LiveSwitchDirection;
+  work: (c: ArenaController) => Promise<unknown>;
+  resolve: (v: unknown) => void;
+}
+let queuedIntent: QueuedIntent | null = null;
+
+function queueIntent<T>(
+  direction: LiveSwitchDirection,
+  work: (c: ArenaController) => Promise<T>,
+): Promise<T | LiveSwitchIgnored> {
+  if (queuedIntent) queuedIntent.resolve("ignored");
+  queuedIntent = null;
+  const already = direction === "going-live" ? state.isLive : !state.isLive;
+  if (already) {
+    if (goLiveDisplay === "leaving" || goLiveDisplay === "going-live") setGoLiveDisplay(null);
+    return Promise.resolve("ignored");
+  }
+  setGoLiveDisplay(direction === "going-offline" ? "leaving" : "going-live");
+  return new Promise((resolve) => {
+    queuedIntent = { direction, work: work as QueuedIntent["work"], resolve: resolve as (v: unknown) => void };
+  });
+}
+
+function runQueuedIntent(): void {
+  const q = queuedIntent;
+  queuedIntent = null;
+  if (!q) return;
+  if (q.direction === "going-offline") {
+    // Keep drawing offline through the clear; nothing in between.
+    void runGuarded(q.direction, q.work).then(
+      (r) => {
+        if (goLiveDisplay === "leaving") setGoLiveDisplay(null);
+        q.resolve(r);
+      },
+      () => {
+        if (goLiveDisplay === "leaving") setGoLiveDisplay(null);
+        q.resolve(false);
+      },
+    );
+    return;
+  }
+  void runGuarded(q.direction, q.work).then(q.resolve, () => q.resolve(false));
+}
+
+/** Guarded, cancelling, or queued: how a tap-facing call is routed. */
+function routeTap<T>(
+  direction: LiveSwitchDirection,
+  work: (c: ArenaController) => Promise<T>,
+): Promise<T | LiveSwitchIgnored> {
+  if (!controller) return Promise.resolve("ignored");
+  const phase = getLiveSwitchPhase();
+  // A go-offline during a go-live in flight cancels it quietly, then goes
+  // offline (QA A): never live after the athlete chose offline, because
+  // the clear is serialized behind any write already in flight.
+  if (direction === "going-offline" && phase === "saving" && getLiveSwitchDirection() === "going-live") {
+    if (!cancelGoLiveInFlight()) return Promise.resolve("ignored");
+    return work(controller);
+  }
+  if (phase === "cooldown") return queueIntent(direction, work);
+  return runGuarded(direction, work);
+}
+
+/** The athlete can choose offline right now (ready, cooldown, or a cancellable go-live). */
+function getCanGoOffline(): boolean {
+  if (!controller) return false;
+  const phase = getLiveSwitchPhase();
+  if (phase !== "saving") return true;
+  return getLiveSwitchDirection() === "going-live" && goLiveCanceller !== null;
+}
+
+export function useCanGoOffline(): boolean {
+  return useSyncExternalStore(subscribe, getCanGoOffline, getCanGoOffline);
+}
+
+/** The athlete can choose live right now (ready, or queued during the cooldown). */
+function getCanGoLive(): boolean {
+  return controller !== null && getLiveSwitchPhase() !== "saving";
+}
+
+export function useCanGoLive(): boolean {
+  return useSyncExternalStore(subscribe, getCanGoLive, getCanGoLive);
+}
+
+/**
+ * A tapped go-live is in flight and has not landed. The background handler
+ * of `useArenaLive` does not restore it on return (QA B: pending flows are
+ * cancelled on background, nothing is queued for later).
+ */
+export function isTappedGoLiveInFlight(): boolean {
+  return switchInFlight && switchDirection === "going-live";
 }
 
 /**
@@ -686,11 +860,9 @@ export const liveSwitch = Object.freeze({
    * gets here, so the direction reported from `isLive` is what toggle does.
    */
   toggle: (): Promise<void | LiveSwitchIgnored> =>
-    runGuarded(state.isLive ? "going-offline" : "going-live", (c) => c.toggle()),
-  goLive: (): Promise<boolean | LiveSwitchIgnored> =>
-    runGuarded("going-live", (c) => c.goLive()),
-  goOffline: (): Promise<boolean | LiveSwitchIgnored> =>
-    runGuarded("going-offline", (c) => c.goOffline()),
+    routeTap(state.isLive ? "going-offline" : "going-live", (c) => c.toggle()),
+  goLive: (): Promise<boolean | LiveSwitchIgnored> => routeTap("going-live", (c) => c.goLive()),
+  goOffline: (): Promise<boolean | LiveSwitchIgnored> => routeTap("going-offline", (c) => c.goOffline()),
 });
 
 /**
@@ -1006,7 +1178,10 @@ export function __resetArenaStoreForTests(): void {
   clearDisplayOnLive = false;
   needsLocation = false;
   goLiveMomentSpent = false;
-  restoreInFlight = false;
+  restoreRuns = 0;
+  goLiveCanceller = null;
+  if (queuedIntent) queuedIntent.resolve("ignored");
+  queuedIntent = null;
   liveMenusOpen = 0;
   menuListeners.clear();
 }

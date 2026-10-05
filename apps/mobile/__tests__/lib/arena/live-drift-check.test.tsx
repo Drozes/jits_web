@@ -45,7 +45,7 @@ jest.mock("@/lib/arena/location-telemetry", () => ({
   logDriftCheck: (...a: unknown[]) => mockDriftCheck(...a),
   logDriftPrompt: (...a: unknown[]) => mockDriftPrompt(...a),
 }));
-const mockGoOffline = jest.fn(() => Promise.resolve());
+const mockGoOffline = jest.fn<Promise<boolean | "ignored">, []>(() => Promise.resolve(true));
 jest.mock("@/lib/arena/go-live-feedback", () => ({
   goOfflineWithFeedback: () => mockGoOffline(),
 }));
@@ -271,6 +271,14 @@ describe("the answers", () => {
     expect(peekDeviceTag(ME)).toMatchObject(TAG);
     const { result } = renderHook(() => useDriftPrompt());
     expect(result.current).toBeNull();
+  });
+
+  it("Go offline that did not happen (nothing to do) logs nothing", async () => {
+    seedTag();
+    await runDriftCheck(ME);
+    mockGoOffline.mockResolvedValueOnce("ignored");
+    await answerDriftPrompt("offline");
+    expect(mockDriftPrompt).not.toHaveBeenCalledWith("went_offline");
   });
 
   it("Go offline: the manual go-offline, logged went_offline", async () => {

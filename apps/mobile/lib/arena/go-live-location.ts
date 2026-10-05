@@ -43,6 +43,12 @@ import { supabase } from "@/lib/supabase/client";
 import { permissionRequestInFlight, readLocationOnce } from "@/lib/invites/location";
 import { getDeviceLocationOwner, recordAcceptedReading } from "@/lib/location/device-location-store";
 import { notePresenceAnswer } from "@/lib/location/presence-capability";
+import {
+  __resetLocationPermissionCacheForTests,
+  lastKnownLocationPermission,
+  readLocationPermission,
+  type PermissionState,
+} from "@/lib/location/permission-cache";
 import { setGoLiveDisplay, type LiveSwitchIgnored } from "./arena-store";
 import { logGoLiveAttempt } from "./location-telemetry";
 
@@ -151,7 +157,7 @@ export function useGoLiveLocationSheet(): GoLiveLocationSheetState | null {
 export function __resetGoLiveLocationForTests(): void {
   resolver = null;
   sheet = null;
-  lastPermission = null;
+  __resetLocationPermissionCacheForTests();
   if (activeFlow) endFlow(activeFlow);
   emit();
 }
@@ -278,6 +284,16 @@ export function waitForActive(flow: GoLiveFlow, ms = ACTIVE_WAIT_MS): Promise<bo
   });
 }
 
+/**
+ * Abort the Go Live flow in flight (the athlete chose offline meanwhile,
+ * QA A): it resolves at once, as for a background, and closes its sheet.
+ */
+export function abortActiveGoLiveFlow(): void {
+  if (!activeFlow) return;
+  activeFlow.abort();
+  cancelLocationSheet("go_live", "background");
+}
+
 export function endFlow(flow: GoLiveFlow): void {
   if (activeFlow !== flow) return;
   activeFlow = null;
@@ -350,33 +366,16 @@ async function readAndReport(ask: boolean, opts: ReadOptions = {}): Promise<Read
   return (opts.reporter ?? reportFreshOnce)(reading, loc.capturedAt ?? Date.now());
 }
 
-export interface PermissionState {
-  granted: boolean;
-  canAskAgain: boolean;
-  /** Android approximate location only (no reading can pass 100 m). */
-  coarse?: boolean;
-}
+export type { PermissionState } from "@/lib/location/permission-cache";
 
 /** The last permission state read, for synchronous first-frame decisions. */
-let lastPermission: PermissionState | null = null;
-
 export function lastKnownPermission(): PermissionState | null {
-  return lastPermission;
+  return lastKnownLocationPermission();
 }
 
 /** The foreground location permission, read (never asked). */
-export async function permissionState(): Promise<PermissionState> {
-  try {
-    const p = await Location.getForegroundPermissionsAsync();
-    lastPermission = {
-      granted: Boolean(p.granted),
-      canAskAgain: Boolean(p.canAskAgain),
-      ...((p as { android?: { accuracy?: string } }).android?.accuracy === "coarse" ? { coarse: true } : {}),
-    };
-  } catch {
-    lastPermission = { granted: false, canAskAgain: false };
-  }
-  return lastPermission;
+export function permissionState(): Promise<PermissionState> {
+  return readLocationPermission();
 }
 
 /**
@@ -514,6 +513,12 @@ export async function goLiveWithLocation(
         return "ignored";
       }
       const ok = await goLive();
+      // Cancelled (a go-offline, or the background) while the write was in
+      // flight: over, quietly; the clear is serialized behind the write.
+      if (flow.aborted) {
+        attempt = "dismissed";
+        return "ignored";
+      }
       if (ok) {
         attempt = "ok";
         return true;

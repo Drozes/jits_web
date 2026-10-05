@@ -253,7 +253,11 @@ jest.mock("@/lib/arena/use-arena-roster", () => ({
   useArenaRoster: () => mockRoster,
 }));
 
-jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
+const mockToastBelowBar = jest.fn();
+jest.mock("@/components/ui/toast", () => ({
+  toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
+  useToastBelowScreenBar: (...a: unknown[]) => mockToastBelowBar(...a),
+}));
 
 const mockToggle = jest.fn();
 const mockGuardedGoLive = jest.fn<Promise<boolean | "ignored">, []>(() =>
@@ -292,6 +296,8 @@ jest.mock("@/lib/arena/arena-store", () => ({
   useArenaState: () => ({ isLive: mockIsLive, isSaving: false, ...mockChallenge }),
   useIsArenaLive: () => mockIsLive,
   useIsArenaDisplayLive: () => mockIsLive,
+  useCanGoLive: () => mockSwitchPhase !== "saving",
+  useCanGoOffline: () => mockSwitchPhase !== "saving",
   useGoLiveDisplay: () => null,
   useIsInArenaMatch: () => mockInMatch,
   useLiveSwitchPhase: () => mockSwitchPhase,
@@ -314,6 +320,7 @@ jest.mock("@/lib/arena/arena-store", () => ({
   isIncomingChallengeDismissed: (id: string) => mockDismissed.has(id),
 }));
 
+import { MAT_CONTROL_BAR_HEIGHT } from "@/components/arena/mat-board";
 import ArenaScreen from "@/app/(app)/(tabs)/arena/index";
 import { publishBellBadge, resetBellStore } from "@/lib/notifications/bell-store";
 import { __resetArenaNearbyForTests } from "@/lib/arena/use-arena-nearby";
@@ -783,8 +790,8 @@ describe("Arena screen", () => {
       expect(r.queryByLabelText("You are offline")).toBeNull();
     });
 
-    it("disables the switch while locked (saving or cooldown), keeping its label", () => {
-      mockSwitchPhase = "cooldown";
+    it("disables the switch while a transition is in flight, keeping its label", () => {
+      mockSwitchPhase = "saving";
       mockRoster.competitors = [competitor()];
       mockLobbyIds = new Set(["a-1"]);
       const offline = render(<ArenaScreen />);
@@ -800,11 +807,18 @@ describe("Arena screen", () => {
       offline.unmount();
 
       // A challenge is not the live switch: the cooldown must not hold it.
+      mockSwitchPhase = "cooldown";
       mockIsLive = true;
       const live = render(<ArenaScreen />);
-      expect(isDisabled(live.getByLabelText("Go offline"))).toBe(true);
+      // In the cooldown the OFFLINE segment takes the tap (queued, QA D).
+      expect(isDisabled(live.getByLabelText("Go offline"))).toBe(false);
       fireEvent.press(rowButton(live, "a-1", "Challenge Alpha"));
       expect(mockSendChallenge).toHaveBeenCalledWith("a-1", "Alpha");
+    });
+
+    it("QA C: while focused, toasts sit below the control bar", () => {
+      render(<ArenaScreen />);
+      expect(mockToastBelowBar).toHaveBeenLastCalledWith(expect.any(Boolean), MAT_CONTROL_BAR_HEIGHT);
     });
 
     it("shows ON MAT and IN BAND counts from the rows, and CONNECTING when the lobby is unknown", () => {

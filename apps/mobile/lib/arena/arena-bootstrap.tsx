@@ -55,6 +55,17 @@ import {
   readMatchLocationRequired,
   useMatchLocationRequired,
 } from "./match-location-flag";
+import * as MatchLocationFlag from "./match-location-flag";
+
+/**
+ * The owner's flag hint for a restore's first frame: the known value, or ON
+ * while unknown (the safe guess: a tag decides, the server is the authority).
+ */
+function locationFlagHint(): boolean {
+  const peek = (MatchLocationFlag as { peekMatchLocationRequired?: () => boolean | null })
+    .peekMatchLocationRequired;
+  return peek?.() ?? true;
+}
 import {
   setDeviceLocationOwner,
   validDeviceReading,
@@ -65,7 +76,12 @@ import {
   getPresenceCapability,
   subscribePresenceCapability,
 } from "@/lib/location/presence-capability";
-import { getGoLiveDisplay, isInArenaMatch, setGoLiveDisplay } from "./arena-store";
+import {
+  getGoLiveDisplay,
+  isInArenaMatch,
+  registerGoLiveCanceller,
+  setGoLiveDisplay,
+} from "./arena-store";
 import { useLobbyIds, useLobbyKnown, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
 import { useActiveMatchOwner } from "../match-flow/active-match-store";
@@ -197,7 +213,9 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   // frame (UX 019, 3h), before the arrival restore has read anything.
   React.useLayoutEffect(() => {
     if (athlete.looking_for_ranked && AppState.currentState === "active" && !isInArenaMatch()) {
-      setGoLiveDisplay(restoreFirstFrame(athlete.id));
+      // The owner's flag hint (review nit): flag known off draws the plain
+      // write live at once, never GO LIVE then LIVE.
+      setGoLiveDisplay(restoreFirstFrame(athlete.id, locationFlagHint()));
     }
     return () => setGoLiveDisplay(null);
     // Once, on arrival, like the arrival restore itself.
@@ -225,8 +243,6 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   // match_location_required: Go Live needs a fresh go_live reading, and an
   // Arena start needs both athletes on one mat (contract-location-flag 6).
   const locationRequired = useMatchLocationRequired();
-  const locationRequiredRef = React.useRef(locationRequired);
-  locationRequiredRef.current = locationRequired;
   const live = useArenaLive({
     athleteId: athlete.id,
     displayName: athlete.display_name ?? "",
@@ -249,7 +265,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
         write: ctx.write,
         lastRefusal: ctx.lastRefusal,
         canWrite: ctx.canWrite,
-        locationRequiredHint: locationRequiredRef.current,
+        locationRequiredHint: locationFlagHint(),
       }),
     // Leaving for the background while live with a valid tag: the chip is
     // already drawn live for the return (UX 019, 3i).
@@ -409,8 +425,18 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     const goLive = async () => {
       const l = liveRef.current;
       if (!(await readMatchLocationRequired())) {
-        const ok = await l.goLive();
-        if (ok || l.lastGoLiveRefusal() !== "location_required") return ok;
+        // Flag off: the plain write, still cancellable by a go-offline (QA A).
+        let cancelled = false;
+        const unregister = registerGoLiveCanceller(() => {
+          cancelled = true;
+        });
+        try {
+          const ok = await l.goLive();
+          if (cancelled) return "ignored" as const;
+          if (ok || l.lastGoLiveRefusal() !== "location_required") return ok;
+        } finally {
+          unregister();
+        }
         markMatchLocationRequired(true);
       }
       // The location ladder (instant go-live 4.2): server tag, device tag,

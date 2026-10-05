@@ -46,6 +46,7 @@ import { supabase } from "../supabase/client";
 import { joinLobby, leaveLobby } from "./use-lobby-presence";
 import type { LiveSwitchDirection } from "./arena-store";
 import { GO_OFFLINE_FAILED_MESSAGE } from "./constants";
+import { isTappedGoLiveInFlight } from "./arena-store";
 
 export interface UseArenaLiveArgs {
   athleteId: string;
@@ -286,8 +287,8 @@ export function useArenaLive({
    * which park it instead (review round 1, B2).
    */
   const offlineIntentRef = React.useRef(0);
-  /** An automatic restore (`autoLive`) is running. */
-  const restoreInFlightRef = React.useRef(false);
+  /** Automatic restores (`autoLive`) running: single-flight (SF1), so 0 or 1. */
+  const restoreInFlightRef = React.useRef(0);
   /** The server's reason for the last refused go-live write, if it gave one. */
   const refusalRef = React.useRef<"location_required" | null>(null);
 
@@ -578,7 +579,7 @@ export function useArenaLive({
       const run = autoLiveRef.current;
       if (!run) return "failed";
       const offlineAtStart = offlineIntentRef.current;
-      restoreInFlightRef.current = true;
+      restoreInFlightRef.current += 1;
       try {
         return await run({
           write: () => requestLiveRef.current(),
@@ -596,7 +597,7 @@ export function useArenaLive({
         console.warn("[arena] restoring live failed:", error);
         return "failed";
       } finally {
-        restoreInFlightRef.current = false;
+        restoreInFlightRef.current -= 1;
       }
     },
     [],
@@ -609,7 +610,13 @@ export function useArenaLive({
    */
   const restoreLive = React.useCallback(async (reason: AutoLiveContext["reason"] = "foreground") => {
     if (autoLiveRef.current) {
-      const r = await runAutoLive(reason);
+      let r = await runAutoLive(reason);
+      // Parked, but the app is already back in front and out of a match (it
+      // came back while this run was mid-step, and the "active" handler left
+      // it to this run): carry on once more, here (SF1).
+      if (r === "parked" && AppState.currentState === "active" && !inMatchRef.current) {
+        r = await runAutoLive(reason);
+      }
       // Failed while the app was not in front: the ladder could say nothing
       // (no toast in the background), so the live intent is not dropped
       // silently; the next foreground tries again, and says it then.
@@ -677,7 +684,14 @@ export function useArenaLive({
     // lobby) instead of seeing desired === actual and doing nothing.
     actualRef.current = false;
     if (autoLiveRef.current) {
-      void runAutoLive("arrival").then((r) => {
+      void (async () => {
+        let r = await runAutoLive("arrival");
+        // Came back in front while the run was mid-step: carry on once (SF1).
+        if (r === "parked" && AppState.currentState === "active" && !inMatchRef.current) {
+          r = await runAutoLive("arrival");
+        }
+        return r;
+      })().then((r) => {
         if (r === "live") return;
         const notInFront = r === "failed" && AppState.currentState !== "active";
         if (r === "parked" || notInFront) {
@@ -746,7 +760,13 @@ export function useArenaLive({
       if (next === "background") {
         // A restore still running (a silent fix) has not set the intent yet:
         // the background must not lose it (B2).
-        resumeLiveRef.current = resumeLiveRef.current || desiredRef.current || restoreInFlightRef.current;
+        // A tapped go-live that has not landed is cancelled by the
+        // background (its flow aborts), never restored on return (QA B).
+        const abandonedTap = isTappedGoLiveInFlight() && !actualRef.current;
+        resumeLiveRef.current =
+          resumeLiveRef.current ||
+          (desiredRef.current && !abandonedTap) ||
+          restoreInFlightRef.current > 0;
         void requestOfflineRef.current();
         if (resumeLiveRef.current && !inMatchRef.current) onResumeParkedRef.current?.();
         return;
@@ -762,6 +782,10 @@ export function useArenaLive({
         resumeAfterMatchRef.current = true;
         return;
       }
+      // Single-flight (SF1): a restore still running (the app went away and
+      // came back before it finished) carries on now that it may write; a
+      // second one alongside it would race it.
+      if (restoreInFlightRef.current > 0) return;
       void restoreLive("foreground");
     };
     const sub = AppState.addEventListener("change", onChange);

@@ -92,6 +92,8 @@ export function registerGoLiveDevHooks(): void {
     clear: () => devClearFaults(),
   };
   (globalThis as unknown as { __goLiveDev?: typeof api }).__goLiveDev = api;
+  // No native dev menu under jest (the console handle is enough there).
+  if (process.env.NODE_ENV === "test") return;
   try {
     const add = (title: string, fn: () => void) => DevSettings.addMenuItem?.(title, fn);
     add("Go live: age stored tag by 4 h", () => api.ageTag(4));

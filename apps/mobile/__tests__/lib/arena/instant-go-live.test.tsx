@@ -36,7 +36,10 @@ let mockLocationRequired = true;
 /** Overrides the flag read (a hang, for S2); null: the plain value. */
 let mockFlagRead: (() => Promise<boolean>) | null = null;
 const mockMarkLocation = jest.fn();
+/** The flag as the store knows it synchronously (null: unknown). */
+let mockFlagPeek: boolean | null = null;
 jest.mock("@/lib/arena/match-location-flag", () => ({
+  peekMatchLocationRequired: () => mockFlagPeek,
   useMatchLocationRequired: () => mockLocationRequired,
   readMatchLocationRequired: () => (mockFlagRead ? mockFlagRead() : Promise.resolve(mockLocationRequired)),
   markMatchLocationRequired: (on: boolean) => mockMarkLocation(on),
@@ -100,8 +103,9 @@ jest.mock("expo-router", () => ({
 }));
 jest.mock("@/components/arena/challenge-prompt-sheet", () => ({ ChallengePromptSheet: () => null }));
 const ACTIVE = { id: "me-1", display_name: "Me", current_elo: 1200, current_weight: 180, status: "active" };
+let mockAthlete: Record<string, unknown> = ACTIVE;
 jest.mock("@/lib/auth/hooks", () => ({
-  useAuth: () => ({ athlete: ACTIVE, refreshAthleteSoft: () => Promise.resolve() }),
+  useAuth: () => ({ athlete: mockAthlete, refreshAthleteSoft: () => Promise.resolve() }),
 }));
 jest.mock("@/lib/match-flow/active-match-store", () => ({
   useActiveMatchOwner: () => {},
@@ -118,6 +122,7 @@ jest.mock("@/lib/arena/use-lobby-presence", () => ({
 const mockWrite = jest.fn();
 let mockRefusal: string | null = null;
 const mockLiveArgs = jest.fn();
+const mockGoOffline = jest.fn();
 /** The hook's own goLive (commits `isLive`), for driving a restore's write. */
 const mockLiveApi: { goLive: () => Promise<boolean> } = { goLive: () => Promise.resolve(false) };
 jest.mock("@/lib/arena/use-arena-live", () => {
@@ -138,7 +143,11 @@ jest.mock("@/lib/arena/use-arena-live", () => {
         transition: null,
         lastWriteFailed: false,
         toggle: jest.fn(),
-        goOffline: jest.fn(),
+        goOffline: jest.fn(async () => {
+          mockGoOffline();
+          setIsLive(false);
+          return true;
+        }),
         goLive,
         lastGoLiveRefusal: () => mockRefusal,
         dropIfServerOffline: jest.fn(() => Promise.resolve(false)),
@@ -210,6 +219,8 @@ import {
   restoreLiveSilently,
 } from "@/lib/arena/location-ladder";
 import { devClearFaults, devFailNext, devNextFix } from "@/lib/arena/dev-go-live-hooks";
+import { readLocationPermission } from "@/lib/location/permission-cache";
+import { loadDeviceLocation } from "@/lib/location/device-location-store";
 import { describeHeaderChip } from "@/lib/arena/header-chip-model";
 
 const KEY = "last-location.me-1";
@@ -294,6 +305,8 @@ beforeEach(() => {
   Object.defineProperty(AppState, "currentState", { value: "active", configurable: true });
   mockLocationRequired = true;
   mockFlagRead = null;
+  mockFlagPeek = null;
+  mockAthlete = ACTIVE;
   mockRefusal = null;
   mockGetPermission.mockResolvedValue({ granted: true, canAskAgain: true, status: "granted" });
   mockRequestPermission.mockResolvedValue({ granted: true, canAskAgain: true });
@@ -1057,7 +1070,7 @@ describe("B1: the recovery window covers network phases only", () => {
     expect(lead()).toBe("LIVE");
   });
 
-  it("a write that lands after the 15 s window is a success: never OFFLINE · RETRY, no toast", async () => {
+  it("a write that lands after the 15 s window: OFFLINE · RETRY at 15 s (spec 3g), then LIVE when it lands, no toast", async () => {
     jest.useFakeTimers();
     seedTag(5 * MIN);
     const write = deferred<boolean>();
@@ -1068,16 +1081,23 @@ describe("B1: the recovery window covers network phases only", () => {
       pending = goLiveWithFeedback();
     });
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(20_000);
+      await jest.advanceTimersByTimeAsync(10_000);
     });
-    // Still waiting on the server, honestly: RECONNECTING, not RETRY.
+    // Waiting on the server inside the window: RECONNECTING.
     expect(lead()).toBe("RECONNECTING");
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+    // Past the window, the write still in flight: the chip says RETRY (QA F)...
+    expect(lead()).toBe("OFFLINE · RETRY");
+    // ...but nothing is said until the write actually answers.
+    expect(mockToastInfo).not.toHaveBeenCalled();
     await act(async () => {
       write.resolve(true);
       await pending;
     });
+    // A late success is a success.
     expect(lead()).toBe("LIVE");
-    expect(frames).not.toContain("retry:off");
     expect(mockToastInfo).not.toHaveBeenCalled();
     expect(mockWrite).toHaveBeenCalledTimes(1);
   });
@@ -1282,5 +1302,181 @@ describe("DEV-only QA hooks", () => {
     });
     expect(r).toBe(true);
     expect(mockWrite).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Review round 2
+// ---------------------------------------------------------------------------
+
+describe("QA A: a way out of a slow go-live", () => {
+  it("Go offline from the optimistic LIVE chip's menu cancels it quietly: GO LIVE at once, no toast, logged dismissed", async () => {
+    jest.useFakeTimers();
+    seedTag(5 * MIN);
+    const write = deferred<boolean>();
+    mockWrite.mockReturnValue(write.promise);
+    mount();
+    let tap!: Promise<void>;
+    act(() => {
+      tap = goLiveWithFeedback();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(300);
+    });
+    expect(lead()).toBe("LIVE");
+    // The chip opens the live menu while the write is in flight.
+    expect(screen.getByTestId("header-status-chip").props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: false }),
+    );
+    fireEvent.press(screen.getByTestId("header-status-chip"));
+    const off = screen.getByLabelText("Live menu: go offline");
+    expect(off.props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
+    await act(async () => {
+      fireEvent.press(off);
+      await jest.advanceTimersByTimeAsync(10);
+    });
+    expect(lead()).toBe("GO LIVE");
+    expect(mockGoOffline).toHaveBeenCalledTimes(1);
+    // The write lands later: the attempt is over, nothing more is said.
+    await act(async () => {
+      write.resolve(true);
+      await tap;
+      await jest.advanceTimersByTimeAsync(10);
+    });
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(logged()).toEqual([expect.objectContaining({ outcome: "dismissed" })]);
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+  });
+
+  it("Go offline from RECONNECTING works the same way", async () => {
+    jest.useFakeTimers();
+    seedTag(5 * MIN);
+    mockWrite.mockResolvedValue(false);
+    mount();
+    let tap!: Promise<void>;
+    act(() => {
+      tap = goLiveWithFeedback();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1_500);
+    });
+    expect(lead()).toBe("RECONNECTING");
+    await act(async () => {
+      await arenaActions.goOffline();
+      await jest.advanceTimersByTimeAsync(5_000);
+      await tap;
+    });
+    expect(lead()).toBe("GO LIVE");
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    // No retry after the cancel.
+    const writes = mockWrite.mock.calls.length;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(20_000);
+    });
+    expect(mockWrite.mock.calls.length).toBe(writes);
+  });
+
+  it("a restore drawn live is cancelled the same way (no write after the choice)", async () => {
+    seedTag(30 * MIN);
+    mount();
+    await flush();
+    const write = deferred<boolean>();
+    mockWrite.mockReturnValue(write.promise);
+    const { autoLive } = mockLiveArgs.mock.calls.at(-1)[0] as { autoLive: (ctx: unknown) => Promise<string> };
+    let p!: Promise<string>;
+    act(() => {
+      p = autoLive({ write: () => mockLiveApi.goLive(), lastRefusal: () => mockRefusal, canWrite: () => "ok", reason: "foreground" });
+    });
+    await flush();
+    expect(lead()).toBe("LIVE");
+    await act(async () => {
+      await arenaActions.goOffline();
+    });
+    expect(lead()).toBe("GO LIVE");
+    let r = "";
+    await act(async () => {
+      write.resolve(true);
+      r = await p;
+    });
+    expect(r).toBe("cancelled");
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(mockGoOffline).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("QA B: a tapped go-live abandoned by the background", () => {
+  it("FINDING YOU, background at 2 s, back 25 s later: GO LIVE, no RETRY, no toast, logged dismissed", async () => {
+    jest.useFakeTimers();
+    const handlers: ((st: string) => void)[] = [];
+    const spy = jest.spyOn(AppState, "addEventListener").mockImplementation(((_e: string, h: (st: string) => void) => {
+      handlers.push(h);
+      return { remove: () => undefined };
+    }) as never);
+    try {
+      const fix = deferred<unknown>();
+      mockCurrent.mockReturnValue(fix.promise);
+      mount();
+      let tap!: Promise<void>;
+      act(() => {
+        tap = goLiveWithFeedback();
+      });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(2_000);
+      });
+      expect(lead()).toBe("FINDING YOU");
+      await act(async () => {
+        Object.defineProperty(AppState, "currentState", { value: "background", configurable: true });
+        for (const h of [...handlers]) h("background");
+        await jest.advanceTimersByTimeAsync(25_000);
+        fix.resolve({ ...FRESH, timestamp: Date.now() });
+        Object.defineProperty(AppState, "currentState", { value: "active", configurable: true });
+        for (const h of [...handlers]) h("active");
+        await jest.advanceTimersByTimeAsync(10);
+        await tap;
+      });
+      expect(lead()).toBe("GO LIVE");
+      expect(frames).not.toContain("retry:off");
+      expect(mockToastInfo).not.toHaveBeenCalled();
+      expect(mockWrite).not.toHaveBeenCalled();
+      expect(logged()).toEqual([expect.objectContaining({ outcome: "dismissed" })]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("QA E and the cold-start flag hint: a restore's first frame", () => {
+  it("store read, no valid tag, permission believed granted: FINDING YOU from the first frame", async () => {
+    await loadDeviceLocation("me-1");
+    await readLocationPermission();
+    expect(restoreFirstFrame("me-1")).toBe("restore-finding");
+  });
+
+  it("store read, no tag, permission not believed granted: GO LIVE (hold)", async () => {
+    mockGetPermission.mockResolvedValue({ granted: false, canAskAgain: true, status: "undetermined" });
+    await loadDeviceLocation("me-1");
+    await readLocationPermission();
+    expect(restoreFirstFrame("me-1")).toBe("hold");
+  });
+
+  it("cold start live with the flag known OFF: LIVE from the first frame (never GO LIVE then LIVE)", () => {
+    mockFlagPeek = false;
+    mockLocationRequired = false;
+    mockAthlete = { ...ACTIVE, looking_for_ranked: true };
+    const write = deferred<boolean>();
+    mockWrite.mockReturnValue(write.promise);
+    mount();
+    expect(frames[0]).toBe("none:off");
+    // The layout effect draws before the first paint: no hold frame.
+    expect(frames).not.toContain("hold:off");
+    expect(lead()).toBe("LIVE");
+  });
+
+  it("cold start live with the flag unknown and the store not read: GO LIVE hold (never a provisional LIVE)", () => {
+    mockAthlete = { ...ACTIVE, looking_for_ranked: true };
+    mockWrite.mockReturnValue(new Promise(() => undefined));
+    mount();
+    expect(lead()).toBe("GO LIVE");
   });
 });
