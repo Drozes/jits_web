@@ -10,6 +10,7 @@ import { FilmScrim } from "./film-scrim";
 import { FilmBadge, toneFor } from "./status-badge";
 import { Button } from "@/components/ui/elo-system/button";
 import { TRY_AGAIN_A11Y, TRY_AGAIN_LABEL } from "@/lib/video/use-upload-actions";
+import { CARD_CAPTION, formatCountdown, PHASE_TAG } from "@/lib/video/video-status-copy";
 
 type Letter = "W" | "L" | "D";
 interface CardInk {
@@ -74,6 +75,14 @@ export function compactBadgeLabel(status: CardStatus): string | null {
       return "NEW";
     case "ready":
       return "READY";
+    // The server phases, in the tile's short words.
+    case "waiting":
+      return status.remainingMs != null && status.remainingMs > 0 ? formatCountdown(status.remainingMs) : PHASE_TAG.waiting.toUpperCase();
+    case "building":
+      return PHASE_TAG.building.toUpperCase();
+    case "collecting":
+    case "no_film":
+      return statusBadgeLabel(status);
     default:
       return null;
   }
@@ -84,7 +93,11 @@ function fallbackLabel(item: MatchLibraryItem, status: CardStatus): string {
   if (status.kind === "paused") return "UPLOAD PAUSED";
   if (status.kind === "upload_failed") return "DIDN'T UPLOAD";
   if (status.kind === "processing") return "PROCESSING FILM";
-  if (item.videos.length === 0) return "NO FILM RECORDED";
+  // No film: the badge alone, no centre caption (deck m3).
+  if (status.kind === "no_film") return "";
+  if (item.videos.length === 0) {
+    return status.kind === "collecting" || status.kind === "waiting" || status.kind === "building" ? CARD_CAPTION.arrivesAfterUpload : "NO FILM RECORDED";
+  }
   if (status.kind === "failed") return "FILM FAILED TO PROCESS";
   // The film is on the server and its still is not cut yet: the upload is
   // done, so never "after upload" here (jits-n2im.4 item 6).

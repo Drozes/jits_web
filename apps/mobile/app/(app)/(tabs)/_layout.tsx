@@ -6,6 +6,7 @@ import { ArenaTabBarIcon, ArenaTabSignalsProvider } from "@/components/layout/ar
 import { EloTabBar } from "@/components/layout/elo-tab-bar";
 import { arenaTabBadge } from "@/lib/arena/mat-board";
 import { useArenaTabState } from "@/lib/arena/use-arena-tab-badge";
+import { UploadStripSlot } from "@/components/video-status/upload-strip";
 
 /**
  * The bar plus its status marks. Its own component so the Arena state (the
@@ -26,6 +27,8 @@ function TabBar(props: BottomTabBarProps) {
   );
   return (
     <ArenaTabSignalsProvider value={signals}>
+      {/* The app-wide upload strip sits on the bar, never in the header (jits-n2im.2). */}
+      <UploadStripSlot placement="tabs" />
       <EloTabBar {...props} badges={{ arena: arenaTabBadge(arena) }} live={{ arena: arena.isLive }} />
     </ArenaTabSignalsProvider>
   );

@@ -1,5 +1,7 @@
 # Match video status: copy deck v2 (jits-n2im.24, jits-n2im.2)
 
+v2.3 (2026-10-05, with the build, jits-n2im.25 / .15): section 13 (Best angle) and section 14 (build notes) added; sections 0 to 12 unchanged.
+
 Status: DRAFT v2.2, 2026-10-05: v2 plus the round 2 changes (`REVIEW-round2.md`: N1, N2, m1 to m7, nits) and the owner's naming decisions (Timekeeper kept; both shipped nouns kept). Not published. This version
 applies every finding in `REVIEW-round1.md` (B1, B2, M1 to M14, the minors and the nits) and the
 coordinator's default answers to the open questions. Boards for the canvas page "Proposed (Oct 4
@@ -380,3 +382,41 @@ Terminal helpers that pair with it (section 8): `This clip is too big to upload 
 can't take a video anymore.`
 
 Shipped in M-UPLOAD (`apps/mobile/lib/video/use-upload-actions.ts`, `DISCARD_*`).
+
+## 13. Best angle (jits-n2im.15; added 2026-10-05 with the build)
+
+The server-elected primary angle (`is_primary` on a `get_match_video_status` angle, the
+`primary_video_id` of the match; jr_be-1qz.10) gets a small marker so the athlete knows which angle
+the match opens on and which one the breakdown is timed to.
+
+| Element | Copy | Notes |
+|---|---|---|
+| Tag on the angle's row in Film status (match detail plate and the verdict Film block) | `Best angle` | Mono caps (`BEST ANGLE`), the same bordered chip as the `Timekeeper` tag: `ink-2` text, `hairline-strong` border, 2px corners, beside the angle label. Never colored: it is not a state. |
+| Tag on the angle's chip in the angle switcher (full-screen player and match detail) | `Best angle` | A second line under the chip label, mono 10 caps, `ink-2` on the page / `ON_MEDIA.text2` over video (the selected chip uses its own selected ink). The chip stays 44 px. |
+| Accessibility | `Best angle` | Appended to the element's label: `D. OKAFOR'S ANGLE, Best angle` (chip), `Watch Demo Red's recording, Best angle` (row). |
+
+Shown only when **2+ angles are ready (playable)** and the server has elected a primary among them.
+One ready angle, no election (the multi-angle flag is off, so prod elects none today), or a primary
+that is not ready yet: no marker anywhere. The marker never moves with the athlete's own selection;
+the selection is the switcher's selected state.
+
+## 14. Build notes (jits-n2im.25; how the gates and gaps are resolved in code)
+
+All strings live in `apps/mobile/lib/video/video-status-copy.ts`; `lib/video/film-status.ts`
+derives the one view every surface renders.
+
+1. **Multi-angle gate.** "Fusion live" means the status document carries any fusion field
+   (`wait_extended` not null, `dispatched_at`, `angles_used`, `angles_used_count` or
+   `late_angle_until`). Without it: the collecting helper for `{k}` >= 2 is the single-angle
+   `Your {term} starts as soon as it's in.`, building reads `Building your {term}.` (never `from {n}
+   angles`), and no after-dispatch, late-angle or "updated with" helper is shown.
+2. **Timekeeper building, one angle or no fusion count:** `Building the players' {term}s.` (4b with
+   the "from {n} angles" clause dropped, as 4a does for `{n}` = 1).
+3. **Merge rule edge:** while this phone holds an upload job, `no_video_yet` and `nobody_recorded`
+   render as collecting (`Your film is on its way.`), so the plate never says "No video yet" over
+   "Your angle: Uploading".
+4. **Not drawn yet:** `Upload now` (2a, waiting_for_phone with the clip found) and the "late angle in
+   after you shared" plate helper (4a) have no server or client signal today; the strip's `Preparing
+   upload` state is not shown (the store's `pending` entry also means "recording started").
+5. **The timekeeper's match page** is the plate alone (`get_match_details` refuses the timekeeper;
+   the status RPC admits them), titled with the two competitors' short names.

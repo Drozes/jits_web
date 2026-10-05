@@ -22,6 +22,8 @@ interface VerdictHeroProps {
   filmExpected: boolean;
   /** The server already has a video row (either athlete), or this phone's landed. */
   hasServerVideo?: boolean;
+  /** The Film status's own caption when it says there is no film (yet); wins over the upload table. */
+  statusCaption?: string | null;
   topInset: number;
 }
 
@@ -50,7 +52,7 @@ function localOf(upload: UploadBannerState): Pick<MatchUploadEntry, "status" | "
   }
 }
 
-export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExpected, hasServerVideo, topInset }: VerdictHeroProps) {
+export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExpected, hasServerVideo, statusCaption, topInset }: VerdictHeroProps) {
   const p = usePalette();
   if (posterUrl) {
     return (
@@ -83,7 +85,9 @@ export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExp
   const label =
     upload.kind === "stopping"
       ? "FINISHING RECORDING"
-      : filmStillCaption(localOf(upload), hasServerVideo ?? filmExpected, "NO FILM FOR THIS MATCH");
+      : statusCaption
+        ? statusCaption
+        : filmStillCaption(localOf(upload), hasServerVideo ?? filmExpected, "NO FILM FOR THIS MATCH");
   return (
     <View testID="verdict-still-fallback" style={{ height: HERO_HEIGHT, backgroundColor: p.plate, borderBottomWidth: 1, borderColor: p.hairline }}>
       <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20, paddingTop: topInset }}>

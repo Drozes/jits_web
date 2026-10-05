@@ -10,6 +10,7 @@ import { useMatchUploads } from "@/lib/film-room/use-match-uploads";
 import { useSeenMatches } from "@/lib/film-room/seen-store";
 import { MetaTag } from "@/components/ui/elo-system";
 import { LibraryPoster } from "@/components/film-room/library-poster";
+import { useFilmRoomPhases } from "@/lib/film-room/use-film-room-phases";
 import type { StillAthlete } from "@/components/film-room/opening-still";
 
 /** Posters in the preview row. */
@@ -40,6 +41,7 @@ export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPrevi
   const open = React.useCallback((matchId: string) => router.push(matchDetailHref(matchId)), [router]);
   const seen = useSeenMatches();
   const filmed = React.useMemo(() => (items ?? []).slice(0, 20), [items]);
+  const phases = useFilmRoomPhases(filmed, items);
   const uploads = useMatchUploads(React.useMemo(() => filmed.map((i) => i.match_id), [filmed]));
   const preview = filmed
     .filter((i) => i.videos.length > 0 || uploads.has(i.match_id))
@@ -88,6 +90,7 @@ export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPrevi
                   testID={`past-video-row-${item.match_id}`}
                   accessibilityLabel={`Open match video vs ${name}`}
                   onOpen={open}
+                  phase={phases[item.match_id] ?? null}
                 />
               </View>
             );

@@ -2,6 +2,9 @@ import type { MatchLibraryItem, MatchLibraryVideo } from "@jits/shared/api/film-
 import type { MatchUploadEntry } from "@/lib/video/match-upload-store";
 import { uploadingLabel } from "@/lib/video/upload-copy";
 import { isTerminalUploadClass } from "@/lib/video/upload-errors";
+import type { MatchVideoPhase, MatchVideoPhaseReason } from "@jits/shared/api/match-video-status";
+import { CARD_BADGE, PHASE_TAG } from "@/lib/video/video-status-copy";
+import { formatCountdown } from "@/lib/video/video-status-copy";
 
 export { uploadingLabel };
 
@@ -31,7 +34,22 @@ export type CardStatus =
   | { kind: "analyzing"; done: number | null; total: number | null }
   | { kind: "new" }
   | { kind: "ready" }
-  | { kind: "none" };
+  | { kind: "none" }
+  // From the server's Film status phase (jits-n2im.25, deck section 9):
+  /** The wait for another angle; `remainingMs` <= 0 once the deadline passed. */
+  | { kind: "waiting"; remainingMs: number | null }
+  | { kind: "building" }
+  /** Film is coming in (phase collecting): "UPLOADING". */
+  | { kind: "collecting" }
+  | { kind: "no_film" };
+
+/** The server phase a card digests (`useFilmRoomPhases`), when it read one. */
+export interface CardPhase {
+  phase: MatchVideoPhase;
+  reason: MatchVideoPhaseReason | null;
+  /** Device ms left on the wait (server clock), while waiting. */
+  waitRemainingMs: number | null;
+}
 
 /** A film stays NEW for a week after the match if it was never opened. */
 export const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -55,6 +73,7 @@ export function deriveCardStatus(
   upload: MatchUploadEntry | null,
   seen: boolean,
   now: number = Date.now(),
+  phase: CardPhase | null = null,
 ): CardStatus {
   if (upload && (upload.status === "uploading" || upload.status === "pending")) {
     return { kind: "uploading", progress: upload.progress };
@@ -67,6 +86,29 @@ export function deriveCardStatus(
     return { kind: "upload_failed", terminal: isTerminalUploadClass(upload.errorClass) };
   }
   const videos = item.videos;
+  // With the server's phase in hand, the deck's priority (section 9):
+  // Waiting {mm:ss} > Building > Uploading (collecting) > New > Breakdown
+  // ready > No film. "Processing" is only ever an angle row (B1.1).
+  if (phase) {
+    switch (phase.phase) {
+      case "waiting_for_angle":
+        return { kind: "waiting", remainingMs: phase.waitRemainingMs };
+      case "building":
+        return { kind: "building" };
+      case "collecting":
+        return phase.reason === "no_video_yet" ? { kind: "none" } : { kind: "collecting" };
+      case "no_film":
+        return { kind: "no_film" };
+      case "ready": {
+        const completedAt = item.completed_at ? Date.parse(item.completed_at) : NaN;
+        const fresh = Number.isFinite(completedAt) && now - completedAt < NEW_WINDOW_MS;
+        if (!seen && fresh && videos.length > 0) return { kind: "new" };
+        return videos.some((v) => v.has_analysis) ? { kind: "ready" } : { kind: "none" };
+      }
+      default:
+        break;
+    }
+  }
   if (videos.length === 0) {
     // Landed a moment ago; the refetch (useRefetchOnUploadSettled) is on
     // its way. Until then this is film being processed, not no film.
@@ -115,6 +157,14 @@ export function statusBadgeLabel(status: CardStatus): string | null {
       return "NEW";
     case "ready":
       return "BREAKDOWN READY";
+    case "waiting":
+      return status.remainingMs != null && status.remainingMs > 0 ? CARD_BADGE.waiting(formatCountdown(status.remainingMs)) : PHASE_TAG.waiting.toUpperCase();
+    case "building":
+      return CARD_BADGE.building;
+    case "collecting":
+      return CARD_BADGE.uploading;
+    case "no_film":
+      return CARD_BADGE.noFilm;
     default:
       return null;
   }

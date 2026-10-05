@@ -53,6 +53,8 @@ jest.mock("@/components/ui/skeleton", () => {
 });
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// The Film status read is unavailable here: the wave 2 film rows stand in (jits-n2im.25).
+jest.mock("@/lib/video/use-film-status", () => require("../support/film-status-mock").unavailableFilmStatusModule());
 // Match-level match_videos realtime (jits-n2im.12): its own tests live in
 // packages/shared; here it is inert.
 const mockMatchVideosRealtime = jest.fn();
@@ -817,7 +819,7 @@ describe("wave 2: live angles, primary default, labels (jits-n2im.12 / .15)", ()
 
   it("defaults to the server-elected primary angle, not my own", async () => {
     const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO, is_primary: true })] }));
-    expect(utils.getByLabelText("D. RED'S ANGLE").props.accessibilityState).toMatchObject({ selected: true });
+    expect(utils.getByLabelText("D. RED'S ANGLE, Best angle").props.accessibilityState).toMatchObject({ selected: true });
     expect(utils.getByLabelText("YOUR ANGLE").props.accessibilityState).toMatchObject({ selected: false });
   });
 
@@ -872,5 +874,60 @@ describe("review minor 4: only playable angles are offered in the switcher", () 
   it("keeps two playable angles switchable", async () => {
     const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO })] }));
     utils.getByTestId("angle-switcher");
+  });
+});
+
+describe("the Film status plate (jits-n2im.25) and the video pushes landing on it (jits-n2im.13)", () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const filmMock = require("../support/film-status-mock") as typeof import("../support/film-status-mock");
+  const fx = require("../support/match-video-status-fixture") as typeof import("../support/match-video-status-fixture");
+  const { deriveFilmStatus } = require("@/lib/video/film-status") as typeof import("@/lib/video/film-status");
+  /* eslint-enable @typescript-eslint/no-require-imports */
+
+  const derive = (over: Record<string, unknown>, viewerId = fx.ME) => {
+    const status = fx.statusFixture(over);
+    return { status, view: deriveFilmStatus({ status, viewerId, local: null, nowMs: fx.NOW, clockOffsetMs: 0 }) };
+  };
+
+  afterEach(() => filmMock.setMockFilmStatus(null));
+
+  it("renders the plate under the result, replacing the wave 2 FILM rows (where film_ready / no_film land)", async () => {
+    filmMock.setMockFilmStatus(derive({ phase: "no_film", phase_reason: "none_usable", angles: [fx.angle("me", "no_match"), fx.angle("opp", "failed")] }));
+    const utils = await renderLoaded(view());
+    expect(utils.getByTestId("film-status")).toBeTruthy();
+    expect(utils.getByText("No film for this match.")).toBeTruthy();
+    expect(utils.getByText("None of the video could be used. Your result and rating aren't affected.")).toBeTruthy();
+    expect(utils.queryByTestId("film-angles")).toBeNull();
+  });
+
+  it("only a READY angle plays: hero, switcher and rows follow the status (rule 4)", async () => {
+    filmMock.setMockFilmStatus(
+      derive({ phase: "building", phase_reason: null, angles: [fx.angle("me", "processing", { video_id: "v-mine" }), fx.angle("opp", "ready", { video_id: "v-opp" })] }),
+    );
+    const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO })] }));
+    // The opponent's ready angle is the plate's one Watch row; mine is processing.
+    expect(utils.getByTestId("match-video-watch-v-opp").props.accessibilityLabel).toBe("Watch Demo Red's recording");
+    expect(utils.queryByTestId("match-video-watch-v-mine")).toBeNull();
+    // With one ready angle there is nothing to switch to.
+    expect(utils.queryByTestId("angle-switcher")).toBeNull();
+  });
+
+  it("the timekeeper, refused by get_match_details, gets the plate alone (timekeeper_film_ready lands here)", async () => {
+    filmMock.setMockFilmStatus(
+      derive({ phase: "ready", phase_reason: null, angles: [fx.angle("me", "ready"), fx.angle("opp", "ready"), fx.angle("tk", "ready")], reels: [{ athlete_id: fx.ME, state: "ready" }, { athlete_id: fx.OPP, state: "ready" }] }, fx.TK),
+    );
+    const utils = await renderLoaded({ ok: false, error: { code: "NOT_PARTICIPANT", message: "x" } });
+    expect(utils.getByTestId("timekeeper-film")).toBeTruthy();
+    expect(utils.getByText("M. Reyes vs D. Okafor")).toBeTruthy();
+    expect(utils.getByText("Film ready. Thanks for recording.")).toBeTruthy();
+    expect(utils.queryByTestId("match-detail-not-participant")).toBeNull();
+    fireEvent.press(utils.getByTestId(`match-video-watch-${fx.V_OPP}`));
+    expect(mockPush).toHaveBeenCalledWith(expect.stringContaining(fx.V_OPP));
+  });
+
+  it("a stranger is still refused (no timekeeper role in the status)", async () => {
+    filmMock.setMockFilmStatus({ view: null, status: null, error: { code: "NOT_PARTICIPANT", message: "x" } });
+    const utils = await renderLoaded({ ok: false, error: { code: "NOT_PARTICIPANT", message: "x" } });
+    expect(utils.getByTestId("match-detail-not-participant")).toBeTruthy();
   });
 });

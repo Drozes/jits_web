@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Match video status UX: Film status plate, upload strip, Best angle, video push landing (jits-n2im.25, .2, .15, .13)
+
+JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): no native dependency, no `app.json` / `app.config.js` / `eas.json` / metro / babel change; uses only `AccessibilityInfo`, `AppState` and supabase-js realtime, all in build 25. **Needs the jr_be wave B migrations `20261006100000` to `20261006100200` (live in prod, 2026-10-05).** The fusion fields (section 12) are NULL in prod (`multi_angle_highlights_enabled = false`), and the client never claims a multi-angle highlight without them. Copy: COPY-DECK v2.3 (sections 13 and 14 added).
+
+**Added**
+- `@jits/shared/api/match-video-status` (`packages/shared/src/api/match-video-status.ts`): `getMatchVideoStatus` (a `Result`, never an empty status on error) and `parseMatchVideoStatus`.
+- `useMatchVideoStatus(supabase, matchId, { subscribeForeground })` (`packages/shared/src/hooks/use-match-video-status.ts`): the RPC plus the `match_media_events` realtime (400 ms debounce, re-read on every join), foreground re-read, latest-response-wins with an `event_seq` guard, the server clock offset from `server_now`, and timed re-reads at the wait deadline (then a short poll while "Any second now"), the grace and film windows, and 130 s after a read with an uploading angle.
+- `apps/mobile/lib/video/video-status-copy.ts` (every status string, one module) and `lib/video/film-status.ts` (`deriveFilmStatus`: phase, rows, countdown, ready ids, Best angle; the local job wins only for "Your angle"); `lib/video/use-film-status.ts` (the hook plus screen-reader announcements on phase and row changes and at 5 min, 1 min and 0).
+- `components/video-status/film-status-plate.tsx` + `film-status-row.tsx`: the canonical Film status plate (match detail) and the verdict's Film block (same component), with 44 px Try again / Discard, the Timekeeper and Best angle tags, and the harness `match-video-watch-<id>` rows for ready angles.
+- `components/video-status/upload-strip.tsx`, `lib/video/upload-strip.ts`, `lib/video/upload-strip-visibility.ts`: the app-wide upload strip above the tab bar and above the safe area on pushed screens (jits-n2im.2), hidden on the countdown and live and on the same match's verdict and match detail; "Match video uploaded" for 4 s.
+- `components/match-flow/match-upload-line.tsx`: the compact line under End, Result and Confirm.
+- `components/match-detail/timekeeper-film.tsx`: the timekeeper's match page (the plate alone; `get_match_details` refuses them).
+- `lib/film-room/use-film-room-phases.ts`: the Film Room and Profile preview badges read the server phase for the newest matches (Waiting {mm:ss}, Building highlight, Uploading, No film).
+- Best angle (jits-n2im.15): the tag on the primary's row and on its angle switcher chip (player and match page), only with 2+ ready angles and an elected primary.
+
+**Changed**
+- Match detail: the plate sits under the result and replaces the upload card, FILM rows and no-video plate; only ready angles play (hero, rows, switcher hidden under two ready). The wave 2 rows stay as the fallback when the status read fails.
+- Verdict: the Film block replaces the upload card, the angle rows and the highlight note (the card stays only for "Finishing recording", a camera failure and a short clip); `Watch film` needs a ready angle; the hero caption follows the status (`NO VIDEO YET` in the grace window).
+- Notifications (jits-n2im.13): `film_ready`, `no_film` and `timekeeper_film_ready` open `/match-detail/<id>` (from `data.id` when the route is missing), are held during a live match and opened on the way out, with no banner over the match.
+- `packages/shared/src/types/database.ts` regenerated (additive) against a local stack at jr_be head `20261006200400`.
+
 ### Instant go-live: location ladder, device location store, optimistic chip, proximity flag, drift check (jits-jko7.1 to .4)
 
 Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) and the UX spec `research/019-optimistic-go-live-ux.md` (which wins on UX and copy; orchestrator rulings C1 to C7). JS-only on mobile (OTA-eligible: no dependency, no `app.json` / `app.config.js` change; `expo-secure-store`, `expo-location` and `@react-native-community/netinfo` are already in the binary). Safe before the jr_be migration `20261004100000_instant_go_live.sql`: a `PGRST202` for `p_captured_at` flips the app to the old fresh-reading flow and keeps the 60 s refresh for that backend.

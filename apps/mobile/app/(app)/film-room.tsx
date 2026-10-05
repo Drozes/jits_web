@@ -9,6 +9,7 @@ import { useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import { useMatchLibrary } from "@/lib/film-room/use-match-library";
+import { useFilmRoomPhases } from "@/lib/film-room/use-film-room-phases";
 import { useSeenMatches } from "@/lib/film-room/seen-store";
 import { applyFilter, buildRows, NO_FILTER, opponentsOf, recordOf, type LibraryFilter, type LibraryRow } from "@/lib/film-room/rows";
 import { recordStrip } from "@/lib/film-room/format";
@@ -40,6 +41,8 @@ export default function FilmRoomScreen() {
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const hasMore = library.hasMore;
+  // The server's Film status for the newest matches (badge priority, deck 9).
+  const phases = useFilmRoomPhases(library.items, library.items);
   const ids = React.useMemo(() => library.items.map((i) => i.match_id), [library.items]);
   useRefetchOnUploadSettled(ids, library.revalidate);
   useRefetchOnRefocus(library.revalidate, useMatchExitCount());
@@ -68,13 +71,14 @@ export default function FilmRoomScreen() {
               viewer={viewer}
               seen={!seen.ready || seen.isSeen(m.match_id)}
               onOpen={open}
+              phase={phases[m.match_id] ?? null}
             />
           ))}
           {row.items.length === 1 ? <View className="flex-1" /> : null}
         </View>
       );
     },
-    [viewer, seen, open, hasMore],
+    [viewer, seen, open, hasMore, phases],
   );
 
   const header = (

@@ -54,6 +54,10 @@ export interface LocalAngleJob {
   progress: number | null;
   /** A failure a retry cannot fix (grey, nothing to do). */
   terminal: boolean;
+  /** The store's friendly cause (deck section 8) for a paused or failed job. */
+  message?: string | null;
+  /** A terminal failure with the clip still on this phone: Discard is offered (deck 12). */
+  discardable?: boolean;
 }
 
 export interface AngleStatusContext {
@@ -159,11 +163,17 @@ export function angleRowA11yLabel(label: string, roleTag: string | null, status:
 }
 
 /** This phone's store entry as the row sees it: null once it landed (the server row is the truth then). */
-export function localAngleJob(entry: Pick<MatchUploadEntry, "status" | "progress" | "errorClass"> | null | undefined): LocalAngleJob | null {
+export function localAngleJob(
+  entry: Pick<MatchUploadEntry, "status" | "progress" | "errorClass"> & Partial<Pick<MatchUploadEntry, "error">> | null | undefined,
+): LocalAngleJob | null {
   if (!entry || entry.status === "uploaded") return null;
+  const terminal = entry.status === "error" && isTerminalUploadClass(entry.errorClass);
   return {
     status: entry.status,
     progress: entry.progress ?? null,
-    terminal: entry.status === "error" && isTerminalUploadClass(entry.errorClass),
+    terminal,
+    message: entry.status === "paused" || entry.status === "error" ? (entry.error ?? null) : null,
+    // A missing clip has nothing left to drop (uploadBannerActions).
+    discardable: terminal && entry.errorClass !== "file_missing",
   };
 }

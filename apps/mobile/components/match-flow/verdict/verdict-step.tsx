@@ -28,6 +28,22 @@ import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { useScrolledPast } from "../wizard-scroll";
 import { SummaryHighlightNote } from "../steps/summary-highlight-note";
 import { VerdictAngleRows } from "./verdict-angle-rows";
+import { FilmStatusPlate } from "@/components/video-status/film-status-plate";
+import { useFilmStatus } from "@/lib/video/use-film-status";
+import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
+import { HERO_CAPTION } from "@/lib/video/video-status-copy";
+import { videoHref } from "@/lib/film-room/href";
+
+/**
+ * With the Film block on screen, the upload card stays only for what the
+ * block has no row for: the recorder still finishing, a recorder failure
+ * (no upload class), and a landed clip that stops before the end.
+ */
+export function showRecorderBanner(upload: UploadBannerState): boolean {
+  if (upload.kind === "stopping") return true;
+  if (upload.kind === "error") return upload.errorClass == null;
+  return upload.kind === "uploaded" && upload.truncation != null;
+}
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;
@@ -133,6 +149,12 @@ export function VerdictStep(props: VerdictStepProps) {
   const loss = !disputed && outcome === "loss";
 
   const videos = useVerdictVideos(matchId, me.athlete_id, uploadedVideoId);
+  // The Film block (jits-n2im.25): the same plate and strings as match
+  // detail. It replaces the upload card, the angle rows and the highlight
+  // note; the wave 2 pieces stand in only while the status is unavailable.
+  const filmStatus = useFilmStatus(matchId, me.athlete_id);
+  const fsView = filmStatus.view;
+  useSuppressUploadStrip({ kind: "match", matchId });
   const rank = useRankChange(matchId, win);
   const rankText = win ? rankStripText(rank, shortName) : null;
 
@@ -158,12 +180,20 @@ export function VerdictStep(props: VerdictStepProps) {
   const uploadOwed =
     upload.kind === "paused" || (upload.kind === "error" && upload.errorClass != null && !isTerminalUploadClass(upload.errorClass));
   const hasServerVideo = videos.hasVideo || uploadedVideoId != null;
-  const filmExpected = hasServerVideo || uploadBusy || uploadOwed;
+  const filmExpected = hasServerVideo || uploadBusy || uploadOwed || (fsView != null && fsView.phase !== "no_film" && fsView.rows.length > 0);
+  const statusCaption = fsView
+    ? fsView.phase === "no_film"
+      ? HERO_CAPTION.noFilm
+      : fsView.phaseKey === "no_video_yet"
+        ? HERO_CAPTION.noVideoYet
+        : null
+    : null;
   // Deck rule 4 (overrides the bead's "disabled while uploading"): nothing
   // offers playback of an angle that is not ready. "Open match" (always
   // enabled: the match page has the upload card and its Try again) until an
   // angle can play, then "Watch film".
-  const canWatch = videos.hasPlayable;
+  // With the status in hand, "ready" is the bar (rule 4), as on the plate.
+  const canWatch = fsView ? fsView.readyVideoIds.length > 0 : videos.hasPlayable;
   const watchLabel = canWatch ? "Watch film" : "Open match";
   const uploadActions = useUploadActions(matchId);
   const watch = () => router.push(matchDetailHref(matchId));
@@ -199,6 +229,7 @@ export function VerdictStep(props: VerdictStepProps) {
         upload={upload}
         filmExpected={filmExpected}
         hasServerVideo={hasServerVideo}
+        statusCaption={statusCaption}
         topInset={insets.top}
       />
       {win ? <Confetti play={play} /> : null}
@@ -256,18 +287,29 @@ export function VerdictStep(props: VerdictStepProps) {
           <Mono size="micro" spacing="caps">{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. Heavier athlete’s ELO was adjusted.`}</Mono>
         ) : null}
 
-        {upload.kind !== "hidden" ? (
-          <UploadProgressBanner {...upload} onRetry={uploadActions.retry} onDiscard={uploadActions.discard} />
-        ) : null}
+        {fsView ? (
+          <>
+            {/* Recorder-only states the Film block has no row for: the
+                camera still finishing, a camera failure, a short clip. */}
+            {showRecorderBanner(upload) ? <UploadProgressBanner {...upload} onRetry={uploadActions.retry} onDiscard={uploadActions.discard} /> : null}
+            <FilmStatusPlate matchId={matchId} view={fsView} variant="verdict" testID="verdict-film" onWatch={(id) => router.push(videoHref(id))} />
+          </>
+        ) : (
+          <>
+            {upload.kind !== "hidden" ? (
+              <UploadProgressBanner {...upload} onRetry={uploadActions.retry} onDiscard={uploadActions.discard} />
+            ) : null}
 
-        {/* The other athlete's angle, live (jits-n2im.12). */}
-        <VerdictAngleRows videos={videos.others} opponentName={opponent.display_name} />
+            {/* The other athlete's angle, live (jits-n2im.12). */}
+            <VerdictAngleRows videos={videos.others} opponentName={opponent.display_name} />
 
-        {/* A reel is on its way when THIS phone's clip landed or is still
-            uploading (spec 015 section 16.6.4; the pre-redesign summary's
-            videoId || videoPending). Not on a disputed result: the match is
-            under admin review, so no reel is promised. */}
-        <SummaryHighlightNote hasVideo={(uploadedVideoId != null || uploadBusy || uploadOwed) && !disputed} />
+            {/* A reel is on its way when THIS phone's clip landed or is still
+                uploading (spec 015 section 16.6.4; the pre-redesign summary's
+                videoId || videoPending). Not on a disputed result: the match is
+                under admin review, so no reel is promised. */}
+            <SummaryHighlightNote hasVideo={(uploadedVideoId != null || uploadBusy || uploadOwed) && !disputed} />
+          </>
+        )}
 
         <View style={{ gap: 12 }}>
           <FightButton
