@@ -8,6 +8,7 @@ export * from "./highlight-share";
 export * from "./film-room";
 export * from "./poster-signing";
 export * from "./match-rank-change";
+export * from "./match-video-upload";
 export * from "./athlete-weight";
 export * from "./match-weights";
 export * from "./match-weight-checks";

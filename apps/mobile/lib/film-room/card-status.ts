@@ -88,7 +88,8 @@ export function deriveCardStatus(
 
   const completedAt = item.completed_at ? Date.parse(item.completed_at) : NaN;
   const fresh = Number.isFinite(completedAt) && now - completedAt < NEW_WINDOW_MS;
-  const playable = videos.some((v) => v.playability !== "processing");
+  // Only an angle that plays makes the card NEW (a failed one may have no file).
+  const playable = videos.some((v) => v.playability === "playable");
   if (!seen && fresh && playable) return { kind: "new" };
   if (anyAnalysis) return { kind: "ready" };
   return { kind: "none" };

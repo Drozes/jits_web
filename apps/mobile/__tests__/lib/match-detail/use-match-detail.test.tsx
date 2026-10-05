@@ -13,6 +13,12 @@ jest.mock("expo-router", () => ({
 }));
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// Match-level match_videos realtime (jits-n2im.12): its own tests live in
+// packages/shared; here it is inert.
+const mockMatchVideosRealtime = jest.fn();
+jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
+  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a) ?? { subscribed: true },
+}));
 
 let mockAthleteId: string | undefined = "me-1";
 jest.mock("@/lib/auth/hooks", () => ({
@@ -132,5 +138,35 @@ describe("useMatchDetail", () => {
     });
     await waitFor(() => expect(mockGet).toHaveBeenCalledTimes(2));
     expect(result.current.state).toBe("ready");
+  });
+});
+
+describe("realtime match_videos (jits-n2im.12)", () => {
+  it("subscribes to the match and re-reads in place on a change, with no pull spinner", async () => {
+    mockGet.mockResolvedValueOnce(ok("a"));
+    const { result } = renderHook(() => useMatchDetail(ID));
+    await waitFor(() => expect(result.current.state).toBe("ready"));
+    const last = mockMatchVideosRealtime.mock.calls[mockMatchVideosRealtime.mock.calls.length - 1];
+    expect(last[1]).toBe(ID);
+    const onChange = last[2] as () => void;
+
+    const d = deferred<unknown>();
+    mockGet.mockReturnValueOnce(d.promise);
+    act(() => onChange());
+    // In flight, the page stays as it was: no refreshing flag.
+    expect(result.current.refreshing).toBe(false);
+    await act(async () => {
+      d.resolve(ok("b"));
+      await d.promise;
+    });
+    expect(mockGet).toHaveBeenCalledTimes(2);
+    expect((result.current.data?.match as unknown as { tag: string }).tag).toBe("b");
+    expect(result.current.refreshing).toBe(false);
+  });
+
+  it("stays unsubscribed until the athlete is known", () => {
+    mockAthleteId = undefined;
+    renderHook(() => useMatchDetail(ID));
+    expect(mockMatchVideosRealtime.mock.calls.every((c) => c[1] === null)).toBe(true);
   });
 });

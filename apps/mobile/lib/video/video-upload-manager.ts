@@ -3,16 +3,28 @@ import NetInfo from "@react-native-community/netinfo";
 import { backoffDelayMs, classifyUploadError } from "@jits/shared/utils";
 import { captureException } from "@/lib/error-tracking/sentry";
 import {
+  abandonMatchVideoRow,
+  buildVideoPath,
+  finalizeMatchVideoRow,
   getRecordingSize,
+  preflightMatchVideoUpload,
+  readMatchVideoKey,
   removeUploadedObject,
+  reserveMatchVideoRow,
+  touchMatchVideoRow,
   uploadFileResumable,
   writeMatchVideoRow,
   type MatchVideoGate,
 } from "./upload-recording";
 import { releaseRecording, retainRecording } from "./recording-file";
 import {
+  type PendingAbandon,
   type PendingUploadJob,
+  UPLOAD_JOB_MAX_AGE_MS,
   isJobExpired,
+  loadPendingAbandons,
+  removePendingAbandon,
+  savePendingAbandon,
   loadUploadJob,
   loadUploadJobs,
   patchUploadJob,
@@ -28,7 +40,9 @@ import {
 import type { RecordingTruncation } from "./use-video-recorder";
 import {
   classifyByteFailure,
+  classifyReserveFailure,
   classifyRowFailure,
+  preflightClass,
   RETRY_FAILED_AGAIN_COPY,
   describeUploadFailure,
   isTerminalUploadClass,
@@ -74,6 +88,18 @@ import {
  *   4. a successful storage write is NEVER undone by a failed DB write.
  *      The row is retried on its own schedule, and the object is deleted
  *      only when the job is abandoned outright.
+ *
+ * RESERVE BEFORE BYTES (jits-n2im.11, protocol 2). A fresh recording now
+ * runs: preflight (`can_upload_match_video`, advisory) -> reserve (INSERT the
+ * `match_videos` row at 'uploading' with the final key, the size and the
+ * record start time) -> bytes over tus, with a heartbeat at most every
+ * UPLOAD_HEARTBEAT_INTERVAL_MS and once on pause -> land (PATCH to 'ready';
+ * the storage trigger may have flipped it already, which is fine). So the
+ * opponent sees the angle arriving, and every server gate refuses the upload
+ * before a single byte is spent. The reserved id is persisted the moment the
+ * INSERT returns, and a reservation retried after a kill re-uses the row
+ * (23505 -> re-path, a same-key echo) rather than creating a second one.
+ * A job persisted by the wave 1 build (protocol 1) finishes the old way.
  */
 
 /** Attempts at the byte upload before the job is parked for a later resume. */
@@ -113,6 +139,13 @@ export const STALL_CHECK_INTERVAL_MS = 15_000;
  */
 export const FOREGROUND_RETRY_BASE_MS = 120_000;
 export const FOREGROUND_RETRY_MAX_MS = 600_000;
+/** At most one `touch_match_video_upload` per reserved row per this window. */
+export const UPLOAD_HEARTBEAT_INTERVAL_MS = 30_000;
+/**
+ * How long an abandon waits on `abandon_match_video_upload` before giving up
+ * on the answer. Without the answer a landed object is KEPT, never deleted.
+ */
+export const ABANDON_RPC_TIMEOUT_MS = 10_000;
 
 export type UploadOutcome =
   | { ok: true; videoId: string }
@@ -127,6 +160,10 @@ export interface StartUploadParams {
   storagePath: string;
   ext?: string;
   truncation?: RecordingTruncation | null;
+  /** Wall-clock (epoch ms) the recorder started; sent with the reservation. */
+  recordStartedAt?: number | null;
+  /** Recorder-measured clip length in ms; sent with the reservation. */
+  recordDurationMs?: number | null;
 }
 
 type JobPatch = Partial<Omit<PendingUploadJob, "matchId">>;
@@ -180,6 +217,66 @@ const retryTimers = new Map<string, { timer: ReturnType<typeof setTimeout> | nul
  * silent-RLS-denial report, jits-jm9r).
  */
 const abandonClaims = new Set<string>();
+
+/** Last heartbeat per reserved row id, so resumed attempts share the throttle. */
+const lastHeartbeatAt = new Map<string, number>();
+
+/** True for a job on the reserve-before-bytes lifecycle (protocol 2). */
+function isReserved(job: PendingUploadJob): boolean {
+  return job.protocol === 2;
+}
+
+/**
+ * Report confirmed bytes for a reserved row: at most once per
+ * UPLOAD_HEARTBEAT_INTERVAL_MS while bytes move, or now (`force`) when the
+ * upload pauses. Fire and forget; protocol 1 jobs have no row to touch.
+ */
+function heartbeat(job: PendingUploadJob, bytesConfirmed: number, force: boolean): void {
+  const videoId = job.videoId;
+  if (!isReserved(job) || !videoId) return;
+  const now = Date.now();
+  const last = lastHeartbeatAt.get(videoId);
+  if (!force && last != null && now - last < UPLOAD_HEARTBEAT_INTERVAL_MS) return;
+  lastHeartbeatAt.set(videoId, now);
+  void touchMatchVideoRow({ videoId, bytesConfirmed, bytesTotal: job.fileSizeBytes });
+}
+
+function hintOf(err: unknown): string | null {
+  const hint = (err as { hint?: unknown } | null)?.hint;
+  return typeof hint === "string" ? hint : null;
+}
+
+/**
+ * Give a job a fresh storage key. Only ever before any byte of the NEW key
+ * is sent, which is why the tus URL and offset reset with it: a reservation
+ * the server refused for its key (42501 `invalid_storage_path`), or a row
+ * that was abandoned under the old key (a same-key PATCH cannot revive it).
+ */
+async function rekeyJob(job: PendingUploadJob, handle: RunnerHandle, isCurrent: () => boolean): Promise<PendingUploadJob> {
+  const patch: JobPatch = {
+    storagePath: buildVideoPath(job.matchId, job.uploaderAthleteId, job.ext),
+    uploadUrl: null,
+    bytesUploaded: 0,
+  };
+  const next = (await patchUploadJob(job.matchId, patch)) ?? { ...job, ...patch };
+  if (isCurrent()) {
+    handle.storagePath = next.storagePath;
+    setMatchUpload(job.matchId, { storagePath: next.storagePath });
+  }
+  return next;
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 const activityListeners = new Set<() => void>();
 
@@ -455,6 +552,7 @@ async function uploadBytes(
           stall.ping();
           if (!isCurrent()) return;
           setMatchUpload(current.matchId, { progress: ratio(sent, total) });
+          heartbeat(current, sent, false);
           const now = Date.now();
           if (now - lastPersistedAt >= PROGRESS_PERSIST_INTERVAL_MS) {
             lastPersistedAt = now;
@@ -472,7 +570,13 @@ async function uploadBytes(
       // slicer at a nonexistent file while the user is told the video
       // uploaded.
       if (!isCurrent()) {
-        await discardSupersededObject(current.matchId, current.storagePath);
+        // M1: a reserved job's row may ALREADY be 'ready' on this key (the
+        // storage trigger flips it the moment the last byte lands), and the
+        // newer recording's reservation may never move it off. So a
+        // protocol 2 object is never deleted here; the newer job deletes it
+        // once its own reservation has re-pathed the row (see
+        // `previousStoragePath`). A protocol 1 object has no row yet.
+        if (!isReserved(current)) await discardSupersededObject(current.matchId, current.storagePath);
         return superseded();
       }
 
@@ -593,6 +697,244 @@ async function writeRow(
 }
 
 // ---------------------------------------------------------------------------
+// Reservation (protocol 2, jits-n2im.11) and the land PATCH
+// ---------------------------------------------------------------------------
+
+type ReserveResult =
+  | { ok: true; job: PendingUploadJob; landed: boolean }
+  | { ok: false; error: string; klass: UploadErrorClass; superseded?: boolean; dropped?: boolean };
+
+/**
+ * B1: the athlete already has a row WITH BYTES for this match (a re-record).
+ * Re-pathing it now would fire the server's re-upload reset (chunks,
+ * analysis, AI tags, poster, highlights) before a single new byte exists,
+ * and a re-record that never lands (offline, Discard, the 7-day expiry)
+ * would take the earlier, good video with it. So this job runs in the
+ * wave 1 order instead: bytes first, then the INSERT at 'ready' whose 23505
+ * fallback replaces the row only once the new bytes are in.
+ */
+async function deferToLegacyOrder(job: PendingUploadJob, existingStatus: string | null): Promise<PendingUploadJob> {
+  console.warn(
+    `[video] ${job.matchId} already has a video (${existingStatus ?? "unknown"}); uploading first, replacing it only after the bytes land`,
+  );
+  const patch: JobPatch = { protocol: 1, videoId: null, attempt: 0, lastError: null, errorClass: null };
+  return (await patchUploadJob(job.matchId, patch)) ?? { ...job, ...patch };
+}
+
+/**
+ * Preflight, then reserve the `match_videos` row at 'uploading', BEFORE any
+ * byte. Every server gate (uploads off, cohort, daily cap, the re-slice
+ * ceiling on a re-path) refuses here, so a refused upload costs no data.
+ *
+ * The reserved id is persisted the moment the write returns. A kill before
+ * that leaves the job in phase "bytes" with no id, and the next run's
+ * reservation answers 23505 and takes the same row over with a same-key
+ * echo: one row, never two. When that echo finds the row already past
+ * 'uploading' under our key, the bytes landed before the kill (the storage
+ * trigger flipped it) and the job skips straight to done (`landed`).
+ */
+async function reserveRow(
+  job: PendingUploadJob,
+  handle: RunnerHandle,
+  isCurrent: () => boolean,
+): Promise<ReserveResult> {
+  const superseded: ReserveResult = {
+    ok: false,
+    error: "Superseded by a newer recording",
+    klass: "unknown",
+    superseded: true,
+  };
+  let current = job;
+  let lastError = "Reserving the video record failed";
+  let lastClass: UploadErrorClass = "server";
+  let rekeyed = false;
+
+  // Advisory: null (offline, older backend) falls through to the
+  // reservation, whose triggers enforce the same predicates.
+  const preflight = await preflightMatchVideoUpload(current.matchId, current.fileSizeBytes);
+  if (!isCurrent()) return superseded;
+  const refused = preflight && !preflight.allowed ? preflightClass(preflight.reason) : null;
+  if (preflight && preflight.reason === "duplicate" && preflight.existingStatus !== "uploading") {
+    // Abandoned rows read "failed" here too; the legacy order is safe for
+    // them as well (the 23505 fallback re-paths them after the bytes).
+    return { ok: true, job: await deferToLegacyOrder(current, preflight.existingStatus), landed: false };
+  }
+  if (refused) {
+    lastError = `preflight refused: ${preflight?.reason}`;
+    trackAttemptFailed({
+      matchId: current.matchId,
+      phase: "reserve",
+      attempt: 1,
+      offset: 0,
+      status: null,
+      klass: refused,
+      raw: lastError,
+    });
+    await patchUploadJob(current.matchId, { lastError, errorClass: refused });
+    return { ok: false, error: lastError, klass: refused };
+  }
+
+  for (let attempt = 1; attempt <= ROW_MAX_ATTEMPTS; attempt++) {
+    if (!isCurrent()) return superseded;
+    try {
+      const row = await reserveMatchVideoRow({
+        matchId: current.matchId,
+        uploaderAthleteId: current.uploaderAthleteId,
+        storagePath: current.storagePath,
+        fileSizeBytes: current.fileSizeBytes,
+        recordStartedAt: current.recordStartedAt ?? null,
+        recordDurationMs: current.recordDurationMs ?? null,
+      });
+      if (!isCurrent()) return superseded;
+      if (row.outcome === "deferred") {
+        // The server-side check of the same rule (covers a null preflight).
+        return { ok: true, job: await deferToLegacyOrder(current, row.status), landed: false };
+      }
+      const sameKey = row.storagePath === current.storagePath;
+      if (sameKey && row.status === "deleted") {
+        // The athlete deleted this video while it was still arriving. Never
+        // revive it (minor 6): drop the job.
+        return { ok: false, error: "the reserved video was deleted", klass: "unknown", dropped: true };
+      }
+      if (sameKey && row.status === "failed" && !rekeyed) {
+        // Our own row, abandoned under this key: a same-key PATCH cannot
+        // change its status. A new key can, for free.
+        rekeyed = true;
+        current = await rekeyJob(current, handle, isCurrent);
+        continue;
+      }
+      if (row.previousStoragePath && row.previousStoragePath !== current.storagePath) {
+        // The row moved off an older recording's key (one that never landed,
+        // or a superseded runner left it): nothing references that object
+        // any more, so this job cleans it up (M1).
+        void removeUploadedObject(row.previousStoragePath);
+      }
+      const landed = sameKey && !["uploading", "failed", "deleted"].includes(row.status);
+      const patch: JobPatch = { videoId: row.id, attempt: 0, lastError: null, errorClass: null };
+      if (landed) {
+        patch.phase = "row";
+        patch.bytesUploaded = current.fileSizeBytes;
+      }
+      current = (await patchUploadJob(current.matchId, patch)) ?? { ...current, ...patch };
+      return { ok: true, job: current, landed };
+    } catch (err) {
+      lastError = messageOf(err);
+      if (!isCurrent()) return superseded;
+      if (hintOf(err) === "invalid_storage_path" && !rekeyed) {
+        // The server refused the KEY (42501): mint a canonical one and try
+        // once more. Never loops: a second refusal is classified below.
+        console.warn(`[video] reservation for ${current.matchId} refused its storage key; re-keying once`);
+        captureException(new Error("Match-video reservation refused its storage path"), {
+          matchId: current.matchId,
+          storagePath: current.storagePath,
+        });
+        rekeyed = true;
+        current = await rekeyJob(current, handle, isCurrent);
+        continue;
+      }
+      lastClass = classifyReserveFailure(err);
+      console.warn(
+        `[video] match_videos reservation ${attempt}/${ROW_MAX_ATTEMPTS} for ${current.matchId} failed: ${lastError}`,
+      );
+      trackAttemptFailed({
+        matchId: current.matchId,
+        phase: "reserve",
+        attempt,
+        offset: 0,
+        status: null,
+        klass: lastClass,
+        raw: lastError,
+      });
+      await patchUploadJob(current.matchId, { attempt, lastError, errorClass: lastClass });
+      // A gate or an RLS refusal does not lift within a backoff window.
+      if (gateOf(err) || lastClass === "not_allowed") break;
+      if (attempt >= ROW_MAX_ATTEMPTS) break;
+      await backoffSleep(handle, backoffDelayMs(attempt, ROW_BACKOFF));
+    }
+  }
+  return { ok: false, error: lastError, klass: lastClass };
+}
+
+type FinalizeResult =
+  | { ok: true; videoId: string }
+  | {
+      ok: false;
+      error: string;
+      klass: UploadErrorClass;
+      superseded?: boolean;
+      moved?: boolean;
+      abandoned?: boolean;
+      dropped?: boolean;
+    };
+
+/**
+ * Land a reserved row: PATCH 'uploading' -> 'ready' (filtered on our key, so
+ * it can never flip a newer recording's reservation). The storage trigger
+ * may have flipped it first; the PATCH is then a no-op that still reads
+ * "landed", and exactly one slice runs. A row that vanished falls back to the
+ * wave 1 INSERT at 'ready' (the bytes are in, they just need a row).
+ */
+async function finalizeRow(
+  job: PendingUploadJob,
+  handle: RunnerHandle,
+  isCurrent: () => boolean,
+): Promise<FinalizeResult> {
+  const videoId = job.videoId as string;
+  let lastError = "Saving the video record failed";
+  let lastClass: UploadErrorClass = "save_failed";
+  const superseded: FinalizeResult = {
+    ok: false,
+    error: "Superseded by a newer recording",
+    klass: "unknown",
+    superseded: true,
+  };
+
+  for (let attempt = 1; attempt <= ROW_MAX_ATTEMPTS; attempt++) {
+    if (!isCurrent()) return superseded;
+    try {
+      const out = await finalizeMatchVideoRow({ videoId, storagePath: job.storagePath });
+      if (out.outcome === "landed") return { ok: true, videoId };
+      if (out.outcome === "deleted") {
+        return { ok: false, error: "the reserved video was deleted", klass: "unknown", dropped: true };
+      }
+      if (out.outcome === "moved") {
+        return { ok: false, error: "The match video row now points at another recording", klass: "unknown", moved: true };
+      }
+      if (out.outcome === "abandoned") {
+        return { ok: false, error: `reserved row failed (${out.failureCode ?? "no failure_code"})`, klass: "server", abandoned: true };
+      }
+      // missing: the row was deleted under us. Bytes are in; write one.
+      const id = await writeMatchVideoRow({
+        matchId: job.matchId,
+        uploaderAthleteId: job.uploaderAthleteId,
+        storagePath: job.storagePath,
+        fileSizeBytes: job.fileSizeBytes,
+      });
+      return { ok: true, videoId: id };
+    } catch (err) {
+      lastError = messageOf(err);
+      lastClass = classifyRowFailure(err);
+      console.warn(`[video] land ${attempt}/${ROW_MAX_ATTEMPTS} for ${job.matchId} failed: ${lastError}`);
+      if (!isCurrent()) return superseded;
+      trackAttemptFailed({
+        matchId: job.matchId,
+        phase: "row",
+        attempt,
+        offset: job.fileSizeBytes,
+        status: null,
+        klass: lastClass,
+        raw: lastError,
+      });
+      await patchUploadJob(job.matchId, { attempt, lastError, errorClass: lastClass });
+      if (gateOf(err)) return { ok: false, error: lastError, klass: lastClass };
+      if (attempt >= ROW_MAX_ATTEMPTS) break;
+      await backoffSleep(handle, backoffDelayMs(attempt, ROW_BACKOFF));
+    }
+  }
+  return { ok: false, error: lastError, klass: lastClass };
+}
+
+// ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 
@@ -615,9 +957,93 @@ async function abandonJob(job: PendingUploadJob, reason: string): Promise<void> 
     errorClass: job.errorClass,
     ageMs: Date.now() - job.createdAt,
   });
-  if (job.phase === "row") await removeUploadedObject(job.storagePath);
+  if (isReserved(job) && job.videoId) {
+    // Tell the server first (jits-n2im.11): the reserved row goes
+    // 'uploading' -> 'failed' (upload_abandoned) instead of sitting there
+    // for the 7-day reaper. In phase "row" the object is deleted ONLY when
+    // the row really gave up on it: a row the storage trigger already
+    // flipped to 'ready' is live and uses those bytes, and an unanswered
+    // call (offline, timeout) keeps them. A leaked object is recoverable; a
+    // deleted live recording is not.
+    //
+    // The call is recorded BEFORE it is made and forgotten only once the
+    // server answers (minor 5): an unanswered one is retried on the next
+    // resume sweep, so a Discard made offline still fails the row. A row the
+    // storage trigger already flipped live stays live (abandon answers
+    // `abandoned: false`); that is the server's truth, not a lost clip.
+    const rec: PendingAbandon = {
+      videoId: job.videoId,
+      uploaderAthleteId: job.uploaderAthleteId,
+      matchId: job.matchId,
+      storagePath: job.storagePath,
+      phase: job.phase,
+      createdAt: Date.now(),
+    };
+    await savePendingAbandon(rec);
+    // The resolution keeps running past the timeout and cleans up after
+    // itself if the answer arrives late.
+    await withTimeout(resolvePendingAbandon(rec), ABANDON_RPC_TIMEOUT_MS);
+    lastHeartbeatAt.delete(job.videoId);
+  } else if (job.phase === "row") {
+    await removeUploadedObject(job.storagePath);
+  }
   await removeUploadJob(job.matchId);
   releaseRecording(job.fileUri);
+}
+
+/** Abandons being sent right now, so a sweep never doubles one. */
+const abandonsInFlight = new Set<string>();
+
+/**
+ * Send one pending abandon. Removes the record once the server answered;
+ * keeps it (for the next sweep) when it did not. In phase "row" the object
+ * goes only when the row really gave up on it.
+ */
+async function resolvePendingAbandon(rec: PendingAbandon): Promise<void> {
+  if (abandonsInFlight.has(rec.videoId)) return;
+  abandonsInFlight.add(rec.videoId);
+  try {
+    const res = await abandonMatchVideoRow(rec.videoId);
+    if (!res) return;
+    if (rec.phase === "row" && res.abandoned) await removeUploadedObject(rec.storagePath);
+    await removePendingAbandon(rec.videoId);
+  } finally {
+    abandonsInFlight.delete(rec.videoId);
+  }
+}
+
+/**
+ * A RETRIED abandon first checks the row still points at the saved key
+ * (review R2-m1): a newer recording on the same match may have re-pathed
+ * that row to its own reservation since, and abandoning by id would fail
+ * the NEW upload. A moved or vanished row drops the record; an unreadable
+ * one keeps it for the next sweep.
+ */
+async function retryPendingAbandon(rec: PendingAbandon): Promise<void> {
+  if (abandonsInFlight.has(rec.videoId)) return;
+  const key = await readMatchVideoKey(rec.videoId);
+  if (key === undefined) return;
+  if (key === null || key !== rec.storagePath) {
+    console.warn(`[video] pending abandon of ${rec.videoId} skipped: the row ${key === null ? "is gone" : "moved to another recording"}`);
+    await removePendingAbandon(rec.videoId);
+    return;
+  }
+  await resolvePendingAbandon(rec);
+}
+
+/** Retry this athlete's unanswered abandons (fire and forget, from the resume sweep). */
+async function retryPendingAbandons(): Promise<void> {
+  const mine = owner;
+  if (!mine) return;
+  for (const rec of await loadPendingAbandons()) {
+    if (rec.uploaderAthleteId !== mine) continue;
+    if (Date.now() - rec.createdAt > UPLOAD_JOB_MAX_AGE_MS) {
+      // The server's reaper has failed the row by now.
+      await removePendingAbandon(rec.videoId);
+      continue;
+    }
+    void retryPendingAbandon(rec);
+  }
 }
 
 function cancelPendingRetry(matchId: string): void {
@@ -674,6 +1100,7 @@ async function park(
   failure: { klass: UploadErrorClass; status: number | null; raw: string | null },
   isCurrent: () => boolean,
   trigger: RunTrigger,
+  phase: "reserve" | "bytes" | "row" = job.phase,
 ): Promise<UploadOutcome> {
   const { klass, status, raw } = failure;
   const copy = describeUploadFailure(klass);
@@ -688,8 +1115,11 @@ async function park(
     return { ok: false, error: copy.message, willRetryLater: false };
   };
   if (!isCurrent()) return stale();
-  await patchUploadJob(job.matchId, { errorClass: klass, needsUser: failed });
+  const saved = await patchUploadJob(job.matchId, { errorClass: klass, needsUser: failed });
   if (!isCurrent()) return stale();
+  // Once on pause (jits-n2im.11): the server's in-flight window restarts from
+  // the bytes it really has, so the opponent sees "paused", not a stale %.
+  if (phase === "bytes") heartbeat(saved ?? job, (saved ?? job).bytesUploaded, true);
   // The athlete tapped Try again and it failed again in this same run: the
   // deck's "Still can't upload. Check your connection." (section 8), but
   // only for the causes that sentence is true of. Every other class (auth,
@@ -701,12 +1131,27 @@ async function park(
     error: message,
     errorClass: klass,
   });
-  trackParked({ matchId: job.matchId, disposition: copy.disposition, klass, status, phase: job.phase, raw });
+  trackParked({ matchId: job.matchId, disposition: copy.disposition, klass, status, phase, raw });
   if (failed) clearRetryTimer(job.matchId);
   // A daily-limit gate does not lift in minutes: hitting it every two would
   // be noise. Foreground and reconnect still try it.
   else if (klass !== "limit") scheduleForegroundRetry(job.matchId);
   return { ok: false, error: message, willRetryLater: !failed };
+}
+
+/**
+ * The athlete deleted the reserved video (minor 6): the row is never revived,
+ * the clip is released, and nothing reaches the server.
+ */
+async function dropDeletedJob(job: PendingUploadJob): Promise<UploadOutcome> {
+  console.warn(`[video] ${job.matchId}: the reserved video was deleted; dropping the upload`);
+  captureException(new Error("Match-video upload dropped: its row was deleted"), { matchId: job.matchId });
+  trackRunDropped(job.matchId, "row deleted");
+  await removeUploadJob(job.matchId);
+  releaseRecording(job.fileUri);
+  clearRetryTimer(job.matchId);
+  clearMatchUpload(job.matchId);
+  return { ok: false, error: "The video was deleted.", willRetryLater: false };
 }
 
 async function runJob(
@@ -741,54 +1186,135 @@ async function runJob(
   });
 
   let current = job;
-  if (current.phase === "bytes") {
-    const bytes = await uploadBytes(current, handle, isCurrent);
-    if (!bytes.ok) {
-      if (bytes.superseded || !isCurrent()) {
-        trackRunDropped(current.matchId, "superseded");
-        return { ok: false, error: bytes.error, willRetryLater: false };
-      }
-      if (bytes.fileMissing) {
-        // The ONLY terminal case that also drops the job. There is no clip
-        // left to keep and no object in the bucket, so nothing to park.
-        await abandonJob(current, `the recording file is gone: ${bytes.error}`);
-        const copy = describeUploadFailure("file_missing");
-        // Same guard as `park`: a run that lost its slot during the abandon
-        // must not write the store the new owner (or nobody) now holds.
-        if (isCurrent()) {
-          setMatchUpload(current.matchId, { status: "error", error: copy.message, errorClass: "file_missing" });
+  let videoId = "";
+  // At most one restart: a reserved row found abandoned at land time is
+  // re-keyed and re-uploaded once, never in a loop.
+  for (let pass = 0; ; pass++) {
+    if (isReserved(current) && current.phase === "bytes" && !current.videoId) {
+      const reserved = await reserveRow(current, handle, isCurrent);
+      if (!reserved.ok) {
+        if (reserved.superseded || !isCurrent()) {
+          trackRunDropped(current.matchId, "superseded");
+          return { ok: false, error: reserved.error, willRetryLater: false };
         }
-        return { ok: false, error: copy.message, willRetryLater: false };
+        if (reserved.dropped) return dropDeletedJob(current);
+        // Nothing was sent: no object, no row. The job parks like any other
+        // failure (a gate, the network) and the clip stays on the phone.
+        const latest = (await loadUploadJob(current.matchId)) ?? current;
+        return park(latest, { klass: reserved.klass, status: null, raw: reserved.error }, isCurrent, trigger, "reserve");
       }
-      // NOTHING ELSE ABANDONS, INCLUDING A NON-RETRYABLE FAILURE. This used
-      // to call `abandonJob`, which deletes the local clip, so a single 403
-      // destroyed an irreplaceable 600 MB recording with no user choice on
-      // the strength of one request. A 403 can be transient (a token edge, a
-      // `match_participants` row not yet visible). Such a failure is now
-      // FAILED (jits-n2im.3/.5): kept on disk, no automatic retries, and
-      // the athlete gets Retry. The retention window, not one response,
-      // decides to give up.
-      return park(current, { klass: bytes.klass, status: bytes.status, raw: bytes.error }, isCurrent, trigger);
+      current = reserved.job;
+      if (isCurrent()) {
+        setMatchUpload(current.matchId, {
+          storagePath: current.storagePath,
+          progress: reserved.landed ? 1 : ratio(current.bytesUploaded, current.fileSizeBytes),
+        });
+      }
     }
-    current = bytes.job;
-  }
 
-  const row = await writeRow(current, handle, isCurrent);
-  // The row write awaits, so the slot can change under it. Settling a
-  // superseded run here would delete the NEW job record and the NEW clip.
-  if (!isCurrent()) {
-    if (row.ok) await discardSupersededObject(current.matchId, current.storagePath);
-    trackRunDropped(current.matchId, "superseded");
-    return { ok: false, error: "Superseded by a newer recording", willRetryLater: false };
+    if (current.phase === "bytes") {
+      const bytes = await uploadBytes(current, handle, isCurrent);
+      if (!bytes.ok) {
+        if (bytes.superseded || !isCurrent()) {
+          trackRunDropped(current.matchId, "superseded");
+          return { ok: false, error: bytes.error, willRetryLater: false };
+        }
+        if (bytes.fileMissing) {
+          // The ONLY terminal case that also drops the job. There is no clip
+          // left to keep and no object in the bucket, so nothing to park.
+          await abandonJob(current, `the recording file is gone: ${bytes.error}`);
+          const copy = describeUploadFailure("file_missing");
+          // Same guard as `park`: a run that lost its slot during the abandon
+          // must not write the store the new owner (or nobody) now holds.
+          if (isCurrent()) {
+            setMatchUpload(current.matchId, { status: "error", error: copy.message, errorClass: "file_missing" });
+          }
+          return { ok: false, error: copy.message, willRetryLater: false };
+        }
+        // NOTHING ELSE ABANDONS, INCLUDING A NON-RETRYABLE FAILURE. This used
+        // to call `abandonJob`, which deletes the local clip, so a single 403
+        // destroyed an irreplaceable 600 MB recording with no user choice on
+        // the strength of one request. A 403 can be transient (a token edge, a
+        // `match_participants` row not yet visible). Such a failure is now
+        // FAILED (jits-n2im.3/.5): kept on disk, no automatic retries, and
+        // the athlete gets Retry. The retention window, not one response,
+        // decides to give up.
+        return park(current, { klass: bytes.klass, status: bytes.status, raw: bytes.error }, isCurrent, trigger);
+      }
+      current = bytes.job;
+    }
+
+
+    if (isReserved(current) && current.videoId) {
+      const landed = await finalizeRow(current, handle, isCurrent);
+      if (!isCurrent()) {
+        // M1: never delete here. The row is (or may be) live on this key
+        // until the newer recording's reservation re-paths it, which then
+        // deletes this key itself (`previousStoragePath`).
+        trackRunDropped(current.matchId, "superseded");
+        return { ok: false, error: "Superseded by a newer recording", willRetryLater: false };
+      }
+      if (!landed.ok && landed.dropped) return dropDeletedJob(current);
+      if (landed.ok) {
+        videoId = landed.videoId;
+        break;
+      }
+      if (landed.moved) {
+        // Another recording of this athlete (another device) now owns the
+        // row. This clip can no longer attach to the match: drop the job,
+        // and its object, which nothing references any more.
+        captureException(new Error("Match-video row was re-pathed by another recording"), {
+          matchId: current.matchId,
+          storagePath: current.storagePath,
+        });
+        trackRunDropped(current.matchId, "row moved to another recording");
+        await removeUploadedObject(current.storagePath);
+        await removeUploadJob(current.matchId);
+        releaseRecording(current.fileUri);
+        clearRetryTimer(current.matchId);
+        clearMatchUpload(current.matchId);
+        return { ok: false, error: landed.error, willRetryLater: false };
+      }
+      if (landed.abandoned && pass === 0) {
+        // The row gave up on these bytes (abandoned, e.g. by the reaper):
+        // a status PATCH cannot revive it, a new key can. The old object is
+        // now unreferenced.
+        console.warn(`[video] reserved row for ${current.matchId} was abandoned; re-uploading under a new key`);
+        const orphan = current.storagePath;
+        const reset: JobPatch = { phase: "bytes", videoId: null, attempt: 0 };
+        current = (await patchUploadJob(current.matchId, reset)) ?? { ...current, ...reset };
+        current = await rekeyJob(current, handle, isCurrent);
+        void removeUploadedObject(orphan);
+        continue;
+      }
+      return park(current, { klass: landed.klass, status: null, raw: landed.error }, isCurrent, trigger);
+    }
+
+    const row = await writeRow(current, handle, isCurrent);
+    // The row write awaits, so the slot can change under it. Settling a
+    // superseded run here would delete the NEW job record and the NEW clip.
+    if (!isCurrent()) {
+      // M1: the row now references this key, and the newer recording's
+      // write may never move it off (offline, the re-slice ceiling, a
+      // Discard). Deleting would leave a live row on a missing object; a
+      // leaked object is the recoverable failure. Only a write that did NOT
+      // land leaves an object nothing references.
+      if (!row.ok) await discardSupersededObject(current.matchId, current.storagePath);
+      trackRunDropped(current.matchId, "superseded");
+      return { ok: false, error: "Superseded by a newer recording", willRetryLater: false };
+    }
+    if (!row.ok) return park(current, { klass: row.klass, status: null, raw: row.error }, isCurrent, trigger);
+    videoId = row.videoId;
+    break;
   }
-  if (!row.ok) return park(current, { klass: row.klass, status: null, raw: row.error }, isCurrent, trigger);
 
   await removeUploadJob(current.matchId);
   releaseRecording(current.fileUri);
   clearRetryTimer(current.matchId);
+  if (current.videoId) lastHeartbeatAt.delete(current.videoId);
   setMatchUpload(current.matchId, {
     status: "uploaded",
-    videoId: row.videoId,
+    videoId,
     error: null,
     errorClass: null,
     progress: 1,
@@ -798,7 +1324,7 @@ async function runJob(
     fileSizeBytes: current.fileSizeBytes,
     createdAt: current.createdAt,
   });
-  return { ok: true, videoId: row.videoId };
+  return { ok: true, videoId };
 }
 
 /**
@@ -982,6 +1508,18 @@ async function prepareAndRun(
     lastError: null,
     errorClass: null,
     needsUser: false,
+    // Reserve before bytes (jits-n2im.11). Saved BEFORE the reservation, so
+    // a kill at any point after this finds the clip and resumes it.
+    protocol: 2,
+    videoId: null,
+    recordStartedAt:
+      params.recordStartedAt != null && Number.isFinite(params.recordStartedAt)
+        ? new Date(params.recordStartedAt).toISOString()
+        : null,
+    recordDurationMs:
+      params.recordDurationMs != null && Number.isFinite(params.recordDurationMs) && params.recordDurationMs > 0
+        ? Math.round(params.recordDurationMs)
+        : null,
   };
   await saveUploadJob(job);
   if (!isCurrent()) {
@@ -1023,6 +1561,7 @@ export function startMatchVideoUpload(params: StartUploadParams): Promise<Upload
 export async function resumeMatchVideoUploads(): Promise<void> {
   ensureUploadListeners();
   if (!owner) return;
+  void retryPendingAbandons();
   const jobs = await loadUploadJobs();
   for (const job of jobs) {
     const pending = sweepJob(job);
@@ -1189,6 +1728,8 @@ export function __resetVideoUploadManager(): void {
   owner = null;
   clearAllRetryTimers();
   abandonClaims.clear();
+  lastHeartbeatAt.clear();
+  abandonsInFlight.clear();
   activityListeners.clear();
   unbindListeners?.();
   listenersBound = false;

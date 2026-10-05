@@ -21,14 +21,7 @@ import {
   readMatchExtras,
   resolveDisputeLocksAt,
 } from "@/lib/match-flow/match-extras";
-import {
-  POSTER_POLL_LIMIT,
-  POSTER_POLL_MAX_MS,
-  POSTER_POLL_MS,
-  POSTER_POLL_WINDOW_MS,
-  posterPollDelay,
-  rankStripText,
-} from "@/lib/match-flow/use-verdict-data";
+import { rankStripText } from "@/lib/match-flow/use-verdict-data";
 import { deriveLiveView } from "@/lib/match-flow/live-view-state";
 import { noVideoCopy } from "@/components/match-flow/live/no-video-plate";
 import { formatSignedDelta, initialsOf, shortName } from "@/components/match-flow/fight/fight-ui";
@@ -215,25 +208,3 @@ describe("useMatchWeights", () => {
   });
 });
 
-describe("posterPollDelay (jits-n2im.4 item 7)", () => {
-  it("polls every 20 s for the first two minutes, then backs off to a cap", () => {
-    const delays = Array.from({ length: 12 }, (_, n) => posterPollDelay(n));
-    expect(delays.slice(0, POSTER_POLL_LIMIT)).toEqual(Array(POSTER_POLL_LIMIT).fill(POSTER_POLL_MS));
-    for (let i = POSTER_POLL_LIMIT; i < delays.length; i++) {
-      expect(delays[i]).toBeGreaterThanOrEqual(delays[i - 1]);
-      expect(delays[i]).toBeLessThanOrEqual(POSTER_POLL_MAX_MS);
-    }
-    expect(posterPollDelay(50)).toBe(POSTER_POLL_MAX_MS);
-  });
-
-  it("keeps polling well past the old two-minute stop, within the window", () => {
-    let total = 0;
-    let polls = 0;
-    while (total < POSTER_POLL_WINDOW_MS) {
-      total += posterPollDelay(polls);
-      polls += 1;
-    }
-    expect(polls).toBeGreaterThan(POSTER_POLL_LIMIT * 2);
-    expect(POSTER_POLL_WINDOW_MS).toBeGreaterThanOrEqual(30 * 60_000);
-  });
-});

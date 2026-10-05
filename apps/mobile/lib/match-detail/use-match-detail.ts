@@ -7,6 +7,7 @@ import {
   type MatchDetailView,
 } from "@jits/shared/api/queries";
 import type { DomainError } from "@jits/shared/api/errors";
+import { useMatchVideosRealtime } from "@jits/shared/hooks/use-match-videos-realtime";
 
 export type MatchDetailState = "loading" | "ready" | "error";
 
@@ -28,7 +29,8 @@ interface UseMatchDetailResult {
  * with `refreshing: true` instead of flashing the skeleton; a failed refetch
  * keeps it too. Focus refetch skips the first focus because mount already
  * fetched; it exists so a video that finished uploading shows up when the
- * athlete comes back from the player.
+ * athlete comes back from the player. A realtime subscription on the match's
+ * `match_videos` re-reads in place (no spinner) as angles arrive and move.
  */
 export function useMatchDetail(
   matchId: string | undefined,
@@ -43,6 +45,9 @@ export function useMatchDetail(
   // Which match the data on screen belongs to, so a param change reloads
   // with the skeleton instead of showing the previous match as "refreshing".
   const loadedFor = React.useRef<string | null>(null);
+  // A realtime re-read (jits-n2im.12) refreshes the data in place: no pull
+  // spinner every time the other phone's heartbeat moves the percent.
+  const silentRef = React.useRef(false);
 
   React.useEffect(() => {
     // Auth still resolving (or signed out mid-refresh): no read, and never
@@ -54,8 +59,10 @@ export function useMatchDetail(
     let cancelled = false;
     const id = matchId ?? "";
     const hasData = loadedFor.current === id;
+    const silent = silentRef.current;
+    silentRef.current = false;
     if (hasData) {
-      setRefreshing(true);
+      if (!silent) setRefreshing(true);
     } else {
       setState("loading");
       setData(null);
@@ -84,6 +91,16 @@ export function useMatchDetail(
   }, [matchId, athleteId, tick]);
 
   const refetch = React.useCallback(() => setTick((n) => n + 1), []);
+
+  // Any match_videos INSERT/UPDATE for this match (the other athlete's or
+  // the timekeeper's angle being reserved, its heartbeat, the land flip, the
+  // poster or normalized_path arriving, a pipeline step) re-reads the RPC,
+  // so nothing waits for a refocus or a pull (jits-n2im.12, jr_be-1wk).
+  const silentRefetch = React.useCallback(() => {
+    silentRef.current = true;
+    setTick((n) => n + 1);
+  }, []);
+  useMatchVideosRealtime(supabase, athleteId && matchId ? matchId : null, silentRefetch);
 
   const firstFocus = React.useRef(true);
   useFocusEffect(

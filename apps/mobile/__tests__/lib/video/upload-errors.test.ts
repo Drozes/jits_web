@@ -5,7 +5,9 @@
  */
 import {
   classifyByteFailure,
+  classifyReserveFailure,
   classifyRowFailure,
+  preflightClass,
   describeUploadFailure,
   httpClassOf,
   isTerminalUploadClass,
@@ -114,5 +116,45 @@ describe("httpClassOf", () => {
     expect(httpClassOf(403)).toBe("4xx");
     expect(httpClassOf(502)).toBe("5xx");
     expect(httpClassOf(302)).toBe("other");
+  });
+});
+
+describe("classifyReserveFailure (jits-n2im.11)", () => {
+  const err = (message: string, extra: Record<string, unknown> = {}) => Object.assign(new Error(message), extra);
+
+  it.each([
+    [err("x", { gate: "rate_limited" }), "limit"],
+    [err("x", { gate: "disabled" }), "disabled"],
+    [err("x", { gate: "not_in_cohort" }), "not_in_cohort"],
+    [err("x", { gate: "reslice_limit" }), "reslice_limit"],
+    [err("new row violates row-level security policy", { code: "42501" }), "not_allowed"],
+    [err("JWT expired", { code: "PGRST301" }), "auth"],
+    [err("TypeError: Network request failed"), "offline"],
+    [err("connection reset by peer", { code: "08006" }), "server"],
+    [err("something odd"), "server"],
+  ])("%p -> %s", (e, klass) => {
+    expect(classifyReserveFailure(e)).toBe(klass);
+  });
+
+  it("never says the video uploaded: no byte was sent", () => {
+    expect(classifyReserveFailure(err("duplicate key", { code: "23505" }))).not.toBe("save_failed");
+  });
+});
+
+describe("preflightClass (jits-n2im.5)", () => {
+  it.each([
+    ["rate_limited", "limit"],
+    ["disabled", "disabled"],
+    ["not_in_cohort", "not_in_cohort"],
+    ["reslice_limit", "reslice_limit"],
+    ["file_too_large", "too_large"],
+    ["not_participant", "not_allowed"],
+    ["match_not_found", "not_allowed"],
+  ])("%s -> %s", (reason, klass) => {
+    expect(preflightClass(reason)).toBe(klass);
+  });
+
+  it.each([null, undefined, "duplicate", "a_future_reason"])("%p lets the reservation decide", (reason) => {
+    expect(preflightClass(reason)).toBeNull();
   });
 });

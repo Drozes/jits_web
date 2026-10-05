@@ -27,6 +27,7 @@ import { HERO_HEIGHT, VerdictHero } from "./verdict-hero";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { useScrolledPast } from "../wizard-scroll";
 import { SummaryHighlightNote } from "../steps/summary-highlight-note";
+import { VerdictAngleRows } from "./verdict-angle-rows";
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;
@@ -258,6 +259,9 @@ export function VerdictStep(props: VerdictStepProps) {
         {upload.kind !== "hidden" ? (
           <UploadProgressBanner {...upload} onRetry={uploadActions.retry} onDiscard={uploadActions.discard} />
         ) : null}
+
+        {/* The other athlete's angle, live (jits-n2im.12). */}
+        <VerdictAngleRows videos={videos.others} opponentName={opponent.display_name} />
 
         {/* A reel is on its way when THIS phone's clip landed or is still
             uploading (spec 015 section 16.6.4; the pre-redesign summary's

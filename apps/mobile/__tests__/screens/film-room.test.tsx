@@ -1,5 +1,12 @@
 import * as React from "react";
-import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { act, configure, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+
+// Heavy screen renders: under a loaded machine (parallel agents, the
+// pre-commit hook running every workspace at once) the defaults (5 s per
+// test, 1 s per waitFor) timed out while the suite passes alone in ~15 s.
+// Generous ceilings keep the gate load-insensitive without slowing a pass.
+jest.setTimeout(30_000);
+configure({ asyncUtilTimeout: 5_000 });
 
 type HostNode = ReturnType<typeof render>["UNSAFE_root"];
 
@@ -83,6 +90,13 @@ function library() {
     libItem({ match_id: "m-up", completed_at: daysAgo(0), opponent: PARK, videos: [] }),
   ];
 }
+
+// Each test mounts the whole grid (about 0.8 s alone), and renderLoaded
+// waits up to 5 s for it. With the default 5 s per-test timeout the RUNNER's
+// timeout fired first under a loaded parallel run, failing a test whose
+// waitFor would still have passed. The per-test budget must exceed the
+// waits inside it.
+jest.setTimeout(20_000);
 
 async function renderLoaded(result: unknown = page(library())) {
   mockGetMyMatchLibrary.mockResolvedValue(result);

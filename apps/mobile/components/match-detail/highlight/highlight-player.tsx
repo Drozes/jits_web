@@ -31,17 +31,22 @@ interface HighlightPlayerProps {
 export function HighlightPlayer({ source, onError, frameStyle, showFullscreenButton = true }: HighlightPlayerProps) {
   const viewRef = React.useRef<VideoView>(null);
   const [firstFrameVersion, setFirstFrameVersion] = React.useState<number | null>(null);
-  const { player, renderedVersion, settledVersion, playedVersion } = useHighlightPlayer(source, onError);
+  const { player, renderedVersion, settledVersion, playedVersion, telemetry } = useHighlightPlayer(source, onError);
   const fullscreen = useFullscreenControls(viewRef);
   // A first frame counts only for the item whose swap has settled (never the old one).
-  const onFirstFrame = React.useCallback(() => setFirstFrameVersion(settledVersion()), [settledVersion]);
+  const onFirstFrame = React.useCallback(() => {
+    telemetry.firstFrame();
+    setFirstFrameVersion(settledVersion());
+  }, [settledVersion, telemetry]);
   const v = source.version;
   const covered = renderedVersion !== v && !(firstFrameVersion === v && playedVersion === v);
 
   const toggle = React.useCallback(() => {
-    if (player.playing) player.pause();
-    else player.play();
-  }, [player]);
+    const play = !player.playing;
+    telemetry.playIntent(play);
+    if (play) player.play();
+    else player.pause();
+  }, [player, telemetry]);
 
   return (
     <View testID="highlight-player" className="bg-surface-4 overflow-hidden rounded-md" style={frameStyle ?? HIGHLIGHT_FRAME_STYLE}>
