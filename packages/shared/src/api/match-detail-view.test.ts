@@ -451,7 +451,7 @@ describe("getMatchVideoPlaybackResult", () => {
     expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.norm.mp4", 600);
     expect(r).toEqual({
       ok: true,
-      data: { url: "https://signed/m/a/1.norm.mp4", posterUrl: null, status: "analyzed", playability: "playable", matchId: null, durationSeconds: null },
+      data: { url: "https://signed/m/a/1.norm.mp4", posterUrl: null, status: "analyzed", playability: "playable", matchId: null, durationSeconds: null, sourceKind: "normalized" },
     });
   });
 
@@ -465,6 +465,7 @@ describe("getMatchVideoPlaybackResult", () => {
     const r = await getMatchVideoPlaybackResult(m.client, VID);
     expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.mp4", 3600);
     expect(r.ok && r.data?.url).toBe("https://signed/m/a/1.mp4");
+    expect(r.ok && r.data?.sourceKind).toBe("original");
   });
 
   it("a failed-status video is still returned as playable data (playability failed)", async () => {
@@ -621,7 +622,7 @@ describe("getMatchVideoPlaybackResult", () => {
     const r3 = await getMatchVideoPlaybackResult(failing.client, VID);
     expect(r3).toEqual({
       ok: true,
-      data: { url: "https://signed/m/a/1.mp4", posterUrl: null, status: "ready", playability: "playable", matchId: null, durationSeconds: null },
+      data: { url: "https://signed/m/a/1.mp4", posterUrl: null, status: "ready", playability: "playable", matchId: null, durationSeconds: null, sourceKind: "original" },
     });
   });
 

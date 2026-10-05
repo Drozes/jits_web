@@ -21,8 +21,14 @@ import {
  *   bucket: "match-videos"
  *   path:   `<match_id>/<uploader_athlete_id>/<unix_ts>.<ext>`
  *
- * Web records WebM via `MediaRecorder`; native expo-camera produces MP4
- * (H.264/AAC) on both iOS and Android, so the extension differs.
+ * Web records WebM via `MediaRecorder`; native expo-camera produces an MP4
+ * container, so the extension differs. The CODEC inside differs by platform:
+ * iOS records HEVC (H.265) at 720p, about 4.7 Mbps in prod (the camera has
+ * `videoQuality="720p"` and no codec or bitrate set, and AVFoundation's
+ * default on HEVC-capable iPhones is HEVC), so every iOS upload goes through
+ * the slicer's normalize transcode to H.264/AAC before broad playback;
+ * Android records H.264/AAC. Keeping HEVC 720p is deliberate for now (about
+ * half the upload bytes of H.264); see jits-n2im.10 for the decision.
  */
 export const VIDEO_BUCKET = "match-videos";
 

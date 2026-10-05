@@ -117,16 +117,6 @@ jest.mock("expo-haptics", () => ({
   NotificationFeedbackType: {},
 }));
 
-jest.mock("expo-av", () => {
-  const R = require("react");
-  const RN = require("react-native");
-  return {
-    Audio: { setAudioModeAsync: jest.fn(async () => undefined) },
-    ResizeMode: { CONTAIN: "contain" },
-    Video: (props: Record<string, unknown>) => R.createElement(RN.View, props),
-  };
-});
-
 // Orientation calls share one ordered log with recordAsync (see below).
 const mockCallLog: string[] = [];
 jest.mock("@/lib/orientation", () => ({
@@ -487,8 +477,9 @@ describe("PracticeScreen", () => {
     expect(s.getByText(/Real match clips upload to the match for review/)).toBeTruthy();
     fireEvent.press(s.getByTestId("practice-watch-clip"));
     const player = s.getByTestId("practice-clip-player");
-    expect(player.props.source).toEqual({ uri: CLIP });
-    expect(player.props.isMuted).toBe(true);
+    expect(player.props.player.source).toBe(CLIP);
+    expect(player.props.player.muted).toBe(true);
+    expect(player.props.player.play).toHaveBeenCalled();
     expect(discardLocalClip).not.toHaveBeenCalledWith(CLIP);
     fireEvent.press(s.getByTestId("practice-done"));
     expect(mockRouter.back).toHaveBeenCalled();

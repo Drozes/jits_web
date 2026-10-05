@@ -3111,6 +3111,11 @@ export interface MatchVideoPlayback {
   matchId: string | null;
   /** Recorded length in seconds, when known. */
   durationSeconds: number | null;
+  /**
+   * Which file `url` points at: the slicer's normalized H.264/AAC MP4, or the
+   * uploaded original (playback telemetry splits startup and stalls by it).
+   */
+  sourceKind: "normalized" | "original";
 }
 
 /**
@@ -3187,6 +3192,7 @@ export async function getMatchVideoPlaybackResult(
         playability: videoPlayability(data.status),
         matchId: data.match_id ?? null,
         durationSeconds: data.duration_seconds ?? null,
+        sourceKind: data.normalized_path ? "normalized" : "original",
       },
     };
   } catch (err) {

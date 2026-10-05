@@ -1,5 +1,12 @@
 import * as React from "react";
-import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { act, configure, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+
+// Heavy screen renders: under a loaded machine (parallel agents, the
+// pre-commit hook running every workspace at once) the defaults (5 s per
+// test, 1 s per waitFor) timed out while the suite passes alone in ~15 s.
+// Generous ceilings keep the gate load-insensitive without slowing a pass.
+jest.setTimeout(30_000);
+configure({ asyncUtilTimeout: 5_000 });
 
 type HostNode = ReturnType<typeof render>["UNSAFE_root"];
 
