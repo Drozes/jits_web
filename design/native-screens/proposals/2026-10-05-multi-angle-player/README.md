@@ -21,7 +21,7 @@ Compared with "Current app" board 33 (Video player) and COPY-DECK v2.2:
 
 - Contradiction rule 4 keeps the quick switch ready-only; add the Angles sheet to the surfaces that may list non-ready angles (rows only, never playback).
 - New strings: `Approx. sync`, `{ready} OF {total} ANGLES` / `{total} ANGLES`, `Angles` (sheet title), `Only angles that are ready can play.`, `Watching`, `Switching to {label}`, `Next angle`, `Previous angle`, `Back one frame`, `Forward one frame`, `Match video. Swipe left or right to change angle.`, and the announcements in item 10. They live in `apps/mobile/lib/video/multi-angle/copy.ts` today; move them into `video-status-copy.ts` (the Film status work's single copy module) when both branches land.
-- The `Best angle` string in the sheet duplicates COPY-DECK section 13 (`BEST_ANGLE` on `feat/video-status-ux`); dedupe on rebase.
+- The sheet's `Best angle` uses COPY-DECK section 13's `BEST_ANGLE` (`video-status-copy.ts`, from #52).
 
 ## DESIGN.md Motion registry entries needed
 

@@ -9,11 +9,9 @@ import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { useModalAnimation } from "@/lib/motion";
 import { angleOwnerName, angleRowA11yLabel, angleStatus } from "@/lib/video/angle-status";
 import { MULTI_ANGLE_COPY } from "@/lib/video/multi-angle/copy";
+import { BEST_ANGLE } from "@/lib/video/video-status-copy";
 import type { AngleVideo } from "@/lib/video/multi-angle/trust";
 import { OnMediaTag } from "./angle-bar";
-
-/** COPY-DECK section 13 (Best angle); dedupe with `video-status-copy.ts` BEST_ANGLE on rebase. */
-const BEST_ANGLE = "Best angle";
 
 interface AnglesSheetProps {
   open: boolean;
