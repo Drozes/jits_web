@@ -226,6 +226,8 @@ beforeEach(() => {
     storagePath: p.storagePath,
     failureCode: null,
     resumed: false,
+    outcome: "reserved",
+    previousStoragePath: null,
   }));
   mockTouchRow.mockResolvedValue(undefined);
   mockFinalizeRow.mockResolvedValue({ outcome: "missing" });
@@ -799,10 +801,11 @@ describe("a second recording on the same match", () => {
 
     const job = await loadUploadJob("M1");
     expect(job).toMatchObject({ storagePath: SECOND.storagePath, phase: "bytes" });
-    // Its object is a real orphan, and it is safe to remove because the
-    // runner holding the slot provably owns a different key.
-    expect(mockRemoveUploadedObject).toHaveBeenCalledWith(START.storagePath);
-    expect(mockRemoveUploadedObject).not.toHaveBeenCalledWith(SECOND.storagePath);
+    // M1 (wave 2): the first clip's reserved row may already be live on its
+    // key (the storage trigger flips it on the last byte), so the loser
+    // never deletes it; the winner's reservation cleans it up once it has
+    // moved the row off that key (pinned in the M1 tests below).
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
     // And no row was written for the clip that never uploaded.
     expect(mockWriteMatchVideoRow).not.toHaveBeenCalled();
 
@@ -876,8 +879,10 @@ describe("a second recording on the same match", () => {
     // The winner's job and clip both survive.
     expect(mockReleaseRecording).not.toHaveBeenCalledWith(SECOND.fileUri);
     expect(await loadUploadJob("M1")).toMatchObject({ storagePath: SECOND.storagePath });
-    // The loser's object has no row pointing at it, so it is cleaned up.
-    expect(mockRemoveUploadedObject).toHaveBeenCalledWith(START.storagePath);
+    // M1: the loser's row write LANDED, so the row references its key until
+    // the winner's write moves it off; deleting now could leave a live row
+    // on a missing object. It is left in place.
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalledWith(START.storagePath);
 
     second.gate.finish?.();
     await secondRun;
@@ -2146,6 +2151,217 @@ describe("abandon_match_video_upload (jits-n2im.11)", () => {
   it("a wave 1 job (no reservation) never calls the RPC", async () => {
     seedJob({ needsUser: true, errorClass: "too_large" });
     await discardMatchVideoUpload("M1");
+    expect(mockAbandonRow).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review fixes (REVIEW-wave2.md): B1, M1, minors 5 and 6
+// ---------------------------------------------------------------------------
+
+describe("B1: a re-record never touches the earlier video before its bytes land", () => {
+  it("preflight duplicate over a landed row: bytes first, then the wave 1 INSERT at 'ready', no reservation", async () => {
+    mockPreflight.mockResolvedValue({ allowed: false, reason: "duplicate", existingVideoId: "GOOD", existingStatus: "analyzed" });
+    const order: string[] = [];
+    mockUploadFileResumable.mockImplementation(async () => {
+      order.push("bytes");
+    });
+    mockWriteMatchVideoRow.mockImplementation(async () => {
+      order.push("row");
+      return "GOOD";
+    });
+    const outcome = await startMatchVideoUpload(START);
+    expect(outcome).toEqual({ ok: true, videoId: "GOOD" });
+    expect(mockReserveRow).not.toHaveBeenCalled();
+    expect(mockFinalizeRow).not.toHaveBeenCalled();
+    expect(mockTouchRow).not.toHaveBeenCalled();
+    expect(order).toEqual(["bytes", "row"]);
+  });
+
+  it("the shared reservation deferring (null preflight) also switches to the wave 1 order", async () => {
+    mockPreflight.mockResolvedValue(null);
+    mockReserveRow.mockResolvedValue({
+      id: "GOOD",
+      status: "ready",
+      storagePath: "M1/A1/older.mp4",
+      failureCode: null,
+      resumed: true,
+      outcome: "deferred",
+      previousStoragePath: null,
+    });
+    const outcome = await startMatchVideoUpload(START);
+    expect(outcome.ok).toBe(true);
+    expect(mockReserveRow).toHaveBeenCalledTimes(1);
+    expect(mockFinalizeRow).not.toHaveBeenCalled();
+    expect(mockWriteMatchVideoRow).toHaveBeenCalledWith(expect.objectContaining({ storagePath: START.storagePath }));
+  });
+
+  it("persists the switch, so a kill and relaunch keeps the wave 1 order", async () => {
+    mockPreflight.mockResolvedValue({ allowed: false, reason: "duplicate", existingStatus: "ready" });
+    mockUploadFileResumable.mockRejectedValue(new Error("Network request failed"));
+    await startMatchVideoUpload(START);
+    expect(await loadUploadJob("M1")).toMatchObject({ protocol: 1, videoId: null });
+  });
+
+  it("discarding (or expiring) that re-record never touches the earlier row", async () => {
+    mockPreflight.mockResolvedValue({ allowed: false, reason: "duplicate", existingStatus: "analyzed" });
+    // The new clip turns out too big: a terminal failure at the bytes.
+    mockUploadFileResumable.mockRejectedValue(httpError(413, "too large"));
+    await startMatchVideoUpload(START);
+    expect(getMatchUpload("M1")).toMatchObject({ status: "error", errorClass: "too_large" });
+    expect(await discardMatchVideoUpload("M1")).toBe(true);
+    expect(mockReserveRow).not.toHaveBeenCalled();
+    expect(mockAbandonRow).not.toHaveBeenCalled();
+    expect(mockWriteMatchVideoRow).not.toHaveBeenCalled();
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+  });
+
+  it("an 'uploading' duplicate (our own earlier reservation) is still reserved", async () => {
+    mockPreflight.mockResolvedValue({ allowed: false, reason: "duplicate", existingStatus: "uploading" });
+    mockFinalizeRow.mockResolvedValue({ outcome: "landed", status: "ready" });
+    await startMatchVideoUpload(START);
+    expect(mockReserveRow).toHaveBeenCalledTimes(1);
+    expect(mockFinalizeRow).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("M1: a superseded run never deletes an object a live row may reference", () => {
+  const SECOND = { ...START, fileUri: "file://cache/clip2.mp4", storagePath: "M1/A1/1700000009999.mp4" };
+
+  function held() {
+    const gate: { finish: (() => void) | null } = { finish: null };
+    const impl = () => new Promise<void>((res) => (gate.finish = () => res()));
+    return { gate, impl };
+  }
+
+  it("bytes complete (the trigger flipped the row) after the supersede: the object stays", async () => {
+    const first = held();
+    const second = held();
+    mockUploadFileResumable.mockImplementationOnce(first.impl).mockImplementationOnce(second.impl);
+    const firstRun = startMatchVideoUpload(START);
+    await flush();
+    const secondRun = startMatchVideoUpload(SECOND);
+    await flush();
+    first.gate.finish?.();
+    await firstRun;
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+    second.gate.finish?.();
+    await secondRun;
+  });
+
+  it("land PATCH answered 'landed' after the supersede: the object stays", async () => {
+    const landGate: { release: (() => void) | null } = { release: null };
+    mockFinalizeRow.mockImplementationOnce(
+      () => new Promise((res) => (landGate.release = () => res({ outcome: "landed", status: "ready" }))),
+    );
+    mockFinalizeRow.mockResolvedValue({ outcome: "landed", status: "ready" });
+    const second = held();
+    mockUploadFileResumable.mockResolvedValueOnce(undefined).mockImplementationOnce(second.impl);
+    const firstRun = startMatchVideoUpload(START);
+    await flush();
+    const secondRun = startMatchVideoUpload(SECOND);
+    await flush();
+    landGate.release?.();
+    await firstRun;
+    await flush();
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalledWith(START.storagePath);
+    second.gate.finish?.();
+    await secondRun;
+  });
+
+  it("the newer job deletes the older key only after its reservation moved the row off it", async () => {
+    mockFinalizeRow.mockResolvedValue({ outcome: "landed", status: "ready" });
+    mockReserveRow.mockImplementation(async (p: { storagePath: string }) => ({
+      id: "VID-1",
+      status: "uploading",
+      storagePath: p.storagePath,
+      failureCode: null,
+      resumed: true,
+      outcome: "reserved",
+      previousStoragePath: "M1/A1/older.mp4",
+    }));
+    let removedBeforeBytes = false;
+    mockUploadFileResumable.mockImplementation(async () => {
+      removedBeforeBytes = mockRemoveUploadedObject.mock.calls.some((c) => c[0] === "M1/A1/older.mp4");
+    });
+    await startMatchVideoUpload(START);
+    expect(removedBeforeBytes).toBe(true);
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalledWith(START.storagePath);
+  });
+});
+
+describe("minor 6: a deleted row is never revived", () => {
+  it("a same-key reservation answering 'deleted' drops the job without re-keying", async () => {
+    seedReservedJob();
+    mockReserveRow.mockImplementation(async (p: { storagePath: string }) => ({
+      id: "VID-DEL",
+      status: "deleted",
+      storagePath: p.storagePath,
+      failureCode: null,
+      resumed: true,
+      outcome: "reserved",
+      previousStoragePath: null,
+    }));
+    await resumeMatchVideoUploads();
+    await waitForSettled("M1");
+    expect(mockReserveRow).toHaveBeenCalledTimes(1);
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+    expect(await loadUploadJob("M1")).toBeNull();
+    expect(mockReleaseRecording).toHaveBeenCalled();
+  });
+
+  it("a land PATCH answering 'deleted' drops the job and never writes a new row", async () => {
+    mockFinalizeRow.mockResolvedValue({ outcome: "deleted" });
+    const outcome = await startMatchVideoUpload(START);
+    expect(outcome.ok).toBe(false);
+    expect(mockWriteMatchVideoRow).not.toHaveBeenCalled();
+    expect(await loadUploadJob("M1")).toBeNull();
+    expect(getMatchUpload("M1")).toBeNull();
+  });
+});
+
+describe("minor 5: an unanswered abandon is retried on the next launch", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("keeps the record when the call fails, and the next sweep lands it (deleting the dead object in phase row)", async () => {
+    seedReservedJob({ videoId: "VID-P", phase: "row", needsUser: true, errorClass: "reslice_limit" });
+    mockAbandonRow.mockResolvedValueOnce(null);
+    await discardMatchVideoUpload("M1");
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+    expect([...mockStore.keys()].some((k) => k.startsWith("elo-video-abandon::"))).toBe(true);
+
+    // Next launch: the server answers.
+    mockAbandonRow.mockResolvedValueOnce({ status: "failed", abandoned: true });
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockAbandonRow).toHaveBeenLastCalledWith("VID-P");
+    expect(mockRemoveUploadedObject).toHaveBeenCalledWith("M1/A1/1700000000000.mp4");
+    expect([...mockStore.keys()].some((k) => k.startsWith("elo-video-abandon::"))).toBe(false);
+  });
+
+  it("a timed-out call still cleans up when its answer arrives late", async () => {
+    jest.useFakeTimers();
+    seedReservedJob({ videoId: "VID-T", needsUser: true, errorClass: "too_large" });
+    let answer: ((v: unknown) => void) | null = null;
+    mockAbandonRow.mockImplementationOnce(() => new Promise((res) => (answer = res)));
+    const discarding = discardMatchVideoUpload("M1");
+    await jest.advanceTimersByTimeAsync(10_000);
+    await expect(discarding).resolves.toBe(true);
+    expect([...mockStore.keys()].some((k) => k.startsWith("elo-video-abandon::"))).toBe(true);
+    (answer as unknown as (v: unknown) => void)({ status: "failed", abandoned: true });
+    await jest.advanceTimersByTimeAsync(0);
+    expect([...mockStore.keys()].some((k) => k.startsWith("elo-video-abandon::"))).toBe(false);
+  });
+
+  it("never retries another athlete's abandon", async () => {
+    mockStore.set(
+      "elo-video-abandon::VID-X",
+      JSON.stringify({ videoId: "VID-X", uploaderAthleteId: "B9", matchId: "M9", storagePath: "M9/B9/1.mp4", phase: "row", createdAt: Date.now() }),
+    );
+    await resumeMatchVideoUploads();
+    await flush();
     expect(mockAbandonRow).not.toHaveBeenCalled();
   });
 });

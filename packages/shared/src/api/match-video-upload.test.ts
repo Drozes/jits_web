@@ -20,7 +20,7 @@ function client(results: Res[], rpc?: Res) {
   const calls: { op: string; args: unknown[] }[] = [];
   const next = () => Promise.resolve(queue.shift() ?? { data: null, error: null });
   const chain: Record<string, unknown> = {};
-  for (const op of ["insert", "update", "select", "eq"]) {
+  for (const op of ["insert", "update", "select", "eq", "is"]) {
     chain[op] = (...args: unknown[]) => {
       calls.push({ op, args });
       return chain;
@@ -53,7 +53,15 @@ describe("reserveMatchVideoUpload", () => {
     const res = await reserveMatchVideoUpload(sb, RESERVE);
     expect(res).toEqual({
       ok: true,
-      data: { id: "V1", status: "uploading", storagePath: "M/A/1.mp4", failureCode: null, resumed: false },
+      data: {
+        id: "V1",
+        status: "uploading",
+        storagePath: "M/A/1.mp4",
+        failureCode: null,
+        resumed: false,
+        outcome: "reserved",
+        previousStoragePath: null,
+      },
     });
     const insert = calls.find((c) => c.op === "insert")!.args[0];
     expect(insert).toEqual({
@@ -78,13 +86,21 @@ describe("reserveMatchVideoUpload", () => {
     expect(insert).not.toHaveProperty("record_duration_ms");
   });
 
-  it("on 23505 takes the existing row over with a re-path PATCH (no second row)", async () => {
+  const DUP = { data: null, error: { code: "23505", message: "dup", details: "", hint: "" } };
+
+  it("on 23505 takes an 'uploading' row at another key over, guarded on the key it read (no second row)", async () => {
     const { sb, calls } = client([
-      { data: null, error: { code: "23505", message: "dup", details: "", hint: "" } },
+      DUP,
+      { data: { ...ROW, id: "OLD", storage_path: "M/A/0.mp4" }, error: null },
       { data: { ...ROW, id: "OLD" }, error: null },
     ]);
     const res = await reserveMatchVideoUpload(sb, RESERVE);
-    expect(res.ok && res.data).toMatchObject({ id: "OLD", resumed: true });
+    expect(res.ok && res.data).toMatchObject({
+      id: "OLD",
+      resumed: true,
+      outcome: "reserved",
+      previousStoragePath: "M/A/0.mp4",
+    });
     expect(calls.filter((c) => c.op === "insert")).toHaveLength(1);
     const update = calls.find((c) => c.op === "update")!.args[0];
     expect(update).toEqual({
@@ -97,7 +113,53 @@ describe("reserveMatchVideoUpload", () => {
     expect(calls.filter((c) => c.op === "eq").map((c) => c.args)).toEqual([
       ["match_id", "M"],
       ["uploaded_by", "A"],
+      ["id", "OLD"],
+      ["storage_path", "M/A/0.mp4"],
     ]);
+  });
+
+  it("on 23505 takes an ABANDONED row over (free re-path)", async () => {
+    const { sb, calls } = client([
+      DUP,
+      { data: { ...ROW, id: "OLD", status: "failed", failure_code: "upload_abandoned", storage_path: "M/A/0.mp4" }, error: null },
+      { data: { ...ROW, id: "OLD" }, error: null },
+    ]);
+    const res = await reserveMatchVideoUpload(sb, RESERVE);
+    expect(res.ok && res.data.outcome).toBe("reserved");
+    expect(calls.some((c) => c.op === "update")).toBe(true);
+  });
+
+  it("B1: on 23505 NEVER re-paths a row that already has bytes; it defers", async () => {
+    for (const existing of [
+      { status: "ready", failure_code: null },
+      { status: "analyzed", failure_code: null },
+      { status: "failed", failure_code: null },
+      { status: "deleted", failure_code: null },
+    ]) {
+      const { sb, calls } = client([DUP, { data: { ...ROW, id: "GOOD", storage_path: "M/A/0.mp4", ...existing }, error: null }]);
+      const res = await reserveMatchVideoUpload(sb, RESERVE);
+      expect(res.ok && res.data).toMatchObject({ id: "GOOD", outcome: "deferred", storagePath: "M/A/0.mp4", status: existing.status });
+      expect(calls.some((c) => c.op === "update")).toBe(false);
+    }
+  });
+
+  it("on 23505 returns our own row untouched when it is already at our key (kill after the INSERT)", async () => {
+    const { sb, calls } = client([DUP, { data: { ...ROW, id: "MINE", status: "ready" }, error: null }]);
+    const res = await reserveMatchVideoUpload(sb, RESERVE);
+    expect(res.ok && res.data).toMatchObject({ id: "MINE", status: "ready", outcome: "reserved", previousStoragePath: null });
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+  });
+
+  it("defers when the existing row cannot be read", async () => {
+    const { sb } = client([DUP, { data: null, error: null }]);
+    const res = await reserveMatchVideoUpload(sb, RESERVE);
+    expect(res.ok && res.data.outcome).toBe("deferred");
+  });
+
+  it("reports a transient failure when the row changed between the read and the takeover", async () => {
+    const { sb } = client([DUP, { data: { ...ROW, id: "OLD", storage_path: "M/A/0.mp4" }, error: null }, { data: null, error: null }]);
+    const res = await reserveMatchVideoUpload(sb, RESERVE);
+    expect(res.ok).toBe(false);
   });
 
   it("keeps the raw PostgrestError (code + HINT) for a gate or a bad path", async () => {
@@ -112,6 +174,7 @@ describe("reserveMatchVideoUpload", () => {
   it("surfaces a reslice-limit refusal on the re-path PATCH", async () => {
     const { sb } = client([
       { data: null, error: { code: "23505", message: "dup", details: "", hint: "" } },
+      { data: { ...ROW, id: "OLD", storage_path: "M/A/0.mp4" }, error: null },
       { data: null, error: { code: "P0001", message: "reslice", details: "", hint: "video_reslice_limit" } },
     ]);
     const res = await reserveMatchVideoUpload(sb, RESERVE);
@@ -143,6 +206,19 @@ describe("finalizeMatchVideoUpload", () => {
     const { sb } = client([{ data: { ...ROW, status: "slicing" }, error: null }]);
     const res = await finalizeMatchVideoUpload(sb, { videoId: "V1", storagePath: "M/A/1.mp4" });
     expect(res).toEqual({ ok: true, data: { outcome: "landed", status: "slicing" } });
+  });
+
+  it("never revives a deleted row: 'deleted', whether the PATCH or the read-back finds it", async () => {
+    const patched = client([{ data: { ...ROW, status: "deleted" }, error: null }]);
+    expect(await finalizeMatchVideoUpload(patched.sb, { videoId: "V1", storagePath: "M/A/1.mp4" })).toEqual({
+      ok: true,
+      data: { outcome: "deleted" },
+    });
+    const read = client([{ data: null, error: null }, { data: { ...ROW, status: "deleted" }, error: null }]);
+    expect(await finalizeMatchVideoUpload(read.sb, { videoId: "V1", storagePath: "M/A/1.mp4" })).toEqual({
+      ok: true,
+      data: { outcome: "deleted" },
+    });
   });
 
   it("reports an abandoned row by failure_code", async () => {

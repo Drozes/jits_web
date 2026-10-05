@@ -334,3 +334,74 @@ export async function patchUploadJob(
 export function isJobExpired(job: PendingUploadJob, now = Date.now()): boolean {
   return now - job.createdAt > UPLOAD_JOB_MAX_AGE_MS;
 }
+
+// ---------------------------------------------------------------------------
+// Pending abandons (review minor 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * An `abandon_match_video_upload` the server has not answered yet. Written
+ * BEFORE the call, removed once it answers, and retried on the next resume
+ * sweep, so a Discard or an expiry made offline still reaches the server
+ * instead of leaving the row 'uploading' for the 7-day reaper (or, in phase
+ * "row", for the 5-minute landing cron to flip live).
+ */
+export interface PendingAbandon {
+  videoId: string;
+  uploaderAthleteId: string;
+  matchId: string;
+  storagePath: string;
+  /** "row": the bytes are in the bucket; delete them once the row gave up on them. */
+  phase: UploadJobPhase;
+  createdAt: number;
+}
+
+export const PENDING_ABANDON_PREFIX = "elo-video-abandon::";
+
+export async function savePendingAbandon(rec: PendingAbandon): Promise<void> {
+  try {
+    await AsyncStorage.setItem(`${PENDING_ABANDON_PREFIX}${rec.videoId}`, JSON.stringify(rec));
+  } catch (err) {
+    console.warn(`[video] could not persist the pending abandon of ${rec.videoId}:`, err);
+  }
+}
+
+export async function removePendingAbandon(videoId: string): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(`${PENDING_ABANDON_PREFIX}${videoId}`);
+  } catch {
+    /* retried harmlessly next sweep: the RPC is idempotent */
+  }
+}
+
+export async function loadPendingAbandons(): Promise<PendingAbandon[]> {
+  let keys: readonly string[];
+  try {
+    keys = await AsyncStorage.getAllKeys();
+  } catch {
+    return [];
+  }
+  const out: PendingAbandon[] = [];
+  for (const key of keys) {
+    if (!key.startsWith(PENDING_ABANDON_PREFIX)) continue;
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      const rec = raw ? (JSON.parse(raw) as Partial<PendingAbandon>) : null;
+      if (
+        rec &&
+        typeof rec.videoId === "string" &&
+        typeof rec.uploaderAthleteId === "string" &&
+        typeof rec.storagePath === "string" &&
+        (rec.phase === "bytes" || rec.phase === "row") &&
+        typeof rec.createdAt === "number"
+      ) {
+        out.push({ matchId: "", ...rec } as PendingAbandon);
+      } else {
+        await AsyncStorage.removeItem(key);
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  return out;
+}

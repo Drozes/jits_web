@@ -43,6 +43,24 @@ export interface ReservedMatchVideo {
   failureCode: string | null;
   /** True when an existing (match, uploader) row was taken over (23505 path). */
   resumed: boolean;
+  /**
+   * "reserved": the row is ours at our key (inserted, re-pathed, or the
+   * same-key echo of a reservation a killed process made).
+   * "deferred": the athlete already has a row WITH BYTES (ready, analyzed,
+   * pipeline-failed, deleted, or one this client cannot read) at another
+   * key. It was NOT touched: re-pathing it before the new bytes exist would
+   * fire the server's re-upload reset (chunks, analysis, AI tags, poster,
+   * highlights) and lose a good video if the new upload never lands. The
+   * caller uploads the bytes first and replaces the row only then (the
+   * wave 1 order). `id` / `status` / `storagePath` describe that row.
+   */
+  outcome: "reserved" | "deferred";
+  /**
+   * The key the row pointed at before this reservation re-pathed it, when it
+   * did (an 'uploading' or abandoned row at another key). Nothing references
+   * that object any more, so the caller may delete it. Null otherwise.
+   */
+  previousStoragePath: string | null;
 }
 
 export interface ReserveMatchVideoParams {
@@ -60,14 +78,26 @@ export interface ReserveMatchVideoParams {
   requestedTier?: "standard" | "premium";
 }
 
-function toReserved(row: LifecycleRow, resumed: boolean): ReservedMatchVideo {
+function toReserved(
+  row: LifecycleRow,
+  resumed: boolean,
+  outcome: ReservedMatchVideo["outcome"] = "reserved",
+  previousStoragePath: string | null = null,
+): ReservedMatchVideo {
   return {
     id: row.id,
     status: row.status,
     storagePath: row.storage_path,
     failureCode: row.failure_code ?? null,
     resumed,
+    outcome,
+    previousStoragePath,
   };
+}
+
+/** A row whose key may be replaced before the new bytes exist: no slice ever ran on it. */
+export function isRepathFree(status: string, failureCode: string | null | undefined): boolean {
+  return status === "uploading" || (status === "failed" && failureCode === "upload_abandoned");
 }
 
 function unexpected(err: unknown): DomainError {
@@ -79,14 +109,14 @@ function unexpected(err: unknown): DomainError {
  * sent. Every INSERT gate (uploads off, cohort, daily cap) fires here, so a
  * refused upload costs no bytes.
  *
- * On 23505 (the athlete already has a row for this match) the existing row
- * is taken over with a re-path PATCH to `'uploading'`, which also declares the
- * new size and transport. That is the same path a crash between the INSERT
- * and the caller persisting the id takes on the next launch: with the same
- * `storage_path` the PATCH is a no-op echo that simply returns the row, so a
- * retried reservation never creates a second row. A re-path from an
- * `'uploading'` or abandoned row is free; from a dispatched row it counts
- * against the re-slice ceiling (HINT `video_reslice_limit`).
+ * On 23505 (the athlete already has a row for this match) the row is READ
+ * first, and then:
+ *   - at our own key: returned as is (a crash between the INSERT and the
+ *     caller persisting the id; one row, never two);
+ *   - 'uploading' or abandoned at another key: taken over with a re-path
+ *     PATCH to 'uploading' (free: no slice ever ran on it), guarded on the
+ *     key just read so a concurrent change is not overwritten;
+ *   - anything else (it has bytes): left alone, `outcome: "deferred"`.
  */
 export async function reserveMatchVideoUpload(
   supabase: Client,
@@ -115,6 +145,27 @@ export async function reserveMatchVideoUpload(
       return { ok: false, error: mapPostgrestError(created.error!, "match_video_create") };
     }
 
+    const read = await supabase
+      .from("match_videos")
+      .select(ROW_SELECT)
+      .eq("match_id", params.matchId)
+      .eq("uploaded_by", params.uploaderAthleteId)
+      .maybeSingle();
+    if (read.error) return { ok: false, error: mapPostgrestError(read.error, "match_video_create") };
+    const existing = read.data as LifecycleRow | null;
+    if (!existing) {
+      // The row exists (23505) but this client cannot read it: never touch
+      // what it cannot see.
+      return {
+        ok: true,
+        data: { id: "", status: "unknown", storagePath: null, failureCode: null, resumed: true, outcome: "deferred", previousStoragePath: null },
+      };
+    }
+    if (existing.storage_path === params.storagePath) return { ok: true, data: toReserved(existing, true) };
+    if (!isRepathFree(existing.status, existing.failure_code)) {
+      return { ok: true, data: toReserved(existing, true, "deferred") };
+    }
+
     const update: Database["public"]["Tables"]["match_videos"]["Update"] = {
       storage_path: params.storagePath,
       status: "uploading",
@@ -122,15 +173,16 @@ export async function reserveMatchVideoUpload(
       upload_bytes_total: params.fileSizeBytes,
       upload_transport: transport,
     };
-    const taken = await supabase
-      .from("match_videos")
-      .update(update)
-      .eq("match_id", params.matchId)
-      .eq("uploaded_by", params.uploaderAthleteId)
-      .select(ROW_SELECT)
-      .single();
+    let takeover = supabase.from("match_videos").update(update).eq("id", existing.id);
+    takeover = existing.storage_path == null ? takeover.is("storage_path", null) : takeover.eq("storage_path", existing.storage_path);
+    const taken = await takeover.select(ROW_SELECT).maybeSingle();
     if (taken.error) return { ok: false, error: mapPostgrestError(taken.error, "match_video_create") };
-    return { ok: true, data: toReserved(taken.data as LifecycleRow, true) };
+    if (!taken.data) {
+      // The row changed between the read and the PATCH: report a transient
+      // failure so the caller's backoff re-reads it.
+      return { ok: false, error: { code: "UNKNOWN", message: "match video row changed during the reservation" } };
+    }
+    return { ok: true, data: toReserved(taken.data as LifecycleRow, true, "reserved", existing.storage_path) };
   } catch (err) {
     return { ok: false, error: unexpected(err) };
   }
@@ -183,11 +235,14 @@ export async function touchMatchVideoUpload(
  *              bytes have to go up again under a new storage_path.
  *   moved      the row now points at a different storage_path (a newer
  *              recording re-pathed it). This upload is superseded.
- *   missing    the row is gone (deleted). The bytes are in the bucket with no
- *              row: fall back to the legacy INSERT at 'ready'.
+ *   deleted    the athlete deleted the video (status 'deleted'): never
+ *              revived; the caller drops the job.
+ *   missing    the row is gone (hard-deleted). The bytes are in the bucket
+ *              with no row: fall back to the legacy INSERT at 'ready'.
  */
 export type FinalizeMatchVideoOutcome =
   | { outcome: "landed"; status: string }
+  | { outcome: "deleted" }
   | { outcome: "abandoned"; failureCode: string | null }
   | { outcome: "moved" }
   | { outcome: "missing" };
@@ -217,6 +272,7 @@ export async function finalizeMatchVideoUpload(
     if (patched.error) return { ok: false, error: mapPostgrestError(patched.error, "match_video_finalize") };
     const row = patched.data as LifecycleRow | null;
     if (row) {
+      if (row.status === "deleted") return { ok: true, data: { outcome: "deleted" } };
       if (row.status === "failed") return { ok: true, data: { outcome: "abandoned", failureCode: row.failure_code ?? null } };
       return { ok: true, data: { outcome: "landed", status: row.status } };
     }
@@ -225,7 +281,8 @@ export async function finalizeMatchVideoUpload(
     const read = await supabase.from("match_videos").select(ROW_SELECT).eq("id", params.videoId).maybeSingle();
     if (read.error) return { ok: false, error: mapPostgrestError(read.error, "match_video_finalize") };
     const current = read.data as LifecycleRow | null;
-    if (!current || current.status === "deleted") return { ok: true, data: { outcome: "missing" } };
+    if (!current) return { ok: true, data: { outcome: "missing" } };
+    if (current.status === "deleted") return { ok: true, data: { outcome: "deleted" } };
     if (current.storage_path !== params.storagePath) return { ok: true, data: { outcome: "moved" } };
     if (current.status === "failed") {
       return { ok: true, data: { outcome: "abandoned", failureCode: current.failure_code ?? null } };
