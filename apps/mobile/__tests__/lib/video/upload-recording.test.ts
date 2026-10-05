@@ -406,15 +406,20 @@ describe("writeMatchVideoRow upload-gate copy", () => {
   }
 
   it.each([
-    ["upload_rate_limited", "rate_limited", /^Daily video limit reached\. It will upload automatically later\.$/],
-    ["video_upload_disabled", "disabled", /^Video uploads are turned off right now\./],
-    ["upload_not_in_cohort", "not_in_cohort", /^Video uploads are not enabled for your account yet\./],
+    // The limit lifts as the 24 h window rolls, within the 7-day retention.
+    ["upload_rate_limited", "rate_limited", /^Daily video limit reached\. It uploads once your limit resets, as long as you open the app within 7 days\.$/],
+    // jits-w2h7 item 5: never "saved on this device" with no end date.
+    ["video_upload_disabled", "disabled", /^Video uploads are turned off right now\. .*stays on this phone for 7 days\.$/],
+    ["upload_not_in_cohort", "not_in_cohort", /^Video uploads aren't turned on for your account yet\. .*stays on this phone for 7 days\.$/],
+    // jits-gxok: a terminal gate, said plainly.
+    ["video_reslice_limit", "reslice_limit", /^This match can't take a video anymore\.$/],
   ])("maps HINT %s to clear copy and a gate", async (hint, gate, copy) => {
     const err = await thrownFor(hint);
     expect(err).toBeInstanceOf(MatchVideoDbError);
     expect(err.gate).toBe(gate);
     expect(err.message).toMatch(copy);
-    expect(err.message).not.toMatch(/saving the record failed/i);
+    expect(err.message).not.toMatch(/saving the record failed|raw db message/i);
+    expect(err.message).not.toMatch(/saved on this device/i);
     expect(err.storageObjectPersisted).toBe(true);
   });
 

@@ -3,14 +3,32 @@ import { supabase } from "@/lib/supabase/client";
 import { getMatchDetailView } from "@jits/shared/api/queries";
 import { getMatchRankChange, type MatchRankChange } from "@jits/shared/api/match-rank-change";
 
-/** Re-read the match's videos this often while a poster is still missing. */
+/** Re-read the match's videos this often while a poster is still missing... */
 export const POSTER_POLL_MS = 20_000;
-/** ...at most this many times per verdict (the slicer takes a while). */
+/** ...for this many polls, then back off (the slicer can take a while)... */
 export const POSTER_POLL_LIMIT = 6;
+/** ...growing by this factor per poll, capped at POSTER_POLL_MAX_MS... */
+export const POSTER_POLL_BACKOFF = 1.5;
+export const POSTER_POLL_MAX_MS = 120_000;
+/**
+ * ...until this much polling time has passed. The old poll stopped after 2
+ * minutes and never recovered, so a verdict left open through processing
+ * kept the athletes plate forever (jits-n2im.4 item 7). Thirty minutes
+ * covers the processing window; realtime (jits-n2im.12) replaces this.
+ */
+export const POSTER_POLL_WINDOW_MS = 30 * 60_000;
+
+/** Delay before poll `n` (0-based): flat, then backing off to the cap. */
+export function posterPollDelay(n: number): number {
+  if (n < POSTER_POLL_LIMIT) return POSTER_POLL_MS;
+  return Math.min(POSTER_POLL_MAX_MS, Math.round(POSTER_POLL_MS * POSTER_POLL_BACKOFF ** (n - POSTER_POLL_LIMIT + 1)));
+}
 
 export interface VerdictVideos {
   /** Any `match_videos` row on this match, from either athlete. */
   hasVideo: boolean;
+  /** At least one angle can be played now (deck rule 4: only then "Watch film"). */
+  hasPlayable: boolean;
   /** Signed opening still (the slicer poster), when one exists yet. */
   posterUrl: string | null;
   /**
@@ -24,18 +42,20 @@ export interface VerdictVideos {
   posterKey: string | null;
 }
 
-const EMPTY: VerdictVideos = { hasVideo: false, posterUrl: null, posterKey: null };
+const EMPTY: VerdictVideos = { hasVideo: false, hasPlayable: false, posterUrl: null, posterKey: null };
 
 /**
  * The verdict's opening still: the match's videos via `getMatchDetailView`
  * (participant-gated, posters signed). Re-read when this device's upload
- * lands (`uploadedKey` changes) and on a bounded poll while a video exists
- * without a poster. Any failure keeps what is in hand.
+ * lands (`uploadedKey` changes) and on a backing-off poll while a video
+ * exists without a poster, for up to POSTER_POLL_WINDOW_MS. Any failure
+ * keeps what is in hand.
  */
 export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey: string | null): VerdictVideos {
   const [videos, setVideos] = React.useState<VerdictVideos>(EMPTY);
   const [tick, setTick] = React.useState(0);
   const pollsRef = React.useRef(0);
+  const polledMsRef = React.useRef(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -48,6 +68,7 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
         const withPoster = list.find((v) => v.poster_url);
         setVideos({
           hasVideo: list.length > 0,
+          hasPlayable: list.some((v) => v.playability === "playable"),
           posterUrl: withPoster?.poster_url ?? null,
           posterKey: withPoster ? (withPoster.thumbnail_key ?? withPoster.id) : null,
         });
@@ -58,13 +79,17 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
     };
   }, [matchId, viewerId, uploadedKey, tick]);
 
-  const needsPoll = videos.posterUrl == null && (videos.hasVideo || uploadedKey != null);
+  // Also until an angle is playable, so the CTA turns into "Watch film"
+  // without the athlete leaving the verdict.
+  const needsPoll = (videos.posterUrl == null || !videos.hasPlayable) && (videos.hasVideo || uploadedKey != null);
   React.useEffect(() => {
-    if (!needsPoll || pollsRef.current >= POSTER_POLL_LIMIT) return;
+    if (!needsPoll || polledMsRef.current >= POSTER_POLL_WINDOW_MS) return;
+    const delay = posterPollDelay(pollsRef.current);
     const t = setTimeout(() => {
       pollsRef.current += 1;
+      polledMsRef.current += delay;
       setTick((n) => n + 1);
-    }, POSTER_POLL_MS);
+    }, delay);
     return () => clearTimeout(t);
   }, [needsPoll, tick]);
 

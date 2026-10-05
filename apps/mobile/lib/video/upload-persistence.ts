@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { RecordingTruncation } from "./use-video-recorder";
+import type { UploadErrorClass } from "./upload-errors";
 
 /**
  * Disk-backed record of a match-video upload that has not finished yet
@@ -60,7 +61,20 @@ export interface PendingUploadJob {
   truncation: RecordingTruncation | null;
   createdAt: number;
   updatedAt: number;
+  /** Raw cause of the last failure. Telemetry and logs only, never shown. */
   lastError: string | null;
+  /**
+   * Class of the last failure (jits-n2im.5), so a relaunch can still say
+   * the right thing about a job that is not running.
+   */
+  errorClass: UploadErrorClass | null;
+  /**
+   * The job FAILED and waits for the athlete (jits-n2im.3): automatic
+   * resumes (foreground, reconnect, launch, the retry timer) skip it, and
+   * only `retryMatchVideoUpload` runs it again. Distinct from a parked
+   * (paused) job, which every trigger resumes.
+   */
+  needsUser: boolean;
 }
 
 /**
@@ -68,7 +82,8 @@ export interface PendingUploadJob {
  * any plausible "I was on a plane" gap, and the recording file would have to
  * survive that long too.
  */
-export const UPLOAD_JOB_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const UPLOAD_JOB_RETENTION_DAYS = 7;
+export const UPLOAD_JOB_MAX_AGE_MS = UPLOAD_JOB_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 /**
  * Per-match write serialisation.
@@ -178,6 +193,10 @@ function normaliseJob(job: PendingUploadJob): PendingUploadJob {
     truncation:
       job.truncation === "limit" || job.truncation === "interrupted" ? job.truncation : null,
     lastError: typeof job.lastError === "string" ? job.lastError : null,
+    // Both absent on records written before jits-n2im.3/.5: such a job was
+    // always auto-resumed, so it reads as paused.
+    errorClass: typeof job.errorClass === "string" ? job.errorClass : null,
+    needsUser: job.needsUser === true,
     updatedAt:
       typeof job.updatedAt === "number" && Number.isFinite(job.updatedAt)
         ? job.updatedAt

@@ -1,12 +1,21 @@
 import type { MatchLibraryItem, MatchLibraryVideo } from "@jits/shared/api/film-room";
 import type { MatchUploadEntry } from "@/lib/video/match-upload-store";
+import { uploadingLabel } from "@/lib/video/upload-copy";
+import { isTerminalUploadClass } from "@/lib/video/upload-errors";
+
+export { uploadingLabel };
 
 /**
  * What a Film Room poster says about its film, in priority order:
  *
  *   uploading  this phone is still sending the clip (real % from the upload
  *              store), or the only recording's row is still `uploading`
- *   failed     every recording failed processing
+ *   paused     this phone's upload is parked and will retry on its own
+ *   upload_failed  this phone's upload failed and waits for the athlete
+ *              (Retry, or Discard when a retry cannot help)
+ *   processing this phone's clip just landed and the library has not
+ *              re-read it yet (never "no film" in that window)
+ *   failed     every recording failed processing (server side)
  *   analyzing  a recording is in the chunked pipeline and none has a
  *              breakdown yet ("ANALYZING 3/7" once the slicer has counted)
  *   new        playable film the athlete has not opened, from the last week
@@ -15,6 +24,9 @@ import type { MatchUploadEntry } from "@/lib/video/match-upload-store";
  */
 export type CardStatus =
   | { kind: "uploading"; progress: number | null }
+  | { kind: "paused"; progress: number | null }
+  | { kind: "upload_failed"; terminal: boolean }
+  | { kind: "processing" }
   | { kind: "failed" }
   | { kind: "analyzing"; done: number | null; total: number | null }
   | { kind: "new" }
@@ -47,8 +59,19 @@ export function deriveCardStatus(
   if (upload && (upload.status === "uploading" || upload.status === "pending")) {
     return { kind: "uploading", progress: upload.progress };
   }
+  // This phone still owes the server its clip (jits-n2im.4 item 4). Said
+  // even when the other athlete's angle is already up: it is still true,
+  // and it is the only place the Film Room can offer the Retry.
+  if (upload?.status === "paused") return { kind: "paused", progress: upload.progress };
+  if (upload?.status === "error") {
+    return { kind: "upload_failed", terminal: isTerminalUploadClass(upload.errorClass) };
+  }
   const videos = item.videos;
-  if (videos.length === 0) return { kind: "none" };
+  if (videos.length === 0) {
+    // Landed a moment ago; the refetch (useRefetchOnUploadSettled) is on
+    // its way. Until then this is film being processed, not no film.
+    return upload?.status === "uploaded" ? { kind: "processing" } : { kind: "none" };
+  }
   if (videos.every((v) => v.status === "uploading")) {
     return { kind: "uploading", progress: null };
   }
@@ -76,6 +99,15 @@ export function statusBadgeLabel(status: CardStatus): string | null {
   switch (status.kind) {
     case "failed":
       return "FAILED";
+    case "paused":
+      return "UPLOAD PAUSED";
+    case "upload_failed":
+      // The deck's one label for my own failed upload (m3).
+      return "DIDN'T UPLOAD";
+    case "processing":
+      // Processing is only ever an angle row, never a card badge (deck B1.1);
+      // the card's centre caption says PROCESSING FILM.
+      return null;
     case "analyzing":
       return status.total ? `ANALYZING ${status.done ?? 0}/${status.total}` : "ANALYZING";
     case "new":
@@ -87,8 +119,7 @@ export function statusBadgeLabel(status: CardStatus): string | null {
   }
 }
 
-/** "UPLOADING 64%", or "UPLOADING" when the percentage is unknown. */
-export function uploadingLabel(progress: number | null): string {
-  if (progress == null || !Number.isFinite(progress)) return "UPLOADING";
-  return `UPLOADING ${Math.round(Math.min(1, Math.max(0, progress)) * 100)}%`;
+/** The card offers its own Retry for this status. */
+export function cardOffersRetry(status: CardStatus): boolean {
+  return status.kind === "paused" || (status.kind === "upload_failed" && !status.terminal);
 }

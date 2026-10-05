@@ -9,6 +9,7 @@ import { useAuth, useIsAdmin, useRequireAthlete } from "@/lib/auth/hooks";
 import { isSentryEnabled, showFeedback } from "@/lib/error-tracking/sentry";
 import { cn } from "@/lib/cn";
 import { clearPendingInvite } from "@/lib/invites/pending-invite";
+import { SIGN_OUT_UPLOAD_TITLE, pendingUploadSignOutMessage } from "@/lib/video/sign-out-guard";
 
 /**
  * G3 Settings. Mirrors the web settings index: three Plate sections grouping
@@ -29,16 +30,19 @@ type SettingsRoute =
   | "/practice";
 
 export default function SettingsScreen() {
-  const { user, signOut } = useAuth();
+  const { user, athlete, signOut } = useAuth();
   const isAdmin = useIsAdmin();
   useRequireAthlete();
   const router = useRouter();
+  const displayName = athlete?.display_name ?? null;
 
-  const handleSignOut = React.useCallback(() => {
-    Alert.alert("Sign out", "Are you sure you want to sign out?", [
+  const handleSignOut = React.useCallback(async () => {
+    // A pending match-film upload changes what signing out costs (jits-n2im.6).
+    const uploadWarning = await pendingUploadSignOutMessage(displayName);
+    Alert.alert(uploadWarning ? SIGN_OUT_UPLOAD_TITLE : "Sign out", uploadWarning ?? "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Sign out",
+        text: uploadWarning ? "Sign out anyway" : "Sign out",
         style: "destructive",
         onPress: async () => {
           // A deliberate sign-out drops a pending invite (contract 6); the
@@ -49,7 +53,7 @@ export default function SettingsScreen() {
         },
       },
     ]);
-  }, [signOut, router]);
+  }, [signOut, router, displayName]);
 
   const email = user?.email ?? "";
 
@@ -60,7 +64,7 @@ export default function SettingsScreen() {
         noTabBar
         contentContainerStyle={{ paddingTop: 24, gap: 24 }}
       >
-        <AccountPlate email={email} onSignOut={handleSignOut} />
+        <AccountPlate email={email} onSignOut={() => void handleSignOut()} />
         <PreferencesPlate />
         <SupportPlate />
         {isAdmin ? <AdminPlate /> : null}

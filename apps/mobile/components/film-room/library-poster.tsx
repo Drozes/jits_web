@@ -1,7 +1,8 @@
 import * as React from "react";
 import type { MatchLibraryItem } from "@jits/shared/api/film-room";
 import { useMatchUpload } from "@/lib/video/match-upload-store";
-import { deriveCardStatus } from "@/lib/film-room/card-status";
+import { cardOffersRetry, deriveCardStatus } from "@/lib/film-room/card-status";
+import { useUploadActions } from "@/lib/video/use-upload-actions";
 import { PosterCard } from "./poster-card";
 import type { StillAthlete } from "./opening-still";
 
@@ -26,6 +27,7 @@ export const LibraryPoster = React.memo(function LibraryPoster({ item, viewer, s
   const upload = useMatchUpload(item.match_id);
   const status = React.useMemo(() => deriveCardStatus(item, upload, seen), [item, upload, seen]);
   const onPress = React.useCallback(() => onOpen(item.match_id), [onOpen, item.match_id]);
+  const { retry } = useUploadActions(item.match_id);
   return (
     <PosterCard
       item={item}
@@ -35,6 +37,7 @@ export const LibraryPoster = React.memo(function LibraryPoster({ item, viewer, s
       variant={variant}
       testID={testID}
       accessibilityLabel={accessibilityLabel}
+      onRetry={cardOffersRetry(status) ? retry : undefined}
     />
   );
 });

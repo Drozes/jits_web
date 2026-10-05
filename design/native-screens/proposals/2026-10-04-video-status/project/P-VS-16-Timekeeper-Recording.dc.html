@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Timekeeper recording (record only, no clock control)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+body{margin:0;background:#0D0F14;font-family:'Inter',sans-serif;color:#E8EDF2}
+a{color:#EC6A74;text-decoration:none}a:hover{color:#F0556B}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+<div style="position: absolute; inset: 0; background: #262A34; display: flex; align-items: center; justify-content: center"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 2px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: rgba(232,237,242,0.35)">Camera</span></div><div style="position: absolute; left: 0; right: 0; top: 0; height: 160px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0))"></div><div style="position: absolute; left: 0; right: 0; bottom: 0; height: 220px; background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.85))"></div><div style="position: absolute; left: 16px; right: 16px; top: 55px; display: flex; flex-direction: row; align-items: center; justify-content: space-between"><a href="P-VS-19-Timekeeper-States.dc.html" style="height: 44px; display: flex; align-items: center; padding: 0 4px; color: #FFFFFF"><span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 1.12px; text-transform: uppercase; color: #FFFFFF">Leave</span></a><span style="height: 28px; box-sizing: border-box; padding: 0 9px; display: flex; align-items: center; gap: 7px; background: rgba(0,0,0,0.88); border-radius: 2px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: #FFFFFF"></span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #FFFFFF">Recording</span></span><span aria-label="Match clock 3 minutes 48 seconds" style="height: 28px; box-sizing: border-box; padding: 0 9px; display: flex; align-items: center; background: rgba(0,0,0,0.88); border-radius: 2px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; color: #FFFFFF">03:48</span></div><div style="position: absolute; left: 16px; right: 16px; bottom: 42px; display: flex; flex-direction: column; gap: 6px"><span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.56px; text-transform: uppercase; color: #FFFFFF">Timekeeper: recording M. Reyes vs D. Okafor</span><span style="font-family: 'Inter', sans-serif; font-size: 13px; line-height: 17px; color: rgba(232,237,242,0.85)">You only record. The players run the clock. Recording stops at the final whistle.</span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

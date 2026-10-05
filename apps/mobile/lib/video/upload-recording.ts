@@ -7,6 +7,7 @@ import {
   buildMatchVideoStoragePath,
   upsertMatchVideo,
 } from "@jits/shared/api/mutations";
+import { describeUploadFailure, type UploadErrorClass } from "./upload-errors";
 import {
   AsyncStorageUrlStorage,
   ExpoFileReader,
@@ -53,38 +54,41 @@ export function contentTypeFor(ext: string): string {
 }
 
 /**
- * A server-side gate on `match_videos` INSERT (jr_be triggers, raised as
+ * A server-side gate on a `match_videos` write (jr_be triggers, raised as
  * P0001 with these HINTs). None of them is fixed by retrying seconds later,
- * so the upload manager parks the job on the first one instead of burning
- * its row budget, and the next foreground or reconnect tries again:
+ * so the upload manager stops on the first one instead of burning its row
+ * budget:
  *
- *   rate_limited   : HINT upload_rate_limited (rolling 24h per-athlete cap)
- *   disabled       : HINT video_upload_disabled (feature flag off)
- *   not_in_cohort  : HINT upload_not_in_cohort (uploader not allowlisted)
+ *   rate_limited   : HINT upload_rate_limited (rolling 24h per-athlete cap).
+ *                    PAUSED: it lifts as the window rolls, so foreground and
+ *                    reconnect keep trying.
+ *   disabled       : HINT video_upload_disabled (feature flag off). FAILED,
+ *                    Retry offered.
+ *   not_in_cohort  : HINT upload_not_in_cohort (uploader not allowlisted).
+ *                    FAILED, Retry offered.
+ *   reslice_limit  : HINT video_reslice_limit (re-upload ceiling on UPDATE
+ *                    of storage_path, jr_be 20260918020000). TERMINAL: it
+ *                    can never succeed, so it is not parked for 7 days
+ *                    (jits-gxok); the athlete is offered Discard.
+ *
+ * The copy for each lives in `upload-errors.ts`, with every other failure
+ * class, so there is one place that says what the athlete reads.
  */
-export type MatchVideoGate = "rate_limited" | "disabled" | "not_in_cohort";
+export type MatchVideoGate = "rate_limited" | "disabled" | "not_in_cohort" | "reslice_limit";
 
-const GATE_BY_HINT: Record<string, { gate: MatchVideoGate; message: string }> = {
-  upload_rate_limited: {
-    gate: "rate_limited",
-    message: "Daily video limit reached. It will upload automatically later.",
-  },
-  video_upload_disabled: {
-    gate: "disabled",
-    message: "Video uploads are turned off right now. The recording is saved on this device.",
-  },
-  upload_not_in_cohort: {
-    gate: "not_in_cohort",
-    message:
-      "Video uploads are not enabled for your account yet. The recording is saved on this device.",
-  },
+const GATE_BY_HINT: Record<string, { gate: MatchVideoGate; klass: UploadErrorClass }> = {
+  upload_rate_limited: { gate: "rate_limited", klass: "limit" },
+  video_upload_disabled: { gate: "disabled", klass: "disabled" },
+  upload_not_in_cohort: { gate: "not_in_cohort", klass: "not_in_cohort" },
+  video_reslice_limit: { gate: "reslice_limit", klass: "reslice_limit" },
 };
 
 /** The gate behind a `match_videos` write failure, if it was one. */
 export function matchVideoGateFor(
   hint: string | null | undefined,
 ): { gate: MatchVideoGate; message: string } | null {
-  return (hint && GATE_BY_HINT[hint]) || null;
+  const hit = hint ? GATE_BY_HINT[hint] : undefined;
+  return hit ? { gate: hit.gate, message: describeUploadFailure(hit.klass).message } : null;
 }
 
 /**

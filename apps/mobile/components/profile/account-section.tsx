@@ -8,6 +8,7 @@ import { useThemePreference, type ThemePreference } from "@/lib/theme";
 import { Plate, MetaTag } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
 import { clearPendingInvite } from "@/lib/invites/pending-invite";
+import { confirmSignOutWithPendingUploads } from "@/lib/video/sign-out-guard";
 
 function SettingsRow({
   icon,
@@ -105,7 +106,7 @@ function ThemeSwitcherRow({ onSelect }: { onSelect: (pref: ThemePreference) => v
 }
 
 export function AccountSection() {
-  const { signOut } = useAuth();
+  const { athlete, signOut } = useAuth();
   const router = useRouter();
   const tokens = useThemedTokens();
   const { setPreference } = useThemePreference();
@@ -129,6 +130,8 @@ export function AccountSection() {
           label="Sign Out"
           destructive
           onPress={async () => {
+            // Asks first only when a match film is still uploading (jits-n2im.6).
+            if (!(await confirmSignOutWithPendingUploads(athlete?.display_name))) return;
             await clearPendingInvite();
             await signOut();
           }}

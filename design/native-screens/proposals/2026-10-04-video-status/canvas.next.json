@@ -1,0 +1,978 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "00-Triage.dc.html": {
+      "h": 2960,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Review triage: all items",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "01-Splash.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Splash (Glow Statement, default)",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "02-Login.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Login",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "03-Signup.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Sign up",
+      "w": 390,
+      "x": 940,
+      "y": 0
+    },
+    "04-Signup-Confirm.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Sign up: check your email",
+      "w": 390,
+      "x": 1410,
+      "y": 0
+    },
+    "05-Forgot-Password.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Forgot password",
+      "w": 390,
+      "x": 1880,
+      "y": 0
+    },
+    "06-Setup-Terms.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Profile setup 1: Agreement",
+      "w": 390,
+      "x": 2350,
+      "y": 0
+    },
+    "07-Setup-Who.dc.html": {
+      "h": 1100,
+      "is_interactive": true,
+      "title": "Profile setup 2: Who are you",
+      "w": 390,
+      "x": 2820,
+      "y": 0
+    },
+    "08-Setup-Where.dc.html": {
+      "h": 852,
+      "is_interactive": true,
+      "title": "Profile setup 3: Where you train",
+      "w": 390,
+      "x": 3290,
+      "y": 0
+    },
+    "11-Home-Resume.dc.html": {
+      "h": 1420,
+      "is_interactive": true,
+      "title": "Home: resume match + new highlight",
+      "w": 390,
+      "x": 470,
+      "y": 1200
+    },
+    "12-Arena-Offline.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Arena: offline (Go Live)",
+      "w": 390,
+      "x": 940,
+      "y": 1200
+    },
+    "13-Arena-Live.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Arena: live roster",
+      "w": 390,
+      "x": 1410,
+      "y": 1200
+    },
+    "14-Arena-Waiting.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Arena: challenge sent",
+      "w": 390,
+      "x": 1880,
+      "y": 1200
+    },
+    "15-Challenge-Sheet.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Incoming challenge sheet",
+      "w": 390,
+      "x": 2350,
+      "y": 1200
+    },
+    "16-Rankings.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Rankings",
+      "w": 390,
+      "x": 2820,
+      "y": 1200
+    },
+    "17-Profile.dc.html": {
+      "h": 2083,
+      "is_interactive": true,
+      "title": "Profile",
+      "w": 390,
+      "x": 3290,
+      "y": 1200
+    },
+    "18-Profile-Stats.dc.html": {
+      "h": 1472,
+      "is_interactive": true,
+      "title": "Profile: detailed stats",
+      "w": 390,
+      "x": 3760,
+      "y": 1200
+    },
+    "21-Faceoff-Weight.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 1: face-off weigh-in",
+      "w": 390,
+      "x": 0,
+      "y": 3560
+    },
+    "21b-Faceoff-Flagged.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 1b: face-off, you flagged the weight",
+      "w": 390,
+      "x": 0,
+      "y": 4662
+    },
+    "21c-Faceoff-Reweigh.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 1c: face-off, re-weigh requested",
+      "w": 390,
+      "x": 470,
+      "y": 4662
+    },
+    "22-Ready-Check.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 2: ready check",
+      "w": 390,
+      "x": 470,
+      "y": 3560
+    },
+    "22b-Ready-Hold.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 2b: ready check on weight hold",
+      "w": 390,
+      "x": 940,
+      "y": 4662
+    },
+    "23-Countdown.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 3a: countdown",
+      "w": 390,
+      "x": 940,
+      "y": 3560
+    },
+    "24-Live-Broadcast.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 3b: live broadcast",
+      "w": 390,
+      "x": 1410,
+      "y": 3560
+    },
+    "25-Result-Entry.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 5: result (claim-first)",
+      "w": 390,
+      "x": 1880,
+      "y": 3560
+    },
+    "26-Result-Waiting.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 5: other phone waits",
+      "w": 390,
+      "x": 2350,
+      "y": 3560
+    },
+    "27-Confirm.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 6: confirm result",
+      "w": 390,
+      "x": 2820,
+      "y": 3560
+    },
+    "28-Dispute.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Match 6: dispute form",
+      "w": 390,
+      "x": 3290,
+      "y": 3560
+    },
+    "29-Verdict.dc.html": {
+      "h": 983,
+      "is_interactive": true,
+      "title": "Match 7: verdict summary",
+      "w": 390,
+      "x": 3760,
+      "y": 3560
+    },
+    "31-Film-Room.dc.html": {
+      "h": 1200,
+      "is_interactive": true,
+      "title": "Film Room",
+      "w": 390,
+      "x": 0,
+      "y": 5874
+    },
+    "32-Match-Detail.dc.html": {
+      "h": 2135,
+      "is_interactive": true,
+      "title": "Match detail (AI breakdown)",
+      "w": 390,
+      "x": 470,
+      "y": 5874
+    },
+    "33-Video-Player.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Video player",
+      "w": 390,
+      "x": 940,
+      "y": 5874
+    },
+    "34-Highlight-Viewer.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Highlight reel viewer",
+      "w": 390,
+      "x": 1410,
+      "y": 5874
+    },
+    "35-Highlight-Share.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Highlight share sheet",
+      "w": 390,
+      "x": 1880,
+      "y": 5874
+    },
+    "36-Athlete.dc.html": {
+      "h": 961,
+      "is_interactive": true,
+      "title": "Athlete profile",
+      "w": 390,
+      "x": 2350,
+      "y": 5874
+    },
+    "37-Compare-Stats.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Compare stats modal",
+      "w": 390,
+      "x": 2820,
+      "y": 5874
+    },
+    "41-Practice.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Practice match (coach tip)",
+      "w": 390,
+      "x": 0,
+      "y": 8424
+    },
+    "42-Notifications-Panel.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Notification panel",
+      "w": 390,
+      "x": 470,
+      "y": 8424
+    },
+    "43-Settings.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Settings (admin view)",
+      "w": 390,
+      "x": 940,
+      "y": 8424
+    },
+    "44-Settings-Notifications.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Settings: notifications",
+      "w": 390,
+      "x": 1410,
+      "y": 8424
+    },
+    "45-Feedback.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Settings: feedback (fallback when Sentry is off)",
+      "w": 390,
+      "x": 1880,
+      "y": 8424
+    },
+    "46-Help.dc.html": {
+      "h": 1560,
+      "is_interactive": true,
+      "title": "Settings: help & support",
+      "w": 390,
+      "x": 2350,
+      "y": 8424
+    },
+    "47-Admin.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Settings: admin hub",
+      "w": 390,
+      "x": 2820,
+      "y": 8424
+    },
+    "48-System-Overlays.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "System: offline + update",
+      "w": 390,
+      "x": 3290,
+      "y": 8424
+    },
+    "49-Admin-Disputers.dc.html": {
+      "h": 900,
+      "is_interactive": true,
+      "title": "Settings: admin repeat disputers",
+      "w": 390,
+      "x": 3760,
+      "y": 8424
+    },
+    "Main.dc.html": {
+      "h": 1200,
+      "is_interactive": true,
+      "title": "Home",
+      "w": 390,
+      "x": 0,
+      "y": 1200
+    },
+    "P-Arena-Live.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Arena (ranked only)",
+      "w": 390,
+      "x": 3010,
+      "y": 0
+    },
+    "P-Challenge-Sheet.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Challenge modal",
+      "w": 390,
+      "x": 3480,
+      "y": 0
+    },
+    "P-Compare-Stats.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Compare stats",
+      "w": 390,
+      "x": 1600,
+      "y": 1803
+    },
+    "P-Confirm.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Confirm",
+      "w": 390,
+      "x": 3010,
+      "y": 1803
+    },
+    "P-Faceoff-Weight.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Face-off (confirm opponent weight)",
+      "w": 390,
+      "x": 2070,
+      "y": 1803
+    },
+    "P-Home.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Home",
+      "w": 390,
+      "x": 2540,
+      "y": 0
+    },
+    "P-Notifications.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Notifications (featured)",
+      "w": 390,
+      "x": 3950,
+      "y": 1803
+    },
+    "P-Profile-Stats.dc.html": {
+      "h": 1460,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Stats",
+      "w": 390,
+      "x": 3950,
+      "y": 0
+    },
+    "P-Result-Waiting.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Result waiting",
+      "w": 390,
+      "x": 2540,
+      "y": 1803
+    },
+    "P-Setup-Where.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Setup 3 (gym IG)",
+      "w": 390,
+      "x": 2070,
+      "y": 0
+    },
+    "P-Setup-Who.dc.html": {
+      "h": 1090,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Setup 2 (weight + IG)",
+      "w": 390,
+      "x": 1600,
+      "y": 0
+    },
+    "P-Verdict.dc.html": {
+      "h": 982,
+      "is_interactive": true,
+      "page": "proposed",
+      "title": "Proposed: Verdict (no rematch)",
+      "w": 390,
+      "x": 3480,
+      "y": 1803
+    },
+    "50-Invite-Challenge.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Invite & challenge: QR, code, share (invites on)",
+      "w": 390,
+      "x": 0,
+      "y": 10384
+    },
+    "51-Invite-Join.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Invite to join: personal QR (invites on)",
+      "w": 390,
+      "x": 470,
+      "y": 10384
+    },
+    "52-Invite-Claim.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Accept a challenge invite (invites on)",
+      "w": 390,
+      "x": 940,
+      "y": 10384
+    },
+    "53-Invite-Setup.dc.html": {
+      "h": 1102,
+      "is_interactive": true,
+      "title": "Invite setup: one screen (invites on)",
+      "w": 390,
+      "x": 1410,
+      "y": 10384
+    },
+    "54-Invite-Code.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Got a challenge code? (invites on)",
+      "w": 390,
+      "x": 1880,
+      "y": 10384
+    },
+    "55-Friends.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Friends",
+      "w": 390,
+      "x": 2350,
+      "y": 10384
+    },
+    "56-Delete-Account.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Settings: delete account",
+      "w": 390,
+      "x": 2820,
+      "y": 10384
+    },
+    "57-Arena-Nearby.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Arena: on the mat near you + online & close (location on)",
+      "w": 390,
+      "x": 3290,
+      "y": 10384
+    },
+    "58-Go-Live-Location.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Go Live: location explain sheet (location on)",
+      "w": 390,
+      "x": 3760,
+      "y": 10384
+    },
+    "59-Start-Blocked.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Arena: not on the same mat (location on)",
+      "w": 390,
+      "x": 4230,
+      "y": 10384
+    },
+    "60-Arena-Booked.dc.html": {
+      "h": 862,
+      "is_interactive": true,
+      "title": "Arena: booked invite match (invites on)",
+      "w": 390,
+      "x": 4700,
+      "y": 10384
+    },
+    "61-Home-Invite.dc.html": {
+      "h": 1005,
+      "is_interactive": true,
+      "title": "Home: invite card (invites on)",
+      "w": 390,
+      "x": 5170,
+      "y": 10384
+    },
+    "P-VS-00-Map.dc.html": {
+      "h": 1670,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Video status placement map (states x surfaces)",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "P-VS-01-Indicator-Home.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Upload strip on Home, uploading",
+      "w": 390,
+      "x": 0,
+      "y": 2013
+    },
+    "P-VS-02-Indicator-States.dc.html": {
+      "h": 1400,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Upload strip and match flow line, all states",
+      "w": 390,
+      "x": 470,
+      "y": 2013
+    },
+    "P-VS-03-Verdict-1-Angle.dc.html": {
+      "h": 1150,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Verdict, one angle uploading (CTA Open match)",
+      "w": 390,
+      "x": 940,
+      "y": 2013
+    },
+    "P-VS-04-Verdict-2-Angles.dc.html": {
+      "h": 1200,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Verdict, two angles, waiting for the other",
+      "w": 390,
+      "x": 1410,
+      "y": 2013
+    },
+    "P-VS-05-Verdict-States.dc.html": {
+      "h": 2270,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Verdict Film block, every state",
+      "w": 390,
+      "x": 1880,
+      "y": 2013
+    },
+    "P-VS-06-Match-Detail.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Match detail, three angles, waiting for 2 more",
+      "w": 390,
+      "x": 2350,
+      "y": 2013
+    },
+    "P-VS-07-Match-Detail.dc.html": {
+      "h": 910,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Match detail, my upload paused (retry), nothing playable",
+      "w": 390,
+      "x": 2820,
+      "y": 2013
+    },
+    "P-VS-08-Film-Status-Phases.dc.html": {
+      "h": 5780,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Film status, every match phase (competitor and timekeeper)",
+      "w": 390,
+      "x": 3290,
+      "y": 2013
+    },
+    "P-VS-09-Angle-Rows.dc.html": {
+      "h": 3020,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Film status rows, every angle state x viewer",
+      "w": 390,
+      "x": 3760,
+      "y": 2013
+    },
+    "P-VS-10-Film-Room.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Film Room card states",
+      "w": 390,
+      "x": 0,
+      "y": 8136
+    },
+    "P-VS-11-Push-Bell.dc.html": {
+      "h": 1380,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Push and bell, one per athlete per match",
+      "w": 390,
+      "x": 470,
+      "y": 8136
+    },
+    "P-VS-18-Reel-Card.dc.html": {
+      "h": 3120,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Highlight card, mute, building, failed, fallback, late angle",
+      "w": 390,
+      "x": 940,
+      "y": 8136
+    },
+    "P-VS-12-Faceoff-Timekeeper.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Face-off, add a timekeeper",
+      "w": 390,
+      "x": 1410,
+      "y": 8136
+    },
+    "P-VS-13-Timekeeper-Sheet.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Face-off, timekeeper QR and code sheet",
+      "w": 390,
+      "x": 1880,
+      "y": 8136
+    },
+    "P-VS-14-Timekeeper-Join.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper, join by QR or code",
+      "w": 390,
+      "x": 2350,
+      "y": 8136
+    },
+    "P-VS-15-Timekeeper-Joined.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper joined, record only",
+      "w": 390,
+      "x": 2820,
+      "y": 8136
+    },
+    "P-VS-16-Timekeeper-Recording.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper recording (record only, no clock control)",
+      "w": 390,
+      "x": 3290,
+      "y": 8136
+    },
+    "P-VS-17-Timekeeper-After.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper after the match, upload status",
+      "w": 390,
+      "x": 3760,
+      "y": 8136
+    },
+    "P-VS-19-Timekeeper-States.dc.html": {
+      "h": 1030,
+      "is_interactive": true,
+      "page": "video-status",
+      "title": "Proposed: Timekeeper, other states (joined, denied, leave, cancelled)",
+      "w": 390,
+      "x": 4230,
+      "y": 8136
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-29T17:00:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "prop-row-0": {
+      "kind": "title1",
+      "maxW": 2740,
+      "page": "proposed",
+      "text": "Onboarding, Home, Arena, Stats",
+      "w": 240,
+      "x": 1600,
+      "y": -280
+    },
+    "prop-row-1": {
+      "kind": "title1",
+      "maxW": 2740,
+      "page": "proposed",
+      "text": "Stats, match flow, notifications",
+      "w": 240,
+      "x": 1600,
+      "y": 1523
+    },
+    "prop-title": {
+      "kind": "title1",
+      "maxW": 1440,
+      "page": "proposed",
+      "text": "Sept 30 review: triage + proposals",
+      "w": 240,
+      "x": 0,
+      "y": -280
+    },
+    "row-film": {
+      "kind": "title1",
+      "maxW": 3210,
+      "text": "Film Room, video & highlights",
+      "w": 240,
+      "x": 0,
+      "y": 5594
+    },
+    "row-match": {
+      "kind": "title1",
+      "maxW": 4150,
+      "text": "Arena match flow",
+      "w": 240,
+      "x": 0,
+      "y": 3280
+    },
+    "row-onboarding": {
+      "kind": "title1",
+      "maxW": 3680,
+      "text": "Onboarding & auth",
+      "w": 240,
+      "x": 0,
+      "y": -280
+    },
+    "row-settings": {
+      "kind": "title1",
+      "maxW": 4150,
+      "text": "Practice, notifications & settings",
+      "w": 240,
+      "x": 0,
+      "y": 8144
+    },
+    "row-tabs": {
+      "kind": "title1",
+      "maxW": 4150,
+      "text": "Tabs: Home \u00b7 Arena \u00b7 Rankings \u00b7 Profile",
+      "w": 240,
+      "x": 0,
+      "y": 920
+    },
+    "row-invites": {
+      "kind": "title1",
+      "maxW": 5560,
+      "text": "Invites, friends & location",
+      "w": 240,
+      "x": 0,
+      "y": 10104
+    },
+    "vs-row-0": {
+      "kind": "title1",
+      "maxW": 1440,
+      "page": "video-status",
+      "text": "Oct 4 video status: placement map",
+      "w": 240,
+      "x": 0,
+      "y": -280
+    },
+    "vs-row-1": {
+      "kind": "title1",
+      "maxW": 4150,
+      "page": "video-status",
+      "text": "Upload strip, verdict, match detail Film status",
+      "w": 240,
+      "x": 0,
+      "y": 1733
+    },
+    "vs-row-2": {
+      "kind": "title1",
+      "maxW": 4620,
+      "page": "video-status",
+      "text": "Film Room, push and bell, highlight card, timekeeper",
+      "w": 240,
+      "x": 0,
+      "y": 7856
+    }
+  },
+  "order": [
+    "01-Splash.dc.html",
+    "02-Login.dc.html",
+    "03-Signup.dc.html",
+    "04-Signup-Confirm.dc.html",
+    "05-Forgot-Password.dc.html",
+    "06-Setup-Terms.dc.html",
+    "07-Setup-Who.dc.html",
+    "08-Setup-Where.dc.html",
+    "Main.dc.html",
+    "11-Home-Resume.dc.html",
+    "12-Arena-Offline.dc.html",
+    "13-Arena-Live.dc.html",
+    "14-Arena-Waiting.dc.html",
+    "15-Challenge-Sheet.dc.html",
+    "16-Rankings.dc.html",
+    "17-Profile.dc.html",
+    "18-Profile-Stats.dc.html",
+    "21-Faceoff-Weight.dc.html",
+    "22-Ready-Check.dc.html",
+    "21b-Faceoff-Flagged.dc.html",
+    "21c-Faceoff-Reweigh.dc.html",
+    "22b-Ready-Hold.dc.html",
+    "23-Countdown.dc.html",
+    "24-Live-Broadcast.dc.html",
+    "25-Result-Entry.dc.html",
+    "26-Result-Waiting.dc.html",
+    "27-Confirm.dc.html",
+    "28-Dispute.dc.html",
+    "29-Verdict.dc.html",
+    "31-Film-Room.dc.html",
+    "32-Match-Detail.dc.html",
+    "33-Video-Player.dc.html",
+    "34-Highlight-Viewer.dc.html",
+    "35-Highlight-Share.dc.html",
+    "36-Athlete.dc.html",
+    "37-Compare-Stats.dc.html",
+    "41-Practice.dc.html",
+    "42-Notifications-Panel.dc.html",
+    "43-Settings.dc.html",
+    "44-Settings-Notifications.dc.html",
+    "45-Feedback.dc.html",
+    "46-Help.dc.html",
+    "47-Admin.dc.html",
+    "48-System-Overlays.dc.html",
+    "49-Admin-Disputers.dc.html",
+    "50-Invite-Challenge.dc.html",
+    "51-Invite-Join.dc.html",
+    "52-Invite-Claim.dc.html",
+    "53-Invite-Setup.dc.html",
+    "54-Invite-Code.dc.html",
+    "55-Friends.dc.html",
+    "56-Delete-Account.dc.html",
+    "57-Arena-Nearby.dc.html",
+    "58-Go-Live-Location.dc.html",
+    "59-Start-Blocked.dc.html",
+    "60-Arena-Booked.dc.html",
+    "61-Home-Invite.dc.html",
+    "00-Triage.dc.html",
+    "P-Setup-Who.dc.html",
+    "P-Setup-Where.dc.html",
+    "P-Home.dc.html",
+    "P-Arena-Live.dc.html",
+    "P-Challenge-Sheet.dc.html",
+    "P-Profile-Stats.dc.html",
+    "P-Compare-Stats.dc.html",
+    "P-Faceoff-Weight.dc.html",
+    "P-Result-Waiting.dc.html",
+    "P-Confirm.dc.html",
+    "P-Verdict.dc.html",
+    "P-Notifications.dc.html",
+    "P-VS-00-Map.dc.html",
+    "P-VS-01-Indicator-Home.dc.html",
+    "P-VS-02-Indicator-States.dc.html",
+    "P-VS-03-Verdict-1-Angle.dc.html",
+    "P-VS-04-Verdict-2-Angles.dc.html",
+    "P-VS-05-Verdict-States.dc.html",
+    "P-VS-06-Match-Detail.dc.html",
+    "P-VS-07-Match-Detail.dc.html",
+    "P-VS-08-Film-Status-Phases.dc.html",
+    "P-VS-09-Angle-Rows.dc.html",
+    "P-VS-10-Film-Room.dc.html",
+    "P-VS-11-Push-Bell.dc.html",
+    "P-VS-18-Reel-Card.dc.html",
+    "P-VS-12-Faceoff-Timekeeper.dc.html",
+    "P-VS-13-Timekeeper-Sheet.dc.html",
+    "P-VS-14-Timekeeper-Join.dc.html",
+    "P-VS-15-Timekeeper-Joined.dc.html",
+    "P-VS-16-Timekeeper-Recording.dc.html",
+    "P-VS-17-Timekeeper-After.dc.html",
+    "P-VS-19-Timekeeper-States.dc.html"
+  ],
+  "pages": [
+    {
+      "id": "current",
+      "name": "Current app"
+    },
+    {
+      "id": "proposed",
+      "name": "Proposed (Sept 30 review)"
+    },
+    {
+      "id": "video-status",
+      "name": "Proposed (Oct 4 video status)"
+    }
+  ],
+  "title": "ELO RATED Native Screens"
+}

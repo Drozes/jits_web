@@ -1,0 +1,122 @@
+[
+  {
+    "file": "P-VS-00-Map.dc.html",
+    "title": "Video status placement map (states x surfaces)",
+    "w": 1440,
+    "h": 1670
+  },
+  {
+    "file": "P-VS-01-Indicator-Home.dc.html",
+    "title": "Upload strip on Home, uploading",
+    "w": 390,
+    "h": 844
+  },
+  {
+    "file": "P-VS-02-Indicator-States.dc.html",
+    "title": "Upload strip and match flow line, all states",
+    "w": 390,
+    "h": 1400
+  },
+  {
+    "file": "P-VS-03-Verdict-1-Angle.dc.html",
+    "title": "Verdict, one angle uploading (CTA Open match)",
+    "w": 390,
+    "h": 1150
+  },
+  {
+    "file": "P-VS-04-Verdict-2-Angles.dc.html",
+    "title": "Verdict, two angles, waiting for the other",
+    "w": 390,
+    "h": 1200
+  },
+  {
+    "file": "P-VS-05-Verdict-States.dc.html",
+    "title": "Verdict Film block, every state",
+    "w": 390,
+    "h": 2270
+  },
+  {
+    "file": "P-VS-06-Match-Detail.dc.html",
+    "title": "Match detail, three angles, waiting for 2 more",
+    "w": 390,
+    "h": 1000
+  },
+  {
+    "file": "P-VS-07-Match-Detail.dc.html",
+    "title": "Match detail, my upload paused (retry), nothing playable",
+    "w": 390,
+    "h": 910
+  },
+  {
+    "file": "P-VS-08-Film-Status-Phases.dc.html",
+    "title": "Film status, every match phase (competitor and timekeeper)",
+    "w": 390,
+    "h": 5780
+  },
+  {
+    "file": "P-VS-09-Angle-Rows.dc.html",
+    "title": "Film status rows, every angle state x viewer",
+    "w": 390,
+    "h": 3020
+  },
+  {
+    "file": "P-VS-10-Film-Room.dc.html",
+    "title": "Film Room card states",
+    "w": 390,
+    "h": 1000
+  },
+  {
+    "file": "P-VS-11-Push-Bell.dc.html",
+    "title": "Push and bell, one per athlete per match",
+    "w": 390,
+    "h": 1380
+  },
+  {
+    "file": "P-VS-12-Faceoff-Timekeeper.dc.html",
+    "title": "Face-off, add a timekeeper",
+    "w": 390,
+    "h": 844
+  },
+  {
+    "file": "P-VS-13-Timekeeper-Sheet.dc.html",
+    "title": "Face-off, timekeeper QR and code sheet",
+    "w": 390,
+    "h": 844
+  },
+  {
+    "file": "P-VS-14-Timekeeper-Join.dc.html",
+    "title": "Timekeeper, join by QR or code",
+    "w": 390,
+    "h": 844
+  },
+  {
+    "file": "P-VS-15-Timekeeper-Joined.dc.html",
+    "title": "Timekeeper joined, record only",
+    "w": 390,
+    "h": 844
+  },
+  {
+    "file": "P-VS-16-Timekeeper-Recording.dc.html",
+    "title": "Timekeeper recording (record only, no clock control)",
+    "w": 390,
+    "h": 844
+  },
+  {
+    "file": "P-VS-17-Timekeeper-After.dc.html",
+    "title": "Timekeeper after the match, upload status",
+    "w": 390,
+    "h": 844
+  },
+  {
+    "file": "P-VS-19-Timekeeper-States.dc.html",
+    "title": "Timekeeper, other states (joined, denied, leave, cancelled)",
+    "w": 390,
+    "h": 1030
+  },
+  {
+    "file": "P-VS-18-Reel-Card.dc.html",
+    "title": "Highlight card, mute, building, failed, fallback, late angle",
+    "w": 390,
+    "h": 3120
+  }
+]
