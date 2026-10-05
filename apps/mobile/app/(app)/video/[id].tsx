@@ -15,6 +15,8 @@ import { AngleSwitcher } from "@/components/film-room/angle-switcher";
 import { SeekBar } from "@/components/film-room/seek-bar";
 import { MomentCaption, MomentChips, Transport, nextSpeed } from "@/components/film-room/player-controls";
 import { playbackAngleOf } from "@/lib/video/playback-angle";
+import { isMultiAnglePlayerEnabled } from "@/lib/video/multi-angle/flag";
+import { MultiAnglePlayerBody } from "@/components/film-room/multi-angle/multi-angle-player-body";
 import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useVideoAnalysis } from "@/lib/film-room/use-video-analysis";
@@ -52,6 +54,8 @@ export default function MatchVideoScreen() {
   const start = t != null && Number.isFinite(Number(t)) ? Number(t) : null;
   // Full-screen video: no app-wide upload strip over it (jits-n2im.2).
   useSuppressUploadStrip({ kind: "all" });
+  // The multi-angle player (one player per angle) is a dev-flag prototype.
+  if (isMultiAnglePlayerEnabled()) return <MultiAnglePlayerBody id={id} start={start} />;
   // NOT keyed by id: an angle switch must keep the screen and the player.
   return <PlayerBody id={id} start={start} approximate={approx === "1"} />;
 }

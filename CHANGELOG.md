@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Match player: multi-angle player v1 prototype (dev flag, OFF by default)
+
+JS-only on mobile (OTA-safe on runtime 0.5.0, build 25): expo-video 3.0.16 APIs build 25 links (`replaceAsync`, `currentTime`, `playbackRate`, `muted`, `generateThumbnailsAsync`, `surfaceType`), `expo-image` for the held frame and `expo-device` for the Android tier, all linked in build 25. On only in a development build started with `EXPO_PUBLIC_MULTI_ANGLE_PLAYER=1` (`apps/mobile/lib/video/multi-angle/flag.ts`); every release bundle keeps the single player. Test plan: `docs/spikes/2026-10-multi-angle-player.md`. Design notes (not published): `design/native-screens/proposals/2026-10-05-multi-angle-player/README.md`.
+
+**Added**
+- `apps/mobile/lib/video/multi-angle/`: `use-multi-angle-playback.ts` (one player per playable angle, at most three fixed slots, stacked views), `roles.ts` (Best angle as master clock and audio bed, visible plus one hot standby, the rest warm; switch modes swap / seek / dip), `sync-controller.ts` (drift correction: one-frame deadband, proportional `playbackRate` nudge clamped to 5%, exact re-seek past 250 ms visible / 120 ms hidden, 750 ms settle, median-of-three smoothing, residual percentiles), `trust.ts` (audio-synced only with `sync_source = 'audio'` and a confidence; anything else, including missing keys, is clock-only), `device-tier.ts` (at most two playing decoders on Android; conservative warm-only heuristic plus the `ANDROID_FORCE_WARM_ONLY` constant), `moment-angles.ts` (clearest angle per key moment, keys pending in jr_be), `copy.ts`.
+- `apps/mobile/components/film-room/multi-angle/`: `angle-stack.tsx` (stacked views, TextureView on Android, held frame, dip, horizontal swipe with accessibility actions), `angle-bar.tsx` (angle control in the thumb zone, angle-count chip, Approx. sync tag), `angles-sheet.tsx` (every angle including pending and failed, COPY-DECK v2.2 row strings), `frame-step.tsx`, `multi-angle-player-body.tsx`.
+- Playback telemetry: `switchSwapCount` / `switchSeekCount` / `switchDipCount`, `syncResidualP50Ms` / `syncResidualP95Ms` / `syncSamples`, `decoderCapEvents` / `decoderCapReasons`, `playerMode`, `deviceTier`, and the `video.playback.mode` tag.
+- `getMatchDetailView` videos carry `sync_offset_ms`, `sync_source`, `sync_confidence` when `get_match_details` sends them (jr_be `feat/playback-encode`), null otherwise.
+
 ### Match player: angle switch in place (multi-angle P0)
 
 JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): uses only expo-video 3.0.16 APIs build 25 already links (`replaceAsync`, `currentTime`, `pause`, `playbackRate`, `onFirstFrameRender`). No backend change. Research: `research/2026-10-multi-angle-playback/`.

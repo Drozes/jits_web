@@ -328,6 +328,7 @@ describe("reportPlaybackSession", () => {
         "video.playback.source": "normalized",
         "video.playback.network": "wifi",
         "video.playback.outcome": "watched",
+        "video.playback.mode": "single",
       },
       extra: summary,
     });
@@ -397,5 +398,52 @@ describe("PlaybackSession angle switches (multi-angle P0)", () => {
   it("accepts the timekeeper angle as its own dimension", () => {
     const s = new PlaybackSession({ ...MATCH, angle: "timekeeper", angleCount: 3 }, 0);
     expect(s.summary(10, "unmount")).toMatchObject({ angle: "timekeeper", angleCount: 3 });
+  });
+});
+
+describe("PlaybackSession multi-angle fields", () => {
+  it("counts switch modes, reports residual percentiles and decoder-cap events", () => {
+    const s = new PlaybackSession({ ...MATCH, playerMode: "multi", deviceTier: "warm-only" }, 0);
+    s.playIntent(true, 0);
+    s.sourceAttached("normalized", 100);
+    s.switchStarted(1000, "swap");
+    s.switchStarted(2000, "seek");
+    s.switchStarted(3000, "dip");
+    s.switchStarted(4000, "seek");
+    for (let i = 1; i <= 20; i += 1) s.syncResidual(i / 1000);
+    s.decoderCap("warm-only:low-memory");
+    s.decoderCap("decoder-error");
+    s.decoderCap("decoder-error");
+    const out = s.summary(5000, "unmount");
+    expect(out).toMatchObject({
+      playerMode: "multi",
+      deviceTier: "warm-only",
+      switchCount: 4,
+      switchSwapCount: 1,
+      switchSeekCount: 2,
+      switchDipCount: 1,
+      syncResidualP50Ms: 10,
+      syncResidualP95Ms: 19,
+      syncSamples: 20,
+      decoderCapEvents: 3,
+      decoderCapReasons: "decoder-error,warm-only:low-memory",
+    });
+  });
+
+  it("is empty for the single player", () => {
+    expect(matchSession().summary(10, "unmount")).toMatchObject({
+      switchSwapCount: 0,
+      syncResidualP50Ms: null,
+      syncSamples: 0,
+      decoderCapEvents: 0,
+      decoderCapReasons: null,
+    });
+  });
+
+  it("tags the player mode", () => {
+    reportPlaybackSession(new PlaybackSession({ ...MATCH, playerMode: "multi" }, 0).summary(1, "unmount"));
+    expect(mockCaptureMessage.mock.calls[0][1].tags["video.playback.mode"]).toBe("multi");
+    reportPlaybackSession(matchSession().summary(1, "unmount"));
+    expect(mockCaptureMessage.mock.calls[1][1].tags["video.playback.mode"]).toBe("single");
   });
 });
