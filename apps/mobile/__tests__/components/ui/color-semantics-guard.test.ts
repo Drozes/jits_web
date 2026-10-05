@@ -105,7 +105,9 @@ const RED_ALLOWED: Allow = {
   "components/leaderboard/rank-flare.tsx": { lines: 1, reason: "the registered rank flare" },
   "components/match-card.tsx": { lines: 1, reason: "a negative rating delta" },
   "components/match-detail/ai-breakdown.tsx": { lines: 1, reason: "the TRY AGAIN text action after an error" },
-  "components/match-detail/film-angles.tsx": { lines: 1, reason: "ANALYSIS FAILED (a negative)" },
+  // toneColor moved here from match-detail/film-angles.tsx (jits-n2im.25): the deck's "act" class,
+  // red only on the viewer's own retryable upload (COPY-DECK 0.6).
+  "components/video-status/film-status-bits.tsx": { lines: 1, reason: "the act class: my own retryable upload (a negative)" },
   "components/match-detail/match-detail-states.tsx": { lines: 1, reason: "the Retry / Back text action" },
   "components/match-detail/match-verdict.tsx": { lines: 1, reason: "a negative rating delta" },
   "components/match-detail/video-state-panel.tsx": { lines: 2, reason: "the failed / missing state (a negative) and the Try again / Back text action" },

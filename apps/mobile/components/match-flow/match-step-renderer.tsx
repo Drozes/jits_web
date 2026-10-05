@@ -13,6 +13,9 @@ import { VerdictStep } from "./verdict/verdict-step";
 import { useMatchUpload } from "@/lib/video/match-upload-store";
 import { deriveUploadBannerState } from "@/lib/video/upload-banner-state";
 import { useMatchRecorder } from "./match-recorder-context";
+import { MatchUploadLine } from "./match-upload-line";
+import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
+import { View } from "react-native";
 
 export interface MatchParticipant {
   athlete_id: string;
@@ -100,6 +103,10 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
   // survives this subtree remounting and a late-finishing upload.
   const recorder = useMatchRecorder();
   const upload = useMatchUpload(matchId);
+  // The app-wide upload strip (jits-n2im.2): hidden for every job on the
+  // countdown and live screen, and for this match's own job everywhere in
+  // the wizard (the compact line and the verdict's Film block say it).
+  useSuppressUploadStrip(step === "live" ? { kind: "all" } : { kind: "match", matchId });
 
   if (step === "wait") {
     return <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />;
@@ -129,7 +136,12 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     );
   }
   if (step === "end") {
-    return <EndStep onAdvance={advanceToResult} />;
+    return (
+      <View>
+        <EndStep onAdvance={advanceToResult} />
+        <MatchUploadLine matchId={matchId} />
+      </View>
+    );
   }
   if (step === "result") {
     const athlete = (p: MatchParticipant) => ({
@@ -139,25 +151,28 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
       weight: p.current_weight,
     });
     return (
-      <ResultStep
-        matchId={matchId}
-        durationSeconds={durationSeconds}
-        initialFinishSeconds={initialFinishSeconds}
-        me={athlete(me)}
-        opponent={athlete(opponent)}
-        submissionTypes={submissionTypes}
-        onRecorded={(r: BroadcastResult, meta: RecordedMeta) => {
-          setResultData(r);
-          if (meta.recorderConfirmed) {
-            // Auto-confirmed server-side (B2): straight to the verdict, on
-            // the same refresh path the confirm step's completion takes.
-            refresh();
-            setStep("summary");
-          } else {
-            setStep("confirm");
-          }
-        }}
-      />
+      <View style={{ gap: 12 }}>
+        <ResultStep
+          matchId={matchId}
+          durationSeconds={durationSeconds}
+          initialFinishSeconds={initialFinishSeconds}
+          me={athlete(me)}
+          opponent={athlete(opponent)}
+          submissionTypes={submissionTypes}
+          onRecorded={(r: BroadcastResult, meta: RecordedMeta) => {
+            setResultData(r);
+            if (meta.recorderConfirmed) {
+              // Auto-confirmed server-side (B2): straight to the verdict, on
+              // the same refresh path the confirm step's completion takes.
+              refresh();
+              setStep("summary");
+            } else {
+              setStep("confirm");
+            }
+          }}
+        />
+        <MatchUploadLine matchId={matchId} />
+      </View>
     );
   }
   if (step === "confirm") {
@@ -167,21 +182,24 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         ? (submissionTypes.find((t) => t.code === resultData.submissionCode)?.display_name ?? null)
         : null);
     return (
-      <ConfirmStep
-        matchId={matchId}
-        me={me}
-        opponent={opponent}
-        resultData={resultData}
-        confirmedAthleteIds={confirmedAthleteIds}
-        submissionName={submissionName}
-        finishTimeSeconds={extras.finishTimeSeconds ?? resultData?.finishTimeSeconds ?? null}
-        disputeLocksAt={extras.disputeLocksAt}
-        completedAt={extras.completedAt}
-        onCompleted={() => {
-          refresh();
-          setStep("summary");
-        }}
-      />
+      <View style={{ gap: 12 }}>
+        <ConfirmStep
+          matchId={matchId}
+          me={me}
+          opponent={opponent}
+          resultData={resultData}
+          confirmedAthleteIds={confirmedAthleteIds}
+          submissionName={submissionName}
+          finishTimeSeconds={extras.finishTimeSeconds ?? resultData?.finishTimeSeconds ?? null}
+          disputeLocksAt={extras.disputeLocksAt}
+          completedAt={extras.completedAt}
+          onCompleted={() => {
+            refresh();
+            setStep("summary");
+          }}
+        />
+        <MatchUploadLine matchId={matchId} />
+      </View>
     );
   }
   if (step === "summary") {

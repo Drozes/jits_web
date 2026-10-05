@@ -333,6 +333,28 @@ describe("getMatchDetailView", () => {
     });
   });
 
+  it("maps the multi-angle sync keys from get_match_details, null on an older backend", async () => {
+    const m = mockClient({
+      rpc: () => ({
+        data: detailsPayload([
+          videoRow({ id: "v-p", is_primary: true, sync_offset_ms: 0, sync_source: null, sync_confidence: null }),
+          videoRow({ id: "v-a", sync_offset_ms: -163, sync_source: "audio", sync_confidence: 0.82 }),
+          videoRow({ id: "v-b" }),
+          videoRow({ id: "v-c", sync_offset_ms: "12", sync_source: 3, sync_confidence: "x" }),
+        ]),
+        error: null,
+      }),
+    });
+    const r = await getMatchDetailView(m.client, MATCH_ID, ME);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const byId = Object.fromEntries(r.data.videos.map((v) => [v.id, v]));
+    expect(byId["v-p"]).toMatchObject({ is_primary: true, sync_offset_ms: 0, sync_source: null, sync_confidence: null });
+    expect(byId["v-a"]).toMatchObject({ sync_offset_ms: -163, sync_source: "audio", sync_confidence: 0.82 });
+    expect(byId["v-b"]).toMatchObject({ sync_offset_ms: null, sync_source: null, sync_confidence: null });
+    expect(byId["v-c"]).toMatchObject({ sync_offset_ms: null, sync_source: null, sync_confidence: null });
+  });
+
   it("passes the B4 fields through when the backend sends them", async () => {
     const payload = {
       ...detailsPayload([

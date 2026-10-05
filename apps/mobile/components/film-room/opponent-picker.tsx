@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useWindowInsets } from "@/lib/layout/window-insets";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { useModalAnimation } from "@/lib/motion";
@@ -44,7 +44,7 @@ function Row({ label, detail, on, onPress, testID }: { label: string; detail?: s
  */
 export function OpponentPicker({ visible, opponents, selectedId, onSelect, onClose }: OpponentPickerProps) {
   const p = usePalette();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowInsets();
   const animationType = useModalAnimation("slide");
   return (
     <Modal visible={visible} transparent animationType={animationType} onRequestClose={onClose}>

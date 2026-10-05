@@ -26,6 +26,8 @@ export function toneFor(status: CardStatus): Tone {
   // grey (deck 0.6: red only when the viewer can act).
   if (status.kind === "upload_failed") return status.terminal ? "muted" : "red";
   if (status.kind === "ready") return "outline";
+  // No film is final with nothing to do: grey (deck 0.8 info).
+  if (status.kind === "no_film") return "muted";
   return "amber";
 }
 

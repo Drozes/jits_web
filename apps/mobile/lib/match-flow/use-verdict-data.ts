@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getMatchDetailView, type MatchDetailVideo } from "@jits/shared/api/queries";
 import { useMatchVideosRealtime } from "@jits/shared/hooks/use-match-videos-realtime";
 import { defaultMatchAngle } from "@jits/shared/utils";
+import { angleWatchable } from "@/lib/video/angle-status";
 import { getMatchRankChange, type MatchRankChange } from "@jits/shared/api/match-rank-change";
 
 export interface VerdictVideos {
@@ -27,12 +28,17 @@ export interface VerdictVideos {
    * angle is not here: this phone's upload card speaks for it.
    */
   others: MatchDetailVideo[];
+  /**
+   * The angles the playback query can play (`angleWatchable`), video id ->
+   * duration s, for the Film block (jits-n2im.25); null until the first read.
+   */
+  playable: ReadonlyMap<string, number | null> | null;
 }
 
 /** How often the verdict re-reads while realtime is not connected. */
 export const VERDICT_FALLBACK_REFETCH_MS = 60_000;
 
-const EMPTY: VerdictVideos = { hasVideo: false, hasPlayable: false, posterUrl: null, posterKey: null, others: [] };
+const EMPTY: VerdictVideos = { hasVideo: false, hasPlayable: false, posterUrl: null, posterKey: null, others: [], playable: null };
 
 /**
  * The opening still: the server-elected primary's poster when it has one
@@ -71,6 +77,7 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
           posterUrl: withPoster?.poster_url ?? null,
           posterKey: withPoster ? (withPoster.thumbnail_key ?? withPoster.id) : null,
           others: list.filter((v) => !v.is_mine),
+          playable: new Map(list.filter(angleWatchable).map((v) => [v.id, v.duration_seconds])),
         });
       })
       .catch(() => undefined);

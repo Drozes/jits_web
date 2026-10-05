@@ -222,6 +222,7 @@ export default function ProfileScreen() {
               error={!!library.error}
               onRetry={refetchVideos}
               viewer={{ name: athlete.display_name ?? "You", photoUrl: athlete.profile_photo_url }}
+              viewerId={athlete.id}
             />
 
             <View className="gap-2">

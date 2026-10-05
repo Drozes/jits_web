@@ -396,6 +396,7 @@
         "apps/mobile/app/(app)/(tabs)/_layout.tsx",
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/components/arena/challenge-prompt-sheet.tsx",
+        "apps/mobile/components/arena/drift-prompt-sheet.tsx",
         "apps/mobile/components/arena/go-live-location-sheet.tsx",
         "apps/mobile/components/arena/start-blocked-sheet.tsx",
         "apps/mobile/components/dashboard/**",
@@ -426,6 +427,7 @@
         "apps/mobile/components/ui/elo-system/selection.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
+        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -529,6 +531,7 @@
         "apps/mobile/lib/video/upload-copy.ts",
         "apps/mobile/lib/video/upload-errors.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
       ]
     },
@@ -575,6 +578,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/wizard-scroll.tsx",
         "apps/mobile/components/match-flow/wizard-status.tsx",
@@ -583,11 +587,15 @@
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/switch.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/video/recording-space.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "22-Ready-Check.dc.html": {
@@ -606,6 +614,7 @@
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-recorder-surface.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/wizard-scroll.tsx",
         "apps/mobile/components/match-flow/wizard-status.tsx",
@@ -614,11 +623,15 @@
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/switch.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/video/recording-space.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "21b-Faceoff-Flagged.dc.html": {
@@ -635,6 +648,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/wizard-scroll.tsx",
         "apps/mobile/components/match-flow/wizard-status.tsx",
@@ -643,11 +657,15 @@
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/switch.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/video/recording-space.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "21c-Faceoff-Reweigh.dc.html": {
@@ -664,6 +682,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/wizard-scroll.tsx",
         "apps/mobile/components/match-flow/wizard-status.tsx",
@@ -672,11 +691,15 @@
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/switch.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/video/recording-space.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "22b-Ready-Hold.dc.html": {
@@ -695,6 +718,7 @@
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-recorder-surface.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/wizard-scroll.tsx",
         "apps/mobile/components/match-flow/wizard-status.tsx",
@@ -703,11 +727,15 @@
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/switch.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/video/recording-space.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "23-Countdown.dc.html": {
@@ -728,6 +756,7 @@
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-recorder-surface.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/wizard-scroll.tsx",
         "apps/mobile/components/match-flow/wizard-status.tsx",
@@ -735,10 +764,14 @@
         "apps/mobile/components/ui/pressable-scale.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "24-Live-Broadcast.dc.html": {
@@ -759,6 +792,7 @@
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-recorder-surface.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/steps/live-step.tsx",
         "apps/mobile/components/match-flow/wizard-scroll.tsx",
@@ -768,12 +802,16 @@
         "apps/mobile/components/ui/pressable-scale.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/live-view-state.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/video/recording-limits.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "25-Result-Entry.dc.html": {
@@ -791,6 +829,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/steps/result-form.tsx",
         "apps/mobile/components/match-flow/steps/result-step.tsx",
@@ -802,11 +841,15 @@
         "apps/mobile/components/ui/search-select.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/filter-submissions.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "26-Result-Waiting.dc.html": {
@@ -824,6 +867,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/steps/result-form.tsx",
         "apps/mobile/components/match-flow/steps/result-step.tsx",
@@ -836,11 +880,15 @@
         "apps/mobile/components/ui/search-select.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/filter-submissions.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "27-Confirm.dc.html": {
@@ -858,6 +906,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/steps/confirm-step.tsx",
         "apps/mobile/components/match-flow/verdict/rating-moment.tsx",
@@ -871,10 +920,14 @@
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/toast.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "28-Dispute.dc.html": {
@@ -893,6 +946,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/steps/confirm-step.tsx",
         "apps/mobile/components/match-flow/steps/dispute-form.tsx",
@@ -907,10 +961,14 @@
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/toast.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "29-Verdict.dc.html": {
@@ -930,6 +988,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/steps/summary-highlight-note.tsx",
         "apps/mobile/components/match-flow/upload-progress-banner.tsx",
@@ -944,16 +1003,25 @@
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/toast.tsx",
+        "apps/mobile/components/video-status/film-row-info.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
+        "apps/mobile/components/video-status/film-status-header.tsx",
+        "apps/mobile/components/video-status/film-status-plate.tsx",
+        "apps/mobile/components/video-status/film-status-row.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/film-room/format.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/match-flow/use-verdict-data.ts",
+        "apps/mobile/lib/video/film-status.ts",
         "apps/mobile/lib/video/upload-banner-state.ts",
         "apps/mobile/lib/video/upload-capabilities.ts",
         "apps/mobile/lib/video/upload-copy.ts",
         "apps/mobile/lib/video/upload-errors.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-film-status.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/share.ts"
       ]
     },
@@ -984,6 +1052,7 @@
         "apps/mobile/lib/video/upload-copy.ts",
         "apps/mobile/lib/video/upload-errors.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
       ]
     },
@@ -1008,6 +1077,7 @@
         "apps/mobile/components/match-detail/match-verdict.tsx",
         "apps/mobile/components/match-detail/no-match-breakdown.tsx",
         "apps/mobile/components/match-detail/opponent-link-row.tsx",
+        "apps/mobile/components/match-detail/timekeeper-film.tsx",
         "apps/mobile/components/match-detail/use-amber.ts",
         "apps/mobile/components/match-flow/upload-progress-banner.tsx",
         "apps/mobile/components/ui/elo-system/avatar-32.tsx",
@@ -1020,17 +1090,25 @@
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/components/video-status/film-row-info.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
+        "apps/mobile/components/video-status/film-status-header.tsx",
+        "apps/mobile/components/video-status/film-status-plate.tsx",
+        "apps/mobile/components/video-status/film-status-row.tsx",
         "apps/mobile/lib/film-room/format.ts",
         "apps/mobile/lib/highlight/highlight-copy.ts",
         "apps/mobile/lib/highlight/regenerate-mode.ts",
         "apps/mobile/lib/match-detail/film-section.ts",
         "apps/mobile/lib/match-detail/use-match-film.ts",
+        "apps/mobile/lib/video/film-status.ts",
         "apps/mobile/lib/video/upload-banner-state.ts",
         "apps/mobile/lib/video/upload-capabilities.ts",
         "apps/mobile/lib/video/upload-copy.ts",
         "apps/mobile/lib/video/upload-errors.ts",
+        "apps/mobile/lib/video/use-film-status.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
-        "packages/shared/src/constants/**",
+        "apps/mobile/lib/video/video-status-copy.ts",
+        "packages/shared/src/constants/highlights.ts",
         "packages/shared/src/utils/key-moments.ts",
         "packages/shared/src/utils/match-detection.ts",
         "packages/shared/src/utils/shared.ts"
@@ -1050,6 +1128,7 @@
         "apps/mobile/components/match-detail/video-state-panel.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/lib/film-room/format.ts",
+        "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/key-moments.ts",
         "packages/shared/src/utils/match-detection.ts"
       ]
@@ -1203,6 +1282,7 @@
         "apps/mobile/lib/video/upload-copy.ts",
         "apps/mobile/lib/video/upload-errors.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
       ]
     },
@@ -1225,6 +1305,7 @@
         "apps/mobile/components/match-flow/match-orientation-controller.tsx",
         "apps/mobile/components/match-flow/match-recorder-context.tsx",
         "apps/mobile/components/match-flow/match-step-renderer.tsx",
+        "apps/mobile/components/match-flow/match-upload-line.tsx",
         "apps/mobile/components/match-flow/queue-status-banner.tsx",
         "apps/mobile/components/match-flow/steps/confirm-step-panels.tsx",
         "apps/mobile/components/match-flow/steps/ready-panel.tsx",
@@ -1249,6 +1330,7 @@
         "apps/mobile/components/ui/search-select.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/components/video-status/film-status-bits.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/filter-submissions.ts",
         "apps/mobile/lib/match-flow/live-view-state.ts",
@@ -1256,7 +1338,10 @@
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/practice/constants.ts",
         "apps/mobile/lib/video/recording-limits.ts",
-        "apps/mobile/lib/video/upload-banner-state.ts"
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-strip.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "apps/mobile/lib/video/video-status-copy.ts"
       ]
     },
     "42-Notifications-Panel.dc.html": {
@@ -1622,6 +1707,7 @@
         "apps/mobile/components/arena/arena-plates.tsx",
         "apps/mobile/components/arena/arena-skeleton.tsx",
         "apps/mobile/components/arena/challenge-prompt-sheet.tsx",
+        "apps/mobile/components/arena/drift-prompt-sheet.tsx",
         "apps/mobile/components/arena/go-live-location-sheet.tsx",
         "apps/mobile/components/arena/mat-board.tsx",
         "apps/mobile/components/arena/on-air-strip.tsx",
@@ -1647,6 +1733,7 @@
         "apps/mobile/components/ui/elo-system/mono.tsx",
         "apps/mobile/components/ui/elo-system/plate.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
+        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -1670,6 +1757,7 @@
         "apps/mobile/components/arena/arena-plates.tsx",
         "apps/mobile/components/arena/arena-skeleton.tsx",
         "apps/mobile/components/arena/challenge-prompt-sheet.tsx",
+        "apps/mobile/components/arena/drift-prompt-sheet.tsx",
         "apps/mobile/components/arena/go-live-location-sheet.tsx",
         "apps/mobile/components/arena/mat-board.tsx",
         "apps/mobile/components/arena/on-air-strip.tsx",
@@ -1695,6 +1783,7 @@
         "apps/mobile/components/ui/elo-system/mono.tsx",
         "apps/mobile/components/ui/elo-system/plate.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
+        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -1821,6 +1910,8 @@
     "apps/mobile/components/ui/elo-system/index.ts",
     "apps/mobile/components/ui/elo-system/splash-statement.tsx",
     "apps/mobile/components/ui/index.ts",
-    "apps/mobile/components/ui/skeleton/index.ts"
+    "apps/mobile/components/ui/skeleton/index.ts",
+    "apps/mobile/components/video-status/upload-strip-slots.tsx",
+    "apps/mobile/components/video-status/upload-strip.tsx"
   ]
 }

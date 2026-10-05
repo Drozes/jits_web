@@ -96,8 +96,8 @@ it("a row that already plays keeps saying so while a re-record uploads (B1 wave 
 it("localAngleJob maps the store entry and drops it once it landed", () => {
   expect(localAngleJob(null)).toBeNull();
   expect(localAngleJob({ status: "uploaded", progress: 1, errorClass: null })).toBeNull();
-  expect(localAngleJob({ status: "error", progress: 0.5, errorClass: "too_large" })).toEqual({ status: "error", progress: 0.5, terminal: true });
-  expect(localAngleJob({ status: "paused", progress: null, errorClass: "offline" })).toEqual({ status: "paused", progress: null, terminal: false });
+  expect(localAngleJob({ status: "error", progress: 0.5, errorClass: "too_large" })).toEqual({ status: "error", progress: 0.5, terminal: true, message: null, discardable: true });
+  expect(localAngleJob({ status: "paused", progress: null, errorClass: "offline" })).toEqual({ status: "paused", progress: null, terminal: false, message: null, discardable: false });
 });
 
 it("minor 2: another athlete's pipeline failure is grey 'Not used' (deck 2c), never red", () => {

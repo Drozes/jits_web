@@ -7,3 +7,4 @@ export * from "./use-global-notifications";
 export * from "./use-video-progress";
 export * from "./use-highlight-progress";
 export * from "./use-match-videos-realtime";
+export * from "./use-match-video-status";

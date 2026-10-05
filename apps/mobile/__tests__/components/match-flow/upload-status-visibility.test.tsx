@@ -93,6 +93,8 @@ jest.mock("@/lib/theme/use-theme", () => ({
 }));
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// The Film status read is unavailable here: the wave 2 film rows stand in (jits-n2im.25).
+jest.mock("@/lib/video/use-film-status", () => require("../../support/film-status-mock").unavailableFilmStatusModule());
 // Match-level match_videos realtime (jits-n2im.12): its own tests live in
 // packages/shared; here it is inert.
 const mockMatchVideosRealtime = jest.fn();

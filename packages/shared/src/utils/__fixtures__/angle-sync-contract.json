@@ -1,0 +1,12 @@
+{
+  "description": "Cross-repo angle sync contract (jr_be-1qz.11 acceptance 3). sync_offset_ms(V) = start(V) - start(primary) in ms, primary = 0; reference (match) time = video time + offset / 1000. translateAngleTime(t, from_offset_ms, to_offset_ms) = max(0, t + (from_offset_ms - to_offset_ms) / 1000). The same file must be checked into jits_web (packages/shared) and asserted against translateAngleTime there; the worker test (test/sync.test.mjs) asserts the formula and that the renderer reads a match-time segment from angle V at V-local time t - offset(V) / 1000.",
+  "cases": [
+    { "t": 10, "from_offset_ms": 0, "to_offset_ms": 1234, "expected_t": 8.766 },
+    { "t": 10, "from_offset_ms": 1234, "to_offset_ms": 0, "expected_t": 11.234 },
+    { "t": 10, "from_offset_ms": 0, "to_offset_ms": -800, "expected_t": 10.8 },
+    { "t": 10, "from_offset_ms": -800, "to_offset_ms": 0, "expected_t": 9.2 },
+    { "t": 5, "from_offset_ms": 1234, "to_offset_ms": -800, "expected_t": 7.034 },
+    { "t": 0.5, "from_offset_ms": 0, "to_offset_ms": 2000, "expected_t": 0 },
+    { "t": 42, "from_offset_ms": 0, "to_offset_ms": 0, "expected_t": 42 }
+  ]
+}

@@ -37,6 +37,8 @@ jest.mock("expo-image", () => {
   };
 });
 jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
+// The Film status read is unavailable here: the wave 2 film rows stand in (jits-n2im.25).
+jest.mock("@/lib/video/use-film-status", () => require("../../support/film-status-mock").unavailableFilmStatusModule());
 // Match-level match_videos realtime (jits-n2im.12): its own tests live in
 // packages/shared; here it is inert.
 const mockMatchVideosRealtime = jest.fn();
@@ -714,5 +716,76 @@ describe("the other athlete's angle on the verdict (jits-n2im.12)", () => {
     const s = renderVerdict();
     await flush();
     expect(s.queryByTestId("verdict-angle-rows")).toBeNull();
+  });
+});
+
+describe("the verdict Film block (jits-n2im.25): the same plate as match detail", () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const filmMock = require("../../support/film-status-mock") as typeof import("../../support/film-status-mock");
+  const fx = require("../../support/match-video-status-fixture") as typeof import("../../support/match-video-status-fixture");
+  const { deriveFilmStatus } = require("@/lib/video/film-status") as typeof import("@/lib/video/film-status");
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  const derive = (over: Record<string, unknown>) => {
+    const status = fx.statusFixture(over);
+    return { status, view: deriveFilmStatus({ status, viewerId: fx.ME, local: null, nowMs: fx.NOW, clockOffsetMs: 0 }) };
+  };
+  afterEach(() => filmMock.setMockFilmStatus(null));
+
+  it("replaces the upload card, the angle rows and the highlight note", async () => {
+    mockGetFlags.mockResolvedValue({ ok: true, data: { clipsEnabled: true, shareEnabled: false } });
+    filmMock.setMockFilmStatus(derive({ angles: [fx.angle("me", "uploading", { progress_pct: 42 }), fx.angle("opp", "waiting_for_phone")] }));
+    const s = renderVerdict({ upload: { kind: "uploading", message: null, truncation: null, progress: 0.42 } });
+    await flush();
+    expect(s.getByTestId("verdict-film")).toBeTruthy();
+    expect(s.getByText("FILM")).toBeTruthy();
+    expect(s.getByText("Film is coming in from 2 phones.")).toBeTruthy();
+    expect(s.queryByTestId("upload-status-banner")).toBeNull();
+    expect(s.queryByTestId("verdict-angle-rows")).toBeNull();
+    expect(s.queryByTestId("summary-highlight-note")).toBeNull();
+    // Nothing is ready: Open match, never Watch film (rule 4).
+    expect(s.getByText("Open match")).toBeTruthy();
+  });
+
+  it("Watch film once the status has a ready angle, even before the detail read says playable", async () => {
+    filmMock.setMockFilmStatus(derive({ phase: "building", phase_reason: null, angles: [fx.angle("me", "ready"), fx.angle("opp", "processing")] }));
+    const s = renderVerdict();
+    await flush();
+    expect(s.getByText("Watch film")).toBeTruthy();
+  });
+
+  it("Watch film as soon as an angle has playable bytes, before its analysis (rule 4 reads playable)", async () => {
+    const status = fx.statusFixture({ angles: [fx.angle("me", "processing"), fx.angle("opp", "uploading")] });
+    const view = deriveFilmStatus({ status, viewerId: fx.ME, local: null, nowMs: fx.NOW, clockOffsetMs: 0, playable: new Map([[fx.V_ME, 271]]) });
+    filmMock.setMockFilmStatus({ status, view });
+    const s = renderVerdict();
+    await flush();
+    expect(s.getByText("Watch film")).toBeTruthy();
+    // The phase tag and my row both say it (v2.4).
+    expect(s.getAllByText("ANALYZING")).toHaveLength(2);
+    expect(s.getByText("Your film is in. Analyzing now.")).toBeTruthy();
+  });
+
+  it("an angle still merging (no playable bytes) is not a reason to offer Watch film", async () => {
+    filmMock.setMockFilmStatus(derive({ angles: [fx.angle("me", "processing"), fx.angle("opp", "uploading")] }));
+    const s = renderVerdict();
+    await flush();
+    expect(s.getByText("Open match")).toBeTruthy();
+  });
+
+  it("keeps the card only for recorder states the block has no row for", async () => {
+    filmMock.setMockFilmStatus(derive({ angles: [fx.angle("me", "waiting_for_phone"), fx.angle("opp", "uploading")] }));
+    const s = renderVerdict({ upload: { kind: "stopping", message: null, truncation: null, progress: null } });
+    await flush();
+    expect(s.getByTestId("upload-status-banner")).toBeTruthy();
+    expect(s.getByTestId("verdict-film")).toBeTruthy();
+  });
+
+  it("the hero agrees with the block: 'No video yet' in the grace window, never 'No film' early", async () => {
+    filmMock.setMockFilmStatus(derive({ phase: "collecting", phase_reason: "no_video_yet", angles: [fx.angle("me", "not_recording"), fx.angle("opp", "not_recording")] }));
+    const s = renderVerdict();
+    await flush();
+    // The phase tag and the hero caption say the same words.
+    expect(s.getAllByText("NO VIDEO YET")).toHaveLength(2);
+    expect(s.queryByText("NO FILM FOR THIS MATCH")).toBeNull();
   });
 });

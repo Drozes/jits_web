@@ -2,6 +2,8 @@ import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 
 const mockPush = jest.fn();
+// The server Film status phases are their own suite (use-film-room-phases.test).
+jest.mock("@/lib/film-room/use-film-room-phases", () => ({ useFilmRoomPhases: () => ({}) }));
 jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock("lucide-react-native", () => {
   const RN = require("react-native");

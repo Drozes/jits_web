@@ -6,6 +6,7 @@
  *
  * Back and Exit work at every phase with no confirm: nothing can be orphaned.
  */
+import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import * as React from "react";
 import { ActivityIndicator, ScrollView, View } from "react-native";
 import { Stack, useRouter } from "expo-router";
@@ -77,6 +78,8 @@ export default function PracticeScreen() {
   // Offline for the run and no real challenge prompt over it, like a match.
   useArenaMatchScreen();
   useMatchKeepAwake(phase === "ready" || phase === "live");
+  // The practice countdown and live screen hide the app-wide upload strip, as a real match does (jits-n2im.2).
+  useSuppressUploadStrip(phase === "live" ? { kind: "all" } : null);
 
   // Live shrinks the content to the viewport with scrolling off. Reset any
   // offset left from scrolling the ready step (see the match wizard).

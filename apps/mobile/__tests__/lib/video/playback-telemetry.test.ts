@@ -348,3 +348,54 @@ describe("scrubPlaybackError", () => {
     expect(scrubPlaybackError("e".repeat(500))).toHaveLength(200);
   });
 });
+
+describe("PlaybackSession angle switches (multi-angle P0)", () => {
+  it("keeps one session across switches and times tap to the new angle's first frame", () => {
+    const s = matchSession();
+    s.playing(true, 1000);
+    s.switchStarted(5000);
+    s.sourceAttached("normalized", 5010);
+    s.switchLanded(5300);
+    s.switchStarted(9000);
+    s.switchLanded(9100);
+    s.switchStarted(12_000);
+    s.switchLanded(12_500);
+    const out = s.summary(20_000, "unmount");
+    expect(out.switchCount).toBe(3);
+    expect(out.switchLatencyMs).toBe(300);
+    expect(out.switchLatencyMaxMs).toBe(500);
+    // The first startup is still the session's time to first frame.
+    expect(out.timeToFirstFrameMs).toBe(1000);
+  });
+
+  it("does not count the switched-in angle's load as a stall", () => {
+    const s = matchSession();
+    s.playing(true, 1000);
+    s.switchStarted(5000);
+    s.status("loading", 5050);
+    s.status("readyToPlay", 5400);
+    expect(s.summary(6000, "unmount").stallCount).toBe(0);
+  });
+
+  it("a switch with no frame yet (left, or superseded) has no latency; a stray landing is ignored", () => {
+    const s = matchSession();
+    s.switchStarted(5000);
+    s.switchStarted(6000);
+    s.switchLanded(6200);
+    s.switchLanded(7000);
+    const out = s.summary(8000, "unmount");
+    expect(out.switchCount).toBe(2);
+    expect(out.switchLatencyMs).toBe(200);
+    expect(out.switchLatencyMaxMs).toBe(200);
+  });
+
+  it("reports no switch fields' values without a switch", () => {
+    const out = matchSession().summary(1000, "unmount");
+    expect(out).toMatchObject({ switchCount: 0, switchLatencyMs: null, switchLatencyMaxMs: null });
+  });
+
+  it("accepts the timekeeper angle as its own dimension", () => {
+    const s = new PlaybackSession({ ...MATCH, angle: "timekeeper", angleCount: 3 }, 0);
+    expect(s.summary(10, "unmount")).toMatchObject({ angle: "timekeeper", angleCount: 3 });
+  });
+});
