@@ -50,6 +50,8 @@ import * as tracking from "@/lib/error-tracking/sentry";
 
 /** How long a seek's "the next load is ours" exemption lasts at most. */
 export const SEEK_EXEMPT_MS = 1500;
+/** A position change bigger than this is a seek landing, not playback progress. */
+const SEEK_JUMP_S = 1;
 
 export type PlaybackSurface = "match" | "highlight";
 /** Which file was played: the uploaded original, the slicer's normalized MP4, or a reel. */
@@ -274,10 +276,17 @@ export class PlaybackSession {
     if (!Number.isFinite(seconds) || seconds < 0) return;
     this.maxPositionS = Math.max(this.maxPositionS ?? 0, seconds);
     if (this.seekAt != null || this.swapPending) {
-      // The first update after a seek reports where it landed; moving on
-      // from there is playback progress, and the exemption is over.
-      if (this.exemptBase === undefined) this.exemptBase = seconds;
-      else if (seconds > this.exemptBase + 0.01) this.clearExemptions();
+      // Updates after a seek may still report the old spot before the one
+      // where it landed. A jump of more than SEEK_JUMP_S is the seek landing
+      // (reset the baseline there); only a small forward step from the
+      // baseline is playback progress, which ends the exemption.
+      if (this.exemptBase === undefined) {
+        this.exemptBase = seconds;
+        return;
+      }
+      const step = seconds - this.exemptBase;
+      if (Math.abs(step) > SEEK_JUMP_S) this.exemptBase = seconds;
+      else if (step > 0.01) this.clearExemptions();
     }
   }
 

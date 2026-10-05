@@ -121,6 +121,18 @@ describe("PlaybackSession", () => {
     expect(out.stallMs).toBe(1000);
   });
 
+  it("a seek whose first update is still the old spot, then lands, keeps its exemption (r2-1)", () => {
+    const s = matchSession();
+    s.playing(true, 1000);
+    s.position(10);
+    s.seekRequested(2000);
+    s.position(10.2); // pre-seek tick
+    s.position(50); // the seek lands: a jump, not progress
+    s.status("loading", 2300); // buffering at the new spot
+    s.status("readyToPlay", 3000);
+    expect(s.summary(3500, "unmount").stallCount).toBe(0);
+  });
+
   it("a seek's exemption also expires on its own after 1.5 s", () => {
     const s = matchSession();
     s.playing(true, 1000);
