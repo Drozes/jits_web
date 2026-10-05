@@ -2418,10 +2418,16 @@ describe("round 5 (A1): a web session the phone cannot meet is adopted at most o
     await check(false);
     await check(true);
     expect(autoLive).toHaveBeenCalledTimes(2);
-    // A new explicit choice here (offline, acknowledged): the decline is over.
+    await check(true);
+    expect(autoLive).toHaveBeenCalledTimes(2);
+    // Round 6: an explicit OFFLINE here does not end the decline (it writes
+    // false, ending that session); only a server false or a LIVE choice does.
     await act(async () => {
       await liveSwitch.goOffline();
     });
+    await check(true);
+    expect(autoLive).toHaveBeenCalledTimes(2);
+    await check(false);
     await check(true);
     expect(autoLive).toHaveBeenCalledTimes(3);
   });
@@ -2465,5 +2471,81 @@ describe("round 5 (A2): sign-out waits for both false writes", () => {
     // The serialized clear followed the hung live write.
     expect(mockToggleMatchPreferences.mock.calls.length).toBe(before + 2);
     expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review round 6
+// ---------------------------------------------------------------------------
+
+describe("round 6", () => {
+  const NET = { ok: false, error: { code: "UNKNOWN", message: "lost" } };
+  const REFUSED = { ok: false, error: { code: "LOCATION_REQUIRED", message: "no tag" } };
+  const OK = { ok: true, data: undefined };
+  const falseWrites = () =>
+    mockToggleMatchPreferences.mock.calls.filter((c) => !(c[2] as { lookingForRanked: boolean }).lookingForRanked).length;
+
+  it("F1: a live write whose first attempt had no answer and whose retry was refused may have committed: the offline after it writes false", async () => {
+    const { result } = mount();
+    mockToggleMatchPreferences.mockResolvedValueOnce(NET).mockResolvedValueOnce(REFUSED);
+    await act(async () => {
+      expect(await result.current.goLive()).toBe(false);
+    });
+    expect(result.current.lastGoLiveRefusal()).toBe("location_required");
+    expect(result.current.committed().settled).toBe(false);
+    mockToggleMatchPreferences.mockResolvedValue(OK);
+    const before = falseWrites();
+    await act(async () => {
+      await result.current.ensureOffline();
+    });
+    expect(falseWrites()).toBe(before + 1);
+  });
+
+  it("F1: a definite refusal on every attempt leaves nothing uncertain (no extra write)", async () => {
+    const { result } = mount();
+    mockToggleMatchPreferences.mockResolvedValueOnce(REFUSED);
+    await act(async () => {
+      expect(await result.current.goLive()).toBe(false);
+    });
+    expect(result.current.committed()).toEqual({ live: false, settled: true });
+  });
+
+  it("nit: a declined web session, then an explicit OFFLINE here: false is written (the last choice wins) and the session is never adopted again", async () => {
+    let likely = false;
+    const autoLive = jest.fn(async () => "live" as const);
+    const { result } = mount({ autoLive, canAdopt: () => likely });
+    registerArenaController({
+      toggle: jest.fn(),
+      goOffline: () => result.current.goOffline(),
+      goLive: () => result.current.goLive(),
+      committed: () => result.current.committed(),
+      ensureOffline: () => result.current.ensureOffline(),
+      sendChallenge: jest.fn(),
+      cancelOutgoing: jest.fn(),
+      clearCap: jest.fn(),
+      tuckIncoming: jest.fn(),
+      reopenIncoming: jest.fn(),
+    });
+    const out: unknown[] = [];
+    await act(async () => {
+      out.push(await result.current.checkServer(() => Promise.resolve(true)));
+      await flush();
+    });
+    expect(result.current.adoptionDeclined()).toBe(true);
+    const before = falseWrites();
+    await act(async () => {
+      await liveSwitch.goOffline();
+      await flush();
+    });
+    expect(falseWrites()).toBe(before + 1);
+    likely = true;
+    // A read that still says live (the reviewer's probe): not adopted.
+    await act(async () => {
+      out.push(await result.current.checkServer(() => Promise.resolve(true)));
+      await flush();
+    });
+    expect(out[0]).toBeNull();
+    expect(out[1]).not.toBe("adopted");
+    expect(autoLive).not.toHaveBeenCalled();
   });
 });

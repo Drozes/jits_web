@@ -17,7 +17,6 @@ import {
   useArenaSelfId,
   useArenaState,
   useGoLiveCancellable,
-  useGoLiveDisplay,
   useLiveIntent,
   useLiveSurface,
   useHasArenaController,
@@ -141,12 +140,13 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
   const onMat = useOnMatCount(selfId);
   const toConfirm = useMatchToConfirm(selfId);
   const controllerReady = useHasArenaController();
-  const display = useGoLiveDisplay();
+  // Live as drawn, the overlay and pending: ONE snapshot, shared with the
+  // Arena bar (rounds 5 and 6), restores and adoptions included.
+  const surface = useLiveSurface();
+  const display = surface.display;
   const needsLocation = useNeedsLocation();
   const cancellable = useGoLiveCancellable();
   const intent = useLiveIntent();
-  // Live as drawn, from the same snapshot the Arena bar reads (round 5).
-  const surface = useLiveSurface();
   const focused = useScreenFocused();
   // While on screen the chip can bring a tucked challenge back, so the prompt
   // may offer Later (AC-S4). Tab roots stay mounted (blurred) under pushed

@@ -298,6 +298,7 @@ async function writeLookingFlag(
   athleteId: string,
   ranked: boolean,
   onRefused?: (reason: "location_required") => void,
+  onIndefinite?: () => void,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await toggleMatchPreferences(supabase, athleteId, {
@@ -311,6 +312,9 @@ async function writeLookingFlag(
       onRefused?.("location_required");
       return false;
     }
+    // No definite answer: this attempt may have committed all the same
+    // (round 6, F1: whichever attempt it was, not only the last).
+    onIndefinite?.();
   }
   return false;
 }
@@ -455,14 +459,23 @@ export function useArenaLive({
         desiredRef.current = false;
         return false;
       }
-      const ok = await writeLookingFlag(id, true, (reason) => {
-        refusalRef.current = reason;
-      });
+      let indefinite = false;
+      const ok = await writeLookingFlag(
+        id,
+        true,
+        (reason) => {
+          refusalRef.current = reason;
+        },
+        () => {
+          indefinite = true;
+        },
+      );
       if (!ok) {
         desiredRef.current = false;
-        // Without a definite refusal the write may have committed all the
-        // same (the answer was lost): the server may say live (R1).
-        if (refusalRef.current !== "location_required") clearFailedRef.current = true;
+        // Any attempt without a definite answer may have committed (its
+        // answer was lost), even when a later one was refused: the server
+        // may say live (R1; round 6, F1).
+        if (indefinite) clearFailedRef.current = true;
         return false;
       }
       actualRef.current = true;
@@ -667,6 +680,9 @@ export function useArenaLive({
     offlineIntentRef.current += 1;
     resumeLiveRef.current = false;
     resumeAfterMatchRef.current = false;
+    // The server is known live elsewhere (a declined session): the athlete's
+    // offline here is the last choice and writes false, ending it (round 6).
+    if (adoptDeclinedAtRef.current !== null) clearFailedRef.current = true;
     const settle = manualOfflineRef.current?.();
     let ok = false;
     try {
@@ -1174,7 +1190,9 @@ export function useArenaLive({
       // reads false or the athlete chooses again here.
       const declinedAt = adoptDeclinedAtRef.current;
       if (declinedAt !== null) {
-        if (!(i.explicit && i.seq > declinedAt)) return null;
+        // Only a new explicit LIVE choice here ends a decline (an offline
+        // one writes false instead, ending the web session: round 6).
+        if (!(i.explicit && i.live && i.seq > declinedAt)) return null;
         adoptDeclinedAtRef.current = null;
       }
       const decline = () => {

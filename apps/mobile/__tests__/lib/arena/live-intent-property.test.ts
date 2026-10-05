@@ -42,8 +42,8 @@
  *
  * Seeds: one run checks a RANDOM base (printed; pin it with
  * LIVE_PROPERTY_BASE, or one sequence with LIVE_PROPERTY_SEED) and the fixed
- * regression range from review round 4 (base 777_000, where seed 777102 found
- * R1). LIVE_PROPERTY_SEQUENCES sets the random run's length.
+ * regression ranges from review round 4 (base 777_000, where seed 777102
+ * found R1) and round 6 (base 31_337_000, where 31337299 found F1). LIVE_PROPERTY_SEQUENCES sets the random run's length.
  *
  * Covered by targeted suites instead of here: the location ladder's rungs and
  * its sheets (instant-go-live.test.tsx), the cold-start first frame
@@ -70,6 +70,18 @@ const mockServer = {
   live: false,
   /** Bumped every time the flag goes false to true (a new server live session). */
   liveSession: 0,
+  /**
+   * Provenance (round 6): the server's `true` was set by web (another
+   * device), not by any write from this device. Reset by every write from
+   * the device and by the server ending the session.
+   */
+  fromWeb: false,
+  /**
+   * Provenance: the `true` is a late commit from a signed-out session (a live
+   * write hung at sign-out; the KNOWN LIMIT in invariant 1). Reset like
+   * `fromWeb`.
+   */
+  fromRevoked: false,
   /** The running process (a kill starts a new one). */
   proc: 0,
   /** Processes that are dead (killed): they send nothing more. */
@@ -106,6 +118,8 @@ jest.mock("@jits/shared/api/mutations", () => ({
     const commit = () => {
       if (ranked && !mockServer.live) mockServer.liveSession += 1;
       mockServer.live = ranked;
+      mockServer.fromWeb = false;
+      mockServer.fromRevoked = ranked && mockServer.revoked.has(proc);
     };
     if (kind === "instant") {
       commit();
@@ -207,6 +221,8 @@ async function runSequence(seed: number): Promise<SeqResult> {
   const log: string[] = [];
   __resetArenaStoreForTests();
   mockServer.live = rand() < 0.3; // a cold start may find the flag already true
+  mockServer.fromWeb = false;
+  mockServer.fromRevoked = false;
   mockServer.proc += 1;
   mockServer.dead = new Set();
   mockServer.revoked = new Set();
@@ -420,11 +436,15 @@ async function runSequence(seed: number): Promise<SeqResult> {
         // The server ends a live session by itself (the 12 hour cap, an admin).
         log.push("server ends session");
         mockServer.live = false;
+        mockServer.fromWeb = false;
+        mockServer.fromRevoked = false;
       } else if (owner && rand() < 0.5) {
         // The athlete goes live on web: a newer choice, made elsewhere.
         log.push("web goes live");
         mockServer.live = true;
         mockServer.liveSession += 1;
+        mockServer.fromWeb = true;
+        mockServer.fromRevoked = false;
         lastExplicit = null;
       }
     } else if (r < 0.88 && owner) {
@@ -545,7 +565,14 @@ async function runSequence(seed: number): Promise<SeqResult> {
     // A session started elsewhere that this phone declined to follow (it
     // could not meet it, round 5 A1) stays live on the server while the
     // phone draws offline, by design: (1) and (2) do not apply to it.
+    // Only a `true` that came from elsewhere may be declined: one this device
+    // wrote (a lost answer, a refused retry) must be cleared (round 6, F1).
     const declined = mockServer.live && o.view.result.current.live.adoptionDeclined();
+    // (A late commit from a signed-out session is the known limit: to this
+    // session it is indistinguishable from a go-live elsewhere.)
+    if (declined && !mockServer.fromWeb && !mockServer.fromRevoked) {
+      failures.push(`declined a server true this device wrote ${detail()}`);
+    }
     if (declined) log.push("  (server session live elsewhere, declined by this phone)");
     // (1) the athlete's last explicit offline choice always wins.
     if (!declined && lastExplicit === "offline" && intentNow.decided && !intentNow.live && mockServer.live) {
@@ -587,8 +614,9 @@ const ONLY_SEED = process.env.LIVE_PROPERTY_SEED ? Number(process.env.LIVE_PROPE
 const RANDOM_BASE = process.env.LIVE_PROPERTY_BASE
   ? Number(process.env.LIVE_PROPERTY_BASE)
   : 1_000_000 + Math.floor(Math.random() * 1_000_000_000);
-/** Review round 4's range (seed 777102 found R1): always run, as a regression. */
+/** Review round 4's range (seed 777102 found R1) and round 6's (31337299 found F1): always run, as regressions. */
 const REGRESSION_BASE = 777_000;
+const REGRESSION_BASE_2 = 31_337_000;
 
 async function runRange(label: string, seeds: number[]): Promise<void> {
   const started = jest.getRealSystemTime();
@@ -627,5 +655,9 @@ if (ONLY_SEED !== null) {
 
   it(`the athlete's last choice always wins (regression range ${REGRESSION_BASE}, ${REGRESSION_SEQUENCES} sequences)`, async () => {
     await runRange(`regression base ${REGRESSION_BASE}`, range(REGRESSION_BASE, REGRESSION_SEQUENCES));
+  }, 600_000);
+
+  it(`the athlete's last choice always wins (regression range ${REGRESSION_BASE_2}, ${REGRESSION_SEQUENCES} sequences)`, async () => {
+    await runRange(`regression base ${REGRESSION_BASE_2}`, range(REGRESSION_BASE_2, REGRESSION_SEQUENCES));
   }, 600_000);
 }

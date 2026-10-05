@@ -90,6 +90,7 @@ import {
   publishArenaSelfId,
   publishArenaState,
   registerArenaController,
+  setAppLiveIntent,
   setGoLiveDisplay,
   useHasIncomingReopenSurface,
   useLiveSurface,
@@ -995,11 +996,33 @@ describe("HeaderStatusChip", () => {
     );
     act(() => setGoLiveDisplay("going-live"));
     expect(chipText(getByTestId)).toBe("GOING LIVE");
-    expect(surface).toEqual({ drawnLive: false, pending: true });
+    expect(surface).toMatchObject({ drawnLive: false, pending: true });
     // The overtaken attempt's write lands before the driver clears the ring.
     setArena({ isLive: true });
     expect(chipText(getByTestId)).toMatch(/^LIVE/);
-    expect(surface).toEqual({ drawnLive: true, pending: false });
+    expect(surface).toMatchObject({ drawnLive: true, pending: false });
+  });
+
+  it("round 6 (QA cosmetic): a restore or adoption finding a fix: the chip reads FINDING YOU and the bar shows LIVE pending, from one snapshot", () => {
+    let surface: { drawnLive: boolean; pending: boolean } | null = null;
+    function Bar() {
+      surface = useLiveSurface();
+      return null;
+    }
+    const { getByTestId } = render(
+      <>
+        <HeaderStatusChip />
+        <Bar />
+      </>,
+    );
+    // No choice made yet (a foreground restore), then an adoption (the app
+    // decided live).
+    act(() => setGoLiveDisplay("restore-finding"));
+    expect(chipText(getByTestId)).toBe("FINDING YOU");
+    expect(surface).toMatchObject({ drawnLive: false, pending: true });
+    act(() => setAppLiveIntent(true));
+    expect(chipText(getByTestId)).toBe("FINDING YOU");
+    expect(surface).toMatchObject({ drawnLive: false, pending: true });
   });
 
   it("round 4: a second tap within 300 ms of a go-live tap never opens the live menu; later it does", async () => {

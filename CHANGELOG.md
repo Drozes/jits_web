@@ -70,6 +70,12 @@ Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) an
 - Sign-out waits for both its immediate `false` and the serialized clear (inside the 4 s bound).
 - The header chip and the Arena bar read live and pending from one store snapshot (`useLiveSurface`).
 
+**Fixed (review round 6)**
+- A go-live write whose earlier attempt had no answer (it may have committed) and whose retry was refused for location now still counts as possibly live, so the offline after it writes `false`.
+- An explicit OFFLINE on the phone while it declines a session started elsewhere writes `false` and does not make the phone follow it; only a server offline read or an explicit LIVE ends the decline.
+- The chip reads its overlay from the same snapshot as the Arena bar, so restores and follows draw FINDING YOU and LIVE pending together.
+- The randomized test tracks where each server `true` came from, and runs a second regression range (31,337,000).
+
 ### Live location fixes: Allow Once rejoin, GOING LIVE feedback, Precise Location copy, platform header, attempt logging (jits-3i0n.1 to .6)
 
 Built to jr_be `specs/016-invites/addendum-live-location-fixes.md` section 4. JS-only on mobile (OTA-eligible: no native dependency, no `app.json` / `app.config.js` change; `expo-location`, `expo-application` and `expo-updates` are already in build 25). Item 3b (the Swift accuracy module and `NSLocationTemporaryUsageDescriptionDictionary`) is NOT in this slice and needs a TestFlight build.

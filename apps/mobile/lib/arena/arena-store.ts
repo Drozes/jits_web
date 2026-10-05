@@ -377,9 +377,11 @@ export function liveSwitchPending(input: {
 export interface LiveSurface {
   drawnLive: boolean;
   pending: boolean;
+  /** The overlay these were derived from (the chip draws its label from it). */
+  display: GoLiveDisplay | null;
 }
 
-let liveSurfaceCache: LiveSurface = { drawnLive: false, pending: false };
+let liveSurfaceCache: LiveSurface = { drawnLive: false, pending: false, display: null };
 
 function getLiveSurface(): LiveSurface {
   const drawnLive = getDisplayLive();
@@ -390,8 +392,13 @@ function getLiveSurface(): LiveSurface {
     phase: getLiveSwitchPhase(),
     direction: getLiveSwitchDirection(),
   });
-  if (liveSurfaceCache.drawnLive !== drawnLive || liveSurfaceCache.pending !== pending) {
-    liveSurfaceCache = { drawnLive, pending };
+  const display = goLiveDisplay;
+  if (
+    liveSurfaceCache.drawnLive !== drawnLive ||
+    liveSurfaceCache.pending !== pending ||
+    liveSurfaceCache.display !== display
+  ) {
+    liveSurfaceCache = { drawnLive, pending, display };
   }
   return liveSurfaceCache;
 }
