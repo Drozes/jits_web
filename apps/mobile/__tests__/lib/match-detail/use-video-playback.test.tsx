@@ -483,6 +483,25 @@ describe("useVideoPlayback angle switch (multi-angle P0)", () => {
     expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
   });
 
+  it("paused: a first frame drawn after the resume seek lands the switch (review r2-m1)", async () => {
+    signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(10);
+    act(() => result.current.toggle());
+    act(() => result.current.switchAngle("vid-2", 12.5));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    // Before readyToPlay (no seek issued yet): may be frame 0, ignored.
+    act(() => result.current.onFirstFrameRender());
+    expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+    ready();
+    expect(player().seeks.at(-1)).toBe(12.5);
+    act(() => result.current.onFirstFrameRender());
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+    expect(result.current.frameShown).toBe(true);
+  });
+
   it("a switch to 0 has no resume seek: its first frame is the right one", async () => {
     signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
     const { result } = renderHook(() => useVideoPlayback("vid-1"));

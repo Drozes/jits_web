@@ -22,7 +22,7 @@ JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): uses only expo-vide
 
 **Fixed (independent review, `REVIEW-angle-switch.md`)**
 - B1: a switch to an angle whose URL is still being signed unloads the outgoing item at once, so its late time updates, a play or pause tap, or its errors can no longer move the resume point or play the old file; a second switch in that window starts from the first one's target.
-- M2: a switch counts as landed (latency, first frame) only once its resume seek lands, never on the new item's frame 0.
+- M2: a switch counts as landed (latency, first frame) only once its resume seek lands, never on the new item's frame 0. Paused (no time updates), a first frame drawn after the resume seek was issued lands it (r2-m1).
 - m1: the resume seek is clamped to a shorter angle's end. m2/m3: an outside navigation reusing the screen starts at its own `?t=` with its own telemetry entry and note, and the route's own `setParams` echo (even a stale A, B, A) never reloads.
 
 ### Match video status UX: Film status plate, upload strip, Best angle, video push landing (jits-n2im.25, .2, .15, .13)

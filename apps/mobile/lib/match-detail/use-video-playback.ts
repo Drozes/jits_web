@@ -196,6 +196,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
    * counted as landed and the held frame stays (review M2).
    */
   const switchSeekLandedRef = React.useRef(true);
+  /** The generation whose resume seek has been issued (markLoaded). */
+  const seekIssuedGenRef = React.useRef<number | null>(null);
   /**
    * Ids this hook switched to (or opened on). The route catches up with
    * `setParams` a render later, so an `id` from this set is our own echo,
@@ -398,6 +400,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     }
     if (current.generation === switchGenRef.current && !at) switchSeekLandedRef.current = true;
     if (at) {
+      seekIssuedGenRef.current = current.generation;
       holdRef.current = { at, left: SEEK_HOLD_MAX_UPDATES };
       telemetry.expectWait();
       setPositionS(at);
@@ -604,7 +607,19 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const onFirstFrameRender = React.useCallback(() => {
     telemetry.firstFrame();
     const current = sourceRef.current;
-    if (current && settledGenRef.current === current.generation) frameLanded(current.generation);
+    if (!current || settledGenRef.current !== current.generation) return;
+    // Paused, no time update may come: a frame drawn after the resume seek
+    // was issued is the seeked frame (review r2-m1). One drawn before it is
+    // still ignored (it may be frame 0); playing, the time update decides.
+    if (
+      current.generation === switchGenRef.current &&
+      !switchSeekLandedRef.current &&
+      seekIssuedGenRef.current === current.generation &&
+      !playingRef.current
+    ) {
+      switchSeekLandedRef.current = true;
+    }
+    frameLanded(current.generation);
   }, [telemetry, frameLanded]);
 
   const currentTimeNow = React.useCallback(() => {
