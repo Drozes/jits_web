@@ -2332,3 +2332,138 @@ describe("round 4: the own-row check corrects any disagreement", () => {
     expect(r).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review round 5: adoption of a session started elsewhere never loops (A1)
+// ---------------------------------------------------------------------------
+
+describe("round 5 (A1): a web session the phone cannot meet is adopted at most once", () => {
+  type Ctx = Parameters<NonNullable<UseArenaLiveArgs["autoLive"]>>[0];
+
+  function wire(result: { current: ReturnType<typeof useArenaLive> }) {
+    return registerArenaController({
+      toggle: jest.fn(),
+      goOffline: () => result.current.goOffline(),
+      goLive: () => result.current.goLive(),
+      committed: () => result.current.committed(),
+      ensureOffline: () => result.current.ensureOffline(),
+      sendChallenge: jest.fn(),
+      cancelOutgoing: jest.fn(),
+      clearCap: jest.fn(),
+      tuckIncoming: jest.fn(),
+      reopenIncoming: jest.fn(),
+    });
+  }
+
+  const liveWrites = () =>
+    mockToggleMatchPreferences.mock.calls.filter((c) => (c[2] as { lookingForRanked: boolean }).lookingForRanked).length;
+
+  it("reviewer probe: three checks with the server live and a restore that fails: 1 restore, 1 toast, then declined", async () => {
+    const toasts: string[] = [];
+    const autoLive = jest.fn(async (_ctx: Ctx) => {
+      // As the real ladder does without a tag or permission: says so once,
+      // holds offline.
+      toasts.push("Location is off");
+      setAppLiveIntent(false);
+      return "failed" as const;
+    });
+    const { result } = mount({ autoLive });
+    wire(result);
+    await act(async () => {
+      await liveSwitch.goOffline();
+    });
+    const out: unknown[] = [];
+    for (let k = 0; k < 3; k++) {
+      await act(async () => {
+        out.push(await result.current.checkServer(() => Promise.resolve(true)));
+        await flush();
+      });
+    }
+    expect(out).toEqual(["adopted", null, null]);
+    expect(autoLive).toHaveBeenCalledTimes(1);
+    expect(toasts).toHaveLength(1);
+    expect(liveWrites()).toBe(0);
+  });
+
+  it("not likely to work without asking (no tag, no permission): declined at once, no ladder, no toast", async () => {
+    const autoLive = jest.fn(async () => "live" as const);
+    const { result } = mount({ autoLive, canAdopt: () => false });
+    wire(result);
+    for (let k = 0; k < 3; k++) {
+      await act(async () => {
+        expect(await result.current.checkServer(() => Promise.resolve(true))).toBeNull();
+        await flush();
+      });
+    }
+    expect(autoLive).not.toHaveBeenCalled();
+    expect(mockToastInfo).not.toHaveBeenCalled();
+  });
+
+  it("a declined session is offered again once the server reads false (a new session), or after a new choice here", async () => {
+    const autoLive = jest.fn(async () => {
+      setAppLiveIntent(false);
+      return "failed" as const;
+    });
+    const { result } = mount({ autoLive });
+    wire(result);
+    const check = (v: boolean) =>
+      act(async () => {
+        await result.current.checkServer(() => Promise.resolve(v));
+        await flush();
+      });
+    await check(true);
+    await check(true);
+    expect(autoLive).toHaveBeenCalledTimes(1);
+    // The web session ended, a new one started: adopted once more.
+    await check(false);
+    await check(true);
+    expect(autoLive).toHaveBeenCalledTimes(2);
+    // A new explicit choice here (offline, acknowledged): the decline is over.
+    await act(async () => {
+      await liveSwitch.goOffline();
+    });
+    await check(true);
+    expect(autoLive).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("round 5 (A2): sign-out waits for both false writes", () => {
+  it("resolves only after the immediate false AND the serialized clear behind a write in flight", async () => {
+    const { result } = mount();
+    // A live write in flight (hung), then sign-out.
+    const hung = deferred<{ ok: true; data: undefined }>();
+    mockToggleMatchPreferences.mockReturnValueOnce(hung.promise);
+    act(() => {
+      void result.current.goLive();
+    });
+    await act(async () => {
+      await flush();
+    });
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: true });
+    const before = mockToggleMatchPreferences.mock.calls.length;
+    let done = false;
+    let ok: boolean | undefined;
+    act(() => {
+      void result.current.signOutOffline().then((r) => {
+        done = true;
+        ok = r;
+      });
+    });
+    await act(async () => {
+      await flush();
+    });
+    // The immediate false went out (and landed); the serialized clear waits on the hung write.
+    expect(mockToggleMatchPreferences.mock.calls.length).toBe(before + 1);
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+    expect(done).toBe(false);
+    await act(async () => {
+      hung.resolve({ ok: true, data: undefined });
+      await flush();
+    });
+    expect(done).toBe(true);
+    expect(ok).toBe(true);
+    // The serialized clear followed the hung live write.
+    expect(mockToggleMatchPreferences.mock.calls.length).toBe(before + 2);
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+  });
+});

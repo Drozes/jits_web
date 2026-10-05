@@ -127,6 +127,14 @@ export interface UseArenaLiveArgs {
    */
   onOfflineLanded?: () => void;
   /**
+   * Whether following a live session started elsewhere (the own-row check's
+   * "adopted") is likely to succeed without asking anything: a valid stored
+   * tag or reading, location permission already granted, or the location
+   * flag known off (round 5, A1). False: the session is declined at once,
+   * with no ladder and no toast. Omitted: assumed likely.
+   */
+  canAdopt?: () => boolean;
+  /**
    * Instant go-live (jr_be 016 addendum 4.2): runs a WHOLE automatic
    * restore, live writes included, through the location ladder (the server
    * may refuse rung 1's write and the ladder then reports a tag and writes
@@ -230,6 +238,13 @@ export interface UseArenaLiveResult {
    * live. Null: nothing to correct, or something moved during the read.
    */
   checkServer: (read: () => Promise<boolean | null>) => Promise<"dropped" | "cleared" | "adopted" | null>;
+  /**
+   * Whether the server's current live session (started elsewhere) was
+   * declined: the phone could not follow it and will not try again until the
+   * server reads false or the athlete chooses here (round 5, A1). The phone
+   * then draws offline while the server is live elsewhere, by design.
+   */
+  adoptionDeclined: () => boolean;
 }
 
 /**
@@ -312,6 +327,7 @@ export function useArenaLive({
   onResumeParked,
   loadPersistedIntent,
   onOfflineLanded,
+  canAdopt,
 }: UseArenaLiveArgs): UseArenaLiveResult {
   const [isLive, setIsLive] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -355,6 +371,15 @@ export function useArenaLive({
   loadPersistedIntentRef.current = loadPersistedIntent;
   const onOfflineLandedRef = React.useRef(onOfflineLanded);
   onOfflineLandedRef.current = onOfflineLanded;
+  const canAdoptRef = React.useRef(canAdopt);
+  canAdoptRef.current = canAdopt;
+  /**
+   * A live session started elsewhere that this phone declined to follow
+   * (round 5, A1): the intent sequence at which it was declined, or null.
+   * Not adopted again until the server reads false or the athlete makes a
+   * new choice here (an explicit intent newer than it).
+   */
+  const adoptDeclinedAtRef = React.useRef<number | null>(null);
   onResumeParkedRef.current = onResumeParked;
   /**
    * Bumped only by a go-offline the ATHLETE asked for (`manualOffline`: the
@@ -686,14 +711,19 @@ export function useArenaLive({
     desiredRef.current = false;
     const queued = manualOffline();
     if (!id) return queued;
-    let direct = false;
-    try {
-      direct = await writeLookingFlag(id, false);
-    } catch {
-      direct = false;
-    }
-    if (direct) offlineLanded();
-    return direct;
+    const direct = writeLookingFlag(id, false).then(
+      (ok) => {
+        if (ok) offlineLanded();
+        return ok;
+      },
+      () => false,
+    );
+    // Both: the immediate `false` and the serialized clear behind any write
+    // in flight (round 5, A2); the caller bounds the wait (4 s).
+    const [d, q] = await Promise.allSettled([direct, queued]);
+    const directOk = d.status === "fulfilled" && d.value;
+    const queuedOk = q.status === "fulfilled" && q.value;
+    return directOk || queuedOk;
   }, [manualOffline, offlineLanded]);
 
   const requestOfflineRef = React.useRef(requestOffline);
@@ -1107,6 +1137,8 @@ export function useArenaLive({
       if (serverLive === null || generation !== generationRef.current || !idle()) return null;
       const i = getLiveIntent();
       if (serverLive === false) {
+        // The server's live session is over: a declined one is forgotten.
+        adoptDeclinedAtRef.current = null;
         // The server is offline: anything we feared it still said, it does not.
         if (!desiredRef.current) {
           clearFailedRef.current = false;
@@ -1136,9 +1168,37 @@ export function useArenaLive({
       if (AppState.currentState !== "active") return null;
       // The app offline (any offline choice acknowledged by the server), the
       // server live: a session started after it, elsewhere (web). The newer
-      // choice wins, as on arrival (R2): the app follows it.
+      // choice wins, as on arrival (R2): the app follows it, silently.
+      // Round 5 (A1): at most once per server session. A session declined
+      // (the phone could not meet it) is not adopted again until the server
+      // reads false or the athlete chooses again here.
+      const declinedAt = adoptDeclinedAtRef.current;
+      if (declinedAt !== null) {
+        if (!(i.explicit && i.seq > declinedAt)) return null;
+        adoptDeclinedAtRef.current = null;
+      }
+      const decline = () => {
+        adoptDeclinedAtRef.current = getLiveIntent().seq;
+      };
+      // Only when it is likely to work without asking (a valid tag, the
+      // permission already granted, or the flag off): otherwise declined at
+      // once, with no ladder and no toast.
+      let likely = true;
+      try {
+        likely = canAdoptRef.current ? canAdoptRef.current() : true;
+      } catch {
+        likely = false;
+      }
+      if (!likely) {
+        decline();
+        return null;
+      }
       if (i.decided && !i.live) setAppLiveIntent(true);
-      void restoreLive("foreground");
+      void restoreLive("foreground").then(() => {
+        // Not met and held offline (the restore failed in front and said so
+        // once): this server session is declined.
+        if (!actualRef.current && intentHoldsOffline()) decline();
+      });
       return "adopted";
     },
     [requestOffline, restoreLive, setLastWriteFailed],
@@ -1157,6 +1217,7 @@ export function useArenaLive({
     ensureOffline: requestOffline,
     signOutOffline,
     checkServer,
+    adoptionDeclined: React.useCallback(() => adoptDeclinedAtRef.current !== null, []),
     committed: React.useCallback(
       () => ({
         live: actualRef.current,

@@ -2,7 +2,7 @@
  * Property test for the single source of truth (review rounds 3 and 4): the
  * athlete's last choice always wins. Randomized (seeded, reproducible)
  * sequences drive the REAL intent driver (`arena-store.ts`) and the REAL
- * server-write executor (`useArenaLive`) against a fake mockServer.
+ * server-write executor (`useArenaLive`) against a fake server.
  *
  * The model (round 4, R3):
  *  - mockWrites are instant, slow (3 s), hung (until released), failing (never
@@ -23,7 +23,7 @@
  * Invariants, checked once everything settles (in front, out of a match,
  * every hung write answered, every timer run):
  *  (1) the server equals the app's decided intent, and an athlete whose last
- *      explicit choice is offline is offline on the mockServer. After sign-out:
+ *      explicit choice is offline is offline on the server. After sign-out:
  *      a `false` write was sent after sign-out started, and on a healthy
  *      network the server is offline. KNOWN LIMIT (not asserted): a live
  *      write still hung when sign-out starts can commit after the session is
@@ -34,7 +34,11 @@
  *  (3) no live write is ever SENT while the intent is a decided offline, or
  *      after sign-out started;
  *  (4) a go-live never resolves false (a failure toast) for a choice the
- *      athlete already overtook.
+ *      athlete already overtook;
+ *  (5) a live session started elsewhere is adopted at most once per server
+ *      session (per process, with no choice made in between): a phone that
+ *      cannot meet it never retries every 30 s (round 5, A1), so it never
+ *      toasts more than once for it.
  *
  * Seeds: one run checks a RANDOM base (printed; pin it with
  * LIVE_PROPERTY_BASE, or one sequence with LIVE_PROPERTY_SEED) and the fixed
@@ -64,6 +68,8 @@ interface Pending {
 const mockWrites: string[] = [];
 const mockServer = {
   live: false,
+  /** Bumped every time the flag goes false to true (a new server live session). */
+  liveSession: 0,
   /** The running process (a kill starts a new one). */
   proc: 0,
   /** Processes that are dead (killed): they send nothing more. */
@@ -98,6 +104,7 @@ jest.mock("@jits/shared/api/mutations", () => ({
     const ok = { ok: true, data: undefined };
     const net = { ok: false, error: { code: "UNKNOWN", message: "net" } };
     const commit = () => {
+      if (ranked && !mockServer.live) mockServer.liveSession += 1;
       mockServer.live = ranked;
     };
     if (kind === "instant") {
@@ -251,6 +258,9 @@ async function runSequence(seed: number): Promise<SeqResult> {
       return ok ? "live" : "failed";
     },
     loadPersistedIntent: () => Promise.resolve(stored.value ? { ...stored.value } : null),
+    // Whether a session started elsewhere can be followed without asking
+    // (a valid tag, permission granted): random, per check.
+    canAdopt: () => rand() < 0.7,
     onOfflineLanded: () => {
       if (stored.value && !stored.value.live) stored.value = { ...stored.value, confirmed: true };
     },
@@ -262,6 +272,8 @@ async function runSequence(seed: number): Promise<SeqResult> {
   let lastTapAt = 0;
   let tapCount = 0;
   let sinceCheck = 0;
+  /** (5) the last adoption: the server session, process and taps it happened at. */
+  let lastAdoption: { session: number; proc: number; taps: number } | null = null;
   /** After the last sign-out: what (1) asserts for it. */
   let signOutCheck: { healthy: boolean; liveHungAtStart: boolean; falseSent: number } | null = null;
 
@@ -319,6 +331,21 @@ async function runSequence(seed: number): Promise<SeqResult> {
     if (!owner || inMatch || AppState.currentState !== "active") return;
     const r = await owner.view.result.current.live.checkServer(() => Promise.resolve(mockServer.live));
     if (r) log.push(`  check: ${r}`);
+    if (r === "adopted") {
+      // (5) one adoption per server live session: a second one for the same
+      // session, the same process and no choice in between means the first
+      // was not met and it is being retried (the round 5 A1 loop).
+      const at = { session: mockServer.liveSession, proc: mockServer.proc, taps: tapCount };
+      if (
+        lastAdoption &&
+        lastAdoption.session === at.session &&
+        lastAdoption.proc === at.proc &&
+        lastAdoption.taps === at.taps
+      ) {
+        mockServer.violations.push(`adopted the same server session twice (session ${at.session})`);
+      }
+      lastAdoption = at;
+    }
     if (r === "dropped") {
       setAppLiveIntent(false);
       setGoLiveDisplay(null);
@@ -397,6 +424,7 @@ async function runSequence(seed: number): Promise<SeqResult> {
         // The athlete goes live on web: a newer choice, made elsewhere.
         log.push("web goes live");
         mockServer.live = true;
+        mockServer.liveSession += 1;
         lastExplicit = null;
       }
     } else if (r < 0.88 && owner) {
@@ -514,16 +542,21 @@ async function runSequence(seed: number): Promise<SeqResult> {
       `(hook isLive ${o.view.result.current.live.isLive}, committed ${JSON.stringify(o.view.result.current.live.committed())}, ` +
       `display ${getGoLiveDisplay()}, store isLive ${__peekArenaStateForTests().isLive}, intent ${JSON.stringify(intentNow)}, ` +
       `mockWrites ${JSON.stringify(mockWrites.slice(-8))})`;
+    // A session started elsewhere that this phone declined to follow (it
+    // could not meet it, round 5 A1) stays live on the server while the
+    // phone draws offline, by design: (1) and (2) do not apply to it.
+    const declined = mockServer.live && o.view.result.current.live.adoptionDeclined();
+    if (declined) log.push("  (server session live elsewhere, declined by this phone)");
     // (1) the athlete's last explicit offline choice always wins.
-    if (lastExplicit === "offline" && intentNow.decided && !intentNow.live && mockServer.live) {
+    if (!declined && lastExplicit === "offline" && intentNow.decided && !intentNow.live && mockServer.live) {
       failures.push(`server live though the last choice is offline ${detail()}`);
     }
     // (1) settled: the server equals the app's intent once it is decided.
-    if (intentNow.decided && mockServer.live !== intentNow.live) {
+    if (!declined && intentNow.decided && mockServer.live !== intentNow.live) {
       failures.push(`server ${mockServer.live} != intent ${intentNow.live} ${detail()}`);
     }
     // (2) the UI draws the settled server state.
-    if (drawn !== mockServer.live) failures.push(`drawn ${drawn} != server ${mockServer.live} ${detail()}`);
+    if (!declined && drawn !== mockServer.live) failures.push(`drawn ${drawn} != server ${mockServer.live} ${detail()}`);
   }
   if (owner) {
     owner.unregister();

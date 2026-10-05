@@ -298,6 +298,10 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     // A `false` landed: the persisted offline choice is acknowledged, so a
     // later server `true` reads as a newer session (round 4, R2).
     onOfflineLanded: () => confirmPersistedOffline(athlete.id),
+    // Following a session started elsewhere only when the restore can do it
+    // without asking: a valid stored tag or reading, the permission already
+    // granted, or the flag known off (round 5, A1).
+    canAdopt: () => restoreFirstFrame(athlete.id, locationFlagHint()) !== "hold",
   });
   // Read by the refresh handlers below and the controller (registered once).
   const liveRef = React.useRef(live);

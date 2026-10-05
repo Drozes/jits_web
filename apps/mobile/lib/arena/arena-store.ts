@@ -348,6 +348,63 @@ export function useIsArenaDisplayLive(): boolean {
   return useSyncExternalStore(subscribe, getDisplayLive, getDisplayLive);
 }
 
+/**
+ * Whether a go-live is drawn as pending (GOING LIVE, FINDING YOU,
+ * RECONNECTING). The chip and the Arena's OFFLINE / LIVE bar both draw from
+ * this rule (round 4, QA 4), on one snapshot (`useLiveSurface`, round 5).
+ */
+export function liveSwitchPending(input: {
+  intent?: { decided: boolean; live: boolean } | null;
+  display?: GoLiveDisplay | null;
+  /** Live as drawn. */
+  drawnLive: boolean;
+  phase: LiveSwitchPhase;
+  direction: LiveSwitchDirection | null;
+}): boolean {
+  const display = input.display ?? null;
+  if (input.intent && input.intent.decided && !input.intent.live) return false;
+  if (input.drawnLive) return false;
+  return (
+    display === "going-live" ||
+    display === "finding-you" ||
+    display === "restore-finding" ||
+    display === "recovering" ||
+    (display === null && input.phase === "saving" && input.direction === "going-live")
+  );
+}
+
+/** Live as drawn and pending, from ONE read of the store (round 5). */
+export interface LiveSurface {
+  drawnLive: boolean;
+  pending: boolean;
+}
+
+let liveSurfaceCache: LiveSurface = { drawnLive: false, pending: false };
+
+function getLiveSurface(): LiveSurface {
+  const drawnLive = getDisplayLive();
+  const pending = liveSwitchPending({
+    intent,
+    display: goLiveDisplay,
+    drawnLive,
+    phase: getLiveSwitchPhase(),
+    direction: getLiveSwitchDirection(),
+  });
+  if (liveSurfaceCache.drawnLive !== drawnLive || liveSurfaceCache.pending !== pending) {
+    liveSurfaceCache = { drawnLive, pending };
+  }
+  return liveSurfaceCache;
+}
+
+/**
+ * The chip and the Arena bar read live / pending here, one snapshot for
+ * both, so they never disagree for a frame (the end of a superseded attempt
+ * included, round 5).
+ */
+export function useLiveSurface(): LiveSurface {
+  return useSyncExternalStore(subscribe, getLiveSurface, getLiveSurface);
+}
+
 export function setNeedsLocation(next: boolean): void {
   if (next === needsLocation) return;
   needsLocation = next;

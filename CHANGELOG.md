@@ -65,6 +65,11 @@ Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) an
 - The cold start waits at most 1 s for the stored choice; deleting the account forgets it.
 - The randomized test models committed-after-kill writes, lost answers, location refusals, server-ended sessions, web go-lives and the own-row check, and runs a random seed base plus the 777,000 regression range.
 
+**Fixed (review round 5)**
+- The own-row check follows a session started elsewhere at most once per server session, and only when it can without asking (valid tag, permission granted, or the flag off); otherwise, or after a failed attempt, that session is declined until the server reads offline or the athlete chooses again (no 30 s retry loop, at most one toast).
+- Sign-out waits for both its immediate `false` and the serialized clear (inside the 4 s bound).
+- The header chip and the Arena bar read live and pending from one store snapshot (`useLiveSurface`).
+
 ### Live location fixes: Allow Once rejoin, GOING LIVE feedback, Precise Location copy, platform header, attempt logging (jits-3i0n.1 to .6)
 
 Built to jr_be `specs/016-invites/addendum-live-location-fixes.md` section 4. JS-only on mobile (OTA-eligible: no native dependency, no `app.json` / `app.config.js` change; `expo-location`, `expo-application` and `expo-updates` are already in build 25). Item 3b (the Swift accuracy module and `NSLocationTemporaryUsageDescriptionDictionary`) is NOT in this slice and needs a TestFlight build.

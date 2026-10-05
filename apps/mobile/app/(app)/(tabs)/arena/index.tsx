@@ -55,8 +55,7 @@ import {
   useCanGoLive,
   useCanGoOffline,
   useGoLiveDisplay,
-  useIsArenaDisplayLive,
-  useLiveIntent,
+  useLiveSurface,
   useLiveSwitchDirection,
   useLiveSwitchPhase,
 } from "@/lib/arena/arena-store";
@@ -86,7 +85,6 @@ import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
 import { useBookings } from "@/lib/invites/use-bookings";
 import { loadMatchLocationRequired, useMatchLocationFlag } from "@/lib/arena/match-location-flag";
 import { arenaMatchHref } from "@/lib/arena/constants";
-import { liveSwitchPending } from "@/lib/arena/header-chip-model";
 
 /**
  * The tab bar sits below the screen and pads its own inset, so the shared
@@ -126,22 +124,17 @@ export default function ArenaScreen() {
   // What the live surfaces draw while a go-live resolves (UX 019): green on
   // the tap with a valid tag, nothing pending for the first 240 ms.
   const liveDisplay = useGoLiveDisplay();
-  const displayLive = useIsArenaDisplayLive();
+  // Live and pending from ONE store snapshot, shared with the header chip
+  // (round 5): the bar and the chip never read different frames.
+  const surface = useLiveSurface();
+  const displayLive = surface.drawnLive;
   // Both choices are always open with an owner mounted (review round 3).
   const canGoLive = useCanGoLive();
   const canGoOffline = useCanGoOffline();
   const switchLocked = !canGoLive;
   // The athlete chose live and it is on its way (QA 4): LIVE shows pending,
   // OFFLINE stays selectable.
-  const intent = useLiveIntent();
-  // The same rule, from the same snapshot, as the header chip (QA 4).
-  const livePending = liveSwitchPending({
-    intent,
-    display: liveDisplay,
-    drawnLive: displayLive,
-    phase: switchPhase,
-    direction: switchDirection,
-  });
+  const livePending = surface.pending;
   const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {

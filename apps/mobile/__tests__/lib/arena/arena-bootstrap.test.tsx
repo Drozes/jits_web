@@ -241,6 +241,7 @@ describe("ArenaBootstrap", () => {
       onResumeParked: expect.any(Function),
       loadPersistedIntent: expect.any(Function),
       onOfflineLanded: expect.any(Function),
+      canAdopt: expect.any(Function),
     });
     expect(mockActiveMatchOwner).toHaveBeenCalledWith("me-1");
     expect(mockUseArenaChallenge).toHaveBeenLastCalledWith(

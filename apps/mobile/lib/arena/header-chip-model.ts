@@ -6,7 +6,13 @@
  * finds the Arena toggle by those): every chip label starts with
  * `Live status:` (AC-H13).
  */
-import { displayDrawsLive, type GoLiveDisplay, type LiveSwitchDirection, type LiveSwitchPhase } from "./arena-store";
+import {
+  displayDrawsLive,
+  liveSwitchPending,
+  type GoLiveDisplay,
+  type LiveSwitchDirection,
+  type LiveSwitchPhase,
+} from "./arena-store";
 import { freshRemainingMs } from "./incoming-challenges";
 import { formatCountdown, spokenCountdown } from "./fresh-countdown";
 import { formatBadgeCount } from "@/lib/navigation/tab-badge";
@@ -128,6 +134,12 @@ export const NEEDS_LOCATION_HINT = "Location needed to go live";
 
 export interface ChipInput {
   isLive: boolean;
+  /**
+   * Live as drawn, from the store's one snapshot (`useLiveSurface`). When
+   * given it is used as is, so the chip and the Arena bar can never read
+   * different frames (round 5). Otherwise derived from the other inputs.
+   */
+  drawnLive?: boolean;
   phase: LiveSwitchPhase;
   direction: LiveSwitchDirection | null;
   reconnecting: boolean;
@@ -200,31 +212,8 @@ function remaining(
   return ms > 0 ? ms : false;
 }
 
-/**
- * Whether a go-live is drawn as pending (GOING LIVE, FINDING YOU,
- * RECONNECTING), from one snapshot of the stores. The chip and the Arena's
- * OFFLINE / LIVE bar both draw from this, so they never disagree, even for a
- * frame (round 4, QA 4).
- */
-export function liveSwitchPending(input: {
-  intent?: { decided: boolean; live: boolean } | null;
-  display?: GoLiveDisplay | null;
-  /** Live as drawn (`useIsArenaDisplayLive`, or the chip's own `isLive`). */
-  drawnLive: boolean;
-  phase: LiveSwitchPhase;
-  direction: LiveSwitchDirection | null;
-}): boolean {
-  const display = input.display ?? null;
-  if (input.intent && input.intent.decided && !input.intent.live) return false;
-  if (input.drawnLive) return false;
-  return (
-    display === "going-live" ||
-    display === "finding-you" ||
-    display === "restore-finding" ||
-    display === "recovering" ||
-    (display === null && input.phase === "saving" && input.direction === "going-live")
-  );
-}
+/** The pending rule lives with the store (one snapshot for chip and bar); re-exported here. */
+export { liveSwitchPending } from "./arena-store";
 
 /**
  * The chip, as a pure function of the stores (spec 4.3). Precedence, highest
@@ -238,7 +227,8 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
   const intendedOffline = !!input.intent && input.intent.decided && !input.intent.live;
   // Live as the athlete sees it: their offline choice first; else the
   // committed flag, or an optimistic / restore overlay.
-  const isLive = intendedOffline ? false : displayDrawsLive(display, input.isLive);
+  const isLive =
+    input.drawnLive !== undefined ? input.drawnLive : intendedOffline ? false : displayDrawsLive(display, input.isLive);
   const saving = phase === "saving";
   // A choice only needs an owner to run it (with no controller registered
   // the call is a silent no-op). Nothing in flight ever locks the opposite

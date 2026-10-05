@@ -297,6 +297,7 @@ jest.mock("@/lib/arena/arena-store", () => ({
   useArenaState: () => ({ isLive: mockIsLive, isSaving: false, ...mockChallenge }),
   useIsArenaLive: () => mockIsLive,
   useIsArenaDisplayLive: () => mockIsLive,
+  useLiveSurface: () => ({ drawnLive: mockIsLive, pending: false }),
   useLiveIntent: () => mockIntent,
   useCanGoLive: () => mockSwitchPhase !== "saving",
   useCanGoOffline: () => mockSwitchPhase !== "saving",
