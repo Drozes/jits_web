@@ -2,6 +2,7 @@ import * as React from "react";
 import { useFocusEffect } from "expo-router";
 import { useVideoPlayer, type VideoPlayer } from "expo-video";
 import type { HighlightSource } from "./use-my-highlight";
+import { usePlaybackTelemetry, type PlaybackTelemetry } from "@/lib/video/use-playback-telemetry";
 
 export interface HighlightPlayerState {
   player: VideoPlayer;
@@ -17,6 +18,8 @@ export interface HighlightPlayerState {
   settledVersion: () => number | null;
   /** Version whose playback has actually started (the poster stays until then). */
   playedVersion: number | null;
+  /** Playback telemetry (jits-n2im.21): one event per card that was played. */
+  telemetry: PlaybackTelemetry;
 }
 
 /**
@@ -44,6 +47,10 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
     p.loop = true;
     p.allowsExternalPlayback = false;
   });
+  const telemetry = usePlaybackTelemetry(player, { surface: "highlight", videoId: null, angle: null, angleCount: null });
+  React.useEffect(() => {
+    telemetry.sourceAttached("highlight");
+  }, [telemetry]);
   const [readyVersion, setReadyVersion] = React.useState<number | null>(null);
   const [playedVersion, setPlayedVersion] = React.useState<number | null>(null);
   const loadedRef = React.useRef({ url: source.url, version: source.version, generation: source.generation });
@@ -93,6 +100,7 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
     const loaded = loadedRef.current;
     if (loaded.url === source.url && loaded.generation === source.generation) return;
     const sameVersion = loaded.version === source.version;
+    if (sameVersion) telemetry.resigned();
     loadedRef.current = { url: source.url, version: source.version, generation: source.generation };
     let restore = { at: 0, play: false };
     try {
@@ -101,7 +109,7 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
       // Released player: nothing to preserve.
     }
     replace(source.url, restore);
-  }, [player, replace, source.url, source.version, source.generation]);
+  }, [player, replace, source.url, source.version, source.generation, telemetry]);
 
   React.useEffect(() => {
     // A readyToPlay that fired before this listener subscribed (the initial
@@ -147,5 +155,5 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
     () => (swap.current.doneSeq === swap.current.seq ? loadedRef.current.version : null),
     [],
   );
-  return { player, renderedVersion, settledVersion, playedVersion };
+  return { player, renderedVersion, settledVersion, playedVersion, telemetry };
 }

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Text, View } from "react-native";
-import { Audio, ResizeMode, Video } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { Plate } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
 import { PracticeTip } from "./practice-steps";
@@ -39,15 +39,6 @@ export function PracticeSummary({
   const { localUri, permission } = useMatchRecorder();
   const [watching, setWatching] = React.useState(false);
 
-  React.useEffect(() => {
-    if (!watching) return;
-    // The iOS silent switch would otherwise mute playback (same as video/[id]).
-    void Audio.setAudioModeAsync({ playsInSilentModeIOS: true }).catch(() => undefined);
-    return () => {
-      void Audio.setAudioModeAsync({ playsInSilentModeIOS: false }).catch(() => undefined);
-    };
-  }, [watching]);
-
   return (
     <View className="gap-4">
       <PracticeTip
@@ -69,17 +60,7 @@ export function PracticeSummary({
         <Text className="font-body text-body text-ink">Practice: rating unchanged</Text>
         <Text className="font-body text-small text-ink-2">Nobody else sees this.</Text>
       </Plate>
-      {localUri && watching ? (
-        <Video
-          testID="practice-clip-player"
-          source={{ uri: localUri }}
-          style={{ width: "100%", aspectRatio: 16 / 9, backgroundColor: onMediaTokens.black }}
-          useNativeControls
-          isMuted
-          shouldPlay
-          resizeMode={ResizeMode.CONTAIN}
-        />
-      ) : null}
+      {localUri && watching ? <PracticeClipPlayer uri={localUri} /> : null}
       {localUri && !watching ? (
         <Button
           height={44}
@@ -99,5 +80,26 @@ export function PracticeSummary({
         onPress={onAgain}
       />
     </View>
+  );
+}
+
+/**
+ * The local practice clip: muted, autoplaying, native controls. expo-video
+ * (linked in the field build since the reels), like the match player.
+ */
+function PracticeClipPlayer({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.muted = true;
+    p.play();
+  });
+  return (
+    <VideoView
+      testID="practice-clip-player"
+      player={player}
+      style={{ width: "100%", aspectRatio: 16 / 9, backgroundColor: onMediaTokens.black }}
+      nativeControls
+      contentFit="contain"
+      allowsPictureInPicture={false}
+    />
   );
 }
