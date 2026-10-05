@@ -233,7 +233,11 @@ LIB_OK = re.compile(
     r"(copy|format|constants|rows|card-status|header-chip-model|mat-board|notification-items"
     r"|live-view-state|step-router|validation|filter-submissions|splash-variant|elo-cache"
     r"|app-version|upload-banner-state|go-live-feedback|clamp-finish|parse-finish|recording-limits"
-    r"|regenerate-mode|update-policy|fresh-countdown|match-extras|record|(?<![-\w])tab-badge)\.tsx?$"
+    r"|regenerate-mode|update-policy|fresh-countdown|match-extras|record|(?<![-\w])tab-badge"
+    # Video upload states (jits-n2im.22): the hooks and tables that decide the verdict, match
+    # page and Film Room upload copy, captions, CTA label and Try again / Discard actions.
+    r"|use-match-film|use-verdict-data|film-section|use-upload-actions|upload-errors|upload-capabilities"
+    r"|recording-space)\.tsx?$"
 )
 # packages/shared files whose strings or formatting are drawn on boards.
 SHARED_OK = {SH + p for p in [
@@ -314,6 +318,10 @@ def match(*keep):
                 exclude=[s for s in ALLSTEPS if s not in kept])
 
 
+# Upload copy and error classes read through lib files (card-status, upload-banner-state) that
+# the walk does not traverse (jits-n2im.22).
+UPLOAD_LIB = [M + "lib/video/upload-copy.ts", M + "lib/video/upload-errors.ts"]
+
 HV = "components/highlight-viewer/"
 SHARE_ONLY = [HV + x for x in ["pre-share-sheet.tsx", "share-sheet-body.tsx", "share-progress.tsx",
                                "share-failed.tsx", "share-returned.tsx"]]
@@ -346,8 +354,9 @@ BOARDS = {
         seeds=HOME + ["lib/arena/arena-bootstrap.tsx", "components/arena/challenge-prompt-sheet.tsx"]),
     "16-Rankings.dc.html": dict(
         seeds=TABS + ["app/(app)/(tabs)/leaderboard/_layout.tsx", "app/(app)/(tabs)/leaderboard/index.tsx"]),
+    # card-status (a lib file, so not traversed) reads the upload copy and error classes.
     "17-Profile.dc.html": dict(seeds=PROFILE + ["app/(app)/(tabs)/profile/index.tsx"],
-                               exclude=["components/share-profile-sheet.tsx"]),
+                               exclude=["components/share-profile-sheet.tsx"], extra=UPLOAD_LIB),
     "18-Profile-Stats.dc.html": dict(seeds=PROFILE + ["app/(app)/(tabs)/profile/stats.tsx"]),
     "21-Faceoff-Weight.dc.html": match("faceoff/faceoff-body.tsx"),
     "22-Ready-Check.dc.html": match("faceoff/faceoff-body.tsx", "match-recorder-surface.tsx", "camera-overlay.tsx"),
@@ -363,8 +372,8 @@ BOARDS = {
     "27-Confirm.dc.html": match("steps/confirm-step.tsx"),
     "28-Dispute.dc.html": match("steps/confirm-step.tsx", "steps/dispute-form.tsx"),
     "29-Verdict.dc.html": match("verdict/verdict-step.tsx"),
-    "31-Film-Room.dc.html": dict(seeds=APP + ["app/(app)/film-room.tsx"]),
-    "32-Match-Detail.dc.html": dict(seeds=APP + ["app/(app)/match-detail/[matchId].tsx"]),
+    "31-Film-Room.dc.html": dict(seeds=APP + ["app/(app)/film-room.tsx"], extra=UPLOAD_LIB),
+    "32-Match-Detail.dc.html": dict(seeds=APP + ["app/(app)/match-detail/[matchId].tsx"], extra=UPLOAD_LIB),
     "33-Video-Player.dc.html": dict(seeds=APP + ["app/(app)/video/[id].tsx"]),
     "34-Highlight-Viewer.dc.html": dict(seeds=APP + ["app/(app)/highlight/[id].tsx"],
                                         exclude=SHARE_ONLY + [HV + "viewer-improve-sheet.tsx"]),

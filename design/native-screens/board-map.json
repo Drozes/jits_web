@@ -526,6 +526,9 @@
         "apps/mobile/lib/film-room/format.ts",
         "apps/mobile/lib/navigation/**",
         "apps/mobile/lib/updates/app-version.ts",
+        "apps/mobile/lib/video/upload-copy.ts",
+        "apps/mobile/lib/video/upload-errors.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
         "packages/shared/src/utils/shared.ts"
       ]
     },
@@ -583,6 +586,7 @@
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/video/recording-space.ts",
         "apps/mobile/lib/video/upload-banner-state.ts"
       ]
     },
@@ -613,6 +617,7 @@
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/video/recording-space.ts",
         "apps/mobile/lib/video/upload-banner-state.ts"
       ]
     },
@@ -641,6 +646,7 @@
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/video/recording-space.ts",
         "apps/mobile/lib/video/upload-banner-state.ts"
       ]
     },
@@ -669,6 +675,7 @@
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/video/recording-space.ts",
         "apps/mobile/lib/video/upload-banner-state.ts"
       ]
     },
@@ -699,6 +706,7 @@
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/video/recording-space.ts",
         "apps/mobile/lib/video/upload-banner-state.ts"
       ]
     },
@@ -937,7 +945,12 @@
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
+        "apps/mobile/lib/match-flow/use-verdict-data.ts",
         "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-capabilities.ts",
+        "apps/mobile/lib/video/upload-copy.ts",
+        "apps/mobile/lib/video/upload-errors.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
         "packages/shared/src/utils/share.ts"
       ]
     },
@@ -956,12 +969,18 @@
         "apps/mobile/components/film-room/opponent-picker.tsx",
         "apps/mobile/components/film-room/poster-card.tsx",
         "apps/mobile/components/film-room/status-badge.tsx",
+        "apps/mobile/components/ui/elo-system/button.tsx",
+        "apps/mobile/components/ui/pressable-scale.tsx",
         "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
+        "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/lib/film-room/card-status.ts",
         "apps/mobile/lib/film-room/format.ts",
         "apps/mobile/lib/film-room/rows.ts",
+        "apps/mobile/lib/video/upload-copy.ts",
+        "apps/mobile/lib/video/upload-errors.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
         "packages/shared/src/utils/shared.ts"
       ]
     },
@@ -982,10 +1001,12 @@
         "apps/mobile/components/match-detail/key-moments.tsx",
         "apps/mobile/components/match-detail/match-detail-states.tsx",
         "apps/mobile/components/match-detail/match-hero.tsx",
+        "apps/mobile/components/match-detail/match-upload-card.tsx",
         "apps/mobile/components/match-detail/match-verdict.tsx",
         "apps/mobile/components/match-detail/no-match-breakdown.tsx",
         "apps/mobile/components/match-detail/opponent-link-row.tsx",
         "apps/mobile/components/match-detail/use-amber.ts",
+        "apps/mobile/components/match-flow/upload-progress-banner.tsx",
         "apps/mobile/components/ui/elo-system/avatar-32.tsx",
         "apps/mobile/components/ui/elo-system/button.tsx",
         "apps/mobile/components/ui/elo-system/chip.tsx",
@@ -999,6 +1020,13 @@
         "apps/mobile/lib/film-room/format.ts",
         "apps/mobile/lib/highlight/highlight-copy.ts",
         "apps/mobile/lib/highlight/regenerate-mode.ts",
+        "apps/mobile/lib/match-detail/film-section.ts",
+        "apps/mobile/lib/match-detail/use-match-film.ts",
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-capabilities.ts",
+        "apps/mobile/lib/video/upload-copy.ts",
+        "apps/mobile/lib/video/upload-errors.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
         "packages/shared/src/constants/**",
         "packages/shared/src/utils/key-moments.ts",
         "packages/shared/src/utils/match-detection.ts",
@@ -1388,7 +1416,7 @@
       ]
     },
     "50-Invite-Challenge.dc.html": {
-      "title": "50-Invite-Challenge.dc.html",
+      "title": "Invite & challenge: QR, code, share (invites on)",
       "sources": [
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/invite/index.tsx",
@@ -1406,7 +1434,7 @@
       ]
     },
     "51-Invite-Join.dc.html": {
-      "title": "51-Invite-Join.dc.html",
+      "title": "Invite to join: personal QR (invites on)",
       "sources": [
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/invite/join.tsx",
@@ -1422,7 +1450,7 @@
       ]
     },
     "52-Invite-Claim.dc.html": {
-      "title": "52-Invite-Claim.dc.html",
+      "title": "Accept a challenge invite (invites on)",
       "sources": [
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/invite/claim.tsx",
@@ -1443,7 +1471,7 @@
       ]
     },
     "53-Invite-Setup.dc.html": {
-      "title": "53-Invite-Setup.dc.html",
+      "title": "Invite setup: one screen (invites on)",
       "sources": [
         "apps/mobile/app/invite-setup.tsx",
         "apps/mobile/components/layout/app-header.tsx",
@@ -1465,7 +1493,7 @@
       ]
     },
     "54-Invite-Code.dc.html": {
-      "title": "54-Invite-Code.dc.html",
+      "title": "Got a challenge code? (invites on)",
       "sources": [
         "apps/mobile/app/(auth)/_layout.tsx",
         "apps/mobile/app/(auth)/invite-code.tsx",
@@ -1479,7 +1507,7 @@
       ]
     },
     "55-Friends.dc.html": {
-      "title": "55-Friends.dc.html",
+      "title": "Friends",
       "sources": [
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/friends.tsx",
@@ -1496,7 +1524,7 @@
       ]
     },
     "56-Delete-Account.dc.html": {
-      "title": "56-Delete-Account.dc.html",
+      "title": "Settings: delete account",
       "sources": [
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/settings/_layout.tsx",
@@ -1513,7 +1541,7 @@
       ]
     },
     "57-Arena-Nearby.dc.html": {
-      "title": "57-Arena-Nearby.dc.html",
+      "title": "Arena: on the mat near you + online & close (location on)",
       "sources": [
         "apps/mobile/app/(app)/(tabs)/_layout.tsx",
         "apps/mobile/app/(app)/(tabs)/arena/**",
@@ -1555,7 +1583,7 @@
       ]
     },
     "58-Go-Live-Location.dc.html": {
-      "title": "58-Go-Live-Location.dc.html",
+      "title": "Go Live: location explain sheet (location on)",
       "sources": [
         "apps/mobile/app/(app)/(tabs)/_layout.tsx",
         "apps/mobile/app/(app)/(tabs)/arena/**",
@@ -1603,7 +1631,7 @@
       ]
     },
     "59-Start-Blocked.dc.html": {
-      "title": "59-Start-Blocked.dc.html",
+      "title": "Arena: not on the same mat (location on)",
       "sources": [
         "apps/mobile/app/(app)/(tabs)/_layout.tsx",
         "apps/mobile/app/(app)/(tabs)/arena/**",
@@ -1651,7 +1679,7 @@
       ]
     },
     "60-Arena-Booked.dc.html": {
-      "title": "60-Arena-Booked.dc.html",
+      "title": "Arena: booked invite match (invites on)",
       "sources": [
         "apps/mobile/app/(app)/(tabs)/_layout.tsx",
         "apps/mobile/app/(app)/(tabs)/arena/**",
@@ -1693,7 +1721,7 @@
       ]
     },
     "61-Home-Invite.dc.html": {
-      "title": "61-Home-Invite.dc.html",
+      "title": "Home: invite card (invites on)",
       "sources": [
         "apps/mobile/app/(app)/(tabs)/(home)/**",
         "apps/mobile/app/(app)/(tabs)/_layout.tsx",
