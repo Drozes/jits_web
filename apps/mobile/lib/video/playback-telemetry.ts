@@ -46,6 +46,18 @@ import * as tracking from "@/lib/error-tracking/sentry";
  *                       startups abandoned during signing are counted too.
  *   timeToFirstFrameMs is null on a continuation after the background (a
  *   warm resume is not a startup).
+ *   switchCount         match player: angle switches in this session. A switch
+ *                       keeps the screen, the player and this session (it used
+ *                       to remount all three), so one viewing of a match is
+ *                       one event however many angles were watched.
+ *   switchLatencyMs     median, over the switches whose new angle showed a
+ *                       frame, of tap -> first frame of the new angle (the
+ *                       view's onFirstFrameRender for the new item, or the
+ *                       first playback progress on it). Null with none.
+ *   switchLatencyMaxMs  the slowest of those switches.
+ *   After a switch, `durationS` and `maxPositionS` are on the file then on
+ *   screen (each angle has its own clock), so across a switched session they
+ *   mix angles; read them per session, not as one timeline.
  */
 
 /** How long a seek's "the next load is ours" exemption lasts at most. */
@@ -58,14 +70,19 @@ export type PlaybackSurface = "match" | "highlight";
 export type PlaybackSourceKind = "original" | "normalized" | "highlight";
 export type PlaybackEndReason = "unmount" | "background";
 export type PlayerStatus = "idle" | "loading" | "readyToPlay" | "error";
+export type PlaybackAngle = "mine" | "opponent" | "timekeeper";
 export type SignOutcome = "ok" | "failed" | "missing" | "absent" | "processing" | "pending";
 
 export interface PlaybackSessionMeta {
   surface: PlaybackSurface;
   videoId: string | null;
-  /** Match player: whose recording this is. Null when unknown or for a reel. */
-  angle: "mine" | "opponent" | null;
-  /** How many angles the match has (1 or 2); null when unknown. */
+  /**
+   * Match player: whose recording the session opened on ("timekeeper" for
+   * the sideline angle, never folded into "opponent"). Null when unknown or
+   * for a reel.
+   */
+  angle: PlaybackAngle | null;
+  /** How many angles the match has (1 to 3); null when unknown. */
   angleCount: number | null;
 }
 
@@ -100,6 +117,9 @@ export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   endedInError: boolean;
   durationS: number | null;
   maxPositionS: number | null;
+  switchCount: number;
+  switchLatencyMs: number | null;
+  switchLatencyMaxMs: number | null;
 }
 
 /** Longest error text kept. */
@@ -144,6 +164,10 @@ export class PlaybackSession {
   private unrecovered = false;
   private durationS: number | null = null;
   private maxPositionS: number | null = null;
+  private switchCount = 0;
+  /** A switch is waiting for the new angle's first frame (tap time). */
+  private switchAt: number | null = null;
+  private switchLatencies: number[] = [];
 
   constructor(
     meta: PlaybackSessionMeta,
@@ -228,6 +252,23 @@ export class PlaybackSession {
   seekRequested(now: number): void {
     this.seekCount += 1;
     this.expectWait(now);
+  }
+
+  /**
+   * The athlete switched angle (the tap). The new angle's load is the app's
+   * own wait, not a stall; `switchLanded` measures how long it took.
+   */
+  switchStarted(now: number): void {
+    this.switchCount += 1;
+    this.switchAt = now;
+    this.expectSwap(now);
+  }
+
+  /** The switched-to angle showed its first frame. Only the latest switch counts. */
+  switchLanded(now: number): void {
+    if (this.switchAt == null) return;
+    this.switchLatencies.push(Math.max(0, now - this.switchAt));
+    this.switchAt = null;
   }
 
   /** The view rendered a frame (onFirstFrameRender). Only counts after the intent. */
@@ -356,6 +397,9 @@ export class PlaybackSession {
       endedInError: this.unrecovered,
       durationS: this.durationS,
       maxPositionS: this.maxPositionS,
+      switchCount: this.switchCount,
+      switchLatencyMs: median(this.switchLatencies),
+      switchLatencyMaxMs: this.switchLatencies.length > 0 ? Math.max(...this.switchLatencies) : null,
     };
   }
 
@@ -372,6 +416,13 @@ export class PlaybackSession {
     this.watchMs += now - this.playingSince;
     this.playingSince = null;
   }
+}
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
 /** The single coarse bucket a session lands in, for a Sentry tag. */

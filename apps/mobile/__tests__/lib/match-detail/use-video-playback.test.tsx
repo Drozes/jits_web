@@ -19,6 +19,8 @@ const mockTelemetry = {
   signOutcome: jest.fn(),
   expectWait: jest.fn(),
   firstFrame: jest.fn(),
+  switchStarted: jest.fn(),
+  switchLanded: jest.fn(),
   error: jest.fn(),
 };
 jest.mock("@/lib/video/use-playback-telemetry", () => ({
@@ -88,7 +90,10 @@ jest.mock("expo-video", () => {
           listeners.push(e);
           return { remove: () => listeners.splice(listeners.indexOf(e), 1) };
         }),
-        emit: (event: string, payload?: unknown) => listeners.filter((l) => l.event === event).forEach((l) => l.fn(payload)),
+        emit: (event: string, payload?: unknown) => {
+          if (event === "timeUpdate") time = (payload as { currentTime: number }).currentTime;
+          listeners.filter((l) => l.event === event).forEach((l) => l.fn(payload));
+        },
       } as FakePlayer;
       setup?.(p);
       mockPlayers.push(p);
@@ -394,5 +399,239 @@ describe("expo-av is gone from the app (jits-n2im.19)", () => {
       .flatMap((d) => sources(path.join(root, d)))
       .filter((f) => /from\s+["']expo-av["']|require\(["']expo-av["']\)/.test(fs.readFileSync(f, "utf8")));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("useVideoPlayback angle switch (multi-angle P0)", () => {
+  function signById(urls: Record<string, string>) {
+    mockSign.mockImplementation((_c: unknown, vid: string) => Promise.resolve(playable(urls[vid] ?? "https://s/x.mp4")));
+  }
+
+  it("switches in the SAME player at the exact position, keeping play state and speed", async () => {
+    signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    act(() => result.current.presign(["vid-1", "vid-2"]));
+    await waitFor(() => expect(mockSign).toHaveBeenCalledWith({}, "vid-2"));
+    await act(async () => undefined);
+    act(() => result.current.setRate(0.5));
+    time(42.637);
+    expect(result.current.currentTimeNow()).toBe(42.637);
+    const signs = mockSign.mock.calls.length;
+    act(() => result.current.switchAngle("vid-2", 40.137));
+    // Pre-signed: no new sign round trip.
+    expect(mockSign).toHaveBeenCalledTimes(signs);
+    expect(result.current.activeId).toBe("vid-2");
+    expect(result.current.phase).toBe("ready");
+    expect(result.current.positionS).toBe(40.137);
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/b.mp4" }));
+    expect(mockPlayers).toHaveLength(1);
+    expect(mockTelemetry.switchStarted).toHaveBeenCalledTimes(1);
+    expect(player().pause).toHaveBeenCalled();
+    ready();
+    expect(player().seeks.at(-1)).toBe(40.137);
+    expect(player().playing).toBe(true);
+    expect(player().playbackRate).toBe(0.5);
+    expect(result.current.playing).toBe(true);
+    expect(result.current.rate).toBe(0.5);
+    // The held frame stands in until the new angle draws: no poster flash.
+    expect(result.current.frameShown).toBe(true);
+    // A first frame before the resume seek lands may be frame 0: not landed.
+    act(() => result.current.onFirstFrameRender());
+    expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+    time(40.137);
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+  });
+
+  it("lands paused when the athlete was paused", async () => {
+    signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(10);
+    act(() => result.current.toggle());
+    expect(player().playing).toBe(false);
+    player().play.mockClear();
+    act(() => result.current.switchAngle("vid-2", 12.5));
+    // Not pre-signed: signs silently, never drops to the loading phase.
+    expect(result.current.phase).toBe("ready");
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/b.mp4" }));
+    ready();
+    expect(player().seeks.at(-1)).toBe(12.5);
+    expect(player().play).not.toHaveBeenCalled();
+    expect(result.current.playing).toBe(false);
+  });
+
+  it("lands the switch only once the resume seek lands, never on the item's frame 0 (review M2)", async () => {
+    signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(5);
+    act(() => result.current.switchAngle("vid-2", 30));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    // Frame 0 drawn and a stale update at 0 before the seek lands.
+    act(() => result.current.onFirstFrameRender());
+    ready();
+    time(0);
+    expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+    expect(result.current.positionS).toBe(30);
+    time(30.02);
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+    time(30.3);
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+  });
+
+  it("paused: a first frame drawn after the resume seek lands the switch (review r2-m1)", async () => {
+    signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(10);
+    act(() => result.current.toggle());
+    act(() => result.current.switchAngle("vid-2", 12.5));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    // Before readyToPlay (no seek issued yet): may be frame 0, ignored.
+    act(() => result.current.onFirstFrameRender());
+    expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+    ready();
+    expect(player().seeks.at(-1)).toBe(12.5);
+    act(() => result.current.onFirstFrameRender());
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+    expect(result.current.frameShown).toBe(true);
+  });
+
+  it("a switch to 0 has no resume seek: its first frame is the right one", async () => {
+    signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    act(() => result.current.onFirstFrameRender());
+    act(() => result.current.switchAngle("vid-2", 0));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    ready();
+    act(() => result.current.onFirstFrameRender());
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+  });
+
+  it("while the target's sign is pending, the old item no longer counts (review B1)", async () => {
+    let resolveB: (v: unknown) => void = () => undefined;
+    mockSign.mockImplementation((_c: unknown, vid: string) =>
+      vid === "vid-2" ? new Promise((r) => (resolveB = r)) : Promise.resolve(playable("https://s/a.mp4")),
+    );
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(30);
+    act(() => result.current.switchAngle("vid-2", 28.5));
+    await waitFor(() => expect(mockSign).toHaveBeenCalledWith({}, "vid-2"));
+    expect(result.current.currentTimeNow()).toBe(28.5);
+    player().play.mockClear();
+    act(() => result.current.toggle());
+    act(() => result.current.toggle());
+    expect(player().play).not.toHaveBeenCalled();
+    // A late update from the old item must not move the resume point.
+    time(30.25);
+    expect(result.current.positionS).toBe(28.5);
+    expect(result.current.currentTimeNow()).toBe(28.5);
+    await act(async () => resolveB(playable("https://s/b.mp4")));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/b.mp4" }));
+    ready();
+    expect(player().seeks.at(-1)).toBe(28.5);
+    expect(player().play).toHaveBeenCalled();
+  });
+
+  it("a second switch during the first one's sign wins, from the first one's target", async () => {
+    let resolveB: (v: unknown) => void = () => undefined;
+    mockSign.mockImplementation((_c: unknown, vid: string) =>
+      vid === "vid-2" ? new Promise((r) => (resolveB = r)) : Promise.resolve(playable(`https://s/${vid}.mp4`)),
+    );
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(30);
+    act(() => result.current.switchAngle("vid-2", 28.5));
+    // The screen translates from what the hook says now: vid-2's 28.5.
+    expect(result.current.currentTimeNow()).toBe(28.5);
+    act(() => result.current.switchAngle("vid-3", 27));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-3.mp4" }));
+    // The first sign answering late is dropped.
+    await act(async () => resolveB(playable("https://s/vid-2.mp4")));
+    expect(player().replaceAsync).not.toHaveBeenCalledWith({ uri: "https://s/vid-2.mp4" });
+    ready();
+    expect(result.current.activeId).toBe("vid-3");
+    expect(player().seeks.at(-1)).toBe(27);
+    expect(mockTelemetry.switchStarted).toHaveBeenCalledTimes(2);
+  });
+
+  it("clamps the resume seek to a shorter angle's end (review m1)", async () => {
+    signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready(400);
+    time(350);
+    act(() => result.current.switchAngle("vid-2", 350));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    ready(120);
+    expect(player().seeks.at(-1)).toBe(119.5);
+    expect(result.current.positionS).toBe(119.5);
+    expect(result.current.durationS).toBe(120);
+  });
+
+  it("ignores a switch to the angle already on screen", async () => {
+    signById({ "vid-1": "https://s/a.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    act(() => result.current.switchAngle("vid-1", 3));
+    expect(mockTelemetry.switchStarted).not.toHaveBeenCalled();
+    expect(player().replaceAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the poster on a switch made before any frame was on screen", async () => {
+    signById({ "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4" });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    act(() => result.current.switchAngle("vid-2", 0));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    expect(result.current.frameShown).toBe(false);
+  });
+});
+
+describe("useVideoPlayback route id changes (review m2, m3)", () => {
+  it("ignores its own setParams echo, even a stale one after A, B, A", async () => {
+    mockSign.mockImplementation((_c: unknown, vid: string) => Promise.resolve(playable(`https://s/${vid}.mp4`)));
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useVideoPlayback(id), { initialProps: { id: "vid-1" } });
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    act(() => result.current.switchAngle("vid-2", 10));
+    act(() => result.current.switchAngle("vid-1", 12));
+    const signs = mockSign.mock.calls.length;
+    const swaps = player().replaceAsync.mock.calls.length;
+    // The route renders the intermediate id after the hook is back on vid-1.
+    rerender({ id: "vid-2" });
+    rerender({ id: "vid-1" });
+    await act(async () => undefined);
+    expect(result.current.activeId).toBe("vid-1");
+    expect(mockSign).toHaveBeenCalledTimes(signs);
+    expect(player().replaceAsync).toHaveBeenCalledTimes(swaps);
+    expect(result.current.entryId).toBe("vid-1");
+  });
+
+  it("an outside navigation to another recording loads it fresh at its own ?t=", async () => {
+    mockSign.mockImplementation((_c: unknown, vid: string) => Promise.resolve(playable(`https://s/${vid}.mp4`)));
+    const { result, rerender } = renderHook(({ id, t }: { id: string; t: number | null }) => useVideoPlayback(id, t), {
+      initialProps: { id: "vid-1", t: null as number | null },
+    });
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(50);
+    rerender({ id: "vid-9", t: 15 });
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-9.mp4" }));
+    expect(result.current.entryId).toBe("vid-9");
+    expect(result.current.activeId).toBe("vid-9");
+    expect(mockTelemetry.setMeta).toHaveBeenCalledWith({ videoId: "vid-9" });
+    ready();
+    expect(player().seeks.at(-1)).toBe(15);
   });
 });

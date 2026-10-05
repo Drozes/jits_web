@@ -23,6 +23,10 @@ export interface PlaybackTelemetry {
   expectWait: () => void;
   /** Wire to VideoView's onFirstFrameRender. */
   firstFrame: () => void;
+  /** The athlete switched angle (tap time); the session carries on. */
+  switchStarted: () => void;
+  /** The switched-to angle showed its first frame. */
+  switchLanded: () => void;
   error: (message: string | null | undefined) => void;
 }
 
@@ -149,6 +153,8 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
       seekRequested: () => sessionRef.current?.seekRequested(Date.now()),
       expectWait: () => sessionRef.current?.expectWait(Date.now()),
       firstFrame: () => sessionRef.current?.firstFrame(Date.now()),
+      switchStarted: () => sessionRef.current?.switchStarted(Date.now()),
+      switchLanded: () => sessionRef.current?.switchLanded(Date.now()),
       error: (message) => sessionRef.current?.error(message),
     }),
     [],
