@@ -8,11 +8,14 @@ import {
   type PlaybackEndReason,
   type PlaybackSessionMeta,
   type PlaybackSourceKind,
+  type SignOutcome,
 } from "./playback-telemetry";
 
 export interface PlaybackTelemetry {
   setMeta: (partial: Partial<PlaybackSessionMeta>) => void;
   sourceAttached: (kind: PlaybackSourceKind) => void;
+  /** How the latest sign ended (match player). */
+  signOutcome: (outcome: SignOutcome) => void;
   resigned: () => void;
   playIntent: (want: boolean) => void;
   seekRequested: () => void;
@@ -50,9 +53,13 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
   const sessionRef = React.useRef<PlaybackSession | null>(null);
   const lastKindRef = React.useRef<PlaybackSourceKind | null>(null);
   const wantPlayRef = React.useRef(false);
-
-  if (sessionRef.current == null && AppState.currentState !== "background") {
-    sessionRef.current = new PlaybackSession(metaRef.current, Date.now());
+  // Only the FIRST render opens a session; later ones come from the AppState
+  // listener (a render during an "inactive" blip after a background flush
+  // must not open a sourceless, non-resumed session).
+  const createdRef = React.useRef(false);
+  if (!createdRef.current) {
+    createdRef.current = true;
+    if (AppState.currentState !== "background") sessionRef.current = new PlaybackSession(metaRef.current, Date.now());
   }
 
   const flush = React.useCallback((reason: PlaybackEndReason) => {
@@ -133,6 +140,7 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
         lastKindRef.current = kind;
         sessionRef.current?.sourceAttached(kind, Date.now());
       },
+      signOutcome: (outcome) => sessionRef.current?.setSignOutcome(outcome),
       resigned: () => sessionRef.current?.resigned(),
       playIntent: (want) => {
         wantPlayRef.current = want;

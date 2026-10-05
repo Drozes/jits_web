@@ -16,6 +16,7 @@ const mockTelemetry = {
   resigned: jest.fn(),
   playIntent: jest.fn(),
   seekRequested: jest.fn(),
+  signOutcome: jest.fn(),
   expectWait: jest.fn(),
   firstFrame: jest.fn(),
   error: jest.fn(),
@@ -277,6 +278,99 @@ describe("useVideoPlayback", () => {
     expect(mockTelemetry.firstFrame).toHaveBeenCalled();
   });
 
+  it("reports how each sign ended to telemetry", async () => {
+    mockSign.mockResolvedValueOnce({ ok: false, error: { code: "VIDEO_FILE_MISSING", message: "x" } });
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(result.current.phase).toBe("missing"));
+    expect(mockTelemetry.signOutcome).toHaveBeenLastCalledWith("missing");
+    mockSign.mockResolvedValueOnce(playable("https://s/a.mp4"));
+    await act(async () => result.current.retry());
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    expect(mockTelemetry.signOutcome).toHaveBeenLastCalledWith("ok");
+  });
+
+  it("a superseded swap's reload seeks back to the position (m4)", async () => {
+    mockSign.mockResolvedValueOnce(playable("https://s/one.mp4"));
+    mockSign.mockResolvedValueOnce(playable("https://s/two.mp4"));
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(0);
+    time(30);
+    // A re-sign whose old swap hangs, then the athlete's Retry wins the race.
+    let resolveStale!: () => void;
+    player().replaceAsync.mockImplementationOnce((src: { uri: string }) => {
+      player().source = src;
+      return new Promise<void>((r) => (resolveStale = r));
+    });
+    await fail("expired");
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    mockSign.mockResolvedValueOnce(playable("https://s/three.mp4"));
+    await act(async () => result.current.retry());
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(3));
+    ready();
+    expect(result.current.stateLabel).toBe("loaded");
+    player().seeks.length = 0;
+    await act(async () => resolveStale());
+    expect(player().replaceAsync).toHaveBeenCalledTimes(4);
+    expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/three.mp4" });
+    expect(result.current.stateLabel).toBe("loading");
+    ready();
+    expect(player().seeks).toEqual([30]);
+  });
+
+  it("a seek made while a re-signed URL is loading is where it resumes (m5)", async () => {
+    mockSign.mockResolvedValue(playable("https://s/a.mp4"));
+    const { result } = renderHook(() => useVideoPlayback("vid-1"));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    time(0);
+    time(42);
+    await fail("expired");
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    act(() => result.current.seek(100));
+    player().seeks.length = 0;
+    ready();
+    expect(player().seeks).toEqual([100]);
+  });
+
+  it("plays anyway if a settled item is still not ready after 3 s (m6)", async () => {
+    jest.useFakeTimers();
+    try {
+      mockSign.mockResolvedValue(playable("https://s/a.mp4"));
+      renderHook(() => useVideoPlayback("vid-1", 12));
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalled());
+      await act(async () => undefined);
+      expect(player().play).not.toHaveBeenCalled();
+      act(() => jest.advanceTimersByTime(3000));
+      expect(player().play).toHaveBeenCalledTimes(1);
+      // The resume seek still lands once the item reports ready.
+      ready();
+      expect(player().seeks).toEqual([12]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("no fallback play once the item was ready in time, or when paused", async () => {
+    jest.useFakeTimers();
+    try {
+      mockSign.mockResolvedValue(playable("https://s/a.mp4"));
+      const { result } = renderHook(() => useVideoPlayback("vid-1"));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalled());
+      await act(async () => undefined);
+      act(() => result.current.setPlaying(false));
+      act(() => jest.advanceTimersByTime(5000));
+      expect(player().play).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("is absent without an id and never signs", async () => {
     const { result } = renderHook(() => useVideoPlayback(undefined));
     await waitFor(() => expect(result.current.phase).toBe("absent"));
@@ -284,13 +378,21 @@ describe("useVideoPlayback", () => {
   });
 });
 
-describe("expo-av is gone from the match player (jits-n2im.19)", () => {
-  it.each([
-    "app/(app)/video/[id].tsx",
-    "lib/match-detail/use-video-playback.ts",
-    "components/practice/practice-summary.tsx",
-  ])("%s does not import expo-av", (file) => {
-    const src = fs.readFileSync(path.join(__dirname, "../../..", file), "utf8");
-    expect(src).not.toMatch(/from\s+["']expo-av["']/);
+describe("expo-av is gone from the app (jits-n2im.19)", () => {
+  // expo-av leaves the binary in the next TestFlight build (jits-n2im.31):
+  // a stray import anywhere would crash after that build.
+  function sources(dir: string): string[] {
+    return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) return e.name === "node_modules" ? [] : sources(full);
+      return /\.(ts|tsx|js|jsx)$/.test(e.name) ? [full] : [];
+    });
+  }
+  it("no file under app/, components/ or lib/ imports expo-av", () => {
+    const root = path.join(__dirname, "../../..");
+    const offenders = ["app", "components", "lib"]
+      .flatMap((d) => sources(path.join(root, d)))
+      .filter((f) => /from\s+["']expo-av["']|require\(["']expo-av["']\)/.test(fs.readFileSync(f, "utf8")));
+    expect(offenders).toEqual([]);
   });
 });

@@ -520,6 +520,17 @@ describe("MatchVideoScreen", () => {
     expect(payload.extra).toMatchObject({ videoId: "vid-1", angle: "mine", angleCount: 2, maxPositionS: 5, startupAbandoned: false });
   });
 
+  it("an open closed while the URL is still signing is one abandoned-startup event (M2)", async () => {
+    queries().getMatchVideoPlaybackResult.mockReturnValue(new Promise(() => undefined));
+    const utils = render(React.createElement(MatchVideoScreen));
+    await act(async () => undefined);
+    utils.unmount();
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    const payload = mockCaptureMessage.mock.calls[0][1];
+    expect(payload.tags["video.playback.outcome"]).toBe("abandoned_startup");
+    expect(payload.extra).toMatchObject({ startupAbandoned: true, signOutcome: "pending", signMs: null, sourceKind: null });
+  });
+
   it("shows unavailable without a read when the route has no id", async () => {
     mockId = undefined;
     const utils = render(React.createElement(MatchVideoScreen));

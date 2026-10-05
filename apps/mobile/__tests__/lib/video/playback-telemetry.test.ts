@@ -8,6 +8,7 @@ import {
   outcomeOf,
   reportPlaybackSession,
   scrubPlaybackError,
+  SEEK_EXEMPT_MS,
   type PlaybackSessionMeta,
 } from "@/lib/video/playback-telemetry";
 
@@ -105,6 +106,61 @@ describe("PlaybackSession", () => {
     expect(out.signMs).toBe(400);
   });
 
+  it("a seek that never buffers does not swallow the next real stall (M1)", () => {
+    const s = matchSession();
+    s.playing(true, 1000);
+    s.position(10);
+    // A skip inside the buffer: no loading/readyToPlay pair at all.
+    s.seekRequested(2000);
+    s.position(20); // where it landed
+    s.position(20.25); // playing on from there: the exemption is over
+    s.status("loading", 30_000);
+    s.status("readyToPlay", 31_000);
+    const out = s.summary(32_000, "unmount");
+    expect(out.stallCount).toBe(1);
+    expect(out.stallMs).toBe(1000);
+  });
+
+  it("a seek's exemption also expires on its own after 1.5 s", () => {
+    const s = matchSession();
+    s.playing(true, 1000);
+    s.seekRequested(2000);
+    // No position updates at all (paused-looking stream), then a stall.
+    s.status("loading", 2000 + SEEK_EXEMPT_MS + 1);
+    s.status("readyToPlay", 5000);
+    expect(s.summary(6000, "unmount").stallCount).toBe(1);
+  });
+
+  it("playing again after a seek ends its exemption", () => {
+    const s = matchSession();
+    s.playing(true, 1000);
+    s.seekRequested(2000);
+    s.playing(true, 2100);
+    s.status("loading", 2200);
+    s.status("readyToPlay", 2700);
+    expect(s.summary(3000, "unmount")).toMatchObject({ stallCount: 1, stallMs: 500 });
+  });
+
+  it("counts stalls for playback started without an explicit intent (native controls, restore)", () => {
+    const s = new PlaybackSession(REEL, 0);
+    s.sourceAttached("highlight", 0);
+    s.playing(true, 1000);
+    s.status("loading", 3000);
+    s.status("readyToPlay", 3500);
+    expect(s.summary(4000, "unmount").stallCount).toBe(1);
+  });
+
+  it("a reel's re-signed swap is an expected load, not a stall", () => {
+    const s = new PlaybackSession(REEL, 0);
+    s.sourceAttached("highlight", 0);
+    s.playIntent(true, 500);
+    s.playing(true, 800);
+    s.sourceAttached("highlight", 5000);
+    s.status("loading", 5000);
+    s.status("readyToPlay", 6000);
+    expect(s.summary(7000, "unmount").stallCount).toBe(0);
+  });
+
   it("does not count buffering while paused, and pausing ends an open stall", () => {
     const s = matchSession();
     s.playing(true, 1000);
@@ -182,6 +238,29 @@ describe("PlaybackSession", () => {
     expect(opened.shouldReport()).toBe(true);
   });
 
+  it("reports an open that was abandoned while signing (M2)", () => {
+    const s = new PlaybackSession(MATCH, 0);
+    s.playIntent(true, 0);
+    expect(s.shouldReport()).toBe(true);
+    const out = s.summary(4000, "unmount");
+    expect(out).toMatchObject({ signOutcome: "pending", signMs: null, startupAbandoned: true, sourceKind: null });
+    expect(outcomeOf(out)).toBe("abandoned_startup");
+  });
+
+  it("a failed or unplayable sign is its own outcome, not an abandoned startup", () => {
+    const failed = new PlaybackSession(MATCH, 0);
+    failed.playIntent(true, 0);
+    failed.setSignOutcome("failed");
+    const f = failed.summary(900, "unmount");
+    expect(f).toMatchObject({ signOutcome: "failed", startupAbandoned: false });
+    expect(outcomeOf(f)).toBe("sign_failed");
+
+    const processing = new PlaybackSession(MATCH, 0);
+    processing.playIntent(true, 0);
+    processing.setSignOutcome("processing");
+    expect(outcomeOf(processing.summary(900, "unmount"))).toBe("unavailable");
+  });
+
   it("reports a reel only once it was played", () => {
     const s = new PlaybackSession(REEL, 0);
     s.sourceAttached("highlight", 0);
@@ -203,7 +282,9 @@ describe("PlaybackSession", () => {
     watched.playing(true, 100);
     expect(watched.shouldReport()).toBe(true);
     const out = watched.summary(1100, "unmount");
-    expect(out).toMatchObject({ resumed: true, sourceKind: "normalized", signMs: null, watchMs: 1000 });
+    expect(out).toMatchObject({ resumed: true, sourceKind: "normalized", signMs: null, watchMs: 1000, signOutcome: null });
+    // A warm resume is not a startup (m3).
+    expect(out.timeToFirstFrameMs).toBeNull();
   });
 
   it("carries the network type and the meta set later", () => {

@@ -86,6 +86,13 @@ const SEEK_LANDED_S = 1.5;
 const SEEK_HOLD_MAX_UPDATES = 8;
 /** Within this of the end, Play restarts from the top. */
 const END_EPSILON_S = 0.5;
+/**
+ * If a settled swap is still not readyToPlay after this long, play anyway.
+ * iOS reports a ready item with an empty buffer as "loading", and a paused
+ * AVPlayer may not fill it until asked to play (expo-av's shouldPlay asked
+ * at once). The resume seek then lands on the later readyToPlay.
+ */
+const AUTOPLAY_FALLBACK_MS = 3000;
 
 function phaseFor(result: Result<MatchVideoPlayback | null>): PlaybackPhase {
   if (!result.ok) {
@@ -173,6 +180,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const sign = React.useCallback(
     async (silent: boolean) => {
       if (!id) {
+        telemetry.signOutcome("absent");
         setPhase("absent");
         return;
       }
@@ -184,6 +192,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       if (epoch !== epochRef.current) return;
       signingRef.current = false;
       const next = phaseFor(result);
+      telemetry.signOutcome(next === "ready" ? "ok" : next === "loading" ? "pending" : next);
       if (next === "ready" && result.ok && result.data) {
         const resumeAt = positionRef.current > 0 ? positionRef.current : null;
         resumeAtRef.current = resumeAt;
@@ -260,6 +269,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       ready = player.status === "readyToPlay";
     });
     if (!ready) return;
+    clearAutoplayTimer();
     loadedRef.current = true;
     setLoaded(true);
     safely(() => {
@@ -280,6 +290,13 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     }
   }, [player, telemetry]);
 
+  const autoplayTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearAutoplayTimer = () => {
+    if (autoplayTimerRef.current) clearTimeout(autoplayTimerRef.current);
+    autoplayTimerRef.current = null;
+  };
+  React.useEffect(() => clearAutoplayTimer, []);
+
   // Swap each newly signed URL into the one player. Only the latest swap's
   // outcome counts; a superseded swap that settles after it reloads the
   // latest URL (the native item may be the stale one).
@@ -289,10 +306,20 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       const state = swapRef.current;
       const seq = ++state.seq;
       settledGenRef.current = null;
+      clearAutoplayTimer();
       const settle = (ok: boolean, message?: string) => {
         if (!mountedRef.current) return;
         if (seq !== state.seq) {
-          if (state.doneSeq === state.seq && sourceRef.current) replace(sourceRef.current);
+          if (state.doneSeq === state.seq && sourceRef.current) {
+            // The stale item may have replaced the latest one: reload it and
+            // seek back to where playback was, like any fresh load.
+            loadedRef.current = false;
+            setLoaded(false);
+            const at = positionRef.current > 0 ? positionRef.current : null;
+            resumeAtRef.current = at;
+            progressBaseRef.current = at ?? 0;
+            replace(sourceRef.current);
+          }
           return;
         }
         state.doneSeq = seq;
@@ -305,6 +332,13 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         settledGenRef.current = next.generation;
         // readyToPlay may have fired before this promise settled.
         markLoaded();
+        if (!loadedRef.current) {
+          autoplayTimerRef.current = setTimeout(() => {
+            autoplayTimerRef.current = null;
+            if (!mountedRef.current || loadedRef.current || settledGenRef.current !== next.generation) return;
+            if (playingRef.current) startPlayback();
+          }, AUTOPLAY_FALLBACK_MS);
+        }
       };
       let pending: Promise<void>;
       try {
@@ -318,7 +352,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         (e: unknown) => settle(false, e instanceof Error ? e.message : String(e)),
       );
     },
-    [player, markLoaded, telemetry],
+    [player, markLoaded, telemetry, startPlayback],
   );
 
   React.useEffect(() => {
@@ -409,6 +443,12 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       setPositionS(clamped);
       positionRef.current = clamped;
       holdRef.current = { at: clamped, left: SEEK_HOLD_MAX_UPDATES };
+      if (!loadedRef.current) {
+        // An item is still loading (first load or a silent re-sign): the
+        // seek must survive into its resume seek, not land on a dying item.
+        resumeAtRef.current = clamped > 0 ? clamped : null;
+        progressBaseRef.current = clamped;
+      }
       telemetry.seekRequested();
       safely(() => {
         player.currentTime = clamped;

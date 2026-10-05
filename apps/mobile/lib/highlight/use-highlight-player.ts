@@ -101,6 +101,9 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
     if (loaded.url === source.url && loaded.generation === source.generation) return;
     const sameVersion = loaded.version === source.version;
     if (sameVersion) telemetry.resigned();
+    // Every swap reloads the item: telemetry treats that load as expected,
+    // not as a stall.
+    telemetry.sourceAttached("highlight");
     loadedRef.current = { url: source.url, version: source.version, generation: source.generation };
     let restore = { at: 0, play: false };
     try {
@@ -141,13 +144,15 @@ export function useHighlightPlayer(source: HighlightSource, onError: () => void)
   useFocusEffect(
     React.useCallback(() => {
       return () => {
+        // Leaving the screen pauses on the app's behalf, not the athlete's.
+        telemetry.playIntent(false);
         try {
           player.pause();
         } catch {
           // Player already released on unmount.
         }
       };
-    }, [player]),
+    }, [player, telemetry]),
   );
 
   const renderedVersion = readyVersion !== null && readyVersion === playedVersion ? readyVersion : null;

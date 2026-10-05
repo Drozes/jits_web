@@ -29,17 +29,34 @@ import * as tracking from "@/lib/error-tracking/sentry";
  *                       direct result of a seek, a re-signed URL being swapped
  *                       in, or the resume seek after it. Those waits are
  *                       excluded so scrubbing or a URL renewal does not read
- *                       as a network problem.
+ *                       as a network problem. The exemption is BOUNDED: a
+ *                       seek's ends on the first playback progress after it,
+ *                       on playing, on readyToPlay, or SEEK_EXEMPT_MS after
+ *                       the seek; a swap's ends on readyToPlay or progress.
+ *                       (expo-video emits statusChange only on a change, so
+ *                       a seek inside the buffer never produces the
+ *                       loading -> readyToPlay pair that would clear it.)
  *   watchMs             time the player was actually playing (not stalled,
  *                       not paused, not backgrounded).
  *   rebufferRatio       stallMs / (watchMs + stallMs).
+ *   signOutcome         match player: how the (latest) sign ended: ok,
+ *                       failed, missing, absent, processing, or pending when
+ *                       the athlete left before it answered. Every open of
+ *                       the match player with a play intent is one event, so
+ *                       startups abandoned during signing are counted too.
+ *   timeToFirstFrameMs is null on a continuation after the background (a
+ *   warm resume is not a startup).
  */
+
+/** How long a seek's "the next load is ours" exemption lasts at most. */
+export const SEEK_EXEMPT_MS = 1500;
 
 export type PlaybackSurface = "match" | "highlight";
 /** Which file was played: the uploaded original, the slicer's normalized MP4, or a reel. */
 export type PlaybackSourceKind = "original" | "normalized" | "highlight";
 export type PlaybackEndReason = "unmount" | "background";
 export type PlayerStatus = "idle" | "loading" | "readyToPlay" | "error";
+export type SignOutcome = "ok" | "failed" | "missing" | "absent" | "processing" | "pending";
 
 export interface PlaybackSessionMeta {
   surface: PlaybackSurface;
@@ -52,6 +69,8 @@ export interface PlaybackSessionMeta {
 
 export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   sourceKind: PlaybackSourceKind | null;
+  /** Match player only (null for a reel). */
+  signOutcome: SignOutcome | null;
   networkType: string | null;
   cellularGeneration: string | null;
   /** A continuation started when the app came back from the background. */
@@ -107,8 +126,13 @@ export class PlaybackSession {
   private stallCount = 0;
   private stallMs = 0;
   private longestStallMs = 0;
-  /** A wait the app caused (seek, swap) is expected: the next load is not a stall. */
-  private seekPending = false;
+  /** A seek was requested at this time: a load soon after is not a stall (bounded). */
+  private seekAt: number | null = null;
+  /** A new item is being swapped in: its load is not a stall until it is ready. */
+  private swapPending = false;
+  /** First position seen after an exemption started (undefined: none yet). */
+  private exemptBase: number | undefined = undefined;
+  private signOutcome: SignOutcome | null = null;
   private seekCount = 0;
   private resignCount = 0;
   private completed = false;
@@ -126,6 +150,7 @@ export class PlaybackSession {
   ) {
     this.meta = { ...meta };
     this.openedAt = now;
+    if (meta.surface === "match" && !opts.resumed) this.signOutcome = "pending";
     this.resumed = opts.resumed ?? false;
     // A continuation already has its source on the player.
     if (opts.sourceKind) {
@@ -149,13 +174,40 @@ export class PlaybackSession {
     this.sourceKind = kind;
     if (this.sourceAt == null) this.sourceAt = now;
     // A later source (a re-sign) reloads the item: that wait is not a stall.
-    else this.expectWait(now);
+    else this.expectSwap(now);
   }
 
-  /** The app is about to cause a load (a swap or a resume seek): not a stall. */
+  /** How the latest sign ended (match player). */
+  setSignOutcome(outcome: SignOutcome): void {
+    this.signOutcome = outcome;
+  }
+
+  /** A new item is being swapped into the player: its load is ours. */
+  expectSwap(now: number): void {
+    this.closeStall(now);
+    this.swapPending = true;
+    this.exemptBase = undefined;
+  }
+
+  /** The app is about to seek (a user seek or a resume seek): a load soon after is ours. */
   expectWait(now: number): void {
     this.closeStall(now);
-    this.seekPending = true;
+    this.seekAt = now;
+    this.exemptBase = undefined;
+  }
+
+  private exempt(now: number): boolean {
+    if (this.swapPending) return true;
+    if (this.seekAt == null) return false;
+    if (now - this.seekAt <= SEEK_EXEMPT_MS) return true;
+    this.seekAt = null;
+    return false;
+  }
+
+  private clearExemptions(): void {
+    this.seekAt = null;
+    this.swapPending = false;
+    this.exemptBase = undefined;
   }
 
   /** A silent re-sign after a player error. */
@@ -184,7 +236,7 @@ export class PlaybackSession {
 
   status(status: PlayerStatus, now: number): void {
     if (status === "loading") {
-      if (this.seekPending) return;
+      if (this.exempt(now)) return;
       if (this.firstFrameAt != null && this.wantPlay && this.stallSince == null) {
         this.stallSince = now;
         this.stallCount += 1;
@@ -192,7 +244,7 @@ export class PlaybackSession {
       return;
     }
     if (status === "readyToPlay") {
-      this.seekPending = false;
+      this.clearExemptions();
       this.closeStall(now);
       return;
     }
@@ -202,6 +254,10 @@ export class PlaybackSession {
   playing(isPlaying: boolean, now: number): void {
     if (isPlaying) {
       this.closeStall(now);
+      // Playing at all (even when started from native controls or a restore)
+      // means the athlete wants playback; and any app-caused wait is over.
+      this.wantPlay = true;
+      this.clearExemptions();
       if (this.firstFrameAt == null && this.sourceAt != null) {
         // Playing implies a frame, and an intent (a reel's autoplay is off).
         if (this.intentAt == null) this.intentAt = now;
@@ -217,6 +273,12 @@ export class PlaybackSession {
   position(seconds: number): void {
     if (!Number.isFinite(seconds) || seconds < 0) return;
     this.maxPositionS = Math.max(this.maxPositionS ?? 0, seconds);
+    if (this.seekAt != null || this.swapPending) {
+      // The first update after a seek reports where it landed; moving on
+      // from there is playback progress, and the exemption is over.
+      if (this.exemptBase === undefined) this.exemptBase = seconds;
+      else if (seconds > this.exemptBase + 0.01) this.clearExemptions();
+    }
   }
 
   duration(seconds: number): void {
@@ -233,7 +295,11 @@ export class PlaybackSession {
     this.unrecovered = true;
   }
 
-  /** Worth one event: a source reached the player, or something failed. */
+  /**
+   * Worth one event. Match player: every open with a play intent (autoplay
+   * sets it at mount), even one that closed or failed while signing. Reel:
+   * only once it was played. Continuation: only if something happened.
+   */
   shouldReport(): boolean {
     if (this.errorCount > 0) return true;
     if (this.meta.surface === "highlight") {
@@ -241,18 +307,23 @@ export class PlaybackSession {
       return this.intentAt != null && this.sourceAt != null;
     }
     if (this.resumed) return this.watchMs > 0 || this.playingSince != null || this.stallCount > 0;
-    return this.sourceAt != null;
+    return this.intentAt != null || this.sourceAt != null;
   }
 
   summary(now: number, endReason: PlaybackEndReason): PlaybackSessionSummary {
     this.closeStall(now);
     this.stopWatchClock(now);
     const ttff =
-      this.firstFrameAt != null && this.intentAt != null ? Math.max(0, this.firstFrameAt - this.intentAt) : null;
+      !this.resumed && this.firstFrameAt != null && this.intentAt != null
+        ? Math.max(0, this.firstFrameAt - this.intentAt)
+        : null;
+    // A sign that ended without a playable file is not an abandoned startup.
+    const signBlocked = this.signOutcome != null && this.signOutcome !== "ok" && this.signOutcome !== "pending";
     const rebufferBase = this.watchMs + this.stallMs;
     return {
       ...this.meta,
       sourceKind: this.sourceKind,
+      signOutcome: this.signOutcome,
       networkType: this.networkType,
       cellularGeneration: this.cellularGeneration,
       resumed: this.resumed,
@@ -261,7 +332,7 @@ export class PlaybackSession {
       signMs:
         this.meta.surface === "match" && !this.resumed && this.sourceAt != null ? this.sourceAt - this.openedAt : null,
       timeToFirstFrameMs: ttff,
-      startupAbandoned: this.intentAt != null && this.firstFrameAt == null,
+      startupAbandoned: this.intentAt != null && this.firstFrameAt == null && !signBlocked && !this.unrecovered,
       watchMs: this.watchMs,
       watchMinutes: Math.round((this.watchMs / 60_000) * 100) / 100,
       stallCount: this.stallCount,
@@ -295,8 +366,14 @@ export class PlaybackSession {
 }
 
 /** The single coarse bucket a session lands in, for a Sentry tag. */
-export function outcomeOf(s: PlaybackSessionSummary): "error" | "abandoned_startup" | "completed" | "watched" | "idle" {
+export function outcomeOf(
+  s: PlaybackSessionSummary,
+): "error" | "sign_failed" | "unavailable" | "abandoned_startup" | "completed" | "watched" | "idle" {
   if (s.endedInError) return "error";
+  if (s.sourceKind == null && s.signOutcome === "failed") return "sign_failed";
+  if (s.sourceKind == null && (s.signOutcome === "missing" || s.signOutcome === "absent" || s.signOutcome === "processing")) {
+    return "unavailable";
+  }
   if (s.startupAbandoned) return "abandoned_startup";
   if (s.completed) return "completed";
   return s.watchMs > 0 ? "watched" : "idle";
