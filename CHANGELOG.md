@@ -23,6 +23,12 @@ JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): no native dependenc
 - Notifications (jits-n2im.13): `film_ready`, `no_film` and `timekeeper_film_ready` open `/match-detail/<id>` (from `data.id` when the route is missing), are held during a live match and opened on the way out, with no banner over the match.
 - `packages/shared/src/types/database.ts` regenerated (additive) against a local stack at jr_be head `20261006200400`.
 
+**Changed (coordinator review, 2026-10-05)**
+- Playback is never gated on analysis: an angle plays as soon as the playback query can open its bytes (`Analyzing` while the pipeline runs, `Analysis failed · may still play` on a pipeline failure with the file, `Not used` only when there is no file); deck rule 4 reads playable, applied to the hero, rows, switcher and verdict CTA (COPY-DECK 14 item 6).
+- The upload strip is hidden on the match video player and the highlight viewer; on pushed screens it pads the bottom safe area once (`StackStripFrame` gives the Stack a 0 bottom inset).
+- Status components split smaller (`film-status-bits`, `film-row-info`, `film-status-header`, `upload-strip-slots`, `lib/video/use-upload-strip.ts`); `toneColor` moved to `film-status-bits` (film-angles re-exports it).
+- `design/native-screens/build-board-map.py` keeps the strip off every board's walk and maps the Film status view model and copy to boards 29, 31 and 32; `board-map.json` regenerated.
+
 ### Instant go-live: location ladder, device location store, optimistic chip, proximity flag, drift check (jits-jko7.1 to .4)
 
 Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) and the UX spec `research/019-optimistic-go-live-ux.md` (which wins on UX and copy; orchestrator rulings C1 to C7). JS-only on mobile (OTA-eligible: no dependency, no `app.json` / `app.config.js` change; `expo-secure-store`, `expo-location` and `@react-native-community/netinfo` are already in the binary). Safe before the jr_be migration `20261004100000_instant_go_live.sql`: a `PGRST202` for `p_captured_at` flips the app to the old fresh-reading flow and keeps the 60 s refresh for that backend.
