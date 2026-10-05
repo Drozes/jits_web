@@ -11,6 +11,7 @@ import {
   abandonMatchVideoUpload,
   canUploadMatchVideo,
   finalizeMatchVideoUpload,
+  getMatchVideoLifecycle,
   reserveMatchVideoUpload,
   touchMatchVideoUpload,
   type AbandonMatchVideoResult,
@@ -468,4 +469,18 @@ export async function abandonMatchVideoRow(videoId: string): Promise<AbandonMatc
     captureException(err, { videoId });
   }
   return null;
+}
+
+/**
+ * The key a row points at now: a string (or null key), `null` when the row
+ * is gone, `undefined` when the read failed (unknown, try later).
+ */
+export async function readMatchVideoKey(videoId: string): Promise<string | null | undefined> {
+  try {
+    const res = await getMatchVideoLifecycle(supabase, videoId);
+    if (!res.ok) return undefined;
+    return res.data ? res.data.storagePath ?? "" : null;
+  } catch {
+    return undefined;
+  }
 }

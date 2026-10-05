@@ -116,6 +116,7 @@ const mockTouch = jest.fn();
 const mockFinalize = jest.fn();
 const mockAbandon = jest.fn();
 const mockCanUpload = jest.fn();
+const mockLifecycle = jest.fn();
 
 jest.mock("@jits/shared/api/match-video-upload", () => ({
   reserveMatchVideoUpload: (...args: unknown[]) => mockReserve(...args),
@@ -123,12 +124,14 @@ jest.mock("@jits/shared/api/match-video-upload", () => ({
   finalizeMatchVideoUpload: (...args: unknown[]) => mockFinalize(...args),
   abandonMatchVideoUpload: (...args: unknown[]) => mockAbandon(...args),
   canUploadMatchVideo: (...args: unknown[]) => mockCanUpload(...args),
+  getMatchVideoLifecycle: (...args: unknown[]) => mockLifecycle(...args),
 }));
 
 import {
   abandonMatchVideoRow,
   finalizeMatchVideoRow,
   preflightMatchVideoUpload,
+  readMatchVideoKey,
   reserveMatchVideoRow,
   touchMatchVideoRow,
   MAX_UPLOAD_BYTES,
@@ -586,5 +589,18 @@ describe("reserve-before-bytes wrappers (jits-n2im.11)", () => {
     expect(await preflightMatchVideoUpload("M", 10)).toBeNull();
     mockCanUpload.mockResolvedValueOnce({ ok: true, data: { allowed: true, reason: null } });
     expect(await preflightMatchVideoUpload("M", 10)).toEqual({ allowed: true, reason: null });
+  });
+});
+
+describe("readMatchVideoKey (review R2-m1)", () => {
+  it("returns the key, null for a gone row, undefined when unknown", async () => {
+    mockLifecycle.mockResolvedValueOnce({ ok: true, data: { status: "uploading", storagePath: "M/A/1.mp4", failureCode: null } });
+    expect(await readMatchVideoKey("V")).toBe("M/A/1.mp4");
+    mockLifecycle.mockResolvedValueOnce({ ok: true, data: null });
+    expect(await readMatchVideoKey("V")).toBeNull();
+    mockLifecycle.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    expect(await readMatchVideoKey("V")).toBeUndefined();
+    mockLifecycle.mockRejectedValueOnce(new Error("boom"));
+    expect(await readMatchVideoKey("V")).toBeUndefined();
   });
 });

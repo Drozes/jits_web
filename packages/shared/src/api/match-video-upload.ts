@@ -175,6 +175,14 @@ export async function reserveMatchVideoUpload(
     };
     let takeover = supabase.from("match_videos").update(update).eq("id", existing.id);
     takeover = existing.storage_path == null ? takeover.is("storage_path", null) : takeover.eq("storage_path", existing.storage_path);
+    // R2-M1: guard on the STATUS read too. The landing trigger flips
+    // 'uploading' -> 'ready' without changing the key, so a key-only guard
+    // would still re-path a row whose bytes landed between the read and this
+    // PATCH. With the status (and the abandon code) in the WHERE, which
+    // Postgres re-checks under the row lock, such a row matches nothing and
+    // the retry below re-reads it and defers.
+    takeover = takeover.eq("status", existing.status);
+    if (existing.status === "failed") takeover = takeover.eq("failure_code", "upload_abandoned");
     const taken = await takeover.select(ROW_SELECT).maybeSingle();
     if (taken.error) return { ok: false, error: mapPostgrestError(taken.error, "match_video_create") };
     if (!taken.data) {
@@ -288,6 +296,24 @@ export async function finalizeMatchVideoUpload(
       return { ok: true, data: { outcome: "abandoned", failureCode: current.failure_code ?? null } };
     }
     return { ok: true, data: { outcome: "landed", status: current.status } };
+  } catch (err) {
+    return { ok: false, error: unexpected(err) };
+  }
+}
+
+/**
+ * Read one row's lifecycle columns (the uploader's own row). `null` when the
+ * row is gone or not readable.
+ */
+export async function getMatchVideoLifecycle(
+  supabase: Client,
+  videoId: string,
+): Promise<Result<{ status: string; storagePath: string | null; failureCode: string | null } | null>> {
+  try {
+    const { data, error } = await supabase.from("match_videos").select(ROW_SELECT).eq("id", videoId).maybeSingle();
+    if (error) return { ok: false, error: mapPostgrestError(error, "match_video_read") };
+    const row = data as LifecycleRow | null;
+    return { ok: true, data: row ? { status: row.status, storagePath: row.storage_path, failureCode: row.failure_code ?? null } : null };
   } catch (err) {
     return { ok: false, error: unexpected(err) };
   }

@@ -93,6 +93,7 @@ const mockReserveRow = jest.fn();
 const mockTouchRow = jest.fn();
 const mockFinalizeRow = jest.fn();
 const mockAbandonRow = jest.fn();
+const mockReadKey = jest.fn();
 let mockKeySeq = 0;
 
 // The transport is doubled; the retry CLASSIFIER is not (see the
@@ -107,6 +108,7 @@ jest.mock("@/lib/video/upload-recording", () => ({
   touchMatchVideoRow: (...a: unknown[]) => mockTouchRow(...a),
   finalizeMatchVideoRow: (...a: unknown[]) => mockFinalizeRow(...a),
   abandonMatchVideoRow: (...a: unknown[]) => mockAbandonRow(...a),
+  readMatchVideoKey: (...a: unknown[]) => mockReadKey(...a),
   buildVideoPath: (matchId: string, athleteId: string, ext = "mp4") => `${matchId}/${athleteId}/rekey-${++mockKeySeq}.${ext}`,
 }));
 
@@ -232,6 +234,8 @@ beforeEach(() => {
   mockTouchRow.mockResolvedValue(undefined);
   mockFinalizeRow.mockResolvedValue({ outcome: "missing" });
   mockAbandonRow.mockResolvedValue({ status: "failed", abandoned: true });
+  // The row still points at the job's key unless a test says otherwise.
+  mockReadKey.mockResolvedValue("M1/A1/1700000000000.mp4");
   resetMatchUploadStore();
   // Resumes are scoped to the signed-in athlete (jits-n2im.6); every seeded
   // job here is A1's.
@@ -2363,5 +2367,52 @@ describe("minor 5: an unanswered abandon is retried on the next launch", () => {
     await resumeMatchVideoUploads();
     await flush();
     expect(mockAbandonRow).not.toHaveBeenCalled();
+  });
+});
+
+describe("round 2 review", () => {
+  it("R2-m1: a retried abandon is skipped (and dropped) when the row now points at another recording", async () => {
+    mockStore.set(
+      "elo-video-abandon::VID-R",
+      JSON.stringify({ videoId: "VID-R", uploaderAthleteId: "A1", matchId: "M1", storagePath: "M1/A1/old.mp4", phase: "row", createdAt: Date.now() }),
+    );
+    mockReadKey.mockResolvedValue("M1/A1/newer.mp4");
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockAbandonRow).not.toHaveBeenCalled();
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+    expect(mockStore.has("elo-video-abandon::VID-R")).toBe(false);
+  });
+
+  it("R2-m1: an unreadable row keeps the record for the next sweep", async () => {
+    mockStore.set(
+      "elo-video-abandon::VID-U",
+      JSON.stringify({ videoId: "VID-U", uploaderAthleteId: "A1", matchId: "M1", storagePath: "M1/A1/old.mp4", phase: "row", createdAt: Date.now() }),
+    );
+    mockReadKey.mockResolvedValue(undefined);
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockAbandonRow).not.toHaveBeenCalled();
+    expect(mockStore.has("elo-video-abandon::VID-U")).toBe(true);
+  });
+
+  it("R2-M1: a takeover that lost the race to the landing trigger retries, defers, and deletes nothing", async () => {
+    mockReserveRow
+      .mockRejectedValueOnce(Object.assign(new Error("match video row changed during the reservation"), { code: null, hint: null, gate: null }))
+      .mockResolvedValueOnce({
+        id: "R",
+        status: "ready",
+        storagePath: "M1/A1/landed.mp4",
+        failureCode: null,
+        resumed: true,
+        outcome: "deferred",
+        previousStoragePath: null,
+      });
+    const outcome = await startMatchVideoUpload(START);
+    expect(outcome.ok).toBe(true);
+    expect(mockReserveRow).toHaveBeenCalledTimes(2);
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+    expect(mockFinalizeRow).not.toHaveBeenCalled();
+    expect(mockWriteMatchVideoRow).toHaveBeenCalledWith(expect.objectContaining({ storagePath: START.storagePath }));
   });
 });

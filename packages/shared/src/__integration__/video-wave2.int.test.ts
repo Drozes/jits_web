@@ -163,7 +163,17 @@ describe.skipIf(!ENABLED)("OTA wave 2 against a local stack (jits-n2im.11/.12/.1
   let b: Athlete;
   let slicer: Awaited<ReturnType<typeof startSlicer>>;
 
+  /** Vault secrets this suite overrides, with their prior values, restored in afterAll. */
+  const SECRETS = ["app.settings.video_slicer_url", "app.settings.video_upload_daily_cap"];
+  const priorSecrets = new Map<string, string>();
+  let priorUploadFlag = "";
+
   beforeAll(async () => {
+    for (const name of SECRETS) {
+      const v = sql(`SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = '${name}';`);
+      if (v !== "") priorSecrets.set(name, v);
+    }
+    priorUploadFlag = sql(`SELECT enabled FROM feature_flags WHERE key = 'video_upload_enabled';`);
     slicer = await startSlicer();
     admin = createClient<Database>(URL_, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
     // Uploads on, a high cap, and a slicer URL that reaches this process.
@@ -177,7 +187,16 @@ describe.skipIf(!ENABLED)("OTA wave 2 against a local stack (jits-n2im.11/.12/.1
   });
 
   afterAll(async () => {
-    sql(`DELETE FROM vault.secrets WHERE name IN ('app.settings.video_slicer_url', 'app.settings.video_upload_daily_cap');`);
+    // Put the stack back the way it was: the secrets this suite replaced
+    // (or none, if there were none) and the upload flag.
+    const lit = (v: string) => `'${v.replace(/'/g, "''")}'`;
+    sql(
+      `DELETE FROM vault.secrets WHERE name IN (${SECRETS.map(lit).join(", ")});` +
+        [...priorSecrets].map(([name, value]) => `SELECT vault.create_secret(${lit(value)}, ${lit(name)});`).join("\n"),
+    );
+    if (priorUploadFlag === "t" || priorUploadFlag === "f") {
+      sql(`UPDATE feature_flags SET enabled = ${priorUploadFlag === "t"} WHERE key = 'video_upload_enabled';`);
+    }
     await a?.client.removeAllChannels();
     await b?.client.removeAllChannels();
     slicer?.close();

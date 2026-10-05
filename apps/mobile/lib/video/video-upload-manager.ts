@@ -8,6 +8,7 @@ import {
   finalizeMatchVideoRow,
   getRecordingSize,
   preflightMatchVideoUpload,
+  readMatchVideoKey,
   removeUploadedObject,
   reserveMatchVideoRow,
   touchMatchVideoRow,
@@ -1011,6 +1012,25 @@ async function resolvePendingAbandon(rec: PendingAbandon): Promise<void> {
   }
 }
 
+/**
+ * A RETRIED abandon first checks the row still points at the saved key
+ * (review R2-m1): a newer recording on the same match may have re-pathed
+ * that row to its own reservation since, and abandoning by id would fail
+ * the NEW upload. A moved or vanished row drops the record; an unreadable
+ * one keeps it for the next sweep.
+ */
+async function retryPendingAbandon(rec: PendingAbandon): Promise<void> {
+  if (abandonsInFlight.has(rec.videoId)) return;
+  const key = await readMatchVideoKey(rec.videoId);
+  if (key === undefined) return;
+  if (key === null || key !== rec.storagePath) {
+    console.warn(`[video] pending abandon of ${rec.videoId} skipped: the row ${key === null ? "is gone" : "moved to another recording"}`);
+    await removePendingAbandon(rec.videoId);
+    return;
+  }
+  await resolvePendingAbandon(rec);
+}
+
 /** Retry this athlete's unanswered abandons (fire and forget, from the resume sweep). */
 async function retryPendingAbandons(): Promise<void> {
   const mine = owner;
@@ -1022,7 +1042,7 @@ async function retryPendingAbandons(): Promise<void> {
       await removePendingAbandon(rec.videoId);
       continue;
     }
-    void resolvePendingAbandon(rec);
+    void retryPendingAbandon(rec);
   }
 }
 

@@ -115,10 +115,11 @@ describe("reserveMatchVideoUpload", () => {
       ["uploaded_by", "A"],
       ["id", "OLD"],
       ["storage_path", "M/A/0.mp4"],
+      ["status", "uploading"],
     ]);
   });
 
-  it("on 23505 takes an ABANDONED row over (free re-path)", async () => {
+  it("on 23505 takes an ABANDONED row over (free re-path), guarded on the abandon code", async () => {
     const { sb, calls } = client([
       DUP,
       { data: { ...ROW, id: "OLD", status: "failed", failure_code: "upload_abandoned", storage_path: "M/A/0.mp4" }, error: null },
@@ -127,6 +128,28 @@ describe("reserveMatchVideoUpload", () => {
     const res = await reserveMatchVideoUpload(sb, RESERVE);
     expect(res.ok && res.data.outcome).toBe("reserved");
     expect(calls.some((c) => c.op === "update")).toBe(true);
+    const eqs = calls.filter((c) => c.op === "eq").map((c) => c.args);
+    expect(eqs).toContainEqual(["status", "failed"]);
+    expect(eqs).toContainEqual(["failure_code", "upload_abandoned"]);
+  });
+
+  it("R2-M1: a row the trigger flipped to 'ready' between the read and the PATCH is never taken over; the retry defers", async () => {
+    // Attempt 1: the read says 'uploading', but by the PATCH the row is
+    // 'ready' at the same key, so the status-guarded PATCH matches nothing.
+    const first = client([
+      DUP,
+      { data: { ...ROW, id: "R", status: "uploading", storage_path: "M/A/0.mp4" }, error: null },
+      { data: null, error: null },
+    ]);
+    const r1 = await reserveMatchVideoUpload(first.sb, RESERVE);
+    expect(r1.ok).toBe(false);
+    expect(first.calls.filter((c) => c.op === "eq").map((c) => c.args)).toContainEqual(["status", "uploading"]);
+    // The caller's retry re-reads: now 'ready' (it has bytes), so it defers
+    // with no takeover and no key to delete.
+    const retry = client([DUP, { data: { ...ROW, id: "R", status: "ready", storage_path: "M/A/0.mp4" }, error: null }]);
+    const r2 = await reserveMatchVideoUpload(retry.sb, RESERVE);
+    expect(r2.ok && r2.data).toMatchObject({ outcome: "deferred", id: "R", previousStoragePath: null });
+    expect(retry.calls.some((c) => c.op === "update")).toBe(false);
   });
 
   it("B1: on 23505 NEVER re-paths a row that already has bytes; it defers", async () => {
