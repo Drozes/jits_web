@@ -918,8 +918,10 @@
       "sources": [
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/match/**",
+        "apps/mobile/components/film-room/angle-switcher.tsx",
         "apps/mobile/components/layout/app-header.tsx",
         "apps/mobile/components/layout/header-live-dot.tsx",
+        "apps/mobile/components/match-detail/film-angles.tsx",
         "apps/mobile/components/match-flow/faceoff/faceoff-context.tsx",
         "apps/mobile/components/match-flow/faceoff/faceoff-top.tsx",
         "apps/mobile/components/match-flow/fight/**",
@@ -943,6 +945,7 @@
         "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/components/ui/toast.tsx",
         "apps/mobile/lib/arena/constants.ts",
+        "apps/mobile/lib/film-room/format.ts",
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/match-flow/use-verdict-data.ts",
