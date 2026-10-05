@@ -753,8 +753,17 @@ describe("the verdict Film block (jits-n2im.25): the same plate as match detail"
     expect(s.getByText("Watch film")).toBeTruthy();
   });
 
-  it("a processing angle is NOT a reason to offer Watch film when the status is known", async () => {
-    mockDetailView.mockResolvedValue({ ok: true, data: { videos: [{ id: "v1", poster_url: null, playability: "playable" }] } });
+  it("Watch film as soon as an angle has playable bytes, before its analysis (rule 4 reads playable)", async () => {
+    const status = fx.statusFixture({ angles: [fx.angle("me", "processing"), fx.angle("opp", "uploading")] });
+    const view = deriveFilmStatus({ status, viewerId: fx.ME, local: null, nowMs: fx.NOW, clockOffsetMs: 0, playable: new Map([[fx.V_ME, 271]]) });
+    filmMock.setMockFilmStatus({ status, view });
+    const s = renderVerdict();
+    await flush();
+    expect(s.getByText("Watch film")).toBeTruthy();
+    expect(s.getByText("ANALYZING")).toBeTruthy();
+  });
+
+  it("an angle still merging (no playable bytes) is not a reason to offer Watch film", async () => {
     filmMock.setMockFilmStatus(derive({ angles: [fx.angle("me", "processing"), fx.angle("opp", "uploading")] }));
     const s = renderVerdict();
     await flush();

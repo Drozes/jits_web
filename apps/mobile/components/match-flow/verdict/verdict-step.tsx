@@ -152,7 +152,7 @@ export function VerdictStep(props: VerdictStepProps) {
   // The Film block (jits-n2im.25): the same plate and strings as match
   // detail. It replaces the upload card, the angle rows and the highlight
   // note; the wave 2 pieces stand in only while the status is unavailable.
-  const filmStatus = useFilmStatus(matchId, me.athlete_id);
+  const filmStatus = useFilmStatus(matchId, me.athlete_id, videos.playable);
   const fsView = filmStatus.view;
   useSuppressUploadStrip({ kind: "match", matchId });
   const rank = useRankChange(matchId, win);
@@ -192,8 +192,9 @@ export function VerdictStep(props: VerdictStepProps) {
   // offers playback of an angle that is not ready. "Open match" (always
   // enabled: the match page has the upload card and its Try again) until an
   // angle can play, then "Watch film".
-  // With the status in hand, "ready" is the bar (rule 4), as on the plate.
-  const canWatch = fsView ? fsView.readyVideoIds.length > 0 : videos.hasPlayable;
+  // Rule 4 reads PLAYABLE (coordinator 2026-10-05): Watch film as soon as an
+  // angle has bytes the player can open, the same set the Film block plays.
+  const canWatch = fsView ? fsView.playableVideoIds.length > 0 : videos.hasPlayable;
   const watchLabel = canWatch ? "Watch film" : "Open match";
   const uploadActions = useUploadActions(matchId);
   const watch = () => router.push(matchDetailHref(matchId));

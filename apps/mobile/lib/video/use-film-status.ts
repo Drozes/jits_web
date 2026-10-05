@@ -51,7 +51,12 @@ function useTicker(active: boolean): number {
  * upload job for the viewer's own angle, derived once into the
  * `FilmStatusView` every surface renders.
  */
-export function useFilmStatus(matchId: string | null | undefined, viewerId: string | null | undefined): FilmStatusResult {
+export function useFilmStatus(
+  matchId: string | null | undefined,
+  viewerId: string | null | undefined,
+  /** Playable angles from the playback query (video id -> duration s), when the screen has them. */
+  playable: ReadonlyMap<string, number | null> | null = null,
+): FilmStatusResult {
   const { status, error, loading, clockOffsetMs, refetch } = useMatchVideoStatus(
     supabase,
     viewerId && matchId ? matchId : null,
@@ -79,9 +84,10 @@ export function useFilmStatus(matchId: string | null | undefined, viewerId: stri
             nowMs: now,
             clockOffsetMs,
             backgroundUpload: isBackgroundUploadSupported(),
+            playable,
           })
         : null,
-    [status, viewerId, local, now, clockOffsetMs],
+    [status, viewerId, local, now, clockOffsetMs, playable],
   );
 
   return { view, status, error, loading, localUpload: entry, refetch };

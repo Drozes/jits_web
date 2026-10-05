@@ -900,16 +900,17 @@ describe("the Film status plate (jits-n2im.25) and the video pushes landing on i
     expect(utils.queryByTestId("film-angles")).toBeNull();
   });
 
-  it("only a READY angle plays: hero, switcher and rows follow the status (rule 4)", async () => {
-    filmMock.setMockFilmStatus(
-      derive({ phase: "building", phase_reason: null, angles: [fx.angle("me", "processing", { video_id: "v-mine" }), fx.angle("opp", "ready", { video_id: "v-opp" })] }),
-    );
+  it("playback follows the playable bytes, not the analysis: an analysing angle plays from the hero, rows and switcher", async () => {
+    // The screen passes its own playable set to useFilmStatus; the mock
+    // stands in with the view that set produces.
+    const status = fx.statusFixture({ phase: "building", phase_reason: null, angles: [fx.angle("me", "processing", { video_id: "v-mine" }), fx.angle("opp", "ready", { video_id: "v-opp" })] });
+    const fsView = deriveFilmStatus({ status, viewerId: fx.ME, local: null, nowMs: fx.NOW, clockOffsetMs: 0, playable: new Map([["v-mine", 300], ["v-opp", 280]]) });
+    filmMock.setMockFilmStatus({ status, view: fsView });
     const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO })] }));
-    // The opponent's ready angle is the plate's one Watch row; mine is processing.
+    expect(utils.getByTestId("match-video-watch-v-mine").props.accessibilityLabel).toBe("Watch your recording");
     expect(utils.getByTestId("match-video-watch-v-opp").props.accessibilityLabel).toBe("Watch Demo Red's recording");
-    expect(utils.queryByTestId("match-video-watch-v-mine")).toBeNull();
-    // With one ready angle there is nothing to switch to.
-    expect(utils.queryByTestId("angle-switcher")).toBeNull();
+    expect(utils.getByText("ANALYZING")).toBeTruthy();
+    expect(utils.getByTestId("angle-switcher")).toBeTruthy();
   });
 
   it("the timekeeper, refused by get_match_details, gets the plate alone (timekeeper_film_ready lands here)", async () => {

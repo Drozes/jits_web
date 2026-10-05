@@ -58,13 +58,20 @@ export default function MatchDetailScreen() {
   // The canonical Film status (jits-n2im.25). Until it has loaded, or if
   // the status read fails, the wave 2 rows below stand in.
   const { athlete } = useAuth();
-  const filmStatus = useFilmStatus(matchId, athlete?.id);
+  // Playability is the playback query's (wave 2 `angleWatchable`): an angle
+  // plays once it has bytes, whatever its analysis is doing.
+  const playable = React.useMemo(
+    () => (state === "ready" && data ? new Map(data.videos.filter(angleWatchable).map((v) => [v.id, v.duration_seconds])) : null),
+    [state, data],
+  );
+  const filmStatus = useFilmStatus(matchId, athlete?.id, playable);
   const fsView = filmStatus.view;
   // The wave 2 film rows stand in when the status could not be read.
   const legacyFilm = !fsView && !filmStatus.loading;
   useSuppressUploadStrip(matchId ? { kind: "match", matchId } : null);
-  // A newly ready angle brings a poster and a breakdown: re-read the match.
-  const readyKey = fsView ? fsView.readyVideoIds.join(",") : "";
+  // An angle the server newly calls ready (analysed) brings a poster and a
+  // breakdown: re-read the match.
+  const readyKey = filmStatus.status ? filmStatus.status.angles.filter((a) => a.state === "ready").map((a) => a.video_id).join(",") : "";
   const lastReady = React.useRef(readyKey);
   React.useEffect(() => {
     if (readyKey === lastReady.current) return;
@@ -99,10 +106,6 @@ export default function MatchDetailScreen() {
   const play = (videoId: string, t?: number) => router.push(videoHref(videoId, t));
   const active = film.active;
   const section = deriveFilmSection(film.localUpload, state === "ready" && data ? data.videos.length : 0);
-  // Deck rule 4: with the status in hand only a READY angle plays (hero,
-  // switcher, rows); without it, the wave 2 playability rule.
-  const readyIds = fsView ? new Set(fsView.readyVideoIds) : null;
-  const canPlay = (v: { id: string } & Parameters<typeof angleWatchable>[0]) => (readyIds ? readyIds.has(v.id) : angleWatchable(v));
   const rowWatchLabel = (row: FilmRow) => {
     const v = data?.videos.find((x) => x.id === row.videoId);
     return v ? watchLabel(v.angle_label) : `Watch ${row.label.toLowerCase()}`;
@@ -140,17 +143,16 @@ export default function MatchDetailScreen() {
             fallbackLabel={film.fallbackLabel}
             playHint={film.playHint}
             clockSeconds={data.match.duration_seconds}
-            onPlay={active && canPlay(active) ? () => play(active.id) : null}
+            onPlay={active && angleWatchable(active) ? () => play(active.id) : null}
           />
           <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 20 }}>
             <MatchVerdict view={data} />
             {fsView ? (
               <FilmStatusPlate matchId={data.match.id} view={fsView} onWatch={(id) => play(id)} watchLabel={rowWatchLabel} />
             ) : null}
-            {/* Deck rule 4: only ready angles, hidden under two. */}
-            {(readyIds ? readyIds.size >= 2 : data.videos.length > 1) && active ? (
+            {data.videos.length > 1 && active ? (
               <AngleSwitcher
-                angles={readyIds ? data.videos.map((v) => ({ ...v, playability: readyIds.has(v.id) ? "playable" : "processing" })) : data.videos}
+                angles={data.videos}
                 activeId={active.id}
                 opponentName={data.opponent?.display_name}
                 onSelect={film.setActiveId}

@@ -292,9 +292,9 @@ describe("Best angle (deck 13)", () => {
 });
 
 describe("contradiction rules", () => {
-  it("rule 4: only ready angles are watchable", () => {
+  it("rule 4 without the playback read: ready and no-match angles play, nothing still processing", () => {
     const v = view({ angles: [angle("me", "processing"), angle("opp", "ready"), angle("tk", "uploading")] });
-    expect(v.readyVideoIds).toEqual([V_OPP]);
+    expect(v.playableVideoIds).toEqual([V_OPP]);
     expect(v.rows.filter((r) => r.watchable).map((r) => r.videoId)).toEqual([V_OPP]);
   });
   it("rule 3: {n} equals the ready, used rows", () => {
@@ -326,3 +326,49 @@ describe("formatLocalTime ({until})", () => {
 });
 
 void OPP;
+
+describe("playability is PLAYABLE, not analysed (coordinator decision 2026-10-05, deck 14)", () => {
+  const playable = (entries: [string, number | null][]) => new Map(entries);
+
+  it("an analysing angle with playable bytes plays at once, tagged Analyzing", () => {
+    const v = view({ angles: [angle("me", "processing"), angle("opp", "processing")] }, { playable: playable([[V_ME, 271], [V_OPP, null]]) });
+    expect(row(v, "Your angle")).toMatchObject({ tag: "Analyzing", tone: "waiting", watchable: true, duration: "4:31" });
+    expect(row(v, "D. Okafor's angle")).toMatchObject({ tag: "Analyzing", watchable: true });
+    expect(v.playableVideoIds).toEqual([V_ME, V_OPP]);
+  });
+
+  it("a processing angle the playback query cannot open (still merging) stays Processing, not watchable", () => {
+    const v = view({ angles: [angle("me", "processing"), angle("opp", "processing")] }, { playable: playable([[V_ME, 271]]) });
+    expect(row(v, "D. Okafor's angle")).toMatchObject({ tag: "Processing", watchable: false });
+  });
+
+  it("a pipeline failure on a playable file: Analysis failed, may still play (grey, never red), and it plays", () => {
+    const v = view({ angles: [angle("me", "failed"), angle("opp", "failed")] }, { playable: playable([[V_ME, 200], [V_OPP, 190]]) });
+    expect(row(v, "Your angle")).toMatchObject({ tag: "Analysis failed · may still play", tone: "info", watchable: true });
+    expect(row(v, "D. Okafor's angle")).toMatchObject({ tag: "Analysis failed · may still play", tone: "info", watchable: true, helper: "This clip couldn't be processed." });
+  });
+
+  it("a pipeline failure with no playable file stays Not used", () => {
+    const v = view({ angles: [angle("me", "ready"), angle("opp", "failed")] }, { playable: playable([[V_ME, 271]]) });
+    expect(row(v, "D. Okafor's angle")).toMatchObject({ tag: "Not used", watchable: false });
+  });
+
+  it("a no-match angle still plays", () => {
+    expect(row(view({ angles: [angle("me", "no_match"), angle("opp", "processing")] }), "Your angle")).toMatchObject({ tag: "Not used", watchable: true });
+  });
+
+  it("an analysing angle that plays ends the local job's say over Your angle (wave 2)", () => {
+    const v = view({ angles: [angle("me", "processing"), angle("opp", "uploading")] }, { playable: playable([[V_ME, 271]]), local: local({ status: "uploading" }) });
+    expect(row(v, "Your angle")).toMatchObject({ tag: "Analyzing", watchable: true });
+  });
+
+  it("Best angle counts playable angles, analysed or not", () => {
+    const v = view({ angles: [angle("me", "processing"), angle("opp", "ready", { is_primary: true })] }, { playable: playable([[V_ME, 271]]) });
+    expect(v.bestVideoId).toBe(V_OPP);
+  });
+
+  it("the verdict CTA set (playableVideoIds) is the same set the rows play", () => {
+    const v = view({ angles: [angle("me", "processing"), angle("opp", "uploading")] }, { playable: playable([[V_ME, 271]]) });
+    expect(v.playableVideoIds).toEqual([V_ME]);
+  });
+});

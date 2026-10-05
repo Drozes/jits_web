@@ -395,7 +395,7 @@ the match opens on and which one the breakdown is timed to.
 | Tag on the angle's chip in the angle switcher (full-screen player and match detail) | `Best angle` | A second line under the chip label, mono 10 caps, `ink-2` on the page / `ON_MEDIA.text2` over video (the selected chip uses its own selected ink). The chip stays 44 px. |
 | Accessibility | `Best angle` | Appended to the element's label: `D. OKAFOR'S ANGLE, Best angle` (chip), `Watch Demo Red's recording, Best angle` (row). |
 
-Shown only when **2+ angles are ready (playable)** and the server has elected a primary among them.
+Shown only when **2+ angles are playable** (section 14, item 6) and the server has elected a primary among them.
 One ready angle, no election (the multi-angle flag is off, so prod elects none today), or a primary
 that is not ready yet: no marker anywhere. The marker never moves with the athlete's own selection;
 the selection is the switcher's selected state.
@@ -420,3 +420,24 @@ derives the one view every surface renders.
    upload` state is not shown (the store's `pending` entry also means "recording started").
 5. **The timekeeper's match page** is the plate alone (`get_match_details` refuses the timekeeper;
    the status RPC admits them), titled with the two competitors' short names.
+6. **Rule 4 reads PLAYABLE, not analysed (coordinator decision 2026-10-05).** An angle is watchable
+   as soon as the playback query can open its bytes (the shipped `angleWatchable` rule: a
+   normalized or original file, whether the angle is ready, sliced, analysing, analysed, or
+   pipeline-failed with the file still there). Analysis never gates playback. This applies to the
+   match detail hero, the plate's rows, the angle switcher and the verdict CTA (`Open match` until an
+   angle is playable, then `Watch film`). Row tags keep the shipped distinctions:
+   | Server state | Playable | Tag | Class |
+   |---|---|---|---|
+   | processing | yes | `Analyzing` | waiting (it plays: duration and chevron) |
+   | processing | no (still merging) | `Processing` | waiting |
+   | ready | yes | `Ready to watch` | done |
+   | failed (pipeline) | yes | `Analysis failed · may still play` | info (grey, never red) |
+   | failed (pipeline) | no file | `Not used` | info |
+   | no_match | yes | `Not used` (with its helper) | info |
+   The playable set comes from `get_match_details` (match detail and verdict). Where the status is
+   read alone (the timekeeper's page, or before that read lands), only ready and no-match angles
+   count as playable.
+7. **Upload strip placement (coordinator decision 2026-10-05).** The strip is also hidden on the
+   full-screen players (the match video player and the highlight viewer). On a pushed screen the
+   strip pads the bottom safe area itself and the screen above it is given a bottom inset of 0, so
+   the safe area is never padded twice.

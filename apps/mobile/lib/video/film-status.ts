@@ -60,7 +60,11 @@ export interface FilmRow {
   percent: number | null;
   /** "4:31" on a ready angle. */
   duration: string | null;
-  /** Only a ready angle plays (deck rule 4). */
+  /**
+   * The angle has playable bytes (deck rule 4, read as PLAYABLE, coordinator
+   * 2026-10-05): ready or no-match, or an analysing / pipeline-failed angle
+   * whose file the playback query can sign. Analysis never gates playback.
+   */
   watchable: boolean;
   action: FilmRowAction;
 }
@@ -82,8 +86,8 @@ export interface FilmStatusView {
   helper: string | null;
   countdown: FilmCountdown | null;
   rows: FilmRow[];
-  /** Video ids of the ready angles: the only ones anything may play. */
-  readyVideoIds: string[];
+  /** Video ids of the playable angles: the only ones anything may play. */
+  playableVideoIds: string[];
   bestVideoId: string | null;
   fusionLive: boolean;
 }
@@ -99,6 +103,14 @@ export interface FilmStatusInput {
   clockOffsetMs: number;
   /** "Keep ELO RATED open" vs "keeps uploading" (jits-n2im.1 / .9). */
   backgroundUpload?: boolean;
+  /**
+   * The angles the playback query can play (`angleWatchable` on the
+   * `get_match_details` rows), video id -> duration in seconds. Without it
+   * (the timekeeper, or before that read lands) only ready and no-match
+   * angles count as playable: the status alone cannot tell an analysing
+   * file from one still merging.
+   */
+  playable?: ReadonlyMap<string, number | null> | null;
 }
 
 const PENDING: ReadonlySet<MatchVideoAngleState> = new Set(["waiting_for_phone", "uploading", "upload_paused", "processing"]);
@@ -158,6 +170,15 @@ interface Ctx {
   nowMs: number;
   keepOpen: string;
   visible: MatchVideoAngle[];
+  playable: ReadonlyMap<string, number | null> | null;
+}
+
+/** The angle has bytes the player can open (see `FilmRow.watchable`). */
+function canPlay(a: MatchVideoAngle, c: Pick<Ctx, "playable">): boolean {
+  if (!a.video_id) return false;
+  if (a.state === "ready" || a.state === "no_match") return true;
+  if (a.state !== "processing" && a.state !== "failed") return false;
+  return c.playable?.has(a.video_id) ?? false;
 }
 
 function nameOf(a: MatchVideoAngle): string {
@@ -228,16 +249,18 @@ function mineServerRow(a: MatchVideoAngle, c: Ctx): RowBody {
     case "abandoned":
       return body(ROW_TAG.didntUpload, "info", ROW_HELPER.didntFinishThere);
     case "processing":
-      return body(ROW_TAG.processing, "waiting");
+      // Bytes in, analysis running: it already plays (wave 2 "Analyzing").
+      return canPlay(a, c) ? body(ROW_TAG.analyzing, "waiting") : body(ROW_TAG.processing, "waiting");
     case "ready":
       return body(ROW_TAG.ready, "done");
     case "no_match":
       return body(ROW_TAG.notUsed, "info", ROW_HELPER.noMatchMine);
     default: {
-      // failed (pipeline)
-      if (c.role === "timekeeper") return body(ROW_TAG.notUsed, "info", ROW_HELPER.timekeeperFailed);
+      // failed (pipeline): the file may still play; grey either way (0.6).
+      const tag = canPlay(a, c) ? ROW_TAG.analysisFailed : ROW_TAG.notUsed;
+      if (c.role === "timekeeper") return body(tag, "info", ROW_HELPER.timekeeperFailed);
       const other = c.visible.find((b) => b !== a && b.state === "ready");
-      return body(ROW_TAG.notUsed, "info", other ? ROW_HELPER.mineFailedUsesOther(nameOf(other) || ANGLE_LABEL.fallback) : ROW_HELPER.mineFailedNothing);
+      return body(tag, "info", other ? ROW_HELPER.mineFailedUsesOther(nameOf(other) || ANGLE_LABEL.fallback) : ROW_HELPER.mineFailedNothing);
     }
   }
 }
@@ -268,13 +291,13 @@ function otherRow(a: MatchVideoAngle, c: Ctx): RowBody {
     case "upload_paused":
       return pendingClosed() ?? body(ROW_TAG.paused, "waiting", after ? afterHelper(false) : ROW_HELPER.quiet(name), { paused: true });
     case "processing":
-      return body(ROW_TAG.processing, "waiting", after && !closed ? afterHelper(true) : null);
+      return body(canPlay(a, c) ? ROW_TAG.analyzing : ROW_TAG.processing, "waiting", after && !closed ? afterHelper(true) : null);
     case "ready":
       return body(ROW_TAG.ready, "done");
     case "no_match":
       return body(ROW_TAG.notUsed, "info", ROW_HELPER.noMatchOther);
     case "failed":
-      return body(ROW_TAG.notUsed, "info", ROW_HELPER.otherFailed);
+      return body(canPlay(a, c) ? ROW_TAG.analysisFailed : ROW_TAG.notUsed, "info", ROW_HELPER.otherFailed);
     default: {
       // abandoned: grey, never red on someone else's angle (deck 0.5).
       if (tk) return body(ROW_TAG.didntUpload, "info");
@@ -296,16 +319,17 @@ function buildRows(c: Ctx): FilmRow[] {
     ...others.filter((a) => a.role !== "timekeeper"),
     ...others.filter((a) => a.role === "timekeeper"),
   ];
-  const ready = c.visible.filter((a) => a.state === "ready" && a.video_id);
-  const bestId = ready.length >= 2 ? (ready.find((a) => a.is_primary)?.video_id ?? null) : null;
+  const playable = c.visible.filter((a) => canPlay(a, c));
+  const bestId = playable.length >= 2 ? (playable.find((a) => a.is_primary)?.video_id ?? null) : null;
 
   const rows: FilmRow[] = ordered.map((a) => {
     const isMine = a.recorder_athlete_id === c.viewerId;
-    // The local job wins while it exists, unless the server already has the
-    // angle ready (a row that plays keeps saying what it is).
-    const useLocal = isMine && c.local != null && a.state !== "ready";
+    // The local job wins while it exists, unless the angle already plays
+    // (a row that plays keeps saying what it is, as in wave 2).
+    const plays = canPlay(a, c);
+    const useLocal = isMine && c.local != null && !plays;
     const b = useLocal ? localRow(c.local!, c.keepOpen) : isMine ? mineServerRow(a, c) : otherRow(a, c);
-    const watchable = !useLocal && a.state === "ready" && !!a.video_id;
+    const watchable = !useLocal && plays;
     return {
       key: a.video_id ?? `angle-${a.recorder_athlete_id}`,
       videoId: a.video_id,
@@ -318,7 +342,7 @@ function buildRows(c: Ctx): FilmRow[] {
       glyph: toneGlyph(b.tone, b.paused),
       helper: b.helper,
       percent: b.percent,
-      duration: watchable ? formatVideoDuration(a.duration_s) : null,
+      duration: watchable ? formatVideoDuration(a.duration_s ?? (a.video_id ? c.playable?.get(a.video_id) : null)) : null,
       watchable,
       action: b.action,
     };
@@ -490,6 +514,7 @@ export function deriveFilmStatus(input: FilmStatusInput): FilmStatusView {
     keepOpen: keepOpenCopy(input.backgroundUpload ?? false),
     // `not_recording` rows are never drawn (deck 1).
     visible: s.angles.filter((a) => a.state !== "not_recording"),
+    playable: input.playable ?? null,
   };
   const ph = derivePhase(c);
   const rows = buildRows(c);
@@ -503,7 +528,7 @@ export function deriveFilmStatus(input: FilmStatusInput): FilmStatusView {
     helper: ph.helper,
     countdown: ph.countdown,
     rows,
-    readyVideoIds: rows.filter((r) => r.watchable && r.videoId).map((r) => r.videoId!),
+    playableVideoIds: rows.filter((r) => r.watchable && r.videoId).map((r) => r.videoId!),
     bestVideoId: rows.find((r) => r.best)?.videoId ?? null,
     fusionLive: c.fusion,
   };

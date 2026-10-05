@@ -109,7 +109,11 @@ export const ROW_TAG = {
   paused: "Paused",
   didntUpload: "Didn't upload",
   processing: "Processing",
+  /** Bytes in, analysis running: it plays (wave 2 tag). */
+  analyzing: "Analyzing",
   ready: "Ready to watch",
+  /** A pipeline failure on a file that still plays (wave 2 tag). */
+  analysisFailed: "Analysis failed · may still play",
   notUsed: "Not used",
   waitingYourPhone: "Waiting for your phone",
   waitingTheirPhone: "Waiting for their phone",
@@ -198,6 +202,8 @@ const ROW_ANNOUNCE: Record<string, string> = {
   [ROW_TAG.paused]: "is paused",
   [ROW_TAG.didntUpload]: "didn't upload",
   [ROW_TAG.processing]: "is processing",
+  [ROW_TAG.analyzing]: "is being analyzed",
+  [ROW_TAG.analysisFailed]: "couldn't be analyzed but may still play",
   [ROW_TAG.ready]: "is ready to watch",
   [ROW_TAG.notUsed]: "wasn't used",
   [ROW_TAG.waitingYourPhone]: "is waiting for your phone",
