@@ -7,6 +7,18 @@ import type { MatchUploadEntry } from "./match-upload-store";
  * `upload-errors.ts`.
  */
 
+/**
+ * The card's tags (deck section 3, upload strip column; rendered in mono
+ * caps). "Didn't upload" is the one label for the viewer's own failed
+ * upload on every surface (deck m3).
+ */
+export const UPLOAD_TAG = {
+  stopping: "Finishing recording",
+  uploading: "Uploading match video",
+  paused: "Upload paused",
+  failed: "Didn't upload",
+} as const;
+
 /** "Keep the app open" while uploading (jits-n2im.1). */
 export function keepOpenCopy(backgroundUploadSupported: boolean): string {
   return backgroundUploadSupported
@@ -39,7 +51,7 @@ export function uploadingLabel(progress: number | null): string {
  *
  *   uploading  "UPLOADING 42% · STILL ARRIVES AFTER UPLOAD"
  *   paused     "UPLOAD PAUSED · 42%"
- *   failed     "UPLOAD FAILED"
+ *   failed     "DIDN'T UPLOAD"
  *   landed, or the server has a video without a still yet: "PROCESSING FILM"
  *              (never "after upload" once the bytes are in)
  *   nothing    the surface's own "no film" caption
@@ -58,20 +70,10 @@ export function filmStillCaption(
       return p ? `UPLOAD PAUSED · ${p}` : "UPLOAD PAUSED";
     }
     case "error":
-      return hasServerVideo ? "PROCESSING FILM" : "UPLOAD FAILED";
+      return hasServerVideo ? "PROCESSING FILM" : "DIDN'T UPLOAD";
     case "uploaded":
       return "PROCESSING FILM";
     default:
       return hasServerVideo ? "PROCESSING FILM" : noFilm;
   }
-}
-
-/**
- * The verdict's "Watch film" label while it cannot be pressed yet, so a
- * disabled button always says why (jits-n2im.4 item 5).
- */
-export function watchFilmBusyLabel(kind: "stopping" | "uploading", progress: number | null): string {
-  if (kind === "stopping") return "Finishing recording…";
-  const p = pct(progress);
-  return p ? `Film uploading ${p}` : "Film uploading…";
 }

@@ -512,7 +512,8 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
     // videoId lived only on the recorder before, so the remount lost it and
     // the verdict offered no film for a video that exists in storage.
     await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
-    screen.getByText("Watch film");
+    // Open match until an angle can play (deck rule 4); never a dead end.
+    screen.getByText("Open match");
     expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(false);
   });
 
@@ -525,7 +526,7 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
 
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     await waitFor(() => expect(screen.getByText(/match video uploaded/i)).toBeTruthy());
-    screen.getByText("Watch film");
+    screen.getByText("Open match");
   });
 });
 
@@ -573,8 +574,8 @@ describe("an upload that finishes LATE still reaches the summary", () => {
     await completeMatch();
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     screen.getByText(/uploading match video/i);
-    // Pending, not a dead link: Watch film waits for the id.
-    expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(true);
+    // Open match works throughout: the match page shows the upload card.
+    expect(screen.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(false);
 
     // NOW the upload lands, long after the recorder that started it.
     await act(async () => {

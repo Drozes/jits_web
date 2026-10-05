@@ -44,10 +44,32 @@ interface RunStats {
   backgroundedCount: number;
   backgroundedMs: number;
   backgroundedAt: number | null;
-  limitReported: boolean;
 }
 
 const runs = new Map<string, RunStats>();
+/**
+ * Matches whose daily-limit rejection was already reported in this process
+ * (m4). Module-level, not per run: every foreground or reconnect resume of
+ * a limited job starts a new run, and each used to report again.
+ */
+const limitReported = new Set<string>();
+
+/** Longest raw cause kept in telemetry. */
+export const RAW_MAX_CHARS = 300;
+
+/**
+ * Raw causes go to telemetry only, and even there without the parts that
+ * identify a transfer (m5): tus `DetailedError` text embeds the resumable
+ * upload URL and the server's response text. URLs become `<url>`, response
+ * bodies are cut, and the rest is bounded.
+ */
+export function scrubRaw(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  return raw
+    .replace(/https?:\/\/\S+/g, "<url>")
+    .replace(/response text:[\s\S]*$/i, "response text: <omitted>")
+    .slice(0, RAW_MAX_CHARS);
+}
 let appStateBound = false;
 let appStateSub: { remove?: () => void } | null = null;
 
@@ -107,7 +129,6 @@ export function trackRunStart(info: RunInfo): void {
     backgroundedCount: 0,
     backgroundedMs: 0,
     backgroundedAt: AppState.currentState === "background" ? Date.now() : null,
-    limitReported: false,
   });
   crumb(`upload ${info.trigger}`, {
     matchId: info.matchId,
@@ -140,7 +161,7 @@ export function trackAttemptFailed(info: {
       status: info.status,
       httpClass: httpClassOf(info.status),
       class: info.klass,
-      raw: info.raw,
+      raw: scrubRaw(info.raw),
     },
     "warning",
   );
@@ -167,19 +188,18 @@ export function trackParked(info: {
   phase: "bytes" | "row";
   raw: string | null;
 }): void {
-  const stats = runs.get(info.matchId);
   const data = {
     matchId: info.matchId,
     reason: info.klass,
     httpClass: httpClassOf(info.status),
     status: info.status,
     phase: info.phase,
-    raw: info.raw,
+    raw: scrubRaw(info.raw),
   };
   crumb(`upload ${info.disposition}`, data, "warning");
 
-  if (info.klass === "limit" && stats && !stats.limitReported) {
-    stats.limitReported = true;
+  if (info.klass === "limit" && !limitReported.has(info.matchId)) {
+    limitReported.add(info.matchId);
     call("captureMessage", "Match video upload hit the daily limit", {
       level: "warning",
       tags: { "video.upload.outcome": "limit" },
@@ -241,6 +261,7 @@ export function trackRunDropped(matchId: string, why: string): void {
 /** Test-only reset. */
 export function __resetUploadTelemetry(): void {
   runs.clear();
+  limitReported.clear();
   appStateSub?.remove?.();
   appStateSub = null;
   appStateBound = false;

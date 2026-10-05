@@ -31,10 +31,11 @@ describe("estimateRecordingBytes", () => {
 });
 
 describe("recordingSpaceWarning", () => {
-  it("warns with what is free and what is needed", () => {
-    expect(recordingSpaceWarning(200 * 1024 * 1024, 600)).toBe(
-      "Low storage: 200 MB free, about 687 MB needed to record this match. Free up space, or the recording may stop early.",
-    );
+  it("says how much to free, in the deck's words, rounded up to a tenth of a GB", () => {
+    // Needs ~687 MB, has 200 MB: free ~0.45 GB, rounded up.
+    expect(recordingSpaceWarning(200 * 1024 * 1024, 600)).toBe("Not enough space on this phone to record. Free up 0.5 GB.");
+    // A 2-hour cap needs ~8 GB.
+    expect(recordingSpaceWarning(GB, 7200)).toBe("Not enough space on this phone to record. Free up 7.1 GB.");
   });
 
   it("says nothing when there is room, or when the read failed", () => {
@@ -47,7 +48,7 @@ describe("useRecordingSpaceWarning", () => {
   it("shows the warning when recording is on and the disk is short (mocked disk API)", async () => {
     mockFreeDisk.mockResolvedValue(100 * 1024 * 1024);
     const { result } = renderHook(() => useRecordingSpaceWarning(true, 600));
-    await waitFor(() => expect(result.current).toMatch(/^Low storage: 100 MB free/));
+    await waitFor(() => expect(result.current).toMatch(/^Not enough space on this phone to record\. Free up 0\.6 GB\.$/));
   });
 
   it("does not read the disk while recording is off", () => {

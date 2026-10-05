@@ -15,6 +15,7 @@ const mockSetSentryTag = jest.fn();
 const mockResumeUploads = jest.fn(async () => undefined);
 const mockEnsureListeners = jest.fn(() => () => undefined);
 const mockSetUploadOwner = jest.fn();
+const mockStopUploads = jest.fn();
 const mockBindKeepAwake = jest.fn();
 const mockBindNotice = jest.fn();
 const mockStatus = { current: "active" as string };
@@ -34,6 +35,7 @@ jest.mock("@/lib/video/video-upload-manager", () => ({
   ensureUploadListeners: () => mockEnsureListeners(),
   resumeMatchVideoUploads: () => mockResumeUploads(),
   setUploadOwner: (id: string | null) => mockSetUploadOwner(id),
+  stopMatchVideoUploadsForSignOut: () => mockStopUploads(),
 }));
 
 jest.mock("@/lib/video/upload-keep-awake", () => ({
@@ -136,6 +138,25 @@ describe("upload scope and app-wide bindings (jits-n2im.1, .6)", () => {
     view.rerender(<VideoUploadBootstrap />);
     expect(mockSetUploadOwner).toHaveBeenLastCalledWith("b2");
     expect(mockResumeUploads).toHaveBeenCalledTimes(2);
+    // A's runners stop before B is scoped (m3).
+    expect(mockStopUploads).toHaveBeenCalledTimes(1);
+    expect(mockStopUploads.mock.invocationCallOrder[0]).toBeLessThan(mockSetUploadOwner.mock.invocationCallOrder[1]);
+  });
+
+  it("stops the uploads when the session ends without signOut() (m3)", () => {
+    mockAuth.current = { athlete: { id: "a1" } };
+    const view = render(<VideoUploadBootstrap />);
+    expect(mockStopUploads).not.toHaveBeenCalled();
+    mockAuth.current = { athlete: null };
+    view.rerender(<VideoUploadBootstrap />);
+    expect(mockStopUploads).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not stop anything on the first sign-in", () => {
+    const view = render(<VideoUploadBootstrap />);
+    mockAuth.current = { athlete: { id: "a1" } };
+    view.rerender(<VideoUploadBootstrap />);
+    expect(mockStopUploads).not.toHaveBeenCalled();
   });
 
   it("binds the upload keep-awake and the backgrounding notice once, signed in or not", () => {

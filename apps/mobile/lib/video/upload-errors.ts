@@ -71,31 +71,39 @@ export interface UploadFailureCopy {
 
 const RETENTION = `${UPLOAD_JOB_RETENTION_DAYS} days`;
 
+/**
+ * Strings follow the reviewed copy deck (design/native-screens/proposals/
+ * 2026-10-04-video-status/COPY-DECK.md, section 8). The tag above each
+ * helper ("Upload paused", "Didn't upload") already names the state, so a
+ * helper never repeats it. Classes the deck has no row for (auth refresh,
+ * daily limit, uploads off, not in cohort, save failed, unknown) keep this
+ * module's wording in the deck's voice, as the deck README says to.
+ */
 const COPY: Record<UploadErrorClass, Omit<UploadFailureCopy, "klass">> = {
   offline: {
     disposition: "paused",
     terminal: false,
-    message: "Upload paused: no connection. It picks up again when you're back online.",
+    message: "No connection right now. It picks up where it left off.",
   },
   server: {
     disposition: "paused",
     terminal: false,
-    message: "Upload paused: the server is busy. It will retry automatically.",
+    message: "Our server didn't answer. Trying again shortly.",
   },
   auth: {
     disposition: "paused",
     terminal: false,
-    message: "Upload paused while your sign-in refreshes. It will retry automatically.",
+    message: "Your sign-in is refreshing. Trying again shortly.",
   },
   not_allowed: {
     disposition: "failed",
     terminal: false,
-    message: `Upload failed: the server didn't accept this video. Tap Retry to try again. The recording stays on this phone for ${RETENTION}.`,
+    message: "The upload didn't finish.",
   },
   too_large: {
     disposition: "failed",
     terminal: true,
-    message: "This video is too large to upload (2 GB max).",
+    message: "This clip is too big to upload (2 GB max).",
   },
   limit: {
     disposition: "paused",
@@ -105,7 +113,7 @@ const COPY: Record<UploadErrorClass, Omit<UploadFailureCopy, "klass">> = {
   disabled: {
     disposition: "failed",
     terminal: false,
-    message: `Video uploads are turned off right now. Tap Retry later. The recording stays on this phone for ${RETENTION}.`,
+    message: `Video uploads are turned off right now. Try again later. The recording stays on this phone for ${RETENTION}.`,
   },
   not_in_cohort: {
     disposition: "failed",
@@ -115,24 +123,27 @@ const COPY: Record<UploadErrorClass, Omit<UploadFailureCopy, "klass">> = {
   reslice_limit: {
     disposition: "failed",
     terminal: true,
-    message: "This match's video was already replaced the maximum number of times, so this recording can't be uploaded.",
+    message: "This match can't take a video anymore.",
   },
   file_missing: {
     disposition: "failed",
     terminal: true,
-    message: "The recording is no longer on this phone, so it can't be uploaded.",
+    message: "The clip isn't on this phone anymore.",
   },
   save_failed: {
     disposition: "paused",
     terminal: false,
-    message: "Video uploaded, but it isn't attached to the match yet. It will retry automatically.",
+    message: "Video uploaded, but it isn't attached to the match yet. Trying again shortly.",
   },
   unknown: {
     disposition: "paused",
     terminal: false,
-    message: "Upload paused. It will retry automatically.",
+    message: "Trying again shortly.",
   },
 };
+
+/** Deck section 8: a Try again that failed again at once (also announced). */
+export const RETRY_FAILED_AGAIN_COPY = "Still can't upload. Check your connection.";
 
 export function describeUploadFailure(klass: UploadErrorClass): UploadFailureCopy {
   return { klass, ...COPY[klass] };

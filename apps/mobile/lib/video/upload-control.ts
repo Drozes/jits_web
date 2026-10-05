@@ -11,8 +11,11 @@
  * Before registration they are safe no-ops: nothing can be uploading if
  * the manager has never loaded.
  */
+/** Mirrors `RetryResult` in the manager (kept here so this file imports nothing). */
+export type RetryMatchUploadResult = "started" | "running" | "no_job" | "signed_out" | "other_athlete";
+
 export interface UploadControl {
-  retry: (matchId: string) => Promise<boolean>;
+  retry: (matchId: string) => Promise<RetryMatchUploadResult>;
   discard: (matchId: string) => Promise<boolean>;
   hasPending: () => Promise<boolean>;
   stopForSignOut: () => void;
@@ -25,8 +28,8 @@ export function registerUploadControl(control: UploadControl): void {
 }
 
 /** Run a paused or failed upload now (see `retryMatchVideoUpload`). */
-export function retryMatchUpload(matchId: string): Promise<boolean> {
-  return impl ? impl.retry(matchId) : Promise.resolve(false);
+export function retryMatchUpload(matchId: string): Promise<RetryMatchUploadResult> {
+  return impl ? impl.retry(matchId) : Promise.resolve("signed_out");
 }
 
 /** Drop a recording that can never upload (see `discardMatchVideoUpload`). */

@@ -19,11 +19,22 @@
 // ---- AsyncStorage: real persistence over an in-memory map ----
 
 const mockStore = new Map<string, string>();
+/** Lets a test hold one write open, to land something inside it. */
+const mockSetItemGate: { match: RegExp | null; wait: Promise<void> | null; reached: (() => void) | null } = {
+  match: null,
+  wait: null,
+  reached: null,
+};
 jest.mock("@react-native-async-storage/async-storage", () => ({
   __esModule: true,
   default: {
     getItem: async (key: string) => mockStore.get(key) ?? null,
     setItem: async (key: string, value: string) => {
+      if (mockSetItemGate.match?.test(value) && mockSetItemGate.wait) {
+        mockSetItemGate.match = null;
+        mockSetItemGate.reached?.();
+        await mockSetItemGate.wait;
+      }
       mockStore.set(key, value);
     },
     removeItem: async (key: string) => {
@@ -335,7 +346,7 @@ describe("retrying the byte upload", () => {
     // PAUSED, not failed (jits-n2im.3): it retries on its own.
     expect(getMatchUpload("M1")).toMatchObject({ status: "paused", errorClass: "offline" });
     // Friendly copy; the raw transport text is telemetry only (jits-n2im.5).
-    expect(getMatchUpload("M1")?.error).toMatch(/no connection/);
+    expect(getMatchUpload("M1")?.error).toBe("No connection right now. It picks up where it left off.");
     expect(getMatchUpload("M1")?.error).not.toMatch(/Network request failed/);
   });
 
@@ -425,7 +436,7 @@ describe("a failed match_videos write never destroys the uploaded bytes", () => 
     // THE POINT: the object stays in the bucket.
     expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
     expect(await loadUploadJob("M1")).toMatchObject({ phase: "row" });
-    expect(getMatchUpload("M1")?.error).toMatch(/retry automatically/);
+    expect(getMatchUpload("M1")?.error).toMatch(/Trying again shortly/);
   });
 
   it("says the row failure in friendly copy, never the server's text", async () => {
@@ -1033,7 +1044,7 @@ describe("retryMatchVideoUpload (jits-n2im.3)", () => {
     const started = await retryMatchVideoUpload("M1");
     await flush();
 
-    expect(started).toBe(true);
+    expect(started).toBe("started");
     expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
     expect(getMatchUpload("M1")).toMatchObject({ status: "uploaded", videoId: "VID-1" });
     expect(await loadUploadJob("M1")).toBeNull();
@@ -1060,7 +1071,7 @@ describe("retryMatchVideoUpload (jits-n2im.3)", () => {
     await flush();
     expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
 
-    expect(await retryMatchVideoUpload("M1")).toBe(true);
+    expect(await retryMatchVideoUpload("M1")).toBe("running");
     await flush();
     expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
 
@@ -1068,15 +1079,37 @@ describe("retryMatchVideoUpload (jits-n2im.3)", () => {
     await running;
   });
 
-  it("returns false for a match with no job", async () => {
-    expect(await retryMatchVideoUpload("NOPE")).toBe(false);
+  it("says why when there is no job for the match", async () => {
+    expect(await retryMatchVideoUpload("NOPE")).toBe("no_job");
     expect(mockUploadFileResumable).not.toHaveBeenCalled();
   });
 
   it("never runs another athlete's job", async () => {
     seedJob({ uploaderAthleteId: "OTHER" });
-    expect(await retryMatchVideoUpload("M1")).toBe(false);
+    expect(await retryMatchVideoUpload("M1")).toBe("other_athlete");
     expect(mockUploadFileResumable).not.toHaveBeenCalled();
+  });
+
+  it("says signed out when nobody is", async () => {
+    seedJob();
+    stopMatchVideoUploadsForSignOut();
+    expect(await retryMatchVideoUpload("M1")).toBe("signed_out");
+  });
+
+  it("a Try again that fails again says so (deck: Still can't upload)", async () => {
+    seedJob({ needsUser: true, errorClass: "not_allowed" });
+    mockUploadFileResumable.mockRejectedValue(httpError(403));
+    await retryMatchVideoUpload("M1");
+    for (let i = 0; i < 4; i++) await flush();
+    expect(getMatchUpload("M1")).toMatchObject({ status: "error", error: "Still can't upload. Check your connection." });
+  });
+
+  it("but a terminal cause found on a Try again keeps its own copy", async () => {
+    seedJob({ needsUser: true, errorClass: "not_allowed" });
+    mockUploadFileResumable.mockRejectedValue(httpError(413));
+    await retryMatchVideoUpload("M1");
+    for (let i = 0; i < 4; i++) await flush();
+    expect(getMatchUpload("M1")?.error).toBe("This clip is too big to upload (2 GB max).");
   });
 });
 
@@ -1417,5 +1450,86 @@ describe("upload telemetry (jits-n2im.7)", () => {
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
     expect(mockCaptureException.mock.calls[0][1]).toMatchObject({ errorClass: "save_failed", ageMs: expect.any(Number) });
     expect(mockCaptureMessage).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review fixes (REVIEW-m-upload.md m1, m2, m4, m5, m7)
+// ---------------------------------------------------------------------------
+
+describe("review fixes", () => {
+  it("m1: a run that loses its slot while parking never writes the wiped store", async () => {
+    // Hold the park's own write (the only one that sets needsUser: true)
+    // and sign out inside it.
+    let release: () => void = () => undefined;
+    const reached = new Promise<void>((res) => {
+      mockSetItemGate.reached = res;
+    });
+    mockSetItemGate.wait = new Promise<void>((res) => (release = res));
+    mockSetItemGate.match = /"needsUser":true/;
+    mockUploadFileResumable.mockRejectedValue(httpError(403));
+
+    const running = startMatchVideoUpload(START);
+    await reached;
+    stopMatchVideoUploadsForSignOut();
+    release();
+    await running;
+    await flush();
+
+    // The leaving athlete's failure is not re-created for the next account,
+    // and no retry is armed; the job on disk still took the write.
+    expect(getMatchUpload("M1")).toBeNull();
+    expect(await loadUploadJob("M1")).toMatchObject({ needsUser: true });
+    mockSetItemGate.wait = null;
+  });
+
+  it("m2: Discard is refused while a run is live, and the job survives", async () => {
+    const held = heldGate();
+    mockUploadFileResumable.mockImplementation(held.impl);
+    const running = startMatchVideoUpload(START);
+    await flush();
+    expect(await discardMatchVideoUpload("M1")).toBe(false);
+    expect(await loadUploadJob("M1")).not.toBeNull();
+    expect(mockRemoveUploadedObject).not.toHaveBeenCalled();
+    held.finish();
+    await running;
+  });
+
+  it("m7: a terminal failure is not counted as pending at sign-out", async () => {
+    seedJob({ needsUser: true, errorClass: "reslice_limit" });
+    expect(await hasPendingVideoUploads()).toBe(false);
+  });
+
+  it("m7: nothing counts before the athlete is scoped", async () => {
+    seedJob();
+    stopMatchVideoUploadsForSignOut();
+    expect(await hasPendingVideoUploads()).toBe(false);
+  });
+
+  it("m4: the daily-limit event is sent once per job, not once per resume", async () => {
+    mockWriteMatchVideoRow.mockRejectedValue(Object.assign(new Error("limit"), { gate: "rate_limited" }));
+    await startMatchVideoUpload(START);
+    await resumeMatchVideoUploads();
+    await flush();
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockWriteMatchVideoRow.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(mockCaptureMessage.mock.calls.filter((c) => c[0] === "Match video upload hit the daily limit")).toHaveLength(1);
+  });
+
+  it("m5: raw causes reach telemetry without upload URLs or response bodies", async () => {
+    mockUploadFileResumable
+      .mockRejectedValueOnce(
+        httpError(
+          500,
+          "tus: unexpected response while uploading chunk, originated from request (method: PATCH, url: https://abc.supabase.co/storage/v1/upload/resumable/SECRETID, response code: 500, response text: {\"key\":\"secret body\"}, request id: n/a)",
+        ),
+      )
+      .mockResolvedValueOnce(undefined);
+    await startMatchVideoUpload(START);
+    const raw = String(crumbs(/attempt 1 failed/)[0].data.raw);
+    expect(raw).not.toMatch(/supabase\.co|SECRETID|secret body/);
+    expect(raw).toMatch(/<url>/);
+    expect(raw.length).toBeLessThanOrEqual(300);
   });
 });

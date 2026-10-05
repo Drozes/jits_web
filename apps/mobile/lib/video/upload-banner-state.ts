@@ -59,6 +59,18 @@ export function uploadBannerActions(state: UploadBannerState): { retry: boolean;
   return { retry: true, discard: false };
 }
 
+/**
+ * The deck's color class for a failed or paused card (COPY-DECK 0.8):
+ * "act" (red) only when the viewer can fix it with Try again, "waiting"
+ * (amber) while it retries on its own, "info" (grey) for anything nobody
+ * can fix, including a recorder failure.
+ */
+export function uploadBannerTone(state: UploadBannerState): "act" | "waiting" | "info" | "neutral" {
+  if (state.kind === "paused") return "waiting";
+  if (state.kind !== "error") return "neutral";
+  return uploadBannerActions(state).retry ? "act" : "info";
+}
+
 export function deriveUploadBannerState(
   recorderState: RecordingState,
   recorderError: string | null,

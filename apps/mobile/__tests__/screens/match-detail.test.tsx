@@ -377,7 +377,7 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     const utils = await renderLoaded(view({ videos: [] }));
     expect(utils.queryByTestId("match-detail-no-video")).toBeNull();
     expect(utils.getByTestId("upload-status-banner")).toBeTruthy();
-    expect(utils.getByText("Uploading match video...")).toBeTruthy();
+    expect(utils.getByText("Uploading match video")).toBeTruthy();
   });
 
   it("shows a paused upload with Retry on the match page (jits-n2im.3)", async () => {

@@ -102,9 +102,12 @@ export function statusBadgeLabel(status: CardStatus): string | null {
     case "paused":
       return "UPLOAD PAUSED";
     case "upload_failed":
-      return "UPLOAD FAILED";
+      // The deck's one label for my own failed upload (m3).
+      return "DIDN'T UPLOAD";
     case "processing":
-      return "PROCESSING";
+      // Processing is only ever an angle row, never a card badge (deck B1.1);
+      // the card's centre caption says PROCESSING FILM.
+      return null;
     case "analyzing":
       return status.total ? `ANALYZING ${status.done ?? 0}/${status.total}` : "ANALYZING";
     case "new":

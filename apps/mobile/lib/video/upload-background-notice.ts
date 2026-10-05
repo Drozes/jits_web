@@ -26,6 +26,29 @@ function withdraw(): void {
   void Notifications.cancelScheduledNotificationAsync(id).catch(() => undefined);
 }
 
+/**
+ * Take back every notice of ours still in Notification Center, including
+ * one from a process iOS killed while backgrounded, whose id this process
+ * never knew (m6). Run on bind (launch) and on every return to the app;
+ * by then the upload resumes on its own, so the notice is moot.
+ */
+function sweepPresented(): void {
+  const api = Notifications as unknown as {
+    getPresentedNotificationsAsync?: () => Promise<Notifications.Notification[]>;
+  };
+  if (typeof api.getPresentedNotificationsAsync !== "function") return;
+  void api
+    .getPresentedNotificationsAsync()
+    .then((presented) => {
+      for (const n of presented ?? []) {
+        const data = n?.request?.content?.data as { type?: unknown } | undefined;
+        if (data?.type !== UPLOAD_BACKGROUNDED_NOTICE_TYPE) continue;
+        void Notifications.dismissNotificationAsync(n.request.identifier).catch(() => undefined);
+      }
+    })
+    .catch(() => undefined);
+}
+
 function post(): void {
   withdrawn = false;
   void Notifications.scheduleNotificationAsync({
@@ -60,6 +83,7 @@ function onAppState(next: AppStateStatus): void {
     notifiedThisBackground = false;
     // Back in the app: the upload resumes on its own, the notice is moot.
     withdraw();
+    sweepPresented();
   }
   // "inactive" (notification shade, app switcher) is not leaving the app.
 }
@@ -85,6 +109,7 @@ export function bindUploadBackgroundNotice(): () => void {
     };
     return unbind;
   }
+  sweepPresented();
   const sub = AppState.addEventListener("change", onAppState) as { remove?: () => void } | undefined;
   const off = subscribeUploadActivity(() => {
     if (!hasActiveVideoUploads()) withdraw();

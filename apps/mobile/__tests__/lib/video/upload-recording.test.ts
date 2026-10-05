@@ -412,7 +412,7 @@ describe("writeMatchVideoRow upload-gate copy", () => {
     ["video_upload_disabled", "disabled", /^Video uploads are turned off right now\. .*stays on this phone for 7 days\.$/],
     ["upload_not_in_cohort", "not_in_cohort", /^Video uploads aren't turned on for your account yet\. .*stays on this phone for 7 days\.$/],
     // jits-gxok: a terminal gate, said plainly.
-    ["video_reslice_limit", "reslice_limit", /can't be uploaded\.$/],
+    ["video_reslice_limit", "reslice_limit", /^This match can't take a video anymore\.$/],
   ])("maps HINT %s to clear copy and a gate", async (hint, gate, copy) => {
     const err = await thrownFor(hint);
     expect(err).toBeInstanceOf(MatchVideoDbError);

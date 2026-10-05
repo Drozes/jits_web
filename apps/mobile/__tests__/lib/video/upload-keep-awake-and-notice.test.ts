@@ -13,7 +13,9 @@ jest.mock("expo-keep-awake", () => ({
 const mockSchedule = jest.fn((_req: unknown) => Promise.resolve("notice-1"));
 const mockDismiss = jest.fn((_id: string) => Promise.resolve());
 const mockCancel = jest.fn((_id: string) => Promise.resolve());
+const mockPresented = jest.fn(() => Promise.resolve([] as unknown[]));
 jest.mock("expo-notifications", () => ({
+  getPresentedNotificationsAsync: () => mockPresented(),
   scheduleNotificationAsync: (req: unknown) => mockSchedule(req),
   dismissNotificationAsync: (id: string) => mockDismiss(id),
   cancelScheduledNotificationAsync: (id: string) => mockCancel(id),
@@ -169,5 +171,26 @@ describe("backgrounding notice", () => {
     resolveId("late-1");
     await flush();
     expect(mockDismiss).toHaveBeenCalledWith("late-1");
+  });
+});
+
+describe("a notice left by a killed process (m6)", () => {
+  const presented = (id: string, type: string) => ({ request: { identifier: id, content: { data: { type } } } });
+
+  it("is withdrawn on launch, and only ours", async () => {
+    mockPresented.mockResolvedValueOnce([presented("old-1", UPLOAD_BACKGROUNDED_NOTICE_TYPE), presented("chal-1", "challenge")]);
+    bindUploadBackgroundNotice();
+    await flush();
+    expect(mockDismiss).toHaveBeenCalledWith("old-1");
+    expect(mockDismiss).not.toHaveBeenCalledWith("chal-1");
+  });
+
+  it("is withdrawn on every return to the app", async () => {
+    bindUploadBackgroundNotice();
+    await flush();
+    mockPresented.mockResolvedValueOnce([presented("old-2", UPLOAD_BACKGROUNDED_NOTICE_TYPE)]);
+    appStateHandler?.("active");
+    await flush();
+    expect(mockDismiss).toHaveBeenCalledWith("old-2");
   });
 });

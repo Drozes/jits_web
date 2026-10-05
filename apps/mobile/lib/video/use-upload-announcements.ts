@@ -1,70 +1,76 @@
 import * as React from "react";
-import { AccessibilityInfo, Platform } from "react-native";
+import { AccessibilityInfo } from "react-native";
+import { NavigationContext } from "@react-navigation/native";
 import type { UploadBannerState } from "./upload-banner-state";
 
-/** Progress milestones announced on iOS, as fractions. */
-export const UPLOAD_ANNOUNCE_MILESTONES = [0.25, 0.5, 0.75] as const;
-
 /**
- * What VoiceOver should say for a state, or null for nothing.
+ * What a screen reader should hear for a state, or null for nothing.
  * Exported for tests; the hook decides WHEN.
  */
-export function uploadAnnouncement(state: UploadBannerState): string | null {
+export function uploadAnnouncement(state: Pick<UploadBannerState, "kind" | "message" | "truncation" | "errorClass">): string | null {
   switch (state.kind) {
     case "uploading":
       return "Uploading match video";
     case "paused":
-      return state.message ?? "Upload paused";
+      return state.message ? `Upload paused. ${state.message}` : "Upload paused";
     case "uploaded":
       return state.truncation ? "Match video uploaded, but the clip stops before the end of the match" : "Match video uploaded";
     case "error":
-      return state.message ?? "Upload failed";
+      // An upload failure carries a class; a recorder failure is its message.
+      if (state.errorClass == null) return state.message ?? "Recording unavailable";
+      return state.message ? `Didn't upload. ${state.message}` : "Didn't upload";
     default:
       return null;
   }
 }
 
-/** The highest milestone a progress value has crossed, or -1. */
-function milestoneOf(progress: number | null): number {
-  if (progress == null || !Number.isFinite(progress)) return -1;
-  let hit = -1;
-  UPLOAD_ANNOUNCE_MILESTONES.forEach((m, i) => {
-    if (progress >= m) hit = i;
-  });
-  return hit;
+/**
+ * Focus without requiring a navigator (the banner also renders in tests
+ * and outside a screen). Same pattern as `header-status-chip.tsx`.
+ */
+function useIsScreenFocused(): boolean {
+  const navigation = React.useContext(NavigationContext);
+  const [focused, setFocused] = React.useState(() => navigation?.isFocused() ?? true);
+  React.useEffect(() => {
+    if (!navigation) return;
+    setFocused(navigation.isFocused());
+    const offFocus = navigation.addListener("focus", () => setFocused(true));
+    const offBlur = navigation.addListener("blur", () => setFocused(false));
+    return () => {
+      offFocus();
+      offBlur();
+    };
+  }, [navigation]);
+  return focused;
 }
 
 /**
- * VoiceOver announcements for the upload status (jits-5tj9.2).
+ * Screen-reader announcements for the upload status (jits-5tj9.2, deck
+ * section 10.1).
  *
- * `accessibilityLiveRegion` is Android-only in React Native, so on iOS the
- * status changed from uploading to uploaded or failed in total silence.
- * This announces every change of KIND (uploading, paused, uploaded,
- * failed) and each progress milestone (25, 50, 75%) once, through
- * `AccessibilityInfo.announceForAccessibility`. Android keeps its live
- * region and is not announced twice. Not on mount for a state that was
- * already showing: only a real change is news.
+ * - Only on a STATE change (kind, or the failure helper, such as "Still
+ *   can't upload"), never on percent ticks; the percent is on the element
+ *   as a progressbar value instead.
+ * - Only from the FOCUSED screen. The verdict pushes match detail over the
+ *   still-mounted match screen, so two cards describe the same upload and
+ *   both used to announce it.
+ * - On iOS and Android alike. The cards carry no live region any more (the
+ *   deck removes them), so Android needs the announcement too.
+ * - Not on mount: a state that was already showing is not news.
  */
 export function useUploadAnnouncements(state: UploadBannerState): void {
-  const lastKind = React.useRef<string | null>(null);
-  const lastMilestone = React.useRef(-1);
-  const mounted = React.useRef(false);
-  const { kind, message, truncation } = state;
-  const milestone = kind === "uploading" ? milestoneOf(state.progress) : -1;
+  const focused = useIsScreenFocused();
+  const last = React.useRef<string | null>(null);
+  const { kind, message, truncation, errorClass } = state;
+  const key = `${kind}|${message ?? ""}`;
 
   React.useEffect(() => {
-    const first = !mounted.current;
-    mounted.current = true;
-    const kindChanged = lastKind.current !== kind;
-    const crossed = kind === "uploading" && milestone > lastMilestone.current;
-    lastKind.current = kind;
-    if (kind !== "uploading") lastMilestone.current = -1;
-    else if (crossed) lastMilestone.current = milestone;
-    if (first || Platform.OS !== "ios") return;
-
-    let text: string | null = null;
-    if (kindChanged) text = uploadAnnouncement({ kind, message, truncation, progress: null });
-    else if (crossed) text = `Upload ${Math.round(UPLOAD_ANNOUNCE_MILESTONES[milestone] * 100)} percent`;
+    const previous = last.current;
+    last.current = key;
+    if (previous == null || previous === key || !focused) return;
+    const text = uploadAnnouncement({ kind, message, truncation, errorClass });
     if (text) AccessibilityInfo.announceForAccessibility(text);
-  }, [kind, milestone, message, truncation]);
+    // `truncation` and `errorClass` only shape the sentence; they are not news.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, focused]);
 }

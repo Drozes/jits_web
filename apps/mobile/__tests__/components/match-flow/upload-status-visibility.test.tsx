@@ -264,8 +264,9 @@ describe("upload status survives the step that started it", () => {
     });
 
     getByTestId("upload-status-banner");
-    // The card, and the hero where the still will be.
-    getByText(/finishing recording\.\.\./i);
+    // The card ("Finishing recording", deck strip copy), and the hero where
+    // the still will be.
+    within(getByTestId("upload-status-banner")).getByText("Finishing recording");
     getByText("FINISHING RECORDING");
   });
 
@@ -335,22 +336,23 @@ describe("watching the match back from the verdict (jits-p75q)", () => {
   // The verdict's Watch film opens the match page, which lists (and plays)
   // every angle from the server: both athletes' recordings, a reopened
   // match with an empty upload store, and a disputed match alike.
-  it("offers Watch film once this phone's clip has landed", async () => {
+  it("opens the match once this phone's clip has landed (Open match until an angle plays, deck rule 4)", async () => {
     const { getByTestId, getByText } = renderSummary({ status: "uploaded", videoId: "VID-1" });
     await act(async () => {
       await Promise.resolve();
     });
-    getByText("Watch film");
+    getByText("Open match");
     fireEvent.press(getByTestId("summary-watch-film"));
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
-  it("holds Watch film while the upload is still running (never a 404)", () => {
-    const { getByTestId } = renderSummary({ status: "uploading" });
+  it("while the upload runs, Open match goes to the match page (keyed by match id, never a 404)", () => {
+    const { getByTestId, queryByText } = renderSummary({ status: "uploading" });
     const watch = getByTestId("summary-watch-film");
-    expect(watch.props.accessibilityState.disabled).toBe(true);
+    expect(watch.props.accessibilityState.disabled).toBe(false);
+    expect(queryByText("Watch film")).toBeNull();
     fireEvent.press(watch);
-    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
   it("offers it on a DISPUTED match, which Past Match Videos cannot reach", () => {
@@ -359,10 +361,10 @@ describe("watching the match back from the verdict (jits-p75q)", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 
-  it("with no video and none coming it is Match details, still to the match page", () => {
+  it("with no video and none coming it is Open match, still to the match page", () => {
     const { getByText, queryByText } = renderSummary(null);
     expect(queryByText("Watch film")).toBeNull();
-    fireEvent.press(getByText("Match details"));
+    fireEvent.press(getByText("Open match"));
     expect(mockRouterPush).toHaveBeenCalledWith("/(app)/match-detail/M1");
   });
 });

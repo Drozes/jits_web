@@ -12,7 +12,7 @@
  */
 import { deriveFilmSection } from "@/lib/match-detail/film-section";
 import { deriveCardStatus, statusBadgeLabel } from "@/lib/film-room/card-status";
-import { filmStillCaption, uploadingLabel, watchFilmBusyLabel } from "@/lib/video/upload-copy";
+import { filmStillCaption, uploadingLabel } from "@/lib/video/upload-copy";
 import { deriveUploadBannerState, uploadBannerActions } from "@/lib/video/upload-banner-state";
 import type { MatchUploadEntry, MatchUploadStatus } from "@/lib/video/match-upload-store";
 import type { MatchLibraryVideo } from "@jits/shared/api/film-room";
@@ -104,7 +104,7 @@ describe("paused vs failed are distinct everywhere (jits-n2im.3)", () => {
 
   it("card badges", () => {
     expect(statusBadgeLabel(deriveCardStatus(libItem(), entry("paused"), true))).toBe("UPLOAD PAUSED");
-    expect(statusBadgeLabel(deriveCardStatus(libItem(), entry("failed"), true))).toBe("UPLOAD FAILED");
+    expect(statusBadgeLabel(deriveCardStatus(libItem(), entry("failed"), true))).toBe("DIDN'T UPLOAD");
   });
 
   it("actions: Retry for paused and retryable failures, Discard for terminal ones", () => {
@@ -129,14 +129,9 @@ describe("captions and labels", () => {
   it("say the progress while uploading and paused", () => {
     expect(filmStillCaption(entry("uploading"), false, "x")).toBe("UPLOADING 42% · STILL ARRIVES AFTER UPLOAD");
     expect(filmStillCaption(entry("paused"), false, "x")).toBe("UPLOAD PAUSED · 42%");
-    expect(filmStillCaption(entry("failed"), false, "x")).toBe("UPLOAD FAILED");
+    expect(filmStillCaption(entry("failed"), false, "x")).toBe("DIDN'T UPLOAD");
     expect(filmStillCaption(entry("uploaded"), false, "x")).toBe("PROCESSING FILM");
     expect(uploadingLabel(null)).toBe("UPLOADING");
   });
 
-  it("give the disabled Watch film a reason (jits-n2im.4 item 5)", () => {
-    expect(watchFilmBusyLabel("uploading", 0.42)).toBe("Film uploading 42%");
-    expect(watchFilmBusyLabel("uploading", null)).toBe("Film uploading…");
-    expect(watchFilmBusyLabel("stopping", null)).toBe("Finishing recording…");
-  });
 });

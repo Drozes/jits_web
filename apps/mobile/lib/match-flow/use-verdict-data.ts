@@ -27,6 +27,8 @@ export function posterPollDelay(n: number): number {
 export interface VerdictVideos {
   /** Any `match_videos` row on this match, from either athlete. */
   hasVideo: boolean;
+  /** At least one angle can be played now (deck rule 4: only then "Watch film"). */
+  hasPlayable: boolean;
   /** Signed opening still (the slicer poster), when one exists yet. */
   posterUrl: string | null;
   /**
@@ -40,7 +42,7 @@ export interface VerdictVideos {
   posterKey: string | null;
 }
 
-const EMPTY: VerdictVideos = { hasVideo: false, posterUrl: null, posterKey: null };
+const EMPTY: VerdictVideos = { hasVideo: false, hasPlayable: false, posterUrl: null, posterKey: null };
 
 /**
  * The verdict's opening still: the match's videos via `getMatchDetailView`
@@ -66,6 +68,7 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
         const withPoster = list.find((v) => v.poster_url);
         setVideos({
           hasVideo: list.length > 0,
+          hasPlayable: list.some((v) => v.playability === "playable"),
           posterUrl: withPoster?.poster_url ?? null,
           posterKey: withPoster ? (withPoster.thumbnail_key ?? withPoster.id) : null,
         });
@@ -76,7 +79,9 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
     };
   }, [matchId, viewerId, uploadedKey, tick]);
 
-  const needsPoll = videos.posterUrl == null && (videos.hasVideo || uploadedKey != null);
+  // Also until an angle is playable, so the CTA turns into "Watch film"
+  // without the athlete leaving the verdict.
+  const needsPoll = (videos.posterUrl == null || !videos.hasPlayable) && (videos.hasVideo || uploadedKey != null);
   React.useEffect(() => {
     if (!needsPoll || polledMsRef.current >= POSTER_POLL_WINDOW_MS) return;
     const delay = posterPollDelay(pollsRef.current);

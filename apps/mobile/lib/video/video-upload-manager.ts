@@ -29,7 +29,9 @@ import type { RecordingTruncation } from "./use-video-recorder";
 import {
   classifyByteFailure,
   classifyRowFailure,
+  RETRY_FAILED_AGAIN_COPY,
   describeUploadFailure,
+  isTerminalUploadClass,
   type UploadErrorClass,
 } from "./upload-errors";
 import { registerUploadControl } from "./upload-control";
@@ -661,16 +663,31 @@ function scheduleForegroundRetry(matchId: string): void {
  */
 async function park(
   job: PendingUploadJob,
-  klass: UploadErrorClass,
-  status: number | null,
-  raw: string | null,
+  failure: { klass: UploadErrorClass; status: number | null; raw: string | null },
+  isCurrent: () => boolean,
+  trigger: RunTrigger,
 ): Promise<UploadOutcome> {
+  const { klass, status, raw } = failure;
   const copy = describeUploadFailure(klass);
   const failed = copy.disposition === "failed";
+  // The run can lose its slot (sign-out, a newer recording) before or
+  // during the persisted write. The job on disk is still this athlete's and
+  // takes the patch; the store and the retry timer belong to whoever holds
+  // the slot now (sign-out wiped the store for the next account), so a
+  // stale run must not write them.
+  const stale = (): UploadOutcome => {
+    trackRunDropped(job.matchId, "lost its slot while parking");
+    return { ok: false, error: copy.message, willRetryLater: false };
+  };
+  if (!isCurrent()) return stale();
   await patchUploadJob(job.matchId, { errorClass: klass, needsUser: failed });
+  if (!isCurrent()) return stale();
+  // The athlete tapped Try again and it failed again in this same run: the
+  // deck's "Still can't upload" (section 8), unless the cause is terminal.
+  const message = trigger === "retry" && !copy.terminal ? RETRY_FAILED_AGAIN_COPY : copy.message;
   setMatchUpload(job.matchId, {
     status: failed ? "error" : "paused",
-    error: copy.message,
+    error: message,
     errorClass: klass,
   });
   trackParked({ matchId: job.matchId, disposition: copy.disposition, klass, status, phase: job.phase, raw });
@@ -678,7 +695,7 @@ async function park(
   // A daily-limit gate does not lift in minutes: hitting it every two would
   // be noise. Foreground and reconnect still try it.
   else if (klass !== "limit") scheduleForegroundRetry(job.matchId);
-  return { ok: false, error: copy.message, willRetryLater: !failed };
+  return { ok: false, error: message, willRetryLater: !failed };
 }
 
 async function runJob(
@@ -725,7 +742,11 @@ async function runJob(
         // left to keep and no object in the bucket, so nothing to park.
         await abandonJob(current, `the recording file is gone: ${bytes.error}`);
         const copy = describeUploadFailure("file_missing");
-        setMatchUpload(current.matchId, { status: "error", error: copy.message, errorClass: "file_missing" });
+        // Same guard as `park`: a run that lost its slot during the abandon
+        // must not write the store the new owner (or nobody) now holds.
+        if (isCurrent()) {
+          setMatchUpload(current.matchId, { status: "error", error: copy.message, errorClass: "file_missing" });
+        }
         return { ok: false, error: copy.message, willRetryLater: false };
       }
       // NOTHING ELSE ABANDONS, INCLUDING A NON-RETRYABLE FAILURE. This used
@@ -736,7 +757,7 @@ async function runJob(
       // FAILED (jits-n2im.3/.5): kept on disk, no automatic retries, and
       // the athlete gets Retry. The retention window, not one response,
       // decides to give up.
-      return park(current, bytes.klass, bytes.status, bytes.error);
+      return park(current, { klass: bytes.klass, status: bytes.status, raw: bytes.error }, isCurrent, trigger);
     }
     current = bytes.job;
   }
@@ -749,7 +770,7 @@ async function runJob(
     trackRunDropped(current.matchId, "superseded");
     return { ok: false, error: "Superseded by a newer recording", willRetryLater: false };
   }
-  if (!row.ok) return park(current, row.klass, null, row.error);
+  if (!row.ok) return park(current, { klass: row.klass, status: null, raw: row.error }, isCurrent, trigger);
 
   await removeUploadJob(current.matchId);
   releaseRecording(current.fileUri);
@@ -998,28 +1019,30 @@ export async function resumeMatchVideoUploads(): Promise<void> {
   }
 }
 
+/** Why a Try again did or did not start a run (each gets its own message, m8). */
+export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "other_athlete";
+
 /**
- * The athlete's Retry (jits-n2im.3): run a parked or failed job NOW, with a
- * fresh attempt budget, whatever it is waiting for. Clears the "needs the
- * athlete" mark so later automatic triggers pick it up again if it parks.
- *
- * Resolves true when a runner is running for the match afterwards (a job
- * already uploading is left alone: a no-op, not a restart), false when
- * there is no job for the match or it belongs to another athlete.
+ * The athlete's Try again (jits-n2im.3): run a parked or failed job NOW,
+ * with a fresh attempt budget, whatever it is waiting for. Clears the
+ * "needs the athlete" mark so later automatic triggers pick it up again if
+ * it parks. A job already uploading is left alone ("running"): a no-op,
+ * not a restart.
  */
-export async function retryMatchVideoUpload(matchId: string): Promise<boolean> {
-  if (runners.has(matchId)) return true;
-  if (!owner) return false;
+export async function retryMatchVideoUpload(matchId: string): Promise<RetryResult> {
+  if (runners.has(matchId)) return "running";
+  if (!owner) return "signed_out";
   const job = await loadUploadJob(matchId);
-  if (!job || job.uploaderAthleteId !== owner) return false;
+  if (!job) return "no_job";
+  if (job.uploaderAthleteId !== owner) return "other_athlete";
   // Re-checked after the await: a resume can have claimed it meanwhile.
-  if (runners.has(matchId)) return true;
+  if (runners.has(matchId)) return "running";
   const fresh: PendingUploadJob = { ...job, attempt: 0, needsUser: false };
   // `launch` claims synchronously; the persisted reset queues behind no
   // runner write because the runner's first write comes after an await.
   void patchUploadJob(matchId, { attempt: 0, needsUser: false });
   void launch(fresh, "retry");
-  return true;
+  return "started";
 }
 
 /**
@@ -1029,13 +1052,11 @@ export async function retryMatchVideoUpload(matchId: string): Promise<boolean> {
  * when there was no job to discard.
  */
 export async function discardMatchVideoUpload(matchId: string): Promise<boolean> {
-  const running = runners.get(matchId);
-  if (running) {
-    running.abort?.();
-    requestWake(running);
-    runners.delete(matchId);
-    emitActivity();
-  }
+  // Refused while a run is live (m2). Discard is only offered on a settled
+  // terminal failure, so a live run means the athlete also tapped Try again;
+  // stopping it mid row write could leave a `ready` row pointing at the
+  // object this deletes. Let the run settle first.
+  if (runners.has(matchId)) return false;
   clearRetryTimer(matchId);
   const job = await loadUploadJob(matchId);
   clearMatchUpload(matchId);
@@ -1083,8 +1104,14 @@ export function hasActiveVideoUploads(): boolean {
  */
 export async function hasPendingVideoUploads(): Promise<boolean> {
   if (runners.size > 0) return true;
+  // Nobody scoped yet: nothing of the signed-in athlete is known to be owed.
+  if (owner == null) return false;
   const jobs = await loadUploadJobs();
-  return jobs.some((job) => owner == null || job.uploaderAthleteId === owner);
+  // Only this athlete's jobs that can still finish (m7): a terminal failure
+  // will not "finish the next time you sign in", so it does not count.
+  return jobs.some(
+    (job) => job.uploaderAthleteId === owner && !(job.needsUser && isTerminalUploadClass(job.errorClass)),
+  );
 }
 
 /**

@@ -58,7 +58,7 @@ describe("PosterCard badges", () => {
 describe("this phone's paused or failed upload on the card (jits-n2im.3/.4)", () => {
   const { fireEvent } = require("@testing-library/react-native");
 
-  it("shows UPLOAD PAUSED with a Retry that does not open the match", () => {
+  it("shows UPLOAD PAUSED with a 44 pt Try again that does not open the match (M2)", () => {
     const onPress = jest.fn();
     const onRetry = jest.fn();
     const utils = render(
@@ -66,17 +66,36 @@ describe("this phone's paused or failed upload on the card (jits-n2im.3/.4)", ()
     );
     expect(badgeTexts(utils)).toContain("UPLOAD PAUSED");
     expect(utils.getAllByText("UPLOAD PAUSED").length).toBeGreaterThan(0);
-    fireEvent.press(utils.getByTestId("film-card-retry"));
+    const retry = utils.getByTestId("film-card-retry");
+    expect(retry.props.accessibilityLabel).toBe("Try again: upload match video");
+    expect(utils.getByText("Try again")).toBeTruthy();
+    fireEvent.press(retry);
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(onPress).not.toHaveBeenCalled();
   });
 
-  it("shows UPLOAD FAILED, never NO FILM RECORDED, while the phone still owes the clip", () => {
+  it("offers Try again to VoiceOver as an action on the card itself (M2)", () => {
+    const onRetry = jest.fn();
+    const utils = render(
+      <PosterCard item={libItem({ videos: [] })} status={{ kind: "upload_failed", terminal: false }} viewer={viewer} onPress={jest.fn()} onRetry={onRetry} />,
+    );
+    const card = utils.getByTestId("film-card-m-1");
+    expect(card.props.accessibilityActions).toEqual([{ name: "retry", label: "Try again: upload match video" }]);
+    fireEvent(card, "accessibilityAction", { nativeEvent: { actionName: "retry" } });
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("has no retry action when there is nothing to retry", () => {
+    const utils = render(<PosterCard item={libItem()} status={{ kind: "ready" }} viewer={viewer} onPress={jest.fn()} />);
+    expect(utils.getByTestId("film-card-m-1").props.accessibilityActions).toBeUndefined();
+  });
+
+  it("shows DIDN'T UPLOAD, never NO FILM RECORDED, while the phone still owes the clip", () => {
     const utils = render(
       <PosterCard item={libItem({ videos: [] })} status={{ kind: "upload_failed", terminal: false }} viewer={viewer} onPress={jest.fn()} />,
     );
     expect(utils.queryByText("NO FILM RECORDED")).toBeNull();
-    expect(utils.getAllByText("UPLOAD FAILED").length).toBeGreaterThan(0);
+    expect(utils.getAllByText("DIDN'T UPLOAD").length).toBeGreaterThan(0);
   });
 
   it("says PROCESSING FILM, not 'after upload', once the film is on the server", () => {
@@ -93,6 +112,8 @@ describe("this phone's paused or failed upload on the card (jits-n2im.3/.4)", ()
     );
     expect(utils.queryByTestId("film-card-retry")).toBeNull();
     expect(compactBadgeLabel({ kind: "paused", progress: null })).toBe("PAUSED");
-    expect(compactBadgeLabel({ kind: "upload_failed", terminal: true })).toBe("FAILED");
+    // An upload failure is not a processing failure (m11).
+    expect(compactBadgeLabel({ kind: "upload_failed", terminal: true })).toBe("DIDN'T UPLOAD");
+    expect(compactBadgeLabel({ kind: "failed" })).toBe("FAILED");
   });
 });

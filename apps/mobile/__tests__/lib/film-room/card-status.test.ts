@@ -102,7 +102,8 @@ describe("this phone's paused, failed and just-landed uploads (jits-n2im.3/.4)",
 
   it("labels each distinctly", () => {
     expect(statusBadgeLabel({ kind: "paused", progress: null })).toBe("UPLOAD PAUSED");
-    expect(statusBadgeLabel({ kind: "upload_failed", terminal: false })).toBe("UPLOAD FAILED");
-    expect(statusBadgeLabel({ kind: "processing" })).toBe("PROCESSING");
+    expect(statusBadgeLabel({ kind: "upload_failed", terminal: false })).toBe("DIDN'T UPLOAD");
+    // Processing is never a card badge (deck B1.1); the caption says it.
+    expect(statusBadgeLabel({ kind: "processing" })).toBeNull();
   });
 });

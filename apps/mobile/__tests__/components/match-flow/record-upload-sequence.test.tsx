@@ -637,7 +637,7 @@ describe("record, end, upload, across the step boundary", () => {
     expect(queryByText(/row-level security/i)).toBeNull();
     // The copy tells the user it is not over, because it is not: the job
     // is parked in phase "row" and the next foreground retries the write.
-    getByText(/retry automatically/i);
+    getByText(/Trying again shortly/i);
 
     // THE BYTES WENT UP ONCE: the row is retried on its own budget and the
     // object is left alone.

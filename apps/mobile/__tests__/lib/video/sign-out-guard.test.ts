@@ -12,7 +12,7 @@ import {
 } from "@/lib/video/sign-out-guard";
 
 const control = {
-  retry: jest.fn(async () => true),
+  retry: jest.fn(async () => "started" as const),
   discard: jest.fn(async () => true),
   hasPending: jest.fn(async () => false),
   stopForSignOut: jest.fn(),
@@ -32,8 +32,9 @@ afterEach(() => {
 });
 
 it("names the athlete who has to sign back in", () => {
-  expect(signOutUploadMessage("Ana Silva")).toBe(
-    "Your match film hasn't finished uploading. Sign out anyway? It will finish the next time you sign in as Ana Silva.",
+  // Initial + last name, house style.
+  expect(signOutUploadMessage("Ana Maria Silva")).toBe(
+    "Your match film hasn't finished uploading. Sign out anyway? It will finish the next time you sign in as A. Silva.",
   );
   expect(signOutUploadMessage(null)).toBe(
     "Your match film hasn't finished uploading. Sign out anyway? It will finish the next time you sign in.",
@@ -70,4 +71,16 @@ it("stays signed in on Cancel", async () => {
 it("is safe before the upload manager has loaded", async () => {
   __setUploadControl(null);
   await expect(pendingUploadSignOutMessage("Ana")).resolves.toBeNull();
+});
+
+describe("Try again refused (m8)", () => {
+  const { retryRefusedCopy } = require("@/lib/video/use-upload-actions");
+
+  it("says the right thing for each reason, and nothing when it ran", () => {
+    expect(retryRefusedCopy("no_job")).toBe("The clip isn't on this phone anymore.");
+    expect(retryRefusedCopy("signed_out")).toBe("Sign in again to finish this upload.");
+    expect(retryRefusedCopy("other_athlete")).toMatch(/^Only the athlete who recorded this can upload it\./);
+    expect(retryRefusedCopy("started")).toBeNull();
+    expect(retryRefusedCopy("running")).toBeNull();
+  });
 });

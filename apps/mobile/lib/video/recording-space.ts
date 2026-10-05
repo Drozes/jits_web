@@ -1,6 +1,5 @@
 import * as React from "react";
 import * as FileSystem from "expo-file-system/legacy";
-import { formatUploadSize } from "./upload-copy";
 
 /**
  * Rough on-disk rate of a match recording: 720p (`camera-overlay.tsx`) at
@@ -18,13 +17,18 @@ export function estimateRecordingBytes(durationSeconds: number | null | undefine
   return Math.ceil(seconds * RECORDING_BYTES_PER_SECOND * RECORDING_SPACE_MARGIN);
 }
 
-/** The warning for a phone without room for the recording, else null. */
+/** "1.2" GB, rounded UP to a tenth so freeing that much is always enough. */
+function gbToFree(bytes: number): string {
+  const tenths = Math.max(1, Math.ceil(bytes / (1024 * 1024 * 1024) / 0.1));
+  return (tenths / 10).toFixed(1).replace(/\.0$/, "");
+}
+
+/** The warning for a phone without room for the recording, else null (deck section 8). */
 export function recordingSpaceWarning(freeBytes: number | null, durationSeconds: number | null | undefined): string | null {
   if (freeBytes == null || !Number.isFinite(freeBytes)) return null;
   const needed = estimateRecordingBytes(durationSeconds);
   if (freeBytes >= needed) return null;
-  const free = formatUploadSize(freeBytes) ?? "almost no space";
-  return `Low storage: ${free} free, about ${formatUploadSize(needed)} needed to record this match. Free up space, or the recording may stop early.`;
+  return `Not enough space on this phone to record. Free up ${gbToFree(needed - freeBytes)} GB.`;
 }
 
 /**

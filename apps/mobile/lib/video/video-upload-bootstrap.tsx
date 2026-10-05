@@ -8,6 +8,7 @@ import {
   ensureUploadListeners,
   resumeMatchVideoUploads,
   setUploadOwner,
+  stopMatchVideoUploadsForSignOut,
 } from "./video-upload-manager";
 
 /**
@@ -62,7 +63,18 @@ export function VideoUploadBootstrap() {
     bindUploadBackgroundNotice();
   }, []);
 
+  // The athlete this bootstrap last scoped uploads to. A session can end
+  // without `signOut()` (a revoked refresh token, auth-js SIGNED_OUT), or a
+  // different athlete can replace it directly; either way the previous
+  // athlete's runners must stop and their store entries go (m3), exactly
+  // as a sign-out does.
+  const scopedTo = React.useRef<string | null>(null);
+
   React.useEffect(() => {
+    if (scopedTo.current && scopedTo.current !== athleteId) {
+      stopMatchVideoUploadsForSignOut();
+    }
+    scopedTo.current = athleteId;
     if (!athleteId) return;
     setUploadOwner(athleteId);
     const unbind = ensureUploadListeners();

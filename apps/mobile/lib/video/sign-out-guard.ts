@@ -1,11 +1,16 @@
 import { Alert } from "react-native";
+import { shortName } from "@/lib/film-room/format";
 import { hasPendingMatchUploads } from "./upload-control";
 
 export const SIGN_OUT_UPLOAD_TITLE = "Film still uploading";
 
-/** The warning body, naming who has to sign back in for it to finish. */
+/**
+ * The warning body, naming who has to sign back in for it to finish, as
+ * initial + last name (house style). Only resumable uploads reach it: a
+ * terminal failure is not counted (m7), so "it will finish" is true.
+ */
 export function signOutUploadMessage(displayName: string | null | undefined): string {
-  const who = displayName?.trim() ? ` as ${displayName.trim()}` : "";
+  const who = displayName?.trim() ? ` as ${shortName(displayName.trim())}` : "";
   return `Your match film hasn't finished uploading. Sign out anyway? It will finish the next time you sign in${who}.`;
 }
 

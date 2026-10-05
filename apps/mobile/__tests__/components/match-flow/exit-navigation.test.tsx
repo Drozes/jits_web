@@ -611,7 +611,7 @@ describe("no session-lobby URL can be rebuilt in the match-flow tree", () => {
       />,
     );
     fireEvent.press(getByText(ARENA_LABEL));
-    fireEvent.press(getByText("Match details"));
+    fireEvent.press(getByText("Open match"));
 
     expect(mockRouterDismissTo.mock.calls.length).toBeGreaterThan(0);
     for (const [href] of mockRouterDismissTo.mock.calls) {
