@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useSegments } from "expo-router";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { useUploadStripModel } from "@/lib/video/use-upload-strip";
+import { RealInsetsProvider } from "@/lib/layout/window-insets";
 import { UploadStrip } from "./upload-strip";
 
 /** The strip on the tab bar, above it (the screens shrink to make room). */
@@ -28,7 +29,10 @@ export function StackStripFrame({ children }: { children: React.ReactNode }) {
   const inner = React.useMemo(() => (insets && show ? { ...insets, bottom: 0 } : insets), [insets, show]);
   return (
     <View style={{ flex: 1 }}>
-      {inner ? <SafeAreaInsetsContext.Provider value={inner}>{children}</SafeAreaInsetsContext.Provider> : children}
+      {/* Full-window sheets inside read the real insets (useWindowInsets). */}
+      <RealInsetsProvider value={insets}>
+        {inner ? <SafeAreaInsetsContext.Provider value={inner}>{children}</SafeAreaInsetsContext.Provider> : children}
+      </RealInsetsProvider>
       {show && model ? <UploadStrip model={model} bottomInset={insets?.bottom ?? 0} /> : null}
     </View>
   );

@@ -37,7 +37,6 @@ export function FilmStatusPlate({ matchId, view, variant = "detail", onWatch, wa
   return (
     <View
       testID={testID}
-      accessibilityLabel={title}
       style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: 4, paddingTop: 14, paddingHorizontal: 14, paddingBottom: view.rows.length > 0 ? 2 : 12, gap: 8 }}
     >
       <FilmStatusHeader view={view} title={title} testID={testID} />

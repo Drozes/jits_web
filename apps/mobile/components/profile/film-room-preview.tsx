@@ -23,6 +23,8 @@ interface FilmRoomPreviewProps {
   error: boolean;
   onRetry: () => void;
   viewer: StillAthlete;
+  /** The viewer's athlete id: the badge follows their own reel (jits-n2im.25). */
+  viewerId?: string | null;
 }
 
 /**
@@ -32,7 +34,7 @@ interface FilmRoomPreviewProps {
  * keeps the harness contract of the old rows (`past-video-row-<matchId>`,
  * "Open match video vs <name>").
  */
-export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPreviewProps) {
+export function FilmRoomPreview({ items, error, onRetry, viewer, viewerId = null }: FilmRoomPreviewProps) {
   const router = useRouter();
   const tokens = useThemedTokens();
   // Stable props so the memoized posters only re-render when their own
@@ -41,7 +43,7 @@ export function FilmRoomPreview({ items, error, onRetry, viewer }: FilmRoomPrevi
   const open = React.useCallback((matchId: string) => router.push(matchDetailHref(matchId)), [router]);
   const seen = useSeenMatches();
   const filmed = React.useMemo(() => (items ?? []).slice(0, 20), [items]);
-  const phases = useFilmRoomPhases(filmed, items);
+  const phases = useFilmRoomPhases(filmed, items, viewerId);
   const uploads = useMatchUploads(React.useMemo(() => filmed.map((i) => i.match_id), [filmed]));
   const preview = filmed
     .filter((i) => i.videos.length > 0 || uploads.has(i.match_id))

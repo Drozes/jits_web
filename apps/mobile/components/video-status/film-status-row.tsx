@@ -35,12 +35,16 @@ export function FilmStatusRow({ row, last, onWatch, watchLabel, onRetry, onDisca
 
   if (row.watchable && row.videoId && onWatch) {
     const id = row.videoId;
-    const label = [watchLabel ? watchLabel(row) : `Watch ${row.label.toLowerCase()}`, row.best ? BEST_ANGLE : null].filter(Boolean).join(", ");
+    // Names keep their case: only "Your angle" reads "Watch your angle".
+    const own = row.isMine ? row.label.toLowerCase() : row.label;
+    const label = [watchLabel ? watchLabel(row) : `Watch ${own}`, row.best ? BEST_ANGLE : null].filter(Boolean).join(", ");
     return (
       <Pressable
         testID={`match-video-watch-${id}`}
         accessibilityRole="button"
         accessibilityLabel={label}
+        // Deck 10.2: the state and helper are spoken too, after the harness's label.
+        accessibilityHint={[row.tag, row.helper].filter(Boolean).join(", ")}
         onPress={() => onWatch(id)}
         className="flex-row items-start active:opacity-70"
         style={[{ gap: 10, paddingVertical: 12, minHeight: CONTROL_HEIGHT }, border]}

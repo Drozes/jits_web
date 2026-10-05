@@ -29,4 +29,11 @@ describe("Best angle on the switcher", () => {
     expect(bestAngleId([{ ...mine, is_primary: true }, { ...theirs, playability: "processing" }])).toBeNull();
     expect(bestAngleId([{ ...mine, is_primary: true }, theirs])).toBe("a");
   });
+
+  it("on the match page it takes the Film status's Best angle, so the plate and the switcher agree", () => {
+    const s = render(<AngleSwitcher angles={[{ ...mine, is_primary: true }, theirs]} activeId="a" onSelect={jest.fn()} bestId={null} />);
+    expect(s.queryByText("BEST ANGLE")).toBeNull();
+    const t = render(<AngleSwitcher angles={[mine, theirs]} activeId="a" onSelect={jest.fn()} bestId="b" />);
+    expect(t.getByTestId("angle-best-b")).toBeTruthy();
+  });
 });

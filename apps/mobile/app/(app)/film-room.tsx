@@ -42,7 +42,7 @@ export default function FilmRoomScreen() {
 
   const hasMore = library.hasMore;
   // The server's Film status for the newest matches (badge priority, deck 9).
-  const phases = useFilmRoomPhases(library.items, library.items);
+  const phases = useFilmRoomPhases(library.items, library.items, athlete?.id ?? null);
   const ids = React.useMemo(() => library.items.map((i) => i.match_id), [library.items]);
   useRefetchOnUploadSettled(ids, library.revalidate);
   useRefetchOnRefocus(library.revalidate, useMatchExitCount());

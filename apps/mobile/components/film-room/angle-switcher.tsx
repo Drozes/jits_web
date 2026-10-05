@@ -76,17 +76,22 @@ interface AngleSwitcherProps {
   onSelect: (id: string) => void;
   /** "plate" on the match page, "film" over video in the player. */
   variant?: "plate" | "film";
+  /**
+   * The Film status's own Best angle (match page), so the plate and the
+   * switcher always agree; computed from the angles when absent (player).
+   */
+  bestId?: string | null;
 }
 
 /**
  * Two-segment switch between the athletes' recordings of one match. Renders
  * nothing with fewer than two angles.
  */
-export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate" }: AngleSwitcherProps) {
+export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate", bestId }: AngleSwitcherProps) {
   const p = usePalette();
   const angles = switchableAngles(all, activeId);
   if (angles.length < 2) return null;
-  const best = bestAngleId(angles);
+  const best = bestId !== undefined ? bestId : bestAngleId(angles);
   // Over video the segments keep the on-film colors; on the page they follow
   // the theme. The active segment inverts (ink fill, page-colored label).
   const c =

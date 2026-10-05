@@ -25,6 +25,7 @@ import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { angleWatchable, localAngleJob } from "@/lib/video/angle-status";
 import { useFilmStatus } from "@/lib/video/use-film-status";
 import { useAuth } from "@/lib/auth/hooks";
+import { deriveUploadBannerState, showRecorderBanner } from "@/lib/video/upload-banner-state";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { FilmStatusPlate } from "@/components/video-status/film-status-plate";
 import { TimekeeperFilm } from "@/components/match-detail/timekeeper-film";
@@ -71,12 +72,14 @@ export default function MatchDetailScreen() {
   useSuppressUploadStrip(matchId ? { kind: "match", matchId } : null);
   // An angle the server newly calls ready (analysed) brings a poster and a
   // breakdown: re-read the match.
-  const readyKey = filmStatus.status ? filmStatus.status.angles.filter((a) => a.state === "ready").map((a) => a.video_id).join(",") : "";
-  const lastReady = React.useRef(readyKey);
+  const readyKey = filmStatus.status ? filmStatus.status.angles.filter((a) => a.state === "ready").map((a) => a.video_id).join(",") : null;
+  // Seeded by the first status read (no extra get_match_details on open).
+  const lastReady = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (readyKey === lastReady.current) return;
+    if (readyKey == null) return;
+    const prev = lastReady.current;
     lastReady.current = readyKey;
-    refetch();
+    if (prev != null && prev !== readyKey) refetch();
   }, [readyKey, refetch]);
   // The row lands when the upload settles, usually while this page is open:
   // re-read then instead of waiting for a focus or a pull (jits-n2im.4).
@@ -112,6 +115,8 @@ export default function MatchDetailScreen() {
   };
 
   // The timekeeper: get_match_details refuses them, the status admits them.
+  // While the status read is still out, keep the skeleton (no error flash).
+  const awaitingRole = state === "error" && error?.code === "NOT_PARTICIPANT" && filmStatus.loading;
   if (state === "error" && error?.code === "NOT_PARTICIPANT" && fsView?.role === "timekeeper" && filmStatus.status && matchId) {
     return (
       <View className="flex-1 bg-surface">
@@ -150,9 +155,14 @@ export default function MatchDetailScreen() {
             {fsView ? (
               <FilmStatusPlate matchId={data.match.id} view={fsView} onWatch={(id) => play(id)} watchLabel={rowWatchLabel} />
             ) : null}
+            {/* What the plate has no row for: a landed clip that stops before the end. */}
+            {fsView && film.localUpload && showRecorderBanner(deriveUploadBannerState("idle", null, film.localUpload)) ? (
+              <MatchUploadCard matchId={data.match.id} entry={film.localUpload} />
+            ) : null}
             {data.videos.length > 1 && active ? (
               <AngleSwitcher
                 angles={data.videos}
+                bestId={fsView ? fsView.bestVideoId : undefined}
                 activeId={active.id}
                 opponentName={data.opponent?.display_name}
                 onSelect={film.setActiveId}
@@ -192,7 +202,7 @@ export default function MatchDetailScreen() {
           <View style={{ paddingHorizontal: 4, height: 48, justifyContent: "center" }}>
             <FilmBackButton label="Go back" fallback="/" color={p.text} />
           </View>
-          {state === "error" ? (
+          {state === "error" && !awaitingRole ? (
             <MatchDetailError code={error?.code ?? "UNKNOWN"} onBack={goBack} onRetry={refetch} />
           ) : (
             <MatchDetailSkeleton />

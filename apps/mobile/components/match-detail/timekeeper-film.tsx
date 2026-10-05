@@ -6,12 +6,13 @@ import { FilmStatusPlate } from "@/components/video-status/film-status-plate";
 import type { MatchVideoStatus } from "@jits/shared/api/match-video-status";
 import type { FilmStatusView } from "@/lib/video/film-status";
 import { usePalette } from "@/lib/theme/palette";
+import { TIMEKEEPER_TITLE_FALLBACK } from "@/lib/video/video-status-copy";
 import { TRACKING, typeStep } from "@/lib/typography";
 
 /** "M. Reyes vs D. Okafor" from the competitors' angle rows (the timekeeper has no participant row). */
 export function timekeeperMatchTitle(status: MatchVideoStatus): string {
   const names = status.angles.filter((a) => a.role === "competitor").map((a) => a.recorder_name_short).filter(Boolean);
-  return names.length === 2 ? `${names[0]} vs ${names[1]}` : "Match film";
+  return names.length === 2 ? `${names[0]} vs ${names[1]}` : TIMEKEEPER_TITLE_FALLBACK;
 }
 
 /**

@@ -931,4 +931,31 @@ describe("the Film status plate (jits-n2im.25) and the video pushes landing on i
     const utils = await renderLoaded({ ok: false, error: { code: "NOT_PARTICIPANT", message: "x" } });
     expect(utils.getByTestId("match-detail-not-participant")).toBeTruthy();
   });
+
+  it("review 8: the timekeeper's landing keeps the skeleton while the status read is out (no error flash)", async () => {
+    filmMock.setMockFilmStatus({ view: null, status: null, error: null, loading: true });
+    mockGetMatchDetailView.mockResolvedValue({ ok: false, error: { code: "NOT_PARTICIPANT", message: "x" } });
+    const utils = render(React.createElement(MatchDetailScreen));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(utils.queryByTestId("match-detail-not-participant")).toBeNull();
+    expect(utils.getByTestId("match-detail-loading")).toBeTruthy();
+  });
+
+  it("review 9: the first status read does not re-read the match", async () => {
+    filmMock.setMockFilmStatus(derive({ phase: "ready", phase_reason: null, angles: [fx.angle("me", "ready", { video_id: "v-mine" })] }));
+    await renderLoaded(view());
+    expect(mockGetMatchDetailView).toHaveBeenCalledTimes(1);
+  });
+
+  it("review 4: a landed clip that stops before the end keeps its notice above the plate", async () => {
+    filmMock.setMockFilmStatus(derive({ angles: [fx.angle("me", "processing", { video_id: "v-mine" })] }));
+    act(() => {
+      setMatchUpload(mockMatchId, { status: "uploaded", videoId: "v-mine", progress: 1, truncation: "limit" });
+    });
+    const utils = await renderLoaded(view());
+    expect(utils.getByTestId("film-status")).toBeTruthy();
+    expect(utils.getByText(/The clip stops before the end of the match/)).toBeTruthy();
+  });
 });

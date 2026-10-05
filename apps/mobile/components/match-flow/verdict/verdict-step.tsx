@@ -14,6 +14,7 @@ import { rankStripText, useRankChange, useVerdictVideos } from "@/lib/match-flow
 import type { UploadBannerState } from "@/lib/video/upload-banner-state";
 import { isTerminalUploadClass } from "@/lib/video/upload-errors";
 import { useUploadActions } from "@/lib/video/use-upload-actions";
+import { showRecorderBanner } from "@/lib/video/upload-banner-state";
 import { buildShareText, buildShareUrl } from "@jits/shared/utils";
 import { UploadProgressBanner } from "../upload-progress-banner";
 import { usePalette } from "@/lib/theme/palette";
@@ -33,17 +34,6 @@ import { useFilmStatus } from "@/lib/video/use-film-status";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { HERO_CAPTION } from "@/lib/video/video-status-copy";
 import { videoHref } from "@/lib/film-room/href";
-
-/**
- * With the Film block on screen, the upload card stays only for what the
- * block has no row for: the recorder still finishing, a recorder failure
- * (no upload class), and a landed clip that stops before the end.
- */
-export function showRecorderBanner(upload: UploadBannerState): boolean {
-  if (upload.kind === "stopping") return true;
-  if (upload.kind === "error") return upload.errorClass == null;
-  return upload.kind === "uploaded" && upload.truncation != null;
-}
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;

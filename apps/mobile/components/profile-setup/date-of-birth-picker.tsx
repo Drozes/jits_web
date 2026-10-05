@@ -6,7 +6,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useWindowInsets } from "@/lib/layout/window-insets";
 import { isAtLeast16 } from "@/lib/profile-setup/validation";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { ON_MEDIA } from "@/lib/theme/palette";
@@ -53,7 +53,7 @@ interface DateOfBirthPickerProps {
 
 export function DateOfBirthPicker({ value, onChange }: DateOfBirthPickerProps) {
   const tokens = useThemedTokens();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowInsets();
   const animationType = useModalAnimation("slide");
   const [iosOpen, setIosOpen] = React.useState(false);
   // Track whether the user actually moved the iOS spinner; without this, tapping

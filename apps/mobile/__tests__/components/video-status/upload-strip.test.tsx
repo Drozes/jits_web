@@ -200,4 +200,31 @@ describe("UploadStripSlot", () => {
       expect(fs.readFileSync(require("path").join(__dirname, "../../..", f), "utf8")).toContain('useSuppressUploadStrip({ kind: "all" })');
     }
   });
+
+  it("a full-window sheet inside the frame still reads the real bottom inset (no collapse onto the home indicator)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useWindowInsets } = require("@/lib/layout/window-insets") as typeof import("@/lib/layout/window-insets");
+    function SheetProbe() {
+      return <Text testID="sheet">{String(useWindowInsets().bottom)}</Text>;
+    }
+    act(() => {
+      setMatchUpload("m1", { status: "uploading", progress: 0.1 });
+    });
+    mockSegments = ["(app)", "film-room"];
+    const s = render(
+      <StackStripFrame>
+        <InsetProbe />
+        <SheetProbe />
+      </StackStripFrame>,
+    );
+    expect(s.getByTestId("probe").props.children).toBe("0");
+    expect(s.getByTestId("sheet").props.children).toBe("34");
+  });
+
+  it("the practice match hides the strip on its countdown and live screen", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require("fs") as typeof import("fs");
+    const src = fs.readFileSync(require("path").join(__dirname, "../../..", "app/(app)/practice.tsx"), "utf8");
+    expect(src).toContain('useSuppressUploadStrip(phase === "live" ? { kind: "all" } : null)');
+  });
 });

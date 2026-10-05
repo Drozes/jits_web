@@ -176,3 +176,14 @@ export function deriveUploadBannerState(
 
   return { kind: "hidden", message: null, truncation: null, progress: null };
 }
+
+/**
+ * With the Film block on screen, the upload card stays only for what the
+ * block has no row for: the recorder still finishing, a recorder failure
+ * (no upload class), and a landed clip that stops before the end.
+ */
+export function showRecorderBanner(upload: UploadBannerState): boolean {
+  if (upload.kind === "stopping") return true;
+  if (upload.kind === "error") return upload.errorClass == null;
+  return upload.kind === "uploaded" && upload.truncation != null;
+}
