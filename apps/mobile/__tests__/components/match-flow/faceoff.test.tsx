@@ -31,6 +31,10 @@ jest.mock("@jits/shared/api/mutations", () => ({
   startMatch: (...a: unknown[]) => mockStart(...a),
 }));
 const mockUpdateWeight = jest.fn();
+const mockSetIntent = jest.fn();
+jest.mock("@jits/shared/api/match-video-upload", () => ({
+  setMatchRecordingIntent: (...a: unknown[]) => mockSetIntent(...a),
+}));
 jest.mock("@jits/shared/api/athlete-weight", () => ({
   ...jest.requireActual("@jits/shared/api/athlete-weight"),
   updateAthleteWeight: (...a: unknown[]) => mockUpdateWeight(...a),
@@ -68,6 +72,7 @@ import { FaceoffProvider } from "@/components/match-flow/faceoff/faceoff-context
 import { FaceoffTop } from "@/components/match-flow/faceoff/faceoff-top";
 import { FaceoffBody } from "@/components/match-flow/faceoff/faceoff-body";
 import { __resetRecordingOptInForTests, getRecordingOptIn } from "@/lib/match-flow/recording-optin";
+import { __resetRecordingIntentForTests } from "@/lib/match-flow/recording-intent";
 
 const ME = { display_name: "Kai Reyes", current_elo: 1512 };
 const OPP = { display_name: "Mina Park", current_elo: 1498 };
@@ -418,5 +423,51 @@ describe("face-off location re-poll (live location fixes 4.6): record only", () 
       fireEvent.press(s.getByTestId("weight-confirm"));
     });
     await waitFor(() => expect(onWeighedIn).toHaveBeenCalled());
+  });
+});
+
+describe("recording intent persisted to the server (jits-n2im.14)", () => {
+  beforeEach(() => {
+    __resetRecordingIntentForTests();
+    mockSetIntent.mockReset();
+    mockSetIntent.mockResolvedValue({ ok: true, data: undefined });
+  });
+
+  it("declares the toggle on entering the face-off and on every change", async () => {
+    const s = render(<Harness phase="ready" />);
+    await waitFor(() => expect(mockSetIntent).toHaveBeenCalledWith(expect.anything(), "M1", false));
+    act(() => {
+      fireEvent(s.getByTestId("faceoff-record-toggle"), "valueChange", true);
+    });
+    await waitFor(() => expect(mockSetIntent).toHaveBeenLastCalledWith(expect.anything(), "M1", true));
+    act(() => {
+      fireEvent(s.getByTestId("faceoff-record-toggle"), "valueChange", false);
+    });
+    await waitFor(() => expect(mockSetIntent).toHaveBeenLastCalledWith(expect.anything(), "M1", false));
+  });
+
+  it("readying up with the toggle ON sends true (once: ready only re-sends after a failure)", async () => {
+    __resetRecordingOptInForTests(true);
+    const s = render(<Harness phase="ready" />);
+    await waitFor(() => expect(mockSetIntent).toHaveBeenCalledWith(expect.anything(), "M1", true));
+    fireEvent.press(s.getByTestId("ready-button"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockSetIntent).toHaveBeenCalledTimes(1);
+    expect(mockSetIntent.mock.calls.every((c) => c[2] === true)).toBe(true);
+  });
+
+  it("an RPC failure never blocks ready, and ready tries again", async () => {
+    mockSetIntent.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    const s = render(<Harness phase="ready" />);
+    await waitFor(() => expect(mockSetIntent).toHaveBeenCalled());
+    fireEvent.press(s.getByTestId("ready-button"));
+    // Ready went through regardless of the intent write.
+    await waitFor(() => s.getByText("YOU · READY"));
+    mockSetIntent.mockResolvedValue({ ok: true, data: undefined });
+    // The one retry (RECORDING_INTENT_RETRY_MS later) lands it.
+    await waitFor(() => expect(mockSetIntent.mock.calls.length).toBeGreaterThanOrEqual(2), { timeout: 4_000 });
+    expect(mockSetIntent).toHaveBeenLastCalledWith(expect.anything(), "M1", false);
   });
 });
