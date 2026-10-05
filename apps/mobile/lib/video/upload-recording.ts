@@ -7,6 +7,19 @@ import {
   buildMatchVideoStoragePath,
   upsertMatchVideo,
 } from "@jits/shared/api/mutations";
+import {
+  abandonMatchVideoUpload,
+  canUploadMatchVideo,
+  finalizeMatchVideoUpload,
+  getMatchVideoLifecycle,
+  reserveMatchVideoUpload,
+  touchMatchVideoUpload,
+  type AbandonMatchVideoResult,
+  type FinalizeMatchVideoOutcome,
+  type MatchVideoPreflight,
+  type ReservedMatchVideo,
+} from "@jits/shared/api/match-video-upload";
+import type { DomainError } from "@jits/shared/api/errors";
 import { describeUploadFailure, type UploadErrorClass } from "./upload-errors";
 import {
   AsyncStorageUrlStorage,
@@ -115,19 +128,39 @@ export class MatchVideoDbError extends Error {
   readonly storageObjectPersisted: boolean;
   /** The server-side gate that rejected the row, or null for any other failure. */
   readonly gate: MatchVideoGate | null;
+  /** Postgres / PostgREST error code (`42501`, `23505`, `P0001`), when there was one. */
+  readonly code: string | null;
+  /** The RAISE ... HINT (`invalid_storage_path`, a gate HINT), when there was one. */
+  readonly hint: string | null;
 
   constructor(
     message: string,
     path: string,
     storageObjectPersisted: boolean,
     gate: MatchVideoGate | null = null,
+    detail: { code?: string | null; hint?: string | null } = {},
   ) {
     super(message);
     this.name = "MatchVideoDbError";
     this.path = path;
     this.storageObjectPersisted = storageObjectPersisted;
     this.gate = gate;
+    this.code = detail.code || null;
+    this.hint = detail.hint || null;
   }
+}
+
+/** A `Result` failure as a `MatchVideoDbError`, keeping code, HINT and gate. */
+function dbErrorOf(error: DomainError, path: string, storageObjectPersisted: boolean): MatchVideoDbError {
+  const hint = error.raw?.hint ?? null;
+  const gated = matchVideoGateFor(hint);
+  return new MatchVideoDbError(
+    gated ? gated.message : error.message,
+    path,
+    storageObjectPersisted,
+    gated?.gate ?? null,
+    { code: error.raw?.code ?? null, hint },
+  );
 }
 
 /**
@@ -349,11 +382,105 @@ export async function writeMatchVideoRow({
     recordedBy: uploaderAthleteId,
   });
   if (!upserted.ok) {
-    const gated = matchVideoGateFor(upserted.error.raw?.hint);
-    if (gated) throw new MatchVideoDbError(gated.message, storagePath, true, gated.gate);
-    // The raw cause only: the upload manager adds the "Video uploaded, but
-    // saving the record failed" framing, and adding it here too doubled it.
-    throw new MatchVideoDbError(upserted.error.message, storagePath, true);
+    // The raw cause only (or the gate's final copy): the upload manager adds
+    // the "Video uploaded, but saving the record failed" framing, and adding
+    // it here too doubled it.
+    throw dbErrorOf(upserted.error, storagePath, true);
   }
   return upserted.data.id;
+}
+
+// ---------------------------------------------------------------------------
+// Reserve-before-bytes lifecycle (jits-n2im.11, jr_be INTEGRATION.md section 10)
+// ---------------------------------------------------------------------------
+
+/**
+ * `can_upload_match_video` for this athlete (jits-n2im.5). ADVISORY: null on
+ * any failure (offline, an older backend without the RPC), and the caller
+ * then goes straight to the reservation, whose triggers enforce the same
+ * predicates anyway.
+ */
+export async function preflightMatchVideoUpload(
+  matchId: string,
+  fileSizeBytes: number,
+): Promise<MatchVideoPreflight | null> {
+  const res = await canUploadMatchVideo(supabase, matchId, fileSizeBytes);
+  if (res.ok) return res.data;
+  console.warn(`[video] upload preflight for ${matchId} unavailable: ${res.error.message}`);
+  return null;
+}
+
+export interface ReserveRowParams {
+  matchId: string;
+  uploaderAthleteId: string;
+  storagePath: string;
+  fileSizeBytes: number;
+  recordStartedAt: string | null;
+  recordDurationMs: number | null;
+}
+
+/**
+ * INSERT the row at 'uploading' (or take the athlete's existing row over on
+ * 23505). Throws `MatchVideoDbError` carrying `code` / `hint` / `gate`; no
+ * bytes have been sent, so `storageObjectPersisted` is false.
+ */
+export async function reserveMatchVideoRow(params: ReserveRowParams): Promise<ReservedMatchVideo> {
+  const res = await reserveMatchVideoUpload(supabase, { ...params, transport: "tus" });
+  if (!res.ok) throw dbErrorOf(res.error, params.storagePath, false);
+  return res.data;
+}
+
+/**
+ * Heartbeat. Fire and forget: a failed touch only shortens the server's
+ * in-flight window, it never fails the upload.
+ */
+export async function touchMatchVideoRow(params: {
+  videoId: string;
+  bytesConfirmed: number;
+  bytesTotal: number;
+}): Promise<void> {
+  try {
+    const res = await touchMatchVideoUpload(supabase, { ...params, transport: "tus" });
+    if (!res.ok) console.warn(`[video] upload heartbeat for ${params.videoId} failed: ${res.error.message}`);
+  } catch (err) {
+    console.warn(`[video] upload heartbeat for ${params.videoId} failed:`, err);
+  }
+}
+
+/** PATCH 'uploading' -> 'ready'. Throws `MatchVideoDbError` on a failed write. */
+export async function finalizeMatchVideoRow(params: {
+  videoId: string;
+  storagePath: string;
+}): Promise<FinalizeMatchVideoOutcome> {
+  const res = await finalizeMatchVideoUpload(supabase, params);
+  if (!res.ok) throw dbErrorOf(res.error, params.storagePath, true);
+  return res.data;
+}
+
+/** `abandon_match_video_upload`, best effort: null when the call failed. */
+export async function abandonMatchVideoRow(videoId: string): Promise<AbandonMatchVideoResult | null> {
+  try {
+    const res = await abandonMatchVideoUpload(supabase, videoId);
+    if (res.ok) return res.data;
+    console.warn(`[video] abandon of ${videoId} failed: ${res.error.message}`);
+    captureException(new Error(`Match-video abandon failed: ${res.error.message}`), { videoId });
+  } catch (err) {
+    console.warn(`[video] abandon of ${videoId} failed:`, err);
+    captureException(err, { videoId });
+  }
+  return null;
+}
+
+/**
+ * The key a row points at now: a string (or null key), `null` when the row
+ * is gone, `undefined` when the read failed (unknown, try later).
+ */
+export async function readMatchVideoKey(videoId: string): Promise<string | null | undefined> {
+  try {
+    const res = await getMatchVideoLifecycle(supabase, videoId);
+    if (!res.ok) return undefined;
+    return res.data ? res.data.storagePath ?? "" : null;
+  } catch {
+    return undefined;
+  }
 }

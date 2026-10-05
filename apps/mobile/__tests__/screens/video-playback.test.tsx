@@ -553,11 +553,11 @@ function playableInMatch(url = "https://signed.example/v.mp4") {
   };
 }
 
-function detailView(videos = 2) {
+function detailView(videos = 2, extra: Record<string, unknown>[] = []) {
   const vids = [
     { id: "vid-1", uploaded_by: "me-1", uploaded_by_name: "Kai Reyes", is_mine: true, angle_label: "Your recording", playability: "playable", has_analysis: true },
     { id: "vid-2", uploaded_by: "opp-1", uploaded_by_name: "Mina Park", is_mine: false, angle_label: "Mina Park's recording", playability: "playable", has_analysis: false },
-  ].slice(0, videos);
+  ].slice(0, videos).concat(extra as never[]);
   return {
     state: "ready",
     error: null,
@@ -588,10 +588,10 @@ const ANALYSIS = {
   },
 };
 
-async function renderLoadedPlayer(opts: { videos?: number; analysis?: unknown } = {}) {
+async function renderLoadedPlayer(opts: { videos?: number; analysis?: unknown; extra?: Record<string, unknown>[] } = {}) {
   queries().getMatchVideoPlaybackResult.mockResolvedValue(playableInMatch());
   mockUseMatchDetail.mockImplementation((id: string | undefined) =>
-    id === MATCH ? detailView(opts.videos ?? 2) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
+    id === MATCH ? detailView(opts.videos ?? 2, opts.extra) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
   );
   mockGetVideoAnalysis.mockResolvedValue(opts.analysis ?? ANALYSIS);
   const utils = render(React.createElement(MatchVideoScreen));
@@ -786,5 +786,28 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(utils.queryByTestId("moment-chip-0")).toBeNull();
     expect(utils.queryByTestId("player-caption")).toBeNull();
     expect(utils.getByTestId("player-seek")).toBeTruthy();
+  });
+});
+
+describe("wave 2: the expo-video player offers only playable angles (jits-n2im.15, review minor 4)", () => {
+  it("hides an uploading reservation and an abandoned or failed angle from the switcher", async () => {
+    const utils = await renderLoadedPlayer({
+      videos: 1,
+      extra: [
+        { id: "vid-up", uploaded_by: "opp-1", uploaded_by_name: "Mina Park", is_mine: false, angle_label: "Mina Park's recording", status: "uploading", playability: "processing", has_analysis: false },
+        { id: "vid-ab", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, angle_label: "Jo Cruz's recording", status: "failed", playability: "failed", failure_code: "upload_abandoned", recording_type: "timekeeper", has_analysis: false },
+      ],
+    });
+    // One playable angle left: no switcher at all.
+    expect(utils.queryByTestId("angle-switcher")).toBeNull();
+  });
+
+  it("keeps the playable angles and drops the rest when there are still two", async () => {
+    const utils = await renderLoadedPlayer({
+      extra: [{ id: "vid-up", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, angle_label: "Jo Cruz's recording", status: "uploading", playability: "processing", has_analysis: false }],
+    });
+    utils.getByTestId("angle-switcher");
+    expect(utils.getByLabelText("M. PARK'S ANGLE")).toBeTruthy();
+    expect(utils.queryByTestId("angle-vid-up")).toBeNull();
   });
 });

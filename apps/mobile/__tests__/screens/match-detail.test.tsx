@@ -53,6 +53,12 @@ jest.mock("@/components/ui/skeleton", () => {
 });
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// Match-level match_videos realtime (jits-n2im.12): its own tests live in
+// packages/shared; here it is inert.
+const mockMatchVideosRealtime = jest.fn();
+jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
+  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a) ?? { subscribed: true },
+}));
 
 jest.mock("@/lib/auth/hooks", () => ({
   useAuth: () => ({ athlete: { id: "me-1" }, user: { id: "u" }, isLoading: false }),
@@ -330,12 +336,17 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     const utils = await renderLoaded(
       view({ videos: [video({ status: "uploading", playability: "processing" }), video({ ...OPP_VIDEO, status: "failed", playability: "failed" })] }),
     );
-    const processing = utils.getByLabelText("Processing");
+    // Review minor 3: a row that cannot play says what it is
+    // ("{label}, {tag}, {helper}"), not a blanket "Processing".
+    const processing = utils.getByLabelText("Your angle, Uploading");
     expect(processing.props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(processing);
     expect(mockPush).not.toHaveBeenCalled();
     expect(utils.getByText("UPLOADING")).toBeTruthy();
-    expect(utils.getByText("ANALYSIS FAILED · MAY STILL PLAY")).toBeTruthy();
+    // Another athlete's pipeline failure is grey "Not used" (deck 2c), and
+    // its original still plays.
+    expect(utils.getByText("NOT USED")).toBeTruthy();
+    expect(utils.getByText("This clip couldn't be processed.")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Watch Demo Red's recording"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-opp");
     // The selected angle (mine) cannot play yet, so the hero has no play.
@@ -755,5 +766,111 @@ describe("MatchDetailScreen (Film Room match page)", () => {
       expect(mockGetMatchDetailView.mock.calls.length).toBeGreaterThan(calls);
       expect(mockHighlightRefresh).toHaveBeenCalled();
     });
+  });
+});
+
+describe("wave 2: live angles, primary default, labels (jits-n2im.12 / .15)", () => {
+  it("shows the opponent's angle uploading with its percent, not watchable yet", async () => {
+    const utils = await renderLoaded(
+      view({
+        videos: [
+          video(),
+          video({
+            ...OPP_VIDEO,
+            status: "uploading",
+            playability: "processing",
+            upload_bytes_confirmed: 300,
+            upload_bytes_total: 1000,
+            upload_in_flight: true,
+          }),
+        ],
+      }),
+    );
+    const row = utils.getByTestId("match-video-watch-v-opp");
+    within(row).getByText("UPLOADING");
+    within(row).getByText("30%");
+    expect(row.props.accessibilityState).toMatchObject({ disabled: true });
+    expect(row.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 30 });
+  });
+
+  it("says the opponent's upload is paused when the server stopped hearing from it", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video(), video({ ...OPP_VIDEO, status: "uploading", playability: "processing", upload_in_flight: false })] }),
+    );
+    const row = utils.getByTestId("match-video-watch-v-opp");
+    within(row).getByText("PAUSED");
+    within(row).getByText("We haven't heard from D. Red's phone for a few minutes. It picks up where it left off.");
+  });
+
+  it("re-reads when realtime reports a change: the angle turns ready", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video(), video({ ...OPP_VIDEO, status: "uploading", playability: "processing", upload_in_flight: true })] }),
+    );
+    within(utils.getByTestId("match-video-watch-v-opp")).getByText("UPLOADING");
+    mockGetMatchDetailView.mockResolvedValue(view({ videos: [video(), video({ ...OPP_VIDEO, normalized_path: "n.mp4" })] }));
+    const onChange = mockMatchVideosRealtime.mock.calls[mockMatchVideosRealtime.mock.calls.length - 1][2] as () => void;
+    await act(async () => {
+      onChange();
+    });
+    await waitFor(() => within(utils.getByTestId("match-video-watch-v-opp")).getByText("READY TO WATCH"));
+  });
+
+  it("defaults to the server-elected primary angle, not my own", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO, is_primary: true })] }));
+    expect(utils.getByLabelText("D. RED'S ANGLE").props.accessibilityState).toMatchObject({ selected: true });
+    expect(utils.getByLabelText("YOUR ANGLE").props.accessibilityState).toMatchObject({ selected: false });
+  });
+
+  it("falls back to my own angle while nothing is elected", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO })] }));
+    expect(utils.getByLabelText("YOUR ANGLE").props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it("labels a timekeeper's angle by name with the Timekeeper tag, never as the opponent", async () => {
+    const utils = await renderLoaded(
+      view({
+        videos: [
+          video(),
+          video({ ...OPP_VIDEO }),
+          video({ id: "v-tk", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, recording_type: "timekeeper", angle_label: "Jo Cruz's recording" }),
+        ],
+      }),
+    );
+    const tk = utils.getByTestId("match-video-watch-v-tk");
+    within(tk).getByText("J. CRUZ'S ANGLE");
+    within(tk).getByText("TIMEKEEPER");
+    utils.getByText("FILM · 3 ANGLES");
+    utils.getByLabelText("J. CRUZ'S ANGLE, TIMEKEEPER");
+  });
+
+  it("an abandoned upload is Didn't upload and cannot be played", async () => {
+    const utils = await renderLoaded(
+      view({ videos: [video(), video({ ...OPP_VIDEO, status: "failed", playability: "failed", failure_code: "upload_abandoned" })] }),
+    );
+    const row = utils.getByTestId("match-video-watch-v-opp");
+    within(row).getByText("DIDN'T UPLOAD");
+    expect(row.props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});
+
+describe("review minor 4: only playable angles are offered in the switcher", () => {
+  it("hides an uploading reservation and an abandoned row (the switcher drops under two)", async () => {
+    const utils = await renderLoaded(
+      view({
+        videos: [
+          video(),
+          video({ ...OPP_VIDEO, status: "uploading", playability: "processing" }),
+          video({ id: "v-tk", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, recording_type: "timekeeper", status: "failed", playability: "failed", failure_code: "upload_abandoned" }),
+        ],
+      }),
+    );
+    expect(utils.queryByTestId("angle-switcher")).toBeNull();
+    // The abandoned row is not counted as an angle (nit 1).
+    utils.getByText("FILM · 2 ANGLES");
+  });
+
+  it("keeps two playable angles switchable", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO })] }));
+    utils.getByTestId("angle-switcher");
   });
 });

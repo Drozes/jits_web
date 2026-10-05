@@ -91,6 +91,13 @@ function library() {
   ];
 }
 
+// Each test mounts the whole grid (about 0.8 s alone), and renderLoaded
+// waits up to 5 s for it. With the default 5 s per-test timeout the RUNNER's
+// timeout fired first under a loaded parallel run, failing a test whose
+// waitFor would still have passed. The per-test budget must exceed the
+// waits inside it.
+jest.setTimeout(20_000);
+
 async function renderLoaded(result: unknown = page(library())) {
   mockGetMyMatchLibrary.mockResolvedValue(result);
   const utils = render(<FilmRoomScreen />);

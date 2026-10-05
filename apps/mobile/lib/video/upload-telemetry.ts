@@ -142,7 +142,8 @@ export function trackRunStart(info: RunInfo): void {
 /** One failed attempt (bytes or row), with its raw cause. */
 export function trackAttemptFailed(info: {
   matchId: string;
-  phase: "bytes" | "row";
+  /** "reserve": the match_videos reservation before any byte (jits-n2im.11). */
+  phase: "reserve" | "bytes" | "row";
   attempt: number;
   offset: number;
   status: number | null;
@@ -185,7 +186,7 @@ export function trackParked(info: {
   disposition: "paused" | "failed";
   klass: UploadErrorClass;
   status: number | null;
-  phase: "bytes" | "row";
+  phase: "reserve" | "bytes" | "row";
   raw: string | null;
 }): void {
   const data = {

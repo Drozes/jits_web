@@ -22,6 +22,7 @@ import { markMatchSeen } from "@/lib/film-room/seen-store";
 import { videoHref } from "@/lib/film-room/href";
 import { usePalette } from "@/lib/theme/palette";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
+import { angleWatchable, localAngleJob } from "@/lib/video/angle-status";
 
 /**
  * One past match, the Film Room's match page: the opening still with play,
@@ -93,7 +94,7 @@ export default function MatchDetailScreen() {
             fallbackLabel={film.fallbackLabel}
             playHint={film.playHint}
             clockSeconds={data.match.duration_seconds}
-            onPlay={active && active.playability !== "processing" ? () => play(active.id) : null}
+            onPlay={active && angleWatchable(active) ? () => play(active.id) : null}
           />
           <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 20 }}>
             <MatchVerdict view={data} />
@@ -116,7 +117,12 @@ export default function MatchDetailScreen() {
             ) : null}
             {section.upload && film.localUpload ? <MatchUploadCard matchId={data.match.id} entry={film.localUpload} /> : null}
             {section.films ? (
-              <FilmAngles videos={data.videos} opponentName={data.opponent?.display_name ?? null} onWatch={(id) => play(id)} />
+              <FilmAngles
+                videos={data.videos}
+                opponentName={data.opponent?.display_name ?? null}
+                onWatch={(id) => play(id)}
+                local={localAngleJob(film.localUpload)}
+              />
             ) : null}
             {section.noVideo ? <MatchNoVideo /> : null}
             {/* The viewer's own reel of each recording, under the film. */}

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useVideoProgress } from "@jits/shared/hooks/use-video-progress";
-import { buildKeyMoments, isNoMatch, type KeyMoment } from "@jits/shared/utils";
+import { buildKeyMoments, defaultMatchAngle, isNoMatch, type KeyMoment } from "@jits/shared/utils";
 import type { MatchDetailView, MatchDetailVideo } from "@jits/shared/api/queries";
 import { useMatchUpload, type MatchUploadEntry } from "@/lib/video/match-upload-store";
 import type { VideoAnalysis } from "@jits/shared/api/film-room";
@@ -35,14 +35,16 @@ export interface MatchFilm {
 
 /**
  * Everything the match page derives from its recordings: the selected angle
- * (the viewer's own first), live analysis progress while it runs (re-reading
+ * (the server-elected primary, else the viewer's own first), live analysis progress while it runs (re-reading
  * the breakdown the moment the merge lands), the breakdown itself, its key
  * moments and technique tags, and the hero's fallback caption.
  */
 export function useMatchFilm(view: MatchDetailView | null, matchId: string): MatchFilm {
   const videos = view?.videos ?? [];
   const [activeId, setActiveId] = React.useState<string | null>(null);
-  const active = videos.find((v) => v.id === activeId) ?? videos[0] ?? null;
+  // The server-elected primary angle is the default (jits-n2im.15), else the
+  // viewer's own, then the server's order. A pick by the athlete wins.
+  const active = videos.find((v) => v.id === activeId) ?? defaultMatchAngle(videos);
 
   const watching =
     !!active && !active.has_analysis && active.playability === "playable" && PIPELINE.has(active.status);

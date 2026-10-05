@@ -26,12 +26,12 @@ import { UPLOAD_JOB_RETENTION_DAYS } from "./upload-persistence";
  * earlier "The recording is saved on this device" was broken by exactly
  * that cleanup (jits-w2h7 item 5).
  *
- * TODO(jr_be-1qz.2): the preflight half of jits-n2im.5 (call
- * `can_upload_match_video` when the athlete turns "Record from my phone" on
- * at face-off, and again before the upload, showing remaining_today /
- * resets_at up front) waits for that backend RPC. Until it ships, the gate
- * classes below are only learned AFTER the bytes are up, from the
- * `match_videos` insert.
+ * Since OTA wave 2 (jits-n2im.5 / .11) the gate classes are learned BEFORE
+ * any byte moves: from the `can_upload_match_video` preflight
+ * (`preflightClass`) and from the reservation INSERT (`classifyReserveFailure`).
+ * Both map onto the same classes, so the athlete reads the same sentence
+ * whichever step caught it. The face-off half of the preflight (showing the
+ * reason when the athlete turns "Record from my phone" on) is not wired yet.
  */
 export type UploadErrorClass =
   /** No HTTP status: DNS, TLS, socket reset, airplane mode. */
@@ -208,4 +208,61 @@ export function httpClassOf(status: number | null): "none" | "4xx" | "5xx" | "ot
   if (status >= 400 && status < 500) return "4xx";
   if (status >= 500) return "5xx";
   return "other";
+}
+
+function fieldOf(err: unknown, key: "code" | "hint"): string | null {
+  const v = (err as Record<string, unknown> | null)?.[key];
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/**
+ * Classify a failed RESERVATION (the INSERT at 'uploading', jits-n2im.11).
+ * No byte has been sent, so this can never be `save_failed` ("Video
+ * uploaded, but ..."): a transient database failure reads as the server
+ * family, a transport failure as offline.
+ *
+ *   gate HINT (P0001)   its gate class (limit, disabled, not_in_cohort, reslice_limit)
+ *   42501               not_allowed (RLS: not a participant, or a bad storage path
+ *                       the manager could not repair)
+ *   JWT / not signed in auth
+ *   network text        offline
+ *   anything else       server
+ */
+export function classifyReserveFailure(err: unknown): UploadErrorClass {
+  const gate = (err as { gate?: unknown } | null)?.gate;
+  if (typeof gate === "string" && GATE_CLASS[gate]) return GATE_CLASS[gate];
+  const code = fieldOf(err, "code");
+  const message = messageOf(err);
+  if (code === "PGRST301" || /not signed in|jwt/i.test(message)) return "auth";
+  if (code === "42501") return "not_allowed";
+  if (code == null && /network request failed|failed to fetch|network ?error|timed? ?out|load failed/i.test(message)) {
+    return "offline";
+  }
+  return "server";
+}
+
+/**
+ * The class a `can_upload_match_video` refusal maps to, or null when the
+ * reservation should go ahead: allowed, `duplicate` (the athlete's existing
+ * row is resumed by the reservation's 23505 path), or a reason this build
+ * does not know (the reservation's own triggers are authoritative).
+ */
+export function preflightClass(reason: string | null | undefined): UploadErrorClass | null {
+  switch (reason) {
+    case "rate_limited":
+      return "limit";
+    case "disabled":
+      return "disabled";
+    case "not_in_cohort":
+      return "not_in_cohort";
+    case "reslice_limit":
+      return "reslice_limit";
+    case "file_too_large":
+      return "too_large";
+    case "not_participant":
+    case "match_not_found":
+      return "not_allowed";
+    default:
+      return null;
+  }
 }

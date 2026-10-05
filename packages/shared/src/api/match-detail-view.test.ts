@@ -690,7 +690,7 @@ describe("getMyMatchVideos", () => {
     if (!r.ok) expect(r.error.code).toBe("UNKNOWN");
   });
 
-  it("groups two uploaders into one item with history metadata; failed counts as playable", async () => {
+  it("groups two uploaders into one item with history metadata; failed does NOT count as playable (wave 2 review minor 4)", async () => {
     const m = mockClient({
       list: {
         data: [
@@ -717,7 +717,7 @@ describe("getMyMatchVideos", () => {
           opponent_name: "Bob",
           outcome: "win",
           video_count: 2,
-          playable_count: 2,
+          playable_count: 1,
           latest_video_at: "2026-09-20T10:08:00Z",
         },
       ],

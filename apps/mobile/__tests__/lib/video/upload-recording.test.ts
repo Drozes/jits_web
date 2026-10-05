@@ -111,7 +111,29 @@ jest.mock("@jits/shared/api/mutations", () => ({
   upsertMatchVideo: (...args: unknown[]) => mockUpsertMatchVideo(...args),
 }));
 
+const mockReserve = jest.fn();
+const mockTouch = jest.fn();
+const mockFinalize = jest.fn();
+const mockAbandon = jest.fn();
+const mockCanUpload = jest.fn();
+const mockLifecycle = jest.fn();
+
+jest.mock("@jits/shared/api/match-video-upload", () => ({
+  reserveMatchVideoUpload: (...args: unknown[]) => mockReserve(...args),
+  touchMatchVideoUpload: (...args: unknown[]) => mockTouch(...args),
+  finalizeMatchVideoUpload: (...args: unknown[]) => mockFinalize(...args),
+  abandonMatchVideoUpload: (...args: unknown[]) => mockAbandon(...args),
+  canUploadMatchVideo: (...args: unknown[]) => mockCanUpload(...args),
+  getMatchVideoLifecycle: (...args: unknown[]) => mockLifecycle(...args),
+}));
+
 import {
+  abandonMatchVideoRow,
+  finalizeMatchVideoRow,
+  preflightMatchVideoUpload,
+  readMatchVideoKey,
+  reserveMatchVideoRow,
+  touchMatchVideoRow,
   MAX_UPLOAD_BYTES,
   MatchVideoDbError,
   SUPABASE_TUS_CHUNK_SIZE,
@@ -475,5 +497,110 @@ describe("buildVideoPath / getRecordingSize", () => {
     expect(await getRecordingSize("file://gone.mp4")).toBeNull();
     mockGetInfoAsync.mockRejectedValue(new Error("nope"));
     expect(await getRecordingSize("file://gone.mp4")).toBeNull();
+  });
+});
+
+describe("reserve-before-bytes wrappers (jits-n2im.11)", () => {
+  const pgError = (code: string, hint: string, message = "server said no") => ({
+    ok: false,
+    error: { code: "UNKNOWN", message, raw: { code, hint, message, details: "" } },
+  });
+
+  beforeEach(() => {
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    (console.warn as jest.Mock).mockRestore?.();
+  });
+
+  it("reserve declares the tus transport and returns the row", async () => {
+    mockReserve.mockResolvedValueOnce({ ok: true, data: { id: "V", status: "uploading", storagePath: "M/A/1.mp4" } });
+    const row = await reserveMatchVideoRow({
+      matchId: "M",
+      uploaderAthleteId: "A",
+      storagePath: "M/A/1.mp4",
+      fileSizeBytes: 9,
+      recordStartedAt: null,
+      recordDurationMs: null,
+    });
+    expect(row.id).toBe("V");
+    expect(mockReserve.mock.calls[0][1]).toMatchObject({ transport: "tus", storagePath: "M/A/1.mp4" });
+  });
+
+  it("reserve throws a MatchVideoDbError carrying the gate (final copy), code and HINT", async () => {
+    mockReserve.mockResolvedValueOnce(pgError("P0001", "upload_rate_limited", "Upload limit reached: at most 10"));
+    const err = (await reserveMatchVideoRow({
+      matchId: "M",
+      uploaderAthleteId: "A",
+      storagePath: "M/A/1.mp4",
+      fileSizeBytes: 9,
+      recordStartedAt: null,
+      recordDurationMs: null,
+    }).catch((e) => e)) as MatchVideoDbError;
+    expect(err).toBeInstanceOf(MatchVideoDbError);
+    expect(err.gate).toBe("rate_limited");
+    expect(err.code).toBe("P0001");
+    expect(err.hint).toBe("upload_rate_limited");
+    expect(err.storageObjectPersisted).toBe(false);
+    // The athlete's copy, not the server's sentence.
+    expect(err.message).not.toContain("at most 10");
+  });
+
+  it("reserve keeps 42501 invalid_storage_path machine-readable", async () => {
+    mockReserve.mockResolvedValueOnce(pgError("42501", "invalid_storage_path"));
+    const err = (await reserveMatchVideoRow({
+      matchId: "M",
+      uploaderAthleteId: "A",
+      storagePath: "bad",
+      fileSizeBytes: 9,
+      recordStartedAt: null,
+      recordDurationMs: null,
+    }).catch((e) => e)) as MatchVideoDbError;
+    expect(err.code).toBe("42501");
+    expect(err.hint).toBe("invalid_storage_path");
+    expect(err.gate).toBeNull();
+  });
+
+  it("touch never throws, even when the RPC fails or throws", async () => {
+    mockTouch.mockResolvedValueOnce(pgError("42501", "not_uploader"));
+    await expect(touchMatchVideoRow({ videoId: "V", bytesConfirmed: 1, bytesTotal: 2 })).resolves.toBeUndefined();
+    mockTouch.mockRejectedValueOnce(new Error("socket"));
+    await expect(touchMatchVideoRow({ videoId: "V", bytesConfirmed: 1, bytesTotal: 2 })).resolves.toBeUndefined();
+    expect(mockTouch.mock.calls[0][1]).toEqual({ videoId: "V", bytesConfirmed: 1, bytesTotal: 2, transport: "tus" });
+  });
+
+  it("finalize returns the outcome or throws with storageObjectPersisted", async () => {
+    mockFinalize.mockResolvedValueOnce({ ok: true, data: { outcome: "landed", status: "ready" } });
+    await expect(finalizeMatchVideoRow({ videoId: "V", storagePath: "M/A/1.mp4" })).resolves.toEqual({
+      outcome: "landed",
+      status: "ready",
+    });
+    mockFinalize.mockResolvedValueOnce(pgError("", "", "TypeError: Network request failed"));
+    const err = (await finalizeMatchVideoRow({ videoId: "V", storagePath: "M/A/1.mp4" }).catch((e) => e)) as MatchVideoDbError;
+    expect(err.storageObjectPersisted).toBe(true);
+  });
+
+  it("abandon and preflight answer null on failure (advisory)", async () => {
+    mockAbandon.mockResolvedValueOnce(pgError("42501", "not_uploader"));
+    expect(await abandonMatchVideoRow("V")).toBeNull();
+    mockAbandon.mockResolvedValueOnce({ ok: true, data: { status: "failed", abandoned: true } });
+    expect(await abandonMatchVideoRow("V")).toEqual({ status: "failed", abandoned: true });
+    mockCanUpload.mockResolvedValueOnce(pgError("PGRST202", ""));
+    expect(await preflightMatchVideoUpload("M", 10)).toBeNull();
+    mockCanUpload.mockResolvedValueOnce({ ok: true, data: { allowed: true, reason: null } });
+    expect(await preflightMatchVideoUpload("M", 10)).toEqual({ allowed: true, reason: null });
+  });
+});
+
+describe("readMatchVideoKey (review R2-m1)", () => {
+  it("returns the key, null for a gone row, undefined when unknown", async () => {
+    mockLifecycle.mockResolvedValueOnce({ ok: true, data: { status: "uploading", storagePath: "M/A/1.mp4", failureCode: null } });
+    expect(await readMatchVideoKey("V")).toBe("M/A/1.mp4");
+    mockLifecycle.mockResolvedValueOnce({ ok: true, data: null });
+    expect(await readMatchVideoKey("V")).toBeNull();
+    mockLifecycle.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    expect(await readMatchVideoKey("V")).toBeUndefined();
+    mockLifecycle.mockRejectedValueOnce(new Error("boom"));
+    expect(await readMatchVideoKey("V")).toBeUndefined();
   });
 });
