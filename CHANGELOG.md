@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Arena live switch: a stale declined web session (jits-smgb)
+
+JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25). No backend change.
+
+**Fixed**
+- `useArenaLive` (`apps/mobile/lib/arena/use-arena-live.ts`) forgets a declined live session started elsewhere once this phone's own go-live write lands: the server's `true` is then the athlete's choice made here, not the session it declined. Before, the stale decline survived, so the own-row check could skip adopting a later web session and every go-offline wrote an extra defensive `false`. Found by the live-intent property test (seeds 627669244, 205739258, 492049162), which failed deterministically on those seeds in CI.
+- Regression tests: a pinned-seed case in `apps/mobile/__tests__/lib/arena/live-intent-property.test.ts` and a deterministic case in `apps/mobile/__tests__/lib/arena/use-arena-live.test.ts`.
+
 ### Match player: angle switch in place (multi-angle P0)
 
 JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): uses only expo-video 3.0.16 APIs build 25 already links (`replaceAsync`, `currentTime`, `pause`, `playbackRate`, `onFirstFrameRender`). No backend change. Research: `research/2026-10-multi-angle-playback/`.
