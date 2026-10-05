@@ -975,11 +975,23 @@ export function useArenaChallenge({
       if (status === "started" || (status === "accepted" && mode === "fallback")) {
         // Starting it myself: the proximity gate (both flags on) needs my
         // fresh reading too. Off: no reading at all.
-        if (status === "accepted" && proximityRequiredRef.current) {
+        const tookReading = status === "accepted" && proximityRequiredRef.current;
+        if (tookReading) {
           await reportArenaReading(challengeId, { ask: false });
         }
-        const started = await startMatchFromChallenge(supabase, challengeId);
-        if (!started.ok && isProximityRefusal(started.error.code)) markMatchProximityRequired(true);
+        let started = await startMatchFromChallenge(supabase, challengeId);
+        if (!started.ok && isProximityRefusal(started.error.code)) {
+          markMatchProximityRequired(true);
+          // Like the accepter (N5): a server that still gates on proximity
+          // though the app read the flag off (just turned on, or an older
+          // backend): take the reading this start would have taken (never
+          // asking), then start once more.
+          if (!tookReading && status === "accepted") {
+            markMatchLocationRequired(true);
+            await reportArenaReading(challengeId, { ask: false });
+            started = await startMatchFromChallenge(supabase, challengeId);
+          }
+        }
         if (started.ok) {
           enterMatch(challengeId, started.data.match_id, mine.opponentId);
           return;

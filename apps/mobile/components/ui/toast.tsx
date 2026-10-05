@@ -5,7 +5,27 @@ import RNToast, {
   type ToastConfigParams,
   type ToastShowParams,
 } from "react-native-toast-message";
+import * as SafeArea from "react-native-safe-area-context";
 import { cn } from "@/lib/cn";
+
+/** The header bar's height below the safe area (`BrandHeader`, `TabHeader`, `AppHeader`). */
+const HEADER_BAR_HEIGHT = 56;
+
+/**
+ * Where toasts sit: below the status bar AND the header bar, so a toast never
+ * covers the wordmark or the header status chip it is often about (review
+ * round 1, UX defect 6). The library default (40 pt) sat under the Dynamic
+ * Island and over the header. No safe area provider (tests): just the bar.
+ */
+/** Read once: a test double of the library may not export the context. */
+const InsetsContext: React.Context<{ top: number } | null> =
+  (SafeArea as { SafeAreaInsetsContext?: React.Context<{ top: number } | null> }).SafeAreaInsetsContext ??
+  React.createContext<{ top: number } | null>(null);
+
+export function useToastTopOffset(): number {
+  const insets = React.useContext(InsetsContext);
+  return (insets?.top ?? 0) + HEADER_BAR_HEIGHT + 4;
+}
 
 /**
  * Toast wrapper around `react-native-toast-message`. Mirrors the `sonner` API
@@ -162,7 +182,7 @@ export const toastConfig: ToastConfig = {
 
 /** The library host, pre-wired with the branded config. */
 export function Toaster() {
-  return <RNToast config={toastConfig} />;
+  return <RNToast config={toastConfig} topOffset={useToastTopOffset()} />;
 }
 
 /**
@@ -192,7 +212,7 @@ export function ModalToaster() {
       }, 0);
     };
   }, []);
-  return <RNToast config={toastConfig} />;
+  return <RNToast config={toastConfig} topOffset={useToastTopOffset()} />;
 }
 
 export default toast;

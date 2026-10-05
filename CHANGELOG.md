@@ -28,6 +28,15 @@ Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) an
 **Removed**
 - The 60 s go-live reading refresh while live (`useGoLiveReadingRefresh`); it remains only as `useLegacyGoLiveReadingRefresh` against a backend without the migration.
 
+**Fixed (review round 1)**
+- The 15 s recovery window restarts after any sheet, system dialog or fix, and an in-flight report or write is always awaited: a slow answer can no longer leave the tag stored without the live write, or say "failed" and then turn LIVE.
+- Only the athlete's own go-offline cancels a restore; a background or match parks it, a failure while away keeps the resume intent, and a cold-start restore that does not land always clears the stale `looking_for_ranked = true`.
+- The device store keeps the go-live tag apart from browse / arena readings (memory only), so browse reports neither overwrite the tag nor write the keychain; readings are stored only for the athlete the request was made for; involuntary sign-outs clear it too; it is read as soon as the athlete row loads.
+- Restores never draw a provisional LIVE or a GOING LIVE flash (hold instead), and the flag read is bounded at 3 s.
+- No RECONNECTING flicker on foreground (2 s grace, never over a restore); the server-ended check runs every 30 s; toasts sit below the header (`components/ui/toast.tsx`).
+- Drift logs `retagged` only once the server took the new tag; the challenger's fallback start retries with a reading like the accepter.
+- Dev-only QA hooks (`apps/mobile/lib/arena/dev-go-live-hooks.ts`, dev menu "Go live: ..." items and `__goLiveDev`), inert in production; documented in `research/019-optimistic-go-live-ux.md` appendix A.
+
 ### Live location fixes: Allow Once rejoin, GOING LIVE feedback, Precise Location copy, platform header, attempt logging (jits-3i0n.1 to .6)
 
 Built to jr_be `specs/016-invites/addendum-live-location-fixes.md` section 4. JS-only on mobile (OTA-eligible: no native dependency, no `app.json` / `app.config.js` change; `expo-location`, `expo-application` and `expo-updates` are already in build 25). Item 3b (the Swift accuracy module and `NSLocationTemporaryUsageDescriptionDictionary`) is NOT in this slice and needs a TestFlight build.

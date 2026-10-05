@@ -39,6 +39,13 @@
  * already granted. Drawn live from the first frame with a valid tag, FINDING
  * YOU without one (UX 019, C2). No rung lands: no live write, one toast.
  *
+ * THE RECOVERY WINDOW (15 s) covers network phases only (review round 1,
+ * B1): it starts at the tap for rungs 1 to 3, and starts again whenever a
+ * report follows an interactive wait (a sheet, the system dialog, a fresh
+ * fix). It only stops NEW retries: a write or report already in flight is
+ * always awaited, and its answer is final, so a late success is a success
+ * and nothing says "failed" before the server has.
+ *
  * OLD BACKEND: a replay with `p_captured_at` answered `PGRST202` means the
  * instant go-live migration is not on the server yet: the capability flips
  * to `legacy` and the ladder falls to the fresh reading (rung 4), exactly
@@ -57,10 +64,13 @@ import type { LocationReading } from "@jits/shared/api/invites";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce, readOsCachedFix } from "@/lib/invites/location";
 import {
-  clearDeviceLocation,
+  clearDeviceReading,
+  clearDeviceTag,
+  getDeviceLocationOwner,
   isDeviceLocationLoaded,
   loadDeviceLocation,
   recordAcceptedReading,
+  validDeviceReading,
   validDeviceTag,
 } from "@/lib/location/device-location-store";
 import {
@@ -103,7 +113,8 @@ import {
   type ReadOutcome,
 } from "./go-live-location";
 import { logGoLiveAttempt } from "./location-telemetry";
-import { readMatchLocationRequired } from "./match-location-flag";
+import { markMatchLocationRequired, readMatchLocationRequired } from "./match-location-flag";
+import { withDevFault } from "./dev-go-live-hooks";
 
 // ---------------------------------------------------------------------------
 // Timings (UX 019, 2.3)
@@ -121,6 +132,8 @@ export const FINDING_ANNOUNCE_AFTER_MS = 1_000;
 export const RECOVERY_BACKOFF_MS: readonly number[] = [1_000, 2_000, 4_000];
 /** A fresh fix whose report could not land is kept this long for Retry (UX 019, 3g). */
 export const UNREPORTED_FIX_MAX_AGE_MS = 2 * 60 * 1000;
+/** A restore waits this long on the flag read, then goes by the owner's hint (S2). */
+export const FLAG_READ_BOUND_MS = 3_000;
 /** The device-side tag window (4 h minus the 2 minute margin). */
 const TAG_WINDOW_MS = GO_LIVE_TAG_MAX_AGE_MS - GO_LIVE_TAG_MARGIN_MS;
 
@@ -166,11 +179,10 @@ function takeUnreportedFix(now: number = Date.now()): Tag | null {
 // One attempt: its clock, its display and its announcements
 // ---------------------------------------------------------------------------
 
-const TIMED_OUT = Symbol("timed-out");
-
 class Attempt {
   readonly t0 = Date.now();
-  readonly deadline = this.t0 + RECOVERY_WINDOW_MS;
+  /** End of the current network phase's recovery window. */
+  private deadline = this.t0 + RECOVERY_WINDOW_MS;
   /** The chip is drawn green right now on this attempt's say-so. */
   green = false;
   private announcedLive = false;
@@ -189,6 +201,15 @@ class Attempt {
 
   timeLeft(): number {
     return this.deadline - Date.now();
+  }
+
+  /**
+   * A network phase begins after an interactive wait (a sheet, the system
+   * dialog, a fresh fix): it gets its own full window (B1). Time the athlete
+   * spent on a sheet never counts against the network.
+   */
+  restartWindow(): void {
+    this.deadline = Date.now() + RECOVERY_WINDOW_MS;
   }
 
   private later(ms: number, fn: () => void): void {
@@ -266,23 +287,6 @@ class Attempt {
     return r === "slept" && !this.aborted();
   }
 
-  /** `work`, or TIMED_OUT once the recovery window is spent. Never rejects. */
-  async within<T>(work: Promise<T>): Promise<T | typeof TIMED_OUT> {
-    const left = this.timeLeft();
-    if (left <= 0) return TIMED_OUT;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      return await Promise.race([
-        work,
-        new Promise<typeof TIMED_OUT>((resolve) => {
-          timer = setTimeout(() => resolve(TIMED_OUT), left);
-        }),
-      ]);
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
   dispose(): void {
     for (const t of this.timers) clearTimeout(t);
     this.timers = [];
@@ -311,8 +315,9 @@ async function writeLive(a: Attempt, w: LiveWriter, canWrite?: () => "ok" | "par
       const c = canWrite();
       if (c !== "ok") return c;
     }
-    const r = await a.within(w.write().catch(() => false));
-    if (r === TIMED_OUT) return "network";
+    // Never raced against the window: the write in flight is always awaited
+    // and its answer is final (a late success is a success, B1).
+    const r = await withDevFault("write", () => w.write().catch(() => false), false);
     if (r) return "ok";
     if (w.lastRefusal() === "location_required") return "refused";
     if (a.timeLeft() <= 0) return "network";
@@ -338,14 +343,19 @@ type ReportResult =
  */
 async function reportTag(
   a: Attempt,
+  athleteId: string,
   reading: LocationReading,
   sendCapturedAt: number | null,
   deviceCapturedAt: number,
 ): Promise<ReportResult> {
   for (let i = 0; ; i++) {
     if (a.aborted()) return { kind: "aborted" };
-    const res = await a.within(reportGoLivePresence(supabase, reading, { capturedAt: sendCapturedAt }));
-    if (res === TIMED_OUT) return { kind: "network" };
+    // Awaited, never raced (B1): a report that lands late still counts.
+    const res = await withDevFault(
+      "report",
+      () => reportGoLivePresence(supabase, reading, { capturedAt: sendCapturedAt }),
+      { ok: false as const, error: { hint: "unknown", message: "network" } },
+    );
     if (!res.ok) {
       // The older backend has no `p_captured_at`: never resend without it
       // (it would store a replayed location as fresh). Fresh reading instead.
@@ -367,16 +377,21 @@ async function reportTag(
     // backwards, D2): it is the server's, not this reading; keep the store.
     const kept = res.data.captured_at ? Date.parse(res.data.captured_at) : NaN;
     if (!(Number.isFinite(kept) && sendCapturedAt !== null && kept > sendCapturedAt + 1_000)) {
-      recordAcceptedReading("go_live", reading, deviceCapturedAt, res.data);
+      recordAcceptedReading("go_live", reading, deviceCapturedAt, res.data, athleteId);
     }
     return { kind: "ok" };
   }
 }
 
-/** A fresh reading's reporter for rung 4 (with the same silent recovery). */
-function freshReporter(a: Attempt): FreshReporter {
+/**
+ * A fresh reading's reporter for rung 4 (with the same silent recovery). The
+ * fix (and any sheet or system dialog before it) is over: the report starts
+ * a fresh recovery window (B1).
+ */
+function freshReporter(a: Attempt, athleteId: string): FreshReporter {
   return async (reading, capturedAt) => {
-    const r = await reportTag(a, reading, null, capturedAt);
+    a.restartWindow();
+    const r = await reportTag(a, athleteId, reading, null, capturedAt);
     if (r.kind === "ok") return { kind: "ok", reading };
     if (r.kind === "refused") {
       if (r.code === "accuracy_too_low") return { kind: "accuracy", reading };
@@ -409,7 +424,7 @@ async function replay(
     const c = canWrite();
     if (c !== "ok") return { kind: c };
   }
-  const rep = await reportTag(a, tag.reading, tag.capturedAt, tag.capturedAt);
+  const rep = await reportTag(a, w.athleteId, tag.reading, tag.capturedAt, tag.capturedAt);
   if (rep.kind === "refused") return { kind: "next", code: rep.code };
   if (rep.kind !== "ok") return rep;
   const wr = await writeLive(a, w, canWrite);
@@ -447,6 +462,8 @@ export function scheduleBackgroundRefresh(source: GoLiveTagSource, tagCapturedAt
     return;
   }
   const runnable = () => AppState.currentState === "active" && !isInArenaMatch();
+  // Stored only for the athlete this refresh was started for (N2).
+  const athleteId = getDeviceLocationOwner();
   void (async () => {
     const perm = await permissionState();
     if (!perm.granted || perm.coarse || !runnable()) return;
@@ -455,7 +472,7 @@ export function scheduleBackgroundRefresh(source: GoLiveTagSource, tagCapturedAt
     const res = await reportGoLivePresence(supabase, loc.reading);
     if (!res.ok) return;
     notePresenceAnswer(res.data);
-    recordAcceptedReading("go_live", loc.reading, loc.capturedAt ?? Date.now(), res.data);
+    recordAcceptedReading("go_live", loc.reading, loc.capturedAt ?? Date.now(), res.data, athleteId);
   })().catch(() => undefined);
 }
 
@@ -505,20 +522,23 @@ export async function goLiveFromTap(w: LiveWriter): Promise<boolean | LiveSwitch
 
   try {
     await loadDeviceLocation(w.athleteId);
+    // The go_live tag (rung 1, then replayed at rung 2) and the last browse
+    // or arena reading (rung 2 only), kept apart (S3).
     const entry = validDeviceTag(w.athleteId);
+    const stored = validDeviceReading(w.athleteId);
     const perm = await permissionState();
     let os: Tag | null = null;
     let osLooked = false;
     // Rung 3 looked up front when nothing else is in hand: it is evidence
     // for the flip, and it answers within 500 ms (GOING LIVE if it is
     // still running at 240 ms, from the guard's reveal).
-    if (!entry && perm.granted) {
+    if (!entry && !stored && perm.granted) {
       os = await readOsCachedFix(TAG_WINDOW_MS, OS_CACHE_BUDGET_MS, perm.coarse === true);
       osLooked = true;
     }
     const kept = takeUnreportedFix();
     if (flow.aborted) return dismissed();
-    const evidence = !!entry || !!os || !!kept;
+    const evidence = !!entry || !!stored || !!os || !!kept;
     if (evidence && !isKnownOffline()) a.flip();
     else if (!evidence && perm.granted) a.finding();
     // Evidence with no connection: GOING LIVE from the guard's 240 ms reveal.
@@ -533,18 +553,23 @@ export async function goLiveFromTap(w: LiveWriter): Promise<boolean | LiveSwitch
     const stop = (kind: string): boolean | LiveSwitchIgnored => (kind === "network" ? giveUp() : dismissed());
 
     // Rung 1: the server still holds this tag.
-    if (entry && entry.context === "go_live") {
+    if (entry) {
       const r = await writeLive(a, w);
       const h = handle({ kind: r });
       if (h === "live") return succeed("server_tag", tagOf(entry));
       if (h === "stop") return stop(r);
     }
-    // Rung 2: the device-stored location, with its capture time.
-    if (entry && getPresenceCapability() !== "legacy") {
-      const r = await replay(a, w, tagOf(entry));
-      if (r.kind === "live") return succeed("device", tagOf(entry));
+    // Rung 2: the device-stored locations, each with its capture time: the
+    // tag the server lost, then the last browse / arena reading.
+    for (const [cand, clear] of [
+      [entry, clearDeviceTag],
+      [stored, clearDeviceReading],
+    ] as const) {
+      if (!cand || getPresenceCapability() === "legacy") continue;
+      const r = await replay(a, w, tagOf(cand));
+      if (r.kind === "live") return succeed("device", tagOf(cand));
       if (r.kind === "next") {
-        clearDeviceLocation(w.athleteId);
+        clear(w.athleteId);
         if (r.code === "tag_too_old") refusedOld = true;
       } else if (r.kind !== "legacy") return stop(r.kind);
     }
@@ -574,7 +599,11 @@ export async function goLiveFromTap(w: LiveWriter): Promise<boolean | LiveSwitch
     if (flow.aborted) return dismissed();
     a.finding();
     for (let i = 0; i < 3; i++) {
-      const ready = await ensureGoLiveLocation({ flow, skipLastKnown: osLooked, reporter: freshReporter(a) });
+      const ready = await ensureGoLiveLocation({
+        flow,
+        skipLastKnown: osLooked,
+        reporter: freshReporter(a, w.athleteId),
+      });
       reading = ready.reading ?? reading;
       if (ready.reading) freshReading = true;
       if (ready.outcome !== "ready") {
@@ -631,18 +660,35 @@ export type RestoreOutcome = "live" | "failed" | "parked" | "cancelled";
 
 /**
  * What a restore draws from its first frame, decided synchronously from
- * memory: a valid stored tag (or a store not read yet, the common case on a
- * cold start) draws live; none, with permission last seen granted, FINDING
- * YOU; otherwise nothing (GO LIVE).
+ * memory: a valid stored tag or reading draws live; none, with permission
+ * last seen granted, FINDING YOU; otherwise `hold` (GO LIVE, no taps, never
+ * a GOING LIVE flash, N1). A store not read yet is `hold` too (S1): the
+ * athlete row's load already started the read, so this is rare and brief.
+ * Flag off (the owner's hint): the plain write, drawn live.
  */
 export function restoreFirstFrame(
   athleteId: string,
   locationRequiredHint = true,
-): "restore-live" | "restore-finding" | null {
-  // Flag off: the plain write, which needs no tag.
+): "restore-live" | "restore-finding" | "hold" {
   if (!locationRequiredHint) return "restore-live";
-  if (!isDeviceLocationLoaded(athleteId) || validDeviceTag(athleteId)) return "restore-live";
-  return lastKnownPermission()?.granted ? "restore-finding" : null;
+  if (!isDeviceLocationLoaded(athleteId)) return "hold";
+  if (validDeviceTag(athleteId) || validDeviceReading(athleteId)) return "restore-live";
+  return lastKnownPermission()?.granted ? "restore-finding" : "hold";
+}
+
+/** The flag, but never waited on for longer than `FLAG_READ_BOUND_MS` (S2). */
+async function boundedFlagRead(hint: boolean): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      readMatchLocationRequired().catch(() => hint),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(hint), FLAG_READ_BOUND_MS);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -651,7 +697,8 @@ export function restoreFirstFrame(
  * logged (D8 of the previous addendum).
  */
 export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutcome> {
-  setGoLiveDisplay(restoreFirstFrame(w.athleteId, w.locationRequiredHint ?? true));
+  const hint = w.locationRequiredHint ?? true;
+  setGoLiveDisplay(restoreFirstFrame(w.athleteId, hint));
   setRestoreInFlight(true);
   const a = new Attempt(false, null);
   let outcome: RestoreOutcome = "failed";
@@ -667,16 +714,26 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
     return null;
   };
   try {
-    // Flag off: the plain write, as always (drawn live meanwhile).
-    if (!(await readMatchLocationRequired())) {
+    // The store first, then the flag (S1): the first frame is decided from
+    // what is actually stored, never assumed.
+    await loadDeviceLocation(w.athleteId);
+    setGoLiveDisplay(restoreFirstFrame(w.athleteId, hint));
+    // Flag off: the plain write, as always (drawn live meanwhile). A flag
+    // read that does not answer in time goes by the hint, and the server
+    // decides: a `location_required` refusal means the ladder after all.
+    if (!(await boundedFlagRead(hint))) {
       setGoLiveDisplay("restore-live");
-      outcome = fromWrite(await writeLive(a, w, w.canWrite)) ?? fail(showRestoreFailedToast);
-      return outcome;
+      const r = await writeLive(a, w, w.canWrite);
+      if (r !== "refused") {
+        outcome = fromWrite(r) ?? fail(showRestoreFailedToast);
+        return outcome;
+      }
+      markMatchLocationRequired(true);
     }
     // A backend without the ladder: the old restore (a silent fresh reading,
     // no write without permission, otherwise the write).
     if (getPresenceCapability() === "legacy") {
-      setGoLiveDisplay(null);
+      setGoLiveDisplay("hold");
       if ((await silentGoLiveReading()) === "permission") {
         setNeedsLocation(true);
         outcome = fail(showLocationOffGoLiveCta);
@@ -686,12 +743,12 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
       return outcome;
     }
 
-    await loadDeviceLocation(w.athleteId);
     const entry = validDeviceTag(w.athleteId);
+    const stored = validDeviceReading(w.athleteId);
     const perm = await permissionState();
-    if (entry) a.flip();
+    if (entry || stored) a.flip();
     else if (perm.granted) setGoLiveDisplay("restore-finding");
-    else setGoLiveDisplay(null);
+    else setGoLiveDisplay("hold");
 
     const stopped = (r: ReplayResult): RestoreOutcome | null => {
       if (r.kind === "live") return "live";
@@ -700,16 +757,20 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
       return null;
     };
 
-    if (entry && entry.context === "go_live") {
+    if (entry) {
       const r = await writeLive(a, w, w.canWrite);
       if (r !== "refused") {
         outcome = fromWrite(r) ?? fail(showRestoreFailedToast);
         return outcome;
       }
     }
-    if (entry && getPresenceCapability() !== "legacy") {
-      const r = await replay(a, w, tagOf(entry), w.canWrite);
-      if (r.kind === "next") clearDeviceLocation(w.athleteId);
+    for (const [cand, clear] of [
+      [entry, clearDeviceTag],
+      [stored, clearDeviceReading],
+    ] as const) {
+      if (!cand || getPresenceCapability() === "legacy") continue;
+      const r = await replay(a, w, tagOf(cand), w.canWrite);
+      if (r.kind === "next") clear(w.athleteId);
       const s = stopped(r);
       if (s) return (outcome = s);
     }
@@ -724,7 +785,7 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
     }
     if (!perm.granted) {
       // No tag the server would accept and no way to take one without asking.
-      setGoLiveDisplay(null);
+      setGoLiveDisplay("hold");
       setNeedsLocation(true);
       outcome = fail(showLocationOffGoLiveCta);
       return outcome;
@@ -733,7 +794,10 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
     const c = w.canWrite();
     if (c !== "ok") return (outcome = c);
     a.finding();
-    const fresh: ReadOutcome = await silentFreshFix({ skipLastKnown: osLooked, reporter: freshReporter(a) });
+    const fresh: ReadOutcome = await silentFreshFix({
+      skipLastKnown: osLooked,
+      reporter: freshReporter(a, w.athleteId),
+    });
     if (fresh.kind === "ok") {
       outcome = fromWrite(await writeLive(a, w, w.canWrite)) ?? fail(showRestoreFailedToast);
       return outcome;

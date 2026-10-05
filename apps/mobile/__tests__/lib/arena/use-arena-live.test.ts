@@ -1680,3 +1680,155 @@ describe("live location fixes D7: the server expired the live session", () => {
     expect(result.current.isLive).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// autoLive: the location ladder's restores (review round 1, B2)
+// ---------------------------------------------------------------------------
+
+describe("autoLive (instant go-live restores): runAutoLive and canWrite", () => {
+  type Ctx = Parameters<NonNullable<UseArenaLiveArgs["autoLive"]>>[0];
+  type Outcome = "live" | "failed" | "parked" | "cancelled";
+
+  /** An autoLive the test answers by hand; records every ctx it was given. */
+  function controlledAutoLive() {
+    const calls: { ctx: Ctx; answer: ReturnType<typeof deferred<Outcome>> }[] = [];
+    const autoLive = jest.fn((ctx: Ctx) => {
+      const answer = deferred<Outcome>();
+      calls.push({ ctx, answer });
+      return answer.promise;
+    });
+    return { autoLive, calls };
+  }
+
+  it("a background while a restore runs parks it (never 'cancelled'), and the resume intent survives", async () => {
+    const { autoLive, calls } = controlledAutoLive();
+    const { result } = mount({ autoLive });
+    await act(async () => {
+      await result.current.goLive();
+    });
+    // Away and back: the foreground restore starts.
+    await act(async () => {
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(calls).toHaveLength(1);
+    // A quick app switch mid-restore (a silent fix running).
+    await act(async () => {
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(calls[0].ctx.canWrite()).toBe("parked");
+    await act(async () => {
+      calls[0].answer.resolve("parked");
+      await flush();
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+    });
+    // Restored again on return, not dropped.
+    expect(calls).toHaveLength(2);
+  });
+
+  it("a restore that fails while the app is in the background keeps the intent for the next foreground", async () => {
+    const { autoLive, calls } = controlledAutoLive();
+    const { result } = mount({ autoLive });
+    await act(async () => {
+      await result.current.goLive();
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(calls).toHaveLength(1);
+    await act(async () => {
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+      // The fix failed while away: the ladder could say nothing.
+      calls[0].answer.resolve("failed");
+      await flush();
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(calls).toHaveLength(2);
+  });
+
+  it("only the athlete's own go-offline cancels a restore in flight", async () => {
+    const { autoLive, calls } = controlledAutoLive();
+    const { result } = mount({ autoLive });
+    await act(async () => {
+      await result.current.goLive();
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(calls[0].ctx.canWrite()).toBe("ok");
+    await act(async () => {
+      await result.current.goOffline();
+    });
+    expect(calls[0].ctx.canWrite()).toBe("cancelled");
+  });
+
+  it.each(["failed", "parked", "cancelled"] as const)(
+    "cold start while live: a restore that ends %s clears the stale looking_for_ranked = true",
+    async (outcome) => {
+      const { autoLive, calls } = controlledAutoLive();
+      mount({ initialRanked: true, autoLive });
+      await act(async () => {
+        await flush();
+      });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].ctx.reason).toBe("arrival");
+      await act(async () => {
+        calls[0].answer.resolve(outcome);
+        await flush();
+      });
+      // The arrived `true` is written back to false: never advertised while
+      // the app shows GO LIVE.
+      expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+    },
+  );
+
+  it("cold start while live: a restore that lands keeps the athlete live (no clear)", async () => {
+    const { autoLive, calls } = controlledAutoLive();
+    const { result } = mount({ initialRanked: true, autoLive });
+    await act(async () => {
+      await flush();
+    });
+    await act(async () => {
+      const ok = await calls[0].ctx.write();
+      expect(ok).toBe(true);
+      calls[0].answer.resolve("live");
+      await flush();
+    });
+    expect(result.current.isLive).toBe(true);
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: true });
+  });
+
+  it("cold start while live: the athlete tapping Go live meanwhile wins over the clear", async () => {
+    const { autoLive, calls } = controlledAutoLive();
+    const { result } = mount({ initialRanked: true, autoLive });
+    await act(async () => {
+      await flush();
+      await result.current.goLive();
+    });
+    const writes = mockToggleMatchPreferences.mock.calls.length;
+    await act(async () => {
+      calls[0].answer.resolve("failed");
+      await flush();
+    });
+    expect(mockToggleMatchPreferences.mock.calls.length).toBe(writes);
+    expect(result.current.isLive).toBe(true);
+  });
+});

@@ -41,7 +41,7 @@ import { reportGoLivePresence, type LocationEventOutcome } from "@jits/shared/ap
 import type { LocationReading } from "@jits/shared/api/invites";
 import { supabase } from "@/lib/supabase/client";
 import { permissionRequestInFlight, readLocationOnce } from "@/lib/invites/location";
-import { recordAcceptedReading } from "@/lib/location/device-location-store";
+import { getDeviceLocationOwner, recordAcceptedReading } from "@/lib/location/device-location-store";
 import { notePresenceAnswer } from "@/lib/location/presence-capability";
 import { setGoLiveDisplay, type LiveSwitchIgnored } from "./arena-store";
 import { logGoLiveAttempt } from "./location-telemetry";
@@ -151,6 +151,7 @@ export function useGoLiveLocationSheet(): GoLiveLocationSheetState | null {
 export function __resetGoLiveLocationForTests(): void {
   resolver = null;
   sheet = null;
+  lastPermission = null;
   if (activeFlow) endFlow(activeFlow);
   emit();
 }
@@ -309,6 +310,8 @@ export type ReadOutcome =
 export type FreshReporter = (reading: LocationReading, capturedAt: number) => Promise<ReadOutcome>;
 
 export const reportFreshOnce: FreshReporter = async (reading, capturedAt) => {
+  // Stored only for the athlete the request was made for (N2).
+  const athleteId = getDeviceLocationOwner();
   const res = await reportGoLivePresence(supabase, reading);
   if (!res.ok) {
     console.warn("[location] go_live report failed:", res.error.hint, res.error.message);
@@ -322,7 +325,7 @@ export const reportFreshOnce: FreshReporter = async (reading, capturedAt) => {
     if (res.data.code === "implausible_movement") return { kind: "movement", reading };
     return { kind: "error", reading };
   }
-  recordAcceptedReading("go_live", reading, capturedAt, res.data);
+  recordAcceptedReading("go_live", reading, capturedAt, res.data, athleteId);
   return { kind: "ok", reading };
 };
 

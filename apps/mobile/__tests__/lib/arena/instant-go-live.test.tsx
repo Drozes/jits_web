@@ -33,10 +33,13 @@ jest.mock("react-native-safe-area-context", () => ({
 }));
 
 let mockLocationRequired = true;
+/** Overrides the flag read (a hang, for S2); null: the plain value. */
+let mockFlagRead: (() => Promise<boolean>) | null = null;
+const mockMarkLocation = jest.fn();
 jest.mock("@/lib/arena/match-location-flag", () => ({
   useMatchLocationRequired: () => mockLocationRequired,
-  readMatchLocationRequired: () => Promise.resolve(mockLocationRequired),
-  markMatchLocationRequired: jest.fn(),
+  readMatchLocationRequired: () => (mockFlagRead ? mockFlagRead() : Promise.resolve(mockLocationRequired)),
+  markMatchLocationRequired: (on: boolean) => mockMarkLocation(on),
 }));
 jest.mock("@/lib/arena/location-flags", () => ({
   useMatchProximityRequired: () => false,
@@ -191,7 +194,9 @@ import { __resetChallengerArenaReadingForTests } from "@/lib/arena/use-challenge
 import { HeaderStatusChip } from "@/components/layout/header-status-chip";
 import {
   __resetDeviceLocationStoreForTests,
-  peekDeviceLocation,
+  peekDeviceReading,
+  peekDeviceTag,
+  saveDeviceLocation,
 } from "@/lib/location/device-location-store";
 import {
   __resetPresenceCapabilityForTests,
@@ -199,6 +204,13 @@ import {
 } from "@/lib/location/presence-capability";
 import { __setConnectivityForTests } from "@/lib/network/connectivity";
 import { GO_LIVE_TAG_MARGIN_MS, GO_LIVE_TAG_MAX_AGE_MS } from "@jits/shared/constants/go-live";
+import {
+  FLAG_READ_BOUND_MS,
+  restoreFirstFrame,
+  restoreLiveSilently,
+} from "@/lib/arena/location-ladder";
+import { devClearFaults, devFailNext, devNextFix } from "@/lib/arena/dev-go-live-hooks";
+import { describeHeaderChip } from "@/lib/arena/header-chip-model";
 
 const KEY = "last-location.me-1";
 const TAG = { lat: 43.65, lng: -79.38, accuracyM: 22 };
@@ -211,10 +223,14 @@ function recorded(capturedAt: string = new Date().toISOString()) {
 const refused = (code: string) => ({ ok: true, data: { ok: false, code } });
 const PGRST202 = { ok: false, error: { hint: "Perhaps you meant", message: "Could not find the function", code: "PGRST202" } };
 
-/** A stored tag, `ageMs` old. */
-function seedTag(ageMs: number, context = "go_live", accuracyM = TAG.accuracyM) {
+/**
+ * A stored entry, `ageMs` old: a go_live tag in SecureStore, or a browse /
+ * arena reading (memory only, review round 1 S3).
+ */
+function seedTag(ageMs: number, context: "go_live" | "browse" | "arena" = "go_live", accuracyM = TAG.accuracyM) {
   const capturedAt = Date.now() - ageMs;
-  mockSecure.set(KEY, JSON.stringify({ ...TAG, accuracyM, capturedAt, context }));
+  if (context === "go_live") mockSecure.set(KEY, JSON.stringify({ ...TAG, accuracyM, capturedAt, context }));
+  else saveDeviceLocation("me-1", { ...TAG, accuracyM, capturedAt, context });
   return capturedAt;
 }
 
@@ -277,6 +293,7 @@ beforeEach(() => {
   __setConnectivityForTests(true);
   Object.defineProperty(AppState, "currentState", { value: "active", configurable: true });
   mockLocationRequired = true;
+  mockFlagRead = null;
   mockRefusal = null;
   mockGetPermission.mockResolvedValue({ granted: true, canAskAgain: true, status: "granted" });
   mockRequestPermission.mockResolvedValue({ granted: true, canAskAgain: true });
@@ -414,7 +431,8 @@ describe("rung 2: a stored browse or arena reading", () => {
         r = await arenaActions.goLive();
       });
       expect(r).toBe(true);
-      expect(mockSecureDelete).toHaveBeenCalledWith(KEY);
+      // The refused browse reading is dropped (memory slot, S3).
+      expect(peekDeviceReading("me-1")).toBeNull();
       expect(mockLastKnown).toHaveBeenCalledWith({
         maxAge: GO_LIVE_TAG_MAX_AGE_MS - GO_LIVE_TAG_MARGIN_MS,
         requiredAccuracy: 100,
@@ -956,7 +974,7 @@ describe("the device store through the ladder", () => {
     await act(async () => {
       await arenaActions.goLive();
     });
-    expect(peekDeviceLocation("me-1", Date.parse(serverAt) + MIN)).toMatchObject({
+    expect(peekDeviceTag("me-1", Date.parse(serverAt) + MIN)).toMatchObject({
       lat: 43.66,
       lng: -79.39,
       accuracyM: 15,
@@ -972,7 +990,297 @@ describe("the device store through the ladder", () => {
       void arenaActions.goLive();
     });
     await waitFor(() => expect(screen.getByTestId("go-live-location-accuracy")).toBeTruthy());
-    expect(peekDeviceLocation("me-1")).toBeNull();
+    expect(peekDeviceTag("me-1")).toBeNull();
     expect(mockSecure.has(KEY)).toBe(false);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Review round 1
+// ---------------------------------------------------------------------------
+
+describe("B1: the recovery window covers network phases only", () => {
+  it("an explain sheet left open over 15 s, then Continue and Allow: the report AND the live write go out; live", async () => {
+    jest.useFakeTimers();
+    mockGetPermission.mockResolvedValue({ granted: false, canAskAgain: true, status: "undetermined" });
+    mount();
+    let pending!: Promise<unknown>;
+    act(() => {
+      pending = arenaActions.goLive();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(50);
+    });
+    expect(screen.getByTestId("go-live-location-explain")).toBeTruthy();
+    // The athlete reads the sheet for 20 s.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(20_000);
+    });
+    fireEvent.press(screen.getByText("Continue"));
+    let r: unknown;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(100);
+      r = await pending;
+    });
+    expect(r).toBe(true);
+    expect(mockReport).toHaveBeenCalledTimes(1);
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+    expect(lead()).toBe("LIVE");
+    expect(frames).not.toContain("retry:off");
+  });
+
+  it("Retry after a Settings round trip (30 s on the denied sheet) goes live", async () => {
+    jest.useFakeTimers();
+    mockGetPermission.mockResolvedValue({ granted: false, canAskAgain: false, status: "denied" });
+    mount();
+    let pending!: Promise<unknown>;
+    act(() => {
+      pending = arenaActions.goLive();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(50);
+    });
+    expect(screen.getByTestId("go-live-location-denied")).toBeTruthy();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(30_000);
+    });
+    mockGetPermission.mockResolvedValue({ granted: true, canAskAgain: true, status: "granted" });
+    fireEvent.press(screen.getByTestId("go-live-location-retry"));
+    let r: unknown;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(100);
+      r = await pending;
+    });
+    expect(r).toBe(true);
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+    expect(lead()).toBe("LIVE");
+  });
+
+  it("a write that lands after the 15 s window is a success: never OFFLINE · RETRY, no toast", async () => {
+    jest.useFakeTimers();
+    seedTag(5 * MIN);
+    const write = deferred<boolean>();
+    mockWrite.mockReturnValue(write.promise);
+    mount();
+    let pending!: Promise<void>;
+    act(() => {
+      pending = goLiveWithFeedback();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(20_000);
+    });
+    // Still waiting on the server, honestly: RECONNECTING, not RETRY.
+    expect(lead()).toBe("RECONNECTING");
+    await act(async () => {
+      write.resolve(true);
+      await pending;
+    });
+    expect(lead()).toBe("LIVE");
+    expect(frames).not.toContain("retry:off");
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+  });
+
+  it("a report that lands after the window still gets its live write", async () => {
+    jest.useFakeTimers();
+    const report = deferred<unknown>();
+    mockReport.mockReturnValueOnce(report.promise);
+    mount();
+    let pending!: Promise<unknown>;
+    act(() => {
+      pending = arenaActions.goLive();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(20_000);
+    });
+    let r: unknown;
+    await act(async () => {
+      report.resolve(recorded());
+      await jest.advanceTimersByTimeAsync(10);
+      r = await pending;
+    });
+    expect(r).toBe(true);
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+  });
+
+  it("a restore whose write is slower than the window: live, with no 'You're offline' toast first", async () => {
+    jest.useFakeTimers();
+    seedTag(30 * MIN);
+    mount();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10);
+    });
+    const write = deferred<boolean>();
+    mockWrite.mockReturnValue(write.promise);
+    const { autoLive } = mockLiveArgs.mock.calls.at(-1)[0] as { autoLive: (ctx: unknown) => Promise<string> };
+    let p!: Promise<string>;
+    act(() => {
+      p = autoLive({ write: () => mockLiveApi.goLive(), lastRefusal: () => mockRefusal, canWrite: () => "ok", reason: "foreground" });
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(25_000);
+    });
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    let r = "";
+    await act(async () => {
+      write.resolve(true);
+      r = await p;
+    });
+    expect(r).toBe("live");
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(lead()).toBe("LIVE");
+  });
+});
+
+describe("S1 / N1: a restore's first frame", () => {
+  it("a store not read yet is hold (GO LIVE, no taps), never a provisional LIVE", () => {
+    expect(restoreFirstFrame("never-read")).toBe("hold");
+  });
+
+  it("no tag and no permission: GO LIVE through the whole restore, never a GOING LIVE frame", async () => {
+    mockGetPermission.mockResolvedValue({ granted: false, canAskAgain: true, status: "undetermined" });
+    mount();
+    await flush();
+    const { autoLive } = mockLiveArgs.mock.calls.at(-1)[0] as { autoLive: (ctx: unknown) => Promise<string> };
+    const leads: string[] = [];
+    let p!: Promise<string>;
+    act(() => {
+      p = autoLive({ write: () => mockLiveApi.goLive(), lastRefusal: () => mockRefusal, canWrite: () => "ok", reason: "arrival" });
+    });
+    leads.push(lead());
+    await act(async () => {
+      await p;
+    });
+    leads.push(lead());
+    expect(leads.every((l) => l === "GO LIVE")).toBe(true);
+    expect(frames.some((f) => /going-live|restore-live|optimistic/.test(f))).toBe(false);
+  });
+});
+
+describe("S2: the restore's flag read is bounded", () => {
+  const writer = () => ({
+    athleteId: "me-1",
+    write: () => mockWrite(),
+    lastRefusal: () => mockRefusal as "location_required" | null,
+    canWrite: () => "ok" as const,
+  });
+
+  it("a flag read that never answers: after the bound the restore goes by the hint (on) and lands", async () => {
+    jest.useFakeTimers();
+    seedTag(30 * MIN);
+    mockFlagRead = () => new Promise(() => undefined);
+    let p!: Promise<string>;
+    act(() => {
+      p = restoreLiveSilently({ ...writer(), locationRequiredHint: true });
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(FLAG_READ_BOUND_MS + 10);
+    });
+    let r = "";
+    await act(async () => {
+      r = await p;
+    });
+    expect(r).toBe("live");
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+  });
+
+  it("hint off and the server says location_required: the flag is marked on and the ladder runs", async () => {
+    jest.useFakeTimers();
+    seedTag(30 * MIN);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    mockFlagRead = () => new Promise(() => undefined);
+    mockWrite.mockResolvedValueOnce(false).mockResolvedValue(true);
+    mockRefusal = "location_required";
+    let p!: Promise<string>;
+    act(() => {
+      p = restoreLiveSilently({ ...writer(), locationRequiredHint: false });
+    });
+    let r = "";
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(FLAG_READ_BOUND_MS + 10);
+      r = await p;
+    });
+    expect(mockMarkLocation).toHaveBeenCalledWith(true);
+    expect(r).toBe("live");
+  });
+});
+
+describe("UX defect 2: no RECONNECTING over a restore drawn live", () => {
+  it("the chip model keeps LIVE while the lobby rejoins during a restore", () => {
+    const base = {
+      isLive: false,
+      phase: "saving" as const,
+      direction: "going-live" as const,
+      reconnecting: true,
+      lastLiveWriteFailed: false,
+      onMat: 3,
+      outgoing: null,
+      incoming: null,
+      incomingTucked: false,
+      incomingCount: 0,
+      confirm: false,
+      controllerReady: true,
+      now: Date.now(),
+    };
+    expect(describeHeaderChip({ ...base, display: "restore-live" }).lead).toBe("LIVE · 3");
+    // Settled live with the lobby down past the grace: RECONNECTING.
+    expect(describeHeaderChip({ ...base, isLive: true, phase: "ready", display: null }).lead).toBe("RECONNECTING");
+  });
+});
+
+describe("DEV-only QA hooks", () => {
+  afterEach(() => devClearFaults());
+
+  it("a forced report failure goes through the same recovery as a real one", async () => {
+    jest.useFakeTimers();
+    seedTag(20 * MIN, "browse");
+    devFailNext("report");
+    mount();
+    let r: unknown;
+    let pending!: Promise<unknown>;
+    act(() => {
+      pending = arenaActions.goLive();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(3_000);
+      r = await pending;
+    });
+    // The fault ate the first try; the retry landed (then one live write).
+    expect(r).toBe(true);
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+    expect(mockReport.mock.calls[0][2]).toEqual({ capturedAt: expect.any(Number) });
+  });
+
+  it("a forced fix accuracy reaches the sheets (300 m: too rough)", async () => {
+    devNextFix({ kind: "accuracy", accuracyM: 300 });
+    mockReport.mockResolvedValue(refused("accuracy_too_low"));
+    mount();
+    act(() => {
+      void arenaActions.goLive();
+    });
+    await waitFor(() => expect(screen.getByTestId("go-live-location-accuracy")).toBeTruthy());
+    expect(mockReport.mock.calls[0][1]).toMatchObject({ accuracyM: 300 });
+  });
+
+  it("is inert outside __DEV__", async () => {
+    const g = globalThis as unknown as { __DEV__: boolean };
+    const dev = g.__DEV__;
+    g.__DEV__ = false;
+    try {
+      devFailNext("write");
+    } finally {
+      g.__DEV__ = dev;
+    }
+    seedTag(5 * MIN);
+    mount();
+    let r: unknown;
+    await act(async () => {
+      r = await arenaActions.goLive();
+    });
+    expect(r).toBe(true);
+    expect(mockWrite).toHaveBeenCalledTimes(1);
   });
 });

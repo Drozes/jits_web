@@ -55,7 +55,12 @@ import {
   readMatchLocationRequired,
   useMatchLocationRequired,
 } from "./match-location-flag";
-import { setDeviceLocationOwner, validDeviceTag } from "@/lib/location/device-location-store";
+import {
+  setDeviceLocationOwner,
+  validDeviceReading,
+  validDeviceTag,
+} from "@/lib/location/device-location-store";
+import { registerGoLiveDevHooks } from "./dev-go-live-hooks";
 import {
   getPresenceCapability,
   subscribePresenceCapability,
@@ -70,9 +75,32 @@ const ARENA_KEEP_AWAKE_TAG = "arena-live";
 /**
  * How often a live athlete in the foreground asks the server whether it
  * still has them live (the 12 hour cap or an admin can end a session; the
- * athletes row is not on realtime). One small read, never a reading.
+ * athletes row is not on realtime). One single-row select of the athlete's
+ * own `looking_for_ranked`, never a location reading (review round 1, UX
+ * defect 3, orchestrator decision: 30 s).
  */
-export const SERVER_LIVE_CHECK_MS = 3 * 60_000;
+export const SERVER_LIVE_CHECK_MS = 30_000;
+
+/**
+ * How long the lobby channel may be unknown while live before the chip says
+ * RECONNECTING (UX defect 2): a foreground return rejoins it in a few
+ * hundred ms, which must not read as green, grey, green.
+ */
+export const RECONNECTING_GRACE_MS = 2_000;
+
+/** `value`, but true only once it has stayed true for `ms`. */
+function useTrueAfter(value: boolean, ms: number): boolean {
+  const [held, setHeld] = React.useState(false);
+  React.useEffect(() => {
+    if (!value) {
+      setHeld(false);
+      return;
+    }
+    const t = setTimeout(() => setHeld(true), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return value && held;
+}
 
 /** Whether the backend predates the instant go-live migration (`legacy`). */
 function useLegacyBackend(): boolean {
@@ -156,6 +184,10 @@ export function ArenaBootstrap() {
 }
 
 function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
+  // DEV ONLY: the QA hooks (dev menu, `__goLiveDev`); inert in production.
+  React.useEffect(() => {
+    if (__DEV__) registerGoLiveDevHooks();
+  }, []);
   // The device location store belongs to this athlete (an athlete switch
   // clears the previous one's entry); read it into memory now.
   React.useLayoutEffect(() => {
@@ -222,7 +254,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     // Leaving for the background while live with a valid tag: the chip is
     // already drawn live for the return (UX 019, 3i).
     onResumeParked: () => {
-      if (validDeviceTag(athlete.id)) setGoLiveDisplay("restore-live");
+      if (validDeviceTag(athlete.id) || validDeviceReading(athlete.id)) setGoLiveDisplay("restore-live");
     },
   });
   // Read by the refresh handlers below and the controller (registered once).
@@ -279,7 +311,9 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   const lastLiveWriteFailed = live.lastWriteFailed ?? false;
   // Live, with the lobby channel down or rejoining: nobody can vouch that
   // this athlete is on the mat right now (AC-H11, `◌ RECONNECTING`).
-  const reconnecting = isLive && !lobbyKnown;
+  // After a grace: a lobby channel rejoining after a foreground return is
+  // not "reconnecting" to the athlete (UX defect 2).
+  const reconnecting = useTrueAfter(isLive && !lobbyKnown, RECONNECTING_GRACE_MS);
   const { incoming, outgoing, incomingCount, incomingTucked, isBusy, capReached } =
     challenge;
   useArenaLiveKeepAwake(isLive && !inMatch);
@@ -304,7 +338,9 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   });
   // The server may still end a session by itself (the 12 hour cap, an
   // admin): the chip drops at once with one toast (UX 019, 3j).
-  useServerEndedLiveCheck(isLive && !inMatch, () =>
+  // (A legacy backend keeps exactly the old behaviour: its 60 s refresh
+  // above already asks the server after every failing tick.)
+  useServerEndedLiveCheck(isLive && !inMatch && !legacyBackend, () =>
     liveRef.current.dropIfServerOffline(() => getMyLookingForRanked(supabase, athleteId)),
   );
   // The drift check (flag live_location_drift_check, seeded OFF).

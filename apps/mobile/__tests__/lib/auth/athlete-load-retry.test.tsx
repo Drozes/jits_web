@@ -48,8 +48,10 @@ jest.mock("@/lib/arena/arena-store", () => ({
   takeArenaOfflineBeforeSignOut: () => mockArenaOffline(),
 }));
 const mockClearLocations = jest.fn();
+const mockLoadLocation = jest.fn((_id: string) => Promise.resolve(null));
 jest.mock("@/lib/location/device-location-store", () => ({
   clearAllDeviceLocations: () => mockClearLocations(),
+  loadDeviceLocation: (id: string) => mockLoadLocation(id),
 }));
 const mockResetLocationFlags = jest.fn();
 jest.mock("@/lib/arena/location-flags", () => ({
@@ -251,6 +253,25 @@ describe("cold-start athlete load", () => {
     });
     expect(mockClearLocations).toHaveBeenCalledTimes(1);
     expect(mockResetLocationFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it("S4: an involuntary sign-out (SIGNED_OUT from the auth listener) clears the stored location too", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    expect(mockClearLocations).not.toHaveBeenCalled();
+    await act(async () => {
+      mockAuthCallback?.("SIGNED_OUT", null);
+    });
+    expect(mockClearLocations).toHaveBeenCalledTimes(1);
+    expect(mockResetLocationFlags).toHaveBeenCalledTimes(1);
+  });
+
+  it("S1: the stored tag is read as soon as the athlete row loads", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    expect(mockLoadLocation).toHaveBeenCalledWith(ACTIVE.id);
   });
 
   it("clears the downloaded-highlight share cache on sign-out, even when it rejects", async () => {

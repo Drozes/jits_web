@@ -4813,6 +4813,31 @@ describe("match_location_required: Arena accept and the proximity gate", () => {
       expect(result.current.startBlocked).toBeNull();
     });
 
+    it("N5: the challenger's fallback start refused for proximity takes the reading (never asking) and starts once more", async () => {
+      jest.useFakeTimers();
+      try {
+        const { result } = mountLocationOnly();
+        await sendOne(result);
+        await act(async () => {
+          await challengerUpdateBinding().handler({
+            new: { id: CHALLENGE, challenger_id: ME, opponent_id: OPPONENT, status: "accepted" },
+          });
+        });
+        mockGetStatus.mockResolvedValue({ ok: true, data: { status: "accepted", expiresAt: FAR_EXPIRY } });
+        mockStartMatch.mockResolvedValueOnce(proximity("PROXIMITY_REQUIRED")).mockResolvedValue(STARTED);
+        await act(async () => {
+          jest.advanceTimersByTime(12_000);
+          await flushAsync();
+        });
+        expect(mockMarkProximity).toHaveBeenCalledWith(true);
+        expect(mockArenaReading).toHaveBeenCalledWith(CHALLENGE, { ask: false });
+        expect(mockStartMatch).toHaveBeenCalledTimes(2);
+        expect(mockPush).toHaveBeenCalledWith(`/match/${MATCH}`);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("the challenger's fallback start takes no reading with proximity OFF", async () => {
       jest.useFakeTimers();
       try {

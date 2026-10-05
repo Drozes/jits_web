@@ -87,7 +87,8 @@ import { DriftPromptSheet } from "@/components/arena/drift-prompt-sheet";
 import { __resetArenaStoreForTests, useArenaMatchScreen } from "@/lib/arena/arena-store";
 import {
   __resetDeviceLocationStoreForTests,
-  peekDeviceLocation,
+  peekDeviceTag,
+  recordAcceptedReading,
   saveDeviceLocation,
   setDeviceLocationOwner,
 } from "@/lib/location/device-location-store";
@@ -208,6 +209,24 @@ describe("one check", () => {
     expect(mockReading).not.toHaveBeenCalled();
   });
 
+  it("S3: a browse reading far from the tag neither replaces it nor drifts the check", async () => {
+    seedTag();
+    // A browse reading 2 km away was accepted (an Arena visit, say).
+    recordAcceptedReading("browse", north(2_000), Date.now(), {
+      ok: true,
+      verdict: "recorded",
+      reason: null,
+      distance_m: null,
+      started: false,
+      match_id: null,
+      start_blocked_reason: null,
+    });
+    expect(peekDeviceTag(ME)).toMatchObject(TAG);
+    // Standing on the tag: not drifted (it would be against the browse point).
+    mockReading.mockResolvedValue({ status: "ok", reading: north(10), capturedAt: Date.now() });
+    expect(await runDriftCheck(ME)).toBe(false);
+  });
+
   it("in a match: nothing", async () => {
     seedTag();
     renderHook(() => useArenaMatchScreen());
@@ -238,17 +257,18 @@ describe("the answers", () => {
     await answerDriftPrompt("update");
     expect(mockReport).toHaveBeenCalledWith({ tag: "client" }, north(601), { capturedAt: at });
     expect(mockDriftPrompt).toHaveBeenCalledWith("retagged");
-    expect(peekDeviceLocation(ME)).toMatchObject({ ...north(601), context: "go_live", capturedAt: at });
+    expect(peekDeviceTag(ME)).toMatchObject({ ...north(601), context: "go_live", capturedAt: at });
     const { result } = renderHook(() => useDriftPrompt());
     expect(result.current).toBeNull();
   });
 
-  it("Update whose report fails: the sheet closes anyway, nothing else is said, the old tag stays", async () => {
+  it("Update whose report fails: the sheet closes anyway, nothing else is said, the old tag stays, no 'retagged' (N4)", async () => {
     seedTag();
     await runDriftCheck(ME);
     mockReport.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "offline" } });
     await answerDriftPrompt("update");
-    expect(peekDeviceLocation(ME)).toMatchObject(TAG);
+    expect(mockDriftPrompt).not.toHaveBeenCalledWith("retagged");
+    expect(peekDeviceTag(ME)).toMatchObject(TAG);
     const { result } = renderHook(() => useDriftPrompt());
     expect(result.current).toBeNull();
   });

@@ -492,3 +492,34 @@ Open questions for the owner:
 3. C5: suppress the go-live haptic and tab-icon clash on automatic restores (recommended), or keep buzzing on every live transition?
 4. Should the 12-hour-cap toast name the reason ("You've been live for 12 hours, so we took you offline.") instead of the generic "You're offline now. Tap to go live again."?
 5. PM Q4 has a UX side: with the drift flag off, "On the mat" can be up to 4 h stale. Is the one background refresh enough until the drift check is turned on?
+
+## Appendix A. Dev-only QA hooks (simulator testing)
+
+Added in review round 1 so the UX checklist (section 7) can be run on the iOS simulator without a real 4 hour wait, a real dead network or a real bad fix. Source: `apps/mobile/lib/arena/dev-go-live-hooks.ts` and `__devAgeDeviceTag` in `apps/mobile/lib/location/device-location-store.ts`.
+
+They exist only in development builds. Every entry point checks `__DEV__` first; Metro sets it to `false` in a production bundle, so the bodies are dropped by the minifier and the hooks can never change a release build. This was checked by exporting a production iOS bundle (`npx expo export --platform ios --no-bytecode`) and searching it for the menu titles below: none are present.
+
+**How to trigger them.** With a development build or Expo Go running the app signed in as an active athlete:
+
+1. Open the React Native dev menu (shake the device, or press Cmd+D in the iOS simulator).
+2. Pick one of the "Go live: ..." items. Each fault is one-shot: it applies to the next matching call only.
+
+| Dev menu item | Effect | Checklist items it serves |
+|---|---|---|
+| Go live: age stored tag by 4 h | Moves the stored go-live tag (and the in-memory browse reading) 4 hours into the past, so it no longer counts | 17, 18 (return after more than 4 h), restores without a tag |
+| Go live: next report fails | The next `go_live` report fails at once, as a network error would | 12, 13 (recovery) |
+| Go live: next write hangs 20 s, then fails | The next live write waits 20 s and then fails | 13 (RECONNECTING, then OFFLINE · RETRY) |
+| Go live: next write fails | The next live write fails at once | 12, 13 |
+| Go live: next fix times out | The next location fix reports a timeout | 5 (No location sheet), 18 (restore toast) |
+| Go live: next fix 300 m (too rough) | The next fix comes back at 300 m | 6 (Location too rough) |
+| Go live: next fix 1414 m (Precise off) | The next fix comes back at 1414 m (iOS treats 1000 m or worse as Precise Location off) | 11 (Precise Location sheet) |
+| Go live: clear dev faults | Drops every queued fault | any |
+
+**Other values.** In the JS debugger console (the dev menu's "Open JS Debugger"), the same hooks take any value:
+
+- `__goLiveDev.ageTag(5)`: age the stored tag by 5 hours.
+- `__goLiveDev.failNext("report")` or `__goLiveDev.failNext("write", 8)`: fail the next report, or hang the next write 8 s and then fail it.
+- `__goLiveDev.nextFix({ accuracyM: 150 })` or `__goLiveDev.nextFix({ timeout: true })`: override the next fix.
+- `__goLiveDev.clear()`: drop every queued fault.
+
+Network faults go through the same recovery as real ones: a forced report failure is retried silently, so to see OFFLINE · RETRY queue the failing write together with a dead network (Network Link Conditioner, or airplane mode on a device), or use the hanging write.

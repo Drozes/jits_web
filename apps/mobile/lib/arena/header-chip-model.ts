@@ -353,7 +353,9 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
       accessibilityLabel: `${CHIP_LABEL_PREFIX} going live`,
     });
   }
-  if (isLive && input.reconnecting) {
+  // Never over a restore drawn live: the lobby rejoining after a foreground
+  // return is part of the restore, not a reconnect (UX defect 2).
+  if (isLive && input.reconnecting && display !== "restore-live" && display !== "optimistic") {
     return base({
       kind: "reconnecting",
       tone: "neutral",

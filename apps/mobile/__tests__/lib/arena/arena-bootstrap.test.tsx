@@ -131,7 +131,7 @@ jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({
   usePendingChallengeRecovery: (args: unknown) => mockRecovery(args),
 }));
 
-import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
+import { ArenaBootstrap, RECONNECTING_GRACE_MS } from "@/lib/arena/arena-bootstrap";
 import { Toaster, __resetToastTrackingForTests, toast } from "@/components/ui/toast";
 import { PROMPT_INPUT_GUARD_MS, REOPEN_SURFACE_GRACE_MS } from "@/lib/arena/constants";
 import { renderHook } from "@testing-library/react-native";
@@ -352,26 +352,67 @@ describe("ArenaBootstrap", () => {
     expect(seen[seen.length - 1]).toMatchObject({ isLive: true, lastLiveWriteFailed: false });
   });
 
-  it("publishes reconnecting only while live with the lobby channel down (AC-H11)", () => {
-    const seen: Record<string, unknown>[] = [];
-    const tree = () => (
-      <>
-        <ArenaBootstrap />
-        <StoreProbe onState={(s) => seen.push(s as Record<string, unknown>)} />
-      </>
-    );
-    // Offline with the channel down: nothing to reconnect.
-    mockLobbyKnown = false;
-    const view = render(tree());
-    expect(seen[seen.length - 1]).toMatchObject({ reconnecting: false });
+  it("publishes reconnecting only while live with the lobby channel down for over 2 s (AC-H11, UX defect 2)", () => {
+    jest.useFakeTimers();
+    try {
+      const seen: Record<string, unknown>[] = [];
+      const tree = () => (
+        <>
+          <ArenaBootstrap />
+          <StoreProbe onState={(s) => seen.push(s as Record<string, unknown>)} />
+        </>
+      );
+      // Offline with the channel down: nothing to reconnect.
+      mockLobbyKnown = false;
+      const view = render(tree());
+      expect(seen[seen.length - 1]).toMatchObject({ reconnecting: false });
 
-    mockIsLive = true;
-    view.rerender(tree());
-    expect(seen[seen.length - 1]).toMatchObject({ isLive: true, reconnecting: true });
+      mockIsLive = true;
+      view.rerender(tree());
+      // The grace: a channel rejoining after a foreground return is not a
+      // reconnect (no green, grey, green).
+      act(() => {
+        jest.advanceTimersByTime(RECONNECTING_GRACE_MS - 10);
+      });
+      expect(seen.some((x) => x.reconnecting === true)).toBe(false);
+      act(() => {
+        jest.advanceTimersByTime(10);
+      });
+      expect(seen[seen.length - 1]).toMatchObject({ isLive: true, reconnecting: true });
 
-    mockLobbyKnown = true;
-    view.rerender(tree());
-    expect(seen[seen.length - 1]).toMatchObject({ isLive: true, reconnecting: false });
+      mockLobbyKnown = true;
+      view.rerender(tree());
+      expect(seen[seen.length - 1]).toMatchObject({ isLive: true, reconnecting: false });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("a lobby rejoining within the grace never publishes reconnecting (foreground return)", () => {
+    jest.useFakeTimers();
+    try {
+      const seen: Record<string, unknown>[] = [];
+      const tree = () => (
+        <>
+          <ArenaBootstrap />
+          <StoreProbe onState={(s) => seen.push(s as Record<string, unknown>)} />
+        </>
+      );
+      mockIsLive = true;
+      mockLobbyKnown = false;
+      const view = render(tree());
+      act(() => {
+        jest.advanceTimersByTime(400);
+      });
+      mockLobbyKnown = true;
+      view.rerender(tree());
+      act(() => {
+        jest.advanceTimersByTime(5_000);
+      });
+      expect(seen.some((x) => x.reconnecting === true)).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("routes the app's actions to its hooks while mounted, and resets on unmount", async () => {

@@ -21,7 +21,7 @@ import { clearPushDeferral } from "../invites/pending-invite";
 import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
 import { resetMatchLocationRequired } from "../arena/match-location-flag";
 import { resetLocationFlags } from "../arena/location-flags";
-import { clearAllDeviceLocations } from "../location/device-location-store";
+import { clearAllDeviceLocations, loadDeviceLocation } from "../location/device-location-store";
 import { cancelLocationSheet } from "../arena/go-live-location";
 
 type AuthError = { message: string };
@@ -154,6 +154,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resetNotificationRouterReady();
         resetHighlightStore();
         void clearShareCache().catch(() => undefined);
+        // The athlete's last accepted location and the instant go-live
+        // flags never outlive the session either (review round 1, S4).
+        clearAllDeviceLocations();
+        resetLocationFlags();
       } else if (needsAthleteLoad(nextUser.id, loadedAthleteForUserId.current)) {
         // Freshly signed-in user whose athlete row we have NOT loaded yet. Hold
         // the gate on "Loading..." (synchronously, in the same render that sets
@@ -191,6 +195,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await readAthlete(uid);
       if (cancelled) return;
       if (result.ok) {
+        // Start reading the stored go-live tag now, before the Arena owner
+        // mounts, so a cold-start restore decides its first frame from it
+        // (review round 1, S1). Never awaited; a failed read is "no tag".
+        if (result.data?.id) void loadDeviceLocation(result.data.id);
         setAthlete(result.data);
         loadedAthleteForUserId.current = uid;
         setAthleteLoadFailed(false);

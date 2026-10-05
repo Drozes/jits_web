@@ -18,6 +18,7 @@
 import { Platform } from "react-native";
 import * as Location from "expo-location";
 import type { LocationReading } from "@jits/shared/api/invites";
+import { takeDevFix } from "@/lib/arena/dev-go-live-hooks";
 
 export type ReadingResult =
   | {
@@ -178,17 +179,22 @@ export async function readLocationOnce(
       coarse = asked.android?.accuracy === "coarse";
     }
     if (!granted) return { status: "denied", canAskAgain: Boolean(canAskAgain) };
+    // DEV ONLY (QA): a forced timeout or accuracy for this fix; null in production.
+    const devFix = takeDevFix();
+    if (devFix?.kind === "timeout") return { status: "unavailable", reason: "timeout" };
+    const patch = (p: Location.LocationObject): Location.LocationObject =>
+      devFix?.kind === "accuracy" ? { ...p, coords: { ...p.coords, accuracy: devFix.accuracyM } } : p;
     if (opts.fast) {
       const fix = await fastFix(opts.skipLastKnown === true);
       if (fix === "timeout" || fix === "error") return { status: "unavailable", reason: fix };
-      return toResult(fix, coarse);
+      return toResult(patch(fix), coarse);
     }
     const position = await within(
       () => Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
       READING_TIMEOUT_MS,
     );
     if (position === TIMED_OUT) return { status: "unavailable", reason: "timeout" };
-    return toResult(position, coarse);
+    return toResult(patch(position), coarse);
   } catch {
     return { status: "unavailable", reason: "error" };
   }

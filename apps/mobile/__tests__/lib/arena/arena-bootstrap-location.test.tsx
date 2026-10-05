@@ -163,7 +163,7 @@ jest.mock("@/lib/arena/use-arena-challenge", () => ({
 }));
 jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({ usePendingChallengeRecovery: () => {} }));
 
-import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
+import { ArenaBootstrap, SERVER_LIVE_CHECK_MS } from "@/lib/arena/arena-bootstrap";
 import { __resetArenaStoreForTests, arenaActions, useArenaMatchScreen } from "@/lib/arena/arena-store";
 import { GO_LIVE_REFRESH_MS, __resetGoLiveLocationForTests } from "@/lib/arena/go-live-location";
 import { __resetLocationLadderForTests, RECOVERY_WINDOW_MS } from "@/lib/arena/location-ladder";
@@ -547,6 +547,35 @@ describe("the server ends a live session while the app is open (UX 019, 3j)", ()
       ),
     );
     expect(mockToastInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it("UX defect 3: while live in the foreground, asks every 30 s (a single-row read), and drops with one toast", async () => {
+    jest.useFakeTimers();
+    mockIsLive = true;
+    mockDropIfServerOffline.mockResolvedValue(false);
+    render(<ArenaBootstrap />);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SERVER_LIVE_CHECK_MS - 100);
+    });
+    expect(mockDropIfServerOffline).not.toHaveBeenCalled();
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(100);
+    });
+    expect(mockDropIfServerOffline).toHaveBeenCalledTimes(1);
+    // The read is the athlete's own row.
+    const read = mockDropIfServerOffline.mock.calls[0][0] as () => Promise<boolean | null>;
+    await act(async () => {
+      await read();
+    });
+    expect(mockServerRanked).toHaveBeenCalledWith({}, "me-1");
+    mockDropIfServerOffline.mockResolvedValue(true);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(SERVER_LIVE_CHECK_MS);
+    });
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ text1: "You're offline now. Tap to go live again." }),
+    );
+    expect(SERVER_LIVE_CHECK_MS).toBe(30_000);
   });
 
   it("a server that still has the athlete live: nothing changes, nothing is said", async () => {

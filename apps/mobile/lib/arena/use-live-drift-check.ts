@@ -30,7 +30,7 @@ import { reportGoLivePresence } from "@jits/shared/api/location";
 import type { LocationReading } from "@jits/shared/api/invites";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "@/lib/invites/location";
-import { peekDeviceLocation, recordAcceptedReading } from "@/lib/location/device-location-store";
+import { peekDeviceTag, recordAcceptedReading } from "@/lib/location/device-location-store";
 import { notePresenceAnswer } from "@/lib/location/presence-capability";
 import { isInArenaMatch } from "./arena-store";
 import { goOfflineWithFeedback } from "./go-live-feedback";
@@ -39,6 +39,8 @@ import { useLiveDriftCheckEnabled } from "./location-flags";
 import { logDriftCheck, logDriftPrompt } from "./location-telemetry";
 
 export interface DriftPrompt {
+  /** The athlete the check ran for (an Update stores only for them). */
+  athleteId: string;
   reading: LocationReading;
   capturedAt: number;
   /** Update is reporting the reading. */
@@ -97,14 +99,17 @@ export async function answerDriftPrompt(choice: "update" | "offline" | "dismiss"
     return;
   }
   setPrompt({ ...current, busy: true });
-  logDriftPrompt("retagged");
   try {
     const res = await reportGoLivePresence(supabase, current.reading, { capturedAt: current.capturedAt });
     if (res.ok) {
       notePresenceAnswer(res.data);
-      recordAcceptedReading("go_live", current.reading, current.capturedAt, res.data);
-      // The tag changed: a later drift from it is a new streak.
-      if (res.data.ok) promptedTagAt = null;
+      recordAcceptedReading("go_live", current.reading, current.capturedAt, res.data, current.athleteId);
+      if (res.data.ok) {
+        // Logged only once the server took the new tag (N4).
+        logDriftPrompt("retagged");
+        // The tag changed: a later drift from it is a new streak.
+        promptedTagAt = null;
+      }
     }
   } catch {
     // Silent: the next check prompts again if still drifted.
@@ -125,8 +130,9 @@ export async function runDriftCheck(athleteId: string): Promise<boolean> {
   if (AppState.currentState !== "active" || isInArenaMatch() || prompt) return false;
   const perm = await permissionState();
   if (!perm.granted) return false;
-  const tag = peekDeviceLocation(athleteId);
-  if (!tag || tag.context !== "go_live") return false;
+  // The go_live tag only: a browse reading never stands in for it (S3).
+  const tag = peekDeviceTag(athleteId);
+  if (!tag) return false;
   const loc = await readLocationOnce({ ask: false, fast: true, skipLastKnown: true });
   if (loc.status !== "ok" || loc.reducedPrecision) return false;
   if (AppState.currentState !== "active" || isInArenaMatch()) return false;
@@ -138,7 +144,7 @@ export async function runDriftCheck(athleteId: string): Promise<boolean> {
   if (promptedTagAt === tag.capturedAt) return false;
   promptedTagAt = tag.capturedAt;
   logDriftCheck(loc.reading);
-  setPrompt({ reading: loc.reading, capturedAt: loc.capturedAt ?? Date.now(), busy: false });
+  setPrompt({ athleteId, reading: loc.reading, capturedAt: loc.capturedAt ?? Date.now(), busy: false });
   return true;
 }
 

@@ -279,8 +279,15 @@ export function useArenaLive({
   autoLiveRef.current = autoLive;
   const onResumeParkedRef = React.useRef(onResumeParked);
   onResumeParkedRef.current = onResumeParked;
-  /** Bumped by every offline intent the athlete or the app set, so a restore can tell. */
+  /**
+   * Bumped only by a go-offline the ATHLETE asked for (`manualOffline`: the
+   * toggle, the popover, the Arena bar, sign-out), so a restore in flight can
+   * tell "cancelled" from the app's own offline writes (background, a match),
+   * which park it instead (review round 1, B2).
+   */
   const offlineIntentRef = React.useRef(0);
+  /** An automatic restore (`autoLive`) is running. */
+  const restoreInFlightRef = React.useRef(false);
   /** The server's reason for the last refused go-live write, if it gave one. */
   const refusalRef = React.useRef<"location_required" | null>(null);
 
@@ -474,7 +481,6 @@ export function useArenaLive({
 
   const requestOffline = React.useCallback((): Promise<boolean> => {
     desiredRef.current = false;
-    offlineIntentRef.current += 1;
     return reconcile();
   }, [reconcile]);
 
@@ -489,6 +495,8 @@ export function useArenaLive({
    * (the intent flipped back to live meanwhile) keeps it.
    */
   const manualOffline = React.useCallback(async (): Promise<boolean> => {
+    // The athlete's own go-offline: a restore in flight is cancelled by it.
+    offlineIntentRef.current += 1;
     const settle = manualOfflineRef.current?.();
     let ok = false;
     try {
@@ -570,13 +578,14 @@ export function useArenaLive({
       const run = autoLiveRef.current;
       if (!run) return "failed";
       const offlineAtStart = offlineIntentRef.current;
+      restoreInFlightRef.current = true;
       try {
         return await run({
           write: () => requestLiveRef.current(),
           lastRefusal: () => refusalRef.current,
           canWrite: () => {
-            // Backgrounding and entering a match also set an offline
-            // intent: those park the restore, they do not cancel it.
+            // Backgrounding and entering a match park the restore; only the
+            // athlete's own go-offline cancels it.
             if (AppState.currentState !== "active" || inMatchRef.current) return "parked";
             if (offlineIntentRef.current !== offlineAtStart && !desiredRef.current) return "cancelled";
             return "ok";
@@ -586,6 +595,8 @@ export function useArenaLive({
       } catch (error: unknown) {
         console.warn("[arena] restoring live failed:", error);
         return "failed";
+      } finally {
+        restoreInFlightRef.current = false;
       }
     },
     [],
@@ -599,7 +610,11 @@ export function useArenaLive({
   const restoreLive = React.useCallback(async (reason: AutoLiveContext["reason"] = "foreground") => {
     if (autoLiveRef.current) {
       const r = await runAutoLive(reason);
-      if (r !== "parked") return;
+      // Failed while the app was not in front: the ladder could say nothing
+      // (no toast in the background), so the live intent is not dropped
+      // silently; the next foreground tries again, and says it then.
+      const notInFront = r === "failed" && AppState.currentState !== "active";
+      if (r !== "parked" && !notInFront) return;
       if (inMatchRef.current) resumeAfterMatchRef.current = true;
       else resumeLiveRef.current = true;
       return;
@@ -663,14 +678,16 @@ export function useArenaLive({
     actualRef.current = false;
     if (autoLiveRef.current) {
       void runAutoLive("arrival").then((r) => {
-        if (r === "live" || r === "cancelled") return;
-        if (r === "parked") {
+        if (r === "live") return;
+        const notInFront = r === "failed" && AppState.currentState !== "active";
+        if (r === "parked" || notInFront) {
           if (inMatchRef.current) resumeAfterMatchRef.current = true;
           else resumeLiveRef.current = true;
         }
-        // The arrived `true` is still committed in the database (presence is
-        // not): clear it, so nobody can challenge an athlete the app could
-        // not put back. Not when the athlete has tapped Go live meanwhile.
+        // Every other outcome (failed, parked, cancelled): the arrived `true`
+        // is still committed in the database (presence is not). Clear it, so
+        // nobody can challenge an athlete the app could not put back (B2).
+        // Not when the athlete has tapped Go live meanwhile: that intent wins.
         if (!desiredRef.current) {
           actualRef.current = true;
           void requestOfflineRef.current();
@@ -727,7 +744,9 @@ export function useArenaLive({
       // alert and a half-swiped app switcher, none of which mean the athlete
       // left.
       if (next === "background") {
-        resumeLiveRef.current = resumeLiveRef.current || desiredRef.current;
+        // A restore still running (a silent fix) has not set the intent yet:
+        // the background must not lose it (B2).
+        resumeLiveRef.current = resumeLiveRef.current || desiredRef.current || restoreInFlightRef.current;
         void requestOfflineRef.current();
         if (resumeLiveRef.current && !inMatchRef.current) onResumeParkedRef.current?.();
         return;
