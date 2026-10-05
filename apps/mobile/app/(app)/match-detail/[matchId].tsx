@@ -22,7 +22,7 @@ import { markMatchSeen } from "@/lib/film-room/seen-store";
 import { videoHref } from "@/lib/film-room/href";
 import { usePalette } from "@/lib/theme/palette";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
-import { angleWatchable } from "@/lib/video/angle-status";
+import { angleWatchable, localAngleJob } from "@/lib/video/angle-status";
 
 /**
  * One past match, the Film Room's match page: the opening still with play,
@@ -121,7 +121,7 @@ export default function MatchDetailScreen() {
                 videos={data.videos}
                 opponentName={data.opponent?.display_name ?? null}
                 onWatch={(id) => play(id)}
-                localProgress={film.localUpload && film.localUpload.status !== "uploaded" ? film.localUpload.progress ?? null : null}
+                local={localAngleJob(film.localUpload)}
               />
             ) : null}
             {section.noVideo ? <MatchNoVideo /> : null}

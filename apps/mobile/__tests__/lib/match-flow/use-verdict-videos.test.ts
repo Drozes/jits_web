@@ -11,16 +11,21 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetailView: (...a: unknown[]) => mockGetView(...a),
 }));
 jest.mock("@jits/shared/api/match-rank-change", () => ({ getMatchRankChange: jest.fn() }));
-const mockRealtime: { matchId: string | null; onChange: (() => void) | null } = { matchId: null, onChange: null };
+const mockRealtime: { matchId: string | null; onChange: (() => void) | null; subscribed: boolean } = {
+  matchId: null,
+  onChange: null,
+  subscribed: true,
+};
 jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
   useMatchVideosRealtime: (_sb: unknown, matchId: string | null, onChange: () => void) => {
     mockRealtime.matchId = matchId;
     mockRealtime.onChange = onChange;
+    return { subscribed: mockRealtime.subscribed };
   },
 }));
 
 import * as verdictData from "@/lib/match-flow/use-verdict-data";
-import { useVerdictVideos } from "@/lib/match-flow/use-verdict-data";
+import { VERDICT_FALLBACK_REFETCH_MS, useVerdictVideos } from "@/lib/match-flow/use-verdict-data";
 
 function video(over: Record<string, unknown> = {}) {
   return {
@@ -45,6 +50,7 @@ beforeEach(() => {
   mockGetView.mockReset();
   mockRealtime.matchId = null;
   mockRealtime.onChange = null;
+  mockRealtime.subscribed = true;
 });
 
 it("no longer exports or runs a poster poll", () => {
@@ -89,4 +95,29 @@ it("falls back to the first poster when nothing is elected or the primary has no
   );
   const { result } = renderHook(() => useVerdictVideos("M1", "me", null));
   await waitFor(() => expect(result.current.posterUrl).toBe("https://mine"));
+});
+
+describe("fallback while realtime is not connected (review minor 9)", () => {
+  afterEach(() => jest.useRealTimers());
+
+  it("re-reads every minute until the channel joins, and stops once it has", async () => {
+    jest.useFakeTimers();
+    mockRealtime.subscribed = false;
+    mockGetView.mockResolvedValue(view([]));
+    const { rerender } = renderHook(() => useVerdictVideos("M1", "me", null));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockGetView).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(VERDICT_FALLBACK_REFETCH_MS);
+    });
+    expect(mockGetView).toHaveBeenCalledTimes(2);
+    mockRealtime.subscribed = true;
+    rerender({});
+    await act(async () => {
+      jest.advanceTimersByTime(VERDICT_FALLBACK_REFETCH_MS * 3);
+    });
+    expect(mockGetView).toHaveBeenCalledTimes(2);
+  });
 });

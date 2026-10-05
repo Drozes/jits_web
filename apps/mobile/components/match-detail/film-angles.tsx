@@ -5,9 +5,17 @@ import { PlayCircle } from "lucide-react-native";
 import { formatVideoDuration } from "@jits/shared/utils";
 import type { MatchDetailVideo } from "@jits/shared/api/queries";
 import { usePalette, TABULAR, type Palette } from "@/lib/theme/palette";
-import { angleName } from "@/components/film-room/angle-switcher";
+import { angleName, angleText } from "@/components/film-room/angle-switcher";
 import { angleTag } from "@jits/shared/utils";
-import { angleStatus, angleWatchable, type AngleTone } from "@/lib/video/angle-status";
+import {
+  angleCounts,
+  angleOwnerName,
+  angleRowA11yLabel,
+  angleStatus,
+  angleWatchable,
+  type AngleTone,
+  type LocalAngleJob,
+} from "@/lib/video/angle-status";
 import { shortName } from "@/lib/film-room/format";
 
 /** "Your recording" reads "Watch your recording"; a name keeps its case. */
@@ -35,39 +43,43 @@ interface FilmAnglesProps {
   videos: MatchDetailVideo[];
   opponentName: string | null;
   onWatch: (videoId: string) => void;
-  /** This phone's upload progress (0..1) while its own job runs; it wins for "Your angle". */
-  localProgress?: number | null;
+  /** This phone's job for "Your angle" while it has not landed; it wins over the server row (deck 2a). */
+  local?: LocalAngleJob | null;
 }
 
 /**
  * FILM: one row per recording, each a Watch for that angle. Keeps the
  * match-loop harness contract of the old cards: testID
  * `match-video-watch-<id>`, label "Watch your recording" / "Watch <Name>'s
- * recording", and a disabled "Processing" while the clip is still uploading.
+ * recording" while it can play. A row that cannot play yet is disabled and
+ * labelled with its state (deck 10.2: "{label}, {tag}, {helper}").
  */
-export function FilmAngles({ videos, opponentName, onWatch, localProgress = null }: FilmAnglesProps) {
+export function FilmAngles({ videos, opponentName, onWatch, local = null }: FilmAnglesProps) {
   const p = usePalette();
+  // The deck's count is of usable angles: an abandoned reservation is not one.
+  const count = videos.filter(angleCounts).length;
   return (
     <View testID="film-angles" style={{ gap: 10 }}>
       <Text accessibilityRole="header" className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-xl"], color: p.text }, TABULAR]}>
-        {videos.length > 1 ? `FILM · ${videos.length} ANGLES` : "FILM"}
+        {count > 1 ? `FILM · ${count} ANGLES` : "FILM"}
       </Text>
       <View style={{ borderTopWidth: 1, borderTopColor: p.hairline }}>
         {videos.map((v) => {
           // Nothing plays until the angle has bytes (deck rule 4).
           const processing = !angleWatchable(v);
           const status = angleStatus(v, {
-            name: shortName(v.uploaded_by_name ?? (v.recording_type === "timekeeper" ? null : opponentName)),
-            localProgress: v.is_mine ? localProgress : null,
+            name: angleOwnerName(v, opponentName, shortName),
+            local: v.is_mine ? local : null,
           });
           const tag = angleTag(v.recording_type);
+          const label = processing ? angleRowA11yLabel(angleText(v, opponentName), tag, status) : watchLabel(v.angle_label);
           const duration = status.right ?? formatVideoDuration(v.duration_seconds);
           return (
             <Pressable
               key={v.id}
               testID={`match-video-watch-${v.id}`}
               accessibilityRole="button"
-              accessibilityLabel={processing ? "Processing" : watchLabel(v.angle_label)}
+              accessibilityLabel={label}
               accessibilityState={{ disabled: processing }}
               accessibilityValue={status.percent != null ? { min: 0, max: 100, now: status.percent } : undefined}
               disabled={processing}

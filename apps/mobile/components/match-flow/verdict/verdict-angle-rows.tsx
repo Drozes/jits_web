@@ -5,7 +5,7 @@ import { angleTag } from "@jits/shared/utils";
 import { angleName, angleText } from "@/components/film-room/angle-switcher";
 import { toneColor } from "@/components/match-detail/film-angles";
 import { shortName } from "@/lib/film-room/format";
-import { angleStatus } from "@/lib/video/angle-status";
+import { angleOwnerName, angleRowA11yLabel, angleStatus } from "@/lib/video/angle-status";
 import { usePalette } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
@@ -29,10 +29,9 @@ export function VerdictAngleRows({ videos, opponentName }: VerdictAngleRowsProps
   return (
     <View testID="verdict-angle-rows" style={{ borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}>
       {videos.map((v, i) => {
-        const name = shortName(v.uploaded_by_name ?? (v.recording_type === "timekeeper" ? null : opponentName));
-        const status = angleStatus(v, { name });
+        const status = angleStatus(v, { name: angleOwnerName(v, opponentName, shortName) });
         const tag = angleTag(v.recording_type);
-        const a11y = [angleText(v, opponentName), tag, status.tag, status.right, status.helper].filter(Boolean).join(", ");
+        const a11y = angleRowA11yLabel(angleText(v, opponentName), tag, status);
         const uploading = status.percent != null && status.tone === "progress";
         return (
           <View

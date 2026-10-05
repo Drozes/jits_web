@@ -3305,7 +3305,9 @@ export async function getMyMatchVideos(
         latest_video_at: row.created_at,
       };
       g.video_count += 1;
-      if (videoPlayability(row.status) !== "processing") g.playable_count += 1;
+      // Ready, analyzed and the like only: a failed row (pipeline failure or
+      // an abandoned reservation) may have no file to play.
+      if (videoPlayability(row.status) === "playable") g.playable_count += 1;
       if (row.created_at > g.latest_video_at) g.latest_video_at = row.created_at;
       groups.set(row.match_id, g);
     }

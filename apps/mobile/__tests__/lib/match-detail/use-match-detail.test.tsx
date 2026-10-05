@@ -17,7 +17,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 // packages/shared; here it is inert.
 const mockMatchVideosRealtime = jest.fn();
 jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
-  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a),
+  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a) ?? { subscribed: true },
 }));
 
 let mockAthleteId: string | undefined = "me-1";

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { useMatchVideosRealtime, MATCH_VIDEOS_REALTIME_DEBOUNCE_MS } from "./use-match-videos-realtime";
 
 type Handler = (payload: { new?: Record<string, unknown> | null; old?: Record<string, unknown> | null }) => void;
@@ -117,5 +117,21 @@ describe("useMatchVideosRealtime (jits-n2im.12)", () => {
     renderHook(() => useMatchVideosRealtime(c.sb as never, "M1", () => undefined));
     const topics = c.sb.channel.mock.calls.map((call: unknown[]) => call[0]);
     expect(new Set(topics).size).toBe(2);
+  });
+});
+
+describe("subscribed (review minor 9)", () => {
+  it("is false until the join, true after, false again while the channel is down", () => {
+    const c = createClient();
+    const { result } = renderHook(() => useMatchVideosRealtime(c.sb as never, "M1", () => undefined));
+    expect(result.current.subscribed).toBe(false);
+    act(() => c.status("SUBSCRIBED"));
+    expect(result.current.subscribed).toBe(true);
+    act(() => c.status("CHANNEL_ERROR"));
+    expect(result.current.subscribed).toBe(false);
+  });
+
+  it("debounces for about two seconds (each refetch is an RPC plus poster signing)", () => {
+    expect(MATCH_VIDEOS_REALTIME_DEBOUNCE_MS).toBeGreaterThanOrEqual(2_000);
   });
 });

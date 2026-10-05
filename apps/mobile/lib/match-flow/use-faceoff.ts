@@ -176,7 +176,7 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   stateRef.current = { myWeighed, myReady, myWeight, recording };
   // The toggle, persisted for the server too (jits-n2im.14). Fire and
   // forget: ready never waits on it.
-  useRecordingIntent(p.matchId, recording, p.active, myReady);
+  useRecordingIntent(p.meId, p.matchId, recording, p.active, myReady);
 
 
   const sync = useStepMatchSync({

@@ -57,7 +57,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 // packages/shared; here it is inert.
 const mockMatchVideosRealtime = jest.fn();
 jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
-  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a),
+  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a) ?? { subscribed: true },
 }));
 
 jest.mock("@/lib/auth/hooks", () => ({
@@ -336,12 +336,17 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     const utils = await renderLoaded(
       view({ videos: [video({ status: "uploading", playability: "processing" }), video({ ...OPP_VIDEO, status: "failed", playability: "failed" })] }),
     );
-    const processing = utils.getByLabelText("Processing");
+    // Review minor 3: a row that cannot play says what it is
+    // ("{label}, {tag}, {helper}"), not a blanket "Processing".
+    const processing = utils.getByLabelText("Your angle, Uploading");
     expect(processing.props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(processing);
     expect(mockPush).not.toHaveBeenCalled();
     expect(utils.getByText("UPLOADING")).toBeTruthy();
-    expect(utils.getByText("ANALYSIS FAILED · MAY STILL PLAY")).toBeTruthy();
+    // Another athlete's pipeline failure is grey "Not used" (deck 2c), and
+    // its original still plays.
+    expect(utils.getByText("NOT USED")).toBeTruthy();
+    expect(utils.getByText("This clip couldn't be processed.")).toBeTruthy();
     fireEvent.press(utils.getByLabelText("Watch Demo Red's recording"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-opp");
     // The selected angle (mine) cannot play yet, so the hero has no play.
@@ -845,5 +850,27 @@ describe("wave 2: live angles, primary default, labels (jits-n2im.12 / .15)", ()
     const row = utils.getByTestId("match-video-watch-v-opp");
     within(row).getByText("DIDN'T UPLOAD");
     expect(row.props.accessibilityState).toMatchObject({ disabled: true });
+  });
+});
+
+describe("review minor 4: only playable angles are offered in the switcher", () => {
+  it("hides an uploading reservation and an abandoned row (the switcher drops under two)", async () => {
+    const utils = await renderLoaded(
+      view({
+        videos: [
+          video(),
+          video({ ...OPP_VIDEO, status: "uploading", playability: "processing" }),
+          video({ id: "v-tk", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, recording_type: "timekeeper", status: "failed", playability: "failed", failure_code: "upload_abandoned" }),
+        ],
+      }),
+    );
+    expect(utils.queryByTestId("angle-switcher")).toBeNull();
+    // The abandoned row is not counted as an angle (nit 1).
+    utils.getByText("FILM · 2 ANGLES");
+  });
+
+  it("keeps two playable angles switchable", async () => {
+    const utils = await renderLoaded(view({ videos: [video(), video({ ...OPP_VIDEO })] }));
+    utils.getByTestId("angle-switcher");
   });
 });

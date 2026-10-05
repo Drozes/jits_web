@@ -1,5 +1,7 @@
 import type { MatchDetailVideo } from "@jits/shared/api/queries";
 import { uploadPercent } from "@jits/shared/utils";
+import type { MatchUploadEntry } from "./match-upload-store";
+import { isTerminalUploadClass } from "./upload-errors";
 
 /**
  * One angle row's status, from the server row (`get_match_details`), for the
@@ -38,36 +40,61 @@ export const ANGLE_TAG = {
   ready: "Ready to watch",
   breakdown: "Breakdown ready",
   didntUpload: "Didn't upload",
+  notUsed: "Not used",
   analysisFailed: "Analysis failed · may still play",
 } as const;
 
 const PIPELINE = new Set(["processing", "slicing", "analyzing", "merging"]);
 
+/** THIS phone's job for the viewer's own angle (deck 2a: it wins over the server). */
+export interface LocalAngleJob {
+  /** The match-upload store status. */
+  status: "pending" | "uploading" | "paused" | "error";
+  /** 0..1, when known. */
+  progress: number | null;
+  /** A failure a retry cannot fix (grey, nothing to do). */
+  terminal: boolean;
+}
+
 export interface AngleStatusContext {
   /** The uploader's short name (`M. Park`), for the helpers about their phone. */
   name: string;
-  /**
-   * THIS phone's upload progress (0..1) for the viewer's own angle, when a
-   * local job exists: the local job wins over the server for that row (deck
-   * 2a). Undefined/null: no local job.
-   */
-  localProgress?: number | null;
+  /** This phone's job for the viewer's own angle, when one exists. */
+  local?: LocalAngleJob | null;
 }
 
-function pctOf(v: MatchDetailVideo, ctx: AngleStatusContext): number | null {
-  if (v.is_mine && ctx.localProgress != null && Number.isFinite(ctx.localProgress)) {
-    return Math.round(Math.max(0, Math.min(1, ctx.localProgress)) * 100);
+function pct(progress: number | null | undefined): number | null {
+  return progress != null && Number.isFinite(progress) ? Math.round(Math.max(0, Math.min(1, progress)) * 100) : null;
+}
+
+/**
+ * The viewer's own angle while this phone's job is still running or parked.
+ * The upload card above carries the cause and the actions, so the row only
+ * names the state; it never says "Uploading" over a paused or failed job.
+ */
+function localStatus(job: LocalAngleJob): AngleStatus {
+  if (job.status === "paused") {
+    return { tag: ANGLE_TAG.paused, tone: "waiting", right: null, percent: null, helper: null };
   }
-  return uploadPercent(v.upload_bytes_confirmed, v.upload_bytes_total);
+  if (job.status === "error") {
+    return { tag: ANGLE_TAG.didntUpload, tone: job.terminal ? "info" : "negative", right: null, percent: null, helper: null };
+  }
+  const percent = pct(job.progress);
+  return { tag: ANGLE_TAG.uploading, tone: "progress", right: percent != null ? `${percent}%` : null, percent, helper: null };
 }
 
 export function angleStatus(v: MatchDetailVideo, ctx: AngleStatusContext): AngleStatus {
-  const local = v.is_mine && ctx.localProgress != null;
+  const local = v.is_mine && ctx.local ? ctx.local : null;
+  // While the row has no playable bytes, this phone's job is the fresher
+  // truth for "Your angle" (deck 2a, contradiction rule 1). A row that
+  // already plays (an earlier recording, while a re-record uploads in the
+  // wave 1 order) keeps saying what it is.
+  if (local && !angleWatchable(v)) return localStatus(local);
   if (v.status === "uploading") {
-    const percent = pctOf(v, ctx);
+    const percent = uploadPercent(v.upload_bytes_confirmed, v.upload_bytes_total);
     // `upload_in_flight` false: nothing heard from the uploading phone within
-    // the server's grace window. The recording phone's own job is fresher.
-    if (v.upload_in_flight === false && !local) {
+    // the server's grace window.
+    if (v.upload_in_flight === false) {
       return {
         tag: ANGLE_TAG.paused,
         tone: "waiting",
@@ -86,17 +113,57 @@ export function angleStatus(v: MatchDetailVideo, ctx: AngleStatusContext): Angle
       tone: "info",
       right: null,
       percent: null,
-      helper: v.is_mine && !local ? "The upload didn't finish on the phone that recorded." : null,
+      helper: v.is_mine ? "The upload didn't finish on the phone that recorded." : null,
     };
   }
   if (v.playability === "processing") return { tag: ANGLE_TAG.processing, tone: "waiting", right: null, percent: null, helper: null };
-  if (v.playability === "failed") return { tag: ANGLE_TAG.analysisFailed, tone: "negative", right: null, percent: null, helper: null };
+  if (v.playability === "failed") {
+    // Red never appears on another person's angle (deck 0.5); deck 2c.
+    if (!v.is_mine) {
+      return { tag: ANGLE_TAG.notUsed, tone: "info", right: null, percent: null, helper: "This clip couldn't be processed." };
+    }
+    return { tag: ANGLE_TAG.analysisFailed, tone: "negative", right: null, percent: null, helper: null };
+  }
   if (v.has_analysis) return { tag: ANGLE_TAG.breakdown, tone: "done", right: null, percent: null, helper: null };
   if (PIPELINE.has(v.status)) return { tag: ANGLE_TAG.analyzing, tone: "waiting", right: null, percent: null, helper: null };
   return { tag: ANGLE_TAG.ready, tone: "done", right: null, percent: null, helper: null };
 }
 
 /** True when the row can be watched (deck rule 4: only a ready angle plays). */
-export function angleWatchable(v: MatchDetailVideo): boolean {
+export function angleWatchable(v: Pick<MatchDetailVideo, "playability" | "status" | "failure_code">): boolean {
   return v.playability !== "processing" && !(v.status === "failed" && v.failure_code === "upload_abandoned");
+}
+
+/** True when the row has a usable file (not an abandoned or deleted reservation): the FILM count. */
+export function angleCounts(v: Pick<MatchDetailVideo, "status" | "failure_code">): boolean {
+  return v.status !== "deleted" && !(v.status === "failed" && v.failure_code === "upload_abandoned");
+}
+
+/** The short name to use in a helper, with the deck-safe fallback for a nameless timekeeper. */
+export function angleOwnerName(
+  v: Pick<MatchDetailVideo, "uploaded_by_name" | "recording_type">,
+  opponentName: string | null | undefined,
+  short: (name: string) => string,
+): string {
+  const raw = v.uploaded_by_name?.trim() || (v.recording_type === "timekeeper" ? null : opponentName?.trim() || null);
+  if (raw) return short(raw);
+  return v.recording_type === "timekeeper" ? "the timekeeper" : "your opponent";
+}
+
+/**
+ * One screen-reader label for an angle row (deck 10.2): "{label}, {tag},
+ * {helper}", with the Timekeeper tag and the percent when there is one.
+ */
+export function angleRowA11yLabel(label: string, roleTag: string | null, status: AngleStatus): string {
+  return [label, roleTag, status.tag, status.right, status.helper].filter(Boolean).join(", ");
+}
+
+/** This phone's store entry as the row sees it: null once it landed (the server row is the truth then). */
+export function localAngleJob(entry: Pick<MatchUploadEntry, "status" | "progress" | "errorClass"> | null | undefined): LocalAngleJob | null {
+  if (!entry || entry.status === "uploaded") return null;
+  return {
+    status: entry.status,
+    progress: entry.progress ?? null,
+    terminal: entry.status === "error" && isTerminalUploadClass(entry.errorClass),
+  };
 }

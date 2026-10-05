@@ -12,6 +12,22 @@ export interface AngleOption {
   uploaded_by_name: string | null;
   /** "timekeeper" for the sideline angle (jr_be-1qz.5); absent on older data. */
   recording_type?: string | null;
+  /**
+   * What the UI may do with it (`videoPlayability`). Present on every
+   * `MatchDetailVideo`; only a "playable" angle is offered (deck rule 4).
+   */
+  playability?: string;
+}
+
+/**
+ * The angles worth switching to: playable ones only (deck rule 4), so a
+ * reservation still uploading, an abandoned one (no file) or a failed one is
+ * never offered. The angle on screen always stays, so the switch never
+ * loses its selection. An option without `playability` (older callers) is
+ * kept.
+ */
+export function switchableAngles<T extends AngleOption>(angles: T[], activeId: string): T[] {
+  return angles.filter((a) => a.id === activeId || a.playability == null || a.playability === "playable");
 }
 
 /**
@@ -53,8 +69,9 @@ interface AngleSwitcherProps {
  * Two-segment switch between the athletes' recordings of one match. Renders
  * nothing with fewer than two angles.
  */
-export function AngleSwitcher({ angles, activeId, opponentName, onSelect, variant = "plate" }: AngleSwitcherProps) {
+export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate" }: AngleSwitcherProps) {
   const p = usePalette();
+  const angles = switchableAngles(all, activeId);
   if (angles.length < 2) return null;
   // Over video the segments keep the on-film colors; on the page they follow
   // the theme. The active segment inverts (ink fill, page-colored label).

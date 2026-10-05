@@ -29,6 +29,9 @@ export interface VerdictVideos {
   others: MatchDetailVideo[];
 }
 
+/** How often the verdict re-reads while realtime is not connected. */
+export const VERDICT_FALLBACK_REFETCH_MS = 60_000;
+
 const EMPTY: VerdictVideos = { hasVideo: false, hasPlayable: false, posterUrl: null, posterKey: null, others: [] };
 
 /**
@@ -77,7 +80,15 @@ export function useVerdictVideos(matchId: string, viewerId: string, uploadedKey:
   }, [matchId, viewerId, uploadedKey, tick]);
 
   const refetch = React.useCallback(() => setTick((n) => n + 1), []);
-  useMatchVideosRealtime(supabase, matchId, refetch);
+  const { subscribed } = useMatchVideosRealtime(supabase, matchId, refetch);
+
+  // Review minor 9: realtime is the only refresh now, so while the channel
+  // has not joined (or dropped) a slow re-read keeps the verdict moving.
+  React.useEffect(() => {
+    if (subscribed) return;
+    const id = setInterval(refetch, VERDICT_FALLBACK_REFETCH_MS);
+    return () => clearInterval(id);
+  }, [subscribed, refetch]);
 
   return videos;
 }

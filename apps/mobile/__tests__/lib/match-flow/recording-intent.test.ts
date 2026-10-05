@@ -29,8 +29,8 @@ afterEach(() => {
 });
 
 it("sends the value and skips an unchanged repeat", async () => {
-  await persistRecordingIntent("M", true);
-  await persistRecordingIntent("M", true);
+  await persistRecordingIntent("A1", "M", true);
+  await persistRecordingIntent("A1", "M", true);
   expect(mockSetIntent).toHaveBeenCalledTimes(1);
   expect(mockSetIntent).toHaveBeenCalledWith(expect.anything(), "M", true);
 });
@@ -42,9 +42,9 @@ it("a fast ON -> OFF -> ON ends on the last value, in order", async () => {
       release = () => resolve(OK);
     }),
   );
-  const a = persistRecordingIntent("M", true);
-  const b = persistRecordingIntent("M", false);
-  const c = persistRecordingIntent("M", true);
+  const a = persistRecordingIntent("A1", "M", true);
+  const b = persistRecordingIntent("A1", "M", false);
+  const c = persistRecordingIntent("A1", "M", true);
   await Promise.resolve();
   await Promise.resolve();
   (release as unknown as () => void)();
@@ -57,7 +57,7 @@ it("a fast ON -> OFF -> ON ends on the last value, in order", async () => {
 it("retries a failure once, after the retry delay", async () => {
   jest.useFakeTimers();
   mockSetIntent.mockResolvedValueOnce(FAIL).mockResolvedValueOnce(OK);
-  const done = persistRecordingIntent("M", false);
+  const done = persistRecordingIntent("A1", "M", false);
   await jest.advanceTimersByTimeAsync(RECORDING_INTENT_RETRY_MS);
   await done;
   expect(mockSetIntent).toHaveBeenCalledTimes(2);
@@ -66,7 +66,7 @@ it("retries a failure once, after the retry delay", async () => {
 it("gives up after the one retry and never rejects", async () => {
   jest.useFakeTimers();
   mockSetIntent.mockResolvedValue(FAIL);
-  const done = persistRecordingIntent("M", true);
+  const done = persistRecordingIntent("A1", "M", true);
   await jest.advanceTimersByTimeAsync(RECORDING_INTENT_RETRY_MS);
   await expect(done).resolves.toBeUndefined();
   expect(mockSetIntent).toHaveBeenCalledTimes(2);
@@ -74,15 +74,21 @@ it("gives up after the one retry and never rejects", async () => {
 
 it("treats intent_frozen as final (no retry)", async () => {
   mockSetIntent.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "frozen", raw: { hint: "intent_frozen" } } });
-  await persistRecordingIntent("M", true);
+  await persistRecordingIntent("A1", "M", true);
   expect(mockSetIntent).toHaveBeenCalledTimes(1);
 });
 
 it("survives a throwing client", async () => {
   mockSetIntent.mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce(OK);
   jest.useFakeTimers();
-  const done = persistRecordingIntent("M", true);
+  const done = persistRecordingIntent("A1", "M", true);
   await jest.advanceTimersByTimeAsync(RECORDING_INTENT_RETRY_MS);
   await expect(done).resolves.toBeUndefined();
+  expect(mockSetIntent).toHaveBeenCalledTimes(2);
+});
+
+it("nit 3: keys by athlete, so another athlete on the same phone still sends", async () => {
+  await persistRecordingIntent("A1", "M", true);
+  await persistRecordingIntent("A2", "M", true);
   expect(mockSetIntent).toHaveBeenCalledTimes(2);
 });

@@ -22,23 +22,32 @@ export const RECORDING_INTENT_RETRY_MS = 2_000;
 
 const FINAL_HINTS = new Set(["intent_frozen", "not_participant"]);
 
+/**
+ * Keyed by `athleteId:matchId` (review nit 3): a second athlete signing in on
+ * the same phone for the same match must not inherit the first one's
+ * "already sent".
+ */
 const wanted = new Map<string, boolean>();
 const confirmed = new Map<string, boolean>();
 const chains = new Map<string, Promise<void>>();
+
+function keyOf(athleteId: string, matchId: string): string {
+  return `${athleteId}:${matchId}`;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function flush(matchId: string): Promise<void> {
+async function flush(key: string, matchId: string): Promise<void> {
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const value = wanted.get(matchId);
-    if (value === undefined || confirmed.get(matchId) === value) return;
+    const value = wanted.get(key);
+    if (value === undefined || confirmed.get(key) === value) return;
     let hint: string | null = null;
     try {
       const res = await setMatchRecordingIntent(supabase, matchId, value);
       if (res.ok) {
-        confirmed.set(matchId, value);
+        confirmed.set(key, value);
         // Loop: if the toggle moved while this was in flight, send that too.
         continue;
       }
@@ -53,12 +62,13 @@ async function flush(matchId: string): Promise<void> {
 }
 
 /** Queue the athlete's intent for this match. Resolves when the queue drains; never rejects. */
-export function persistRecordingIntent(matchId: string, intends: boolean): Promise<void> {
-  wanted.set(matchId, intends);
-  const next = (chains.get(matchId) ?? Promise.resolve()).then(() => flush(matchId));
-  chains.set(matchId, next);
+export function persistRecordingIntent(athleteId: string, matchId: string, intends: boolean): Promise<void> {
+  const key = keyOf(athleteId, matchId);
+  wanted.set(key, intends);
+  const next = (chains.get(key) ?? Promise.resolve()).then(() => flush(key, matchId));
+  chains.set(key, next);
   void next.then(() => {
-    if (chains.get(matchId) === next) chains.delete(matchId);
+    if (chains.get(key) === next) chains.delete(key);
   });
   return next;
 }
@@ -70,17 +80,23 @@ export function persistRecordingIntent(matchId: string, intends: boolean): Promi
  * failed. Waits for the remembered choice to load first, so the stale
  * pre-hydration OFF is never sent.
  */
-export function useRecordingIntent(matchId: string, recording: boolean, active: boolean, ready: boolean): void {
+export function useRecordingIntent(
+  athleteId: string,
+  matchId: string,
+  recording: boolean,
+  active: boolean,
+  ready: boolean,
+): void {
   React.useEffect(() => {
-    if (!active || !matchId) return;
+    if (!active || !matchId || !athleteId) return;
     let cancelled = false;
     void hydrateRecordingOptIn().then(() => {
-      if (!cancelled) void persistRecordingIntent(matchId, getRecordingOptIn());
+      if (!cancelled) void persistRecordingIntent(athleteId, matchId, getRecordingOptIn());
     });
     return () => {
       cancelled = true;
     };
-  }, [matchId, recording, active, ready]);
+  }, [athleteId, matchId, recording, active, ready]);
 }
 
 /** Tests only. */
