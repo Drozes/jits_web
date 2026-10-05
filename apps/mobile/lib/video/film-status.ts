@@ -111,6 +111,8 @@ export interface FilmStatusInput {
    * file from one still merging.
    */
   playable?: ReadonlyMap<string, number | null> | null;
+  /** The viewer Discarded this match's recording on this phone (deck 2a, no clip). */
+  discardedHere?: boolean;
 }
 
 const PENDING: ReadonlySet<MatchVideoAngleState> = new Set(["waiting_for_phone", "uploading", "upload_paused", "processing"]);
@@ -158,7 +160,8 @@ export function viewerRole(s: MatchVideoStatus, viewerId: string): FilmViewerRol
   return own?.role === "timekeeper" ? "timekeeper" : "competitor";
 }
 
-const localActive = (l: LocalAngleJob | null) => l != null;
+/** This phone's job can still deliver the angle (a terminal failure cannot). */
+const localActive = (l: LocalAngleJob | null) => l != null && !l.terminal;
 
 interface Ctx {
   s: MatchVideoStatus;
@@ -171,6 +174,10 @@ interface Ctx {
   keepOpen: string;
   visible: MatchVideoAngle[];
   playable: ReadonlyMap<string, number | null> | null;
+  /** This phone recorded the viewer's angle and it will never upload (terminal failure, or Discarded). */
+  mineDead: boolean;
+  /** Under admin review: no highlight is promised (wave 2 hid the note). */
+  disputed: boolean;
 }
 
 /** The angle has bytes the player can open (see `FilmRow.watchable`). */
@@ -241,6 +248,9 @@ function localRow(job: LocalAngleJob, keepOpen: string): RowBody {
 function mineServerRow(a: MatchVideoAngle, c: Ctx): RowBody {
   switch (a.state) {
     case "waiting_for_phone":
+      // Deck 2a on the phone that recorded, once its clip is gone (Discard):
+      // never the other-device "open the phone that recorded" copy.
+      if (c.mineDead) return body(ROW_TAG.notUploaded, "info", ROW_HELPER.clipGone);
       return body(ROW_TAG.waitingYourPhone, "waiting", ROW_HELPER.openToStart);
     case "uploading":
       return body(ROW_TAG.uploading, "progress", null, { percent: a.progress_pct });
@@ -385,11 +395,44 @@ function phaseOut(key: string, tag: string, tone: AngleTone, line: string, helpe
   return { key, tag, tone, line, helper, countdown };
 }
 
+/** The viewer's own highlight outcome once it is final (M1: it beats the match-level phase). */
+function ownReelOut(c: Ctx): PhaseOut | null {
+  const reel = c.s.reels.find((r) => r.athlete_id === c.viewerId) ?? null;
+  if (!reel) return null;
+  if (reel.state === "none") {
+    return phaseOut(`film_only_${reel.none_reason ?? "none"}`, PHASE_TAG.filmReady, "done", PHASE_COPY.filmOnlyLine, reel.none_reason === "no_clear_moment" ? PHASE_COPY.noClearMomentHelper : null);
+  }
+  if (reel.state === "failed") {
+    return phaseOut("film_only_failed", PHASE_TAG.filmReady, "done", PHASE_COPY.filmOnlyLine, PHASE_COPY.reelFailedHelper);
+  }
+  if (reel.state === "ready" || reel.state === "none_dominant_fallback") {
+    if (c.fusion && reel.origin === "late_angle") {
+      const late = c.visible.find((a) => a.used === true && a.recorder_athlete_id !== c.viewerId);
+      if (late) return phaseOut("ready_late", PHASE_TAG.ready, "done", PHASE_COPY.readyLine, PHASE_COPY.readyLateAddedHelper(refOf(late, c.viewerId)));
+    }
+    return phaseOut("ready", PHASE_TAG.ready, "done", PHASE_COPY.readyLine);
+  }
+  return null;
+}
+
 function derivePhase(c: Ctx): PhaseOut {
   const { s, role, fusion } = c;
   const tk = role === "timekeeper";
-  const pending = c.visible.filter((a) => PENDING.has(a.state) && a.used !== true);
+  // My own angle that will never arrive (terminal failure or Discard on this
+  // phone) is not "coming": it does not count as pending or expected.
+  const mineGone = c.mineDead
+    ? c.visible.find((a) => a.recorder_athlete_id === c.viewerId && a.state === "waiting_for_phone") ?? null
+    : null;
+  const live = mineGone ? c.visible.filter((a) => a !== mineGone) : c.visible;
+  const pending = live.filter((a) => PENDING.has(a.state) && a.used !== true);
   const ownJobActive = localActive(c.local);
+
+  // M1: once the viewer's own highlight is final, their line follows it,
+  // not the match-level "building" that waits on the other athlete's reel.
+  if (!tk && (s.phase === "building" || s.phase === "waiting_for_angle")) {
+    const own = ownReelOut(c);
+    if (own) return own;
+  }
 
   // A local job on THIS phone is an angle the server has not heard of yet:
   // never "No video yet" / "No one recorded it" over "Your angle: Uploading".
@@ -406,15 +449,24 @@ function derivePhase(c: Ctx): PhaseOut {
       if (s.phase_reason === "no_video_yet" && !ownJobActive) {
         return phaseOut("no_video_yet", PHASE_TAG.noVideoYet, "info", PHASE_COPY.noVideoLine, PHASE_COPY.noVideoHelper);
       }
+      // v2.4 (M2): bytes are in for an angle and analysis is running. Never
+      // "Uploading" / "on its way" beside a strip that says it uploaded.
+      if (live.some((a) => a.state === "processing")) {
+        return phaseOut("collecting_in", PHASE_TAG.analyzing, "waiting", PHASE_COPY.filmInLine);
+      }
+      // Nothing else is coming and mine never will: no film from this phone's view.
+      if (mineGone && !ownJobActive && pending.length === 0 && !live.some((a) => IN_FLIGHT.has(a.state))) {
+        return phaseOut("no_film_here", PHASE_TAG.noFilm, "info", PHASE_COPY.noFilmLine, tk ? TIMEKEEPER_PHASE_COPY.noFilmHelper : PHASE_COPY.noneUsableHelper);
+      }
       if (tk) {
         return phaseOut("collecting", PHASE_TAG.uploading, "progress", TIMEKEEPER_PHASE_COPY.collectingLine, ownJobActive ? c.keepOpen : null);
       }
-      const k = Math.max(s.angles_expected, ownJobActive ? 1 : 0);
+      const k = Math.max(s.angles_expected - (mineGone ? 1 : 0), ownJobActive ? 1 : 0);
       const line = k >= 2 ? PHASE_COPY.collectingManyLine(k) : PHASE_COPY.collectingOneLine;
       const graceMs = iso(s.no_video_grace_until);
       const windowMs = iso(s.film_window_until);
       const nothingIn =
-        !ownJobActive && !c.visible.some((a) => IN_FLIGHT.has(a.state)) && graceMs != null && c.serverNow >= graceMs;
+        !ownJobActive && !live.some((a) => IN_FLIGHT.has(a.state)) && graceMs != null && c.serverNow >= graceMs;
       if (nothingIn && windowMs != null) {
         return phaseOut("collecting_window", PHASE_TAG.uploading, "progress", line, PHASE_COPY.collectingWindowHelper(formatLocalTime(windowMs, c.nowMs)));
       }
@@ -436,7 +488,7 @@ function derivePhase(c: Ctx): PhaseOut {
           tag = PHASE_TAG.anySecond;
         }
       }
-      const first = pending[0] ?? c.visible.find((a) => a.state !== "ready") ?? null;
+      const first = pending[0] ?? live.find((a) => a.state !== "ready") ?? null;
       const ref = first ? refOf(first, c.viewerId) : ANGLE_LABEL.mineRef;
       if (s.wait_extended === true && !tk) {
         const inAngle = pending.find((a) => a.state === "processing") ?? first;
@@ -470,18 +522,7 @@ function derivePhase(c: Ctx): PhaseOut {
 
     case "ready": {
       if (tk) return phaseOut("ready", PHASE_TAG.ready, "done", TIMEKEEPER_PHASE_COPY.readyLine);
-      const reel = s.reels.find((r) => r.athlete_id === c.viewerId) ?? null;
-      if (reel?.state === "none") {
-        return phaseOut(`film_only_${reel.none_reason ?? "none"}`, PHASE_TAG.filmReady, "done", PHASE_COPY.filmOnlyLine, reel.none_reason === "no_clear_moment" ? PHASE_COPY.noClearMomentHelper : null);
-      }
-      if (reel?.state === "failed") {
-        return phaseOut("film_only_failed", PHASE_TAG.filmReady, "done", PHASE_COPY.filmOnlyLine, PHASE_COPY.reelFailedHelper);
-      }
-      if (fusion && reel?.origin === "late_angle") {
-        const late = c.visible.find((a) => a.used === true && a.recorder_athlete_id !== c.viewerId);
-        if (late) return phaseOut("ready_late", PHASE_TAG.ready, "done", PHASE_COPY.readyLine, PHASE_COPY.readyLateAddedHelper(refOf(late, c.viewerId)));
-      }
-      return phaseOut("ready", PHASE_TAG.ready, "done", PHASE_COPY.readyLine);
+      return ownReelOut(c) ?? phaseOut("ready", PHASE_TAG.ready, "done", PHASE_COPY.readyLine);
     }
 
     default: {
@@ -500,6 +541,17 @@ function derivePhase(c: Ctx): PhaseOut {
   }
 }
 
+/** Phase keys whose helper promises a highlight (or its timing). */
+const PROMISE_KEYS = /^(collecting_(one|many)|waiting_|building_|ready_late)/;
+
+/**
+ * A disputed result is under admin review, so nothing promises a highlight
+ * (wave 2 hid the note for the same reason): the line stays, the helper goes.
+ */
+function withoutPromises(ph: PhaseOut, disputed: boolean): PhaseOut {
+  return disputed && PROMISE_KEYS.test(ph.key) ? { ...ph, helper: null } : ph;
+}
+
 export function deriveFilmStatus(input: FilmStatusInput): FilmStatusView {
   const { status: s, viewerId, local, nowMs, clockOffsetMs } = input;
   const role = viewerRole(s, viewerId);
@@ -515,8 +567,10 @@ export function deriveFilmStatus(input: FilmStatusInput): FilmStatusView {
     // `not_recording` rows are never drawn (deck 1).
     visible: s.angles.filter((a) => a.state !== "not_recording"),
     playable: input.playable ?? null,
+    mineDead: input.local?.terminal === true || (input.local == null && input.discardedHere === true),
+    disputed: s.match_status === "disputed",
   };
-  const ph = derivePhase(c);
+  const ph = withoutPromises(derivePhase(c), c.disputed);
   const rows = buildRows(c);
   return {
     role,

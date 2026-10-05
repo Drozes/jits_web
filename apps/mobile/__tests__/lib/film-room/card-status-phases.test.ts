@@ -77,3 +77,30 @@ describe("useFilmRoomPhases helpers", () => {
     expect(cardPhaseOf(s, 30_000, NOW - 30_000).waitRemainingMs).toBe(120_000);
   });
 });
+
+describe("review M1 and M2 on the card", () => {
+  const videos = [{ id: "v", status: "analyzed", has_analysis: true, playability: "playable" }] as never;
+
+  it("own reel final while the match builds: the card follows the viewer (New / Breakdown ready), not BUILDING", () => {
+    const ph = phase({ phase: "building", reason: null, ownReel: "ready" });
+    expect(deriveCardStatus(item({ videos }), null, false, NOW_MS, ph).kind).toBe("new");
+    expect(deriveCardStatus(item({ videos }), null, true, NOW_MS, ph).kind).toBe("ready");
+    expect(deriveCardStatus(item({ videos: [{ id: "v", has_analysis: false, status: "analyzed", playability: "playable" }] as never }), null, true, NOW_MS, phase({ phase: "building", reason: null, ownReel: "none" })).kind).toBe("none");
+    // Own reel still building: BUILDING.
+    expect(statusBadgeLabel(deriveCardStatus(item({ videos }), null, true, NOW_MS, phase({ phase: "building", reason: null, ownReel: "building" })))).toBe("BUILDING HIGHLIGHT");
+  });
+
+  it("collecting with bytes landed falls through to the shipped ANALYZING n/m", () => {
+    const slicing = [{ id: "v", status: "analyzing", has_analysis: false, playability: "playable", chunk_count: 7, chunks_completed: 2 }] as never;
+    expect(statusBadgeLabel(deriveCardStatus(item({ videos: slicing }), null, true, NOW_MS, phase({})))).toBe("ANALYZING 2/7");
+    // Nothing landed (only a reservation uploading): UPLOADING.
+    const reserving = [{ id: "v", status: "uploading", has_analysis: false, playability: "processing" }] as never;
+    expect(statusBadgeLabel(deriveCardStatus(item({ videos: reserving }), null, true, NOW_MS, phase({})))).toBe("UPLOADING");
+  });
+
+  it("cardPhaseOf carries the viewer's own reel", () => {
+    const s = statusFixture({ phase: "building", phase_reason: null, reels: [{ athlete_id: "me-x", state: "ready" }] });
+    expect(cardPhaseOf(s, 0, NOW, "me-x").ownReel).toBe("ready");
+    expect(cardPhaseOf(s, 0, NOW, null).ownReel).toBeNull();
+  });
+});

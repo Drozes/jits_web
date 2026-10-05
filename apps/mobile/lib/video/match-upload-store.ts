@@ -216,6 +216,7 @@ export function setMatchUpload(
  * outcome is still the truth about this match.
  */
 export function beginMatchUploadAttempt(matchId: string): MatchUploadEntry {
+  discarded.delete(matchId);
   const next: MatchUploadEntry = {
     matchId,
     status: "pending",
@@ -242,7 +243,18 @@ export function beginMatchUploadAttempt(matchId: string): MatchUploadEntry {
  */
 export function clearMatchUpload(matchId: string): void {
   if (!entries.delete(matchId)) return;
+  // Remember that this phone recorded the match and dropped the clip, so the
+  // Film status keeps this phone's own copy ("The clip isn't on this phone
+  // anymore."), never the other-device "open the phone that recorded" line.
+  discarded.add(matchId);
   emit();
+}
+
+const discarded = new Set<string>();
+
+/** True when this phone Discarded the match's recording in this session (jits-n2im.25). */
+export function wasDiscardedHere(matchId: string): boolean {
+  return discarded.has(matchId);
 }
 
 /**
@@ -251,6 +263,7 @@ export function clearMatchUpload(matchId: string): void {
  */
 export function resetMatchUploadStore(): void {
   entries.clear();
+  discarded.clear();
   emit();
 }
 

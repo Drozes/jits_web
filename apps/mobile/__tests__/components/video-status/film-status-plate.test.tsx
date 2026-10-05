@@ -40,8 +40,9 @@ describe("FilmStatusPlate", () => {
     );
     const s = render(<FilmStatusPlate matchId={MATCH_ID} view={view} />);
     expect(s.getByText("FILM STATUS")).toBeTruthy();
-    expect(s.getByText("UPLOADING")).toBeTruthy();
-    expect(s.getByText("Film is coming in from 2 phones.")).toBeTruthy();
+    // Their bytes are in and analysing (v2.4): the phase says so, my row keeps its own state.
+    expect(s.getByText("ANALYZING")).toBeTruthy();
+    expect(s.getByText("Your film is in. Analyzing now.")).toBeTruthy();
     expect(s.getByText("YOUR ANGLE")).toBeTruthy();
     expect(s.getByText("PAUSED")).toBeTruthy();
     expect(s.getByText("No connection right now. It picks up where it left off.")).toBeTruthy();
@@ -129,5 +130,23 @@ describe("FilmStatusPlate", () => {
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0][0]).toBe("Building your highlight. D. Okafor's angle is ready to watch.");
     void V_OPP;
+  });
+
+  it("a Try again that fails at once says 'Still can't upload' (deck 10.4: same tag, new helper)", () => {
+    const spy = AccessibilityInfo.announceForAccessibility as jest.Mock;
+    const fail = (message: string | null) =>
+      v({ angles: [angle("me", "uploading"), angle("opp", "processing")] }, { local: { status: "error", progress: null, terminal: false, message } });
+    const s = render(<FilmStatusPlate matchId={MATCH_ID} view={fail("The upload didn't finish.")} />);
+    s.rerender(<FilmStatusPlate matchId={MATCH_ID} view={fail("Still can't upload. Check your connection.")} />);
+    expect(spy).toHaveBeenCalledWith("Still can't upload. Check your connection.");
+  });
+
+  it("a playable row speaks its state as a hint, and names keep their case", () => {
+    const view = v({ phase: "building", phase_reason: null, angles: [angle("me", "processing"), angle("opp", "ready")] }, { playable: new Map([[V_ME, 271]]) });
+    const s = render(<FilmStatusPlate matchId={MATCH_ID} view={view} onWatch={jest.fn()} />);
+    const mine = s.getByTestId(`match-video-watch-${V_ME}`);
+    expect(mine.props.accessibilityLabel).toBe("Watch your angle");
+    expect(mine.props.accessibilityHint).toBe("Analyzing");
+    expect(s.getByTestId(`match-video-watch-${V_OPP}`).props.accessibilityLabel).toBe("Watch D. Okafor's angle");
   });
 });

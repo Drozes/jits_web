@@ -2,7 +2,7 @@ import type { MatchLibraryItem, MatchLibraryVideo } from "@jits/shared/api/film-
 import type { MatchUploadEntry } from "@/lib/video/match-upload-store";
 import { uploadingLabel } from "@/lib/video/upload-copy";
 import { isTerminalUploadClass } from "@/lib/video/upload-errors";
-import type { MatchVideoPhase, MatchVideoPhaseReason } from "@jits/shared/api/match-video-status";
+import type { MatchVideoPhase, MatchVideoPhaseReason, MatchVideoReelState } from "@jits/shared/api/match-video-status";
 import { CARD_BADGE, PHASE_TAG } from "@/lib/video/video-status-copy";
 import { formatCountdown } from "@/lib/video/video-status-copy";
 
@@ -49,7 +49,11 @@ export interface CardPhase {
   reason: MatchVideoPhaseReason | null;
   /** Device ms left on the wait (server clock), while waiting. */
   waitRemainingMs: number | null;
+  /** The viewer's own reel state: once final it beats a match-level "building" (review M1). */
+  ownReel?: MatchVideoReelState | null;
 }
+
+const FINAL_REEL: ReadonlySet<string> = new Set(["ready", "none", "failed", "none_dominant_fallback"]);
 
 /** A film stays NEW for a week after the match if it was never opened. */
 export const NEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -90,13 +94,21 @@ export function deriveCardStatus(
   // Waiting {mm:ss} > Building > Uploading (collecting) > New > Breakdown
   // ready > No film. "Processing" is only ever an angle row (B1.1).
   if (phase) {
-    switch (phase.phase) {
+    // The viewer's own highlight is final while the match still builds the
+    // other athlete's: the card follows the viewer's outcome, as the plate does.
+    const ownFinal = phase.ownReel != null && FINAL_REEL.has(phase.ownReel);
+    const effective = ownFinal && (phase.phase === "building" || phase.phase === "waiting_for_angle") ? "ready" : phase.phase;
+    switch (effective) {
       case "waiting_for_angle":
         return { kind: "waiting", remainingMs: phase.waitRemainingMs };
       case "building":
         return { kind: "building" };
       case "collecting":
-        return phase.reason === "no_video_yet" ? { kind: "none" } : { kind: "collecting" };
+        if (phase.reason === "no_video_yet") return { kind: "none" };
+        // v2.4 (review M2): once bytes have landed for an angle, the shipped
+        // derivation speaks (PROCESSING FILM, ANALYZING n/m), never UPLOADING.
+        if (videos.some((v) => v.status !== "uploading")) break;
+        return { kind: "collecting" };
       case "no_film":
         return { kind: "no_film" };
       case "ready": {

@@ -760,7 +760,9 @@ describe("the verdict Film block (jits-n2im.25): the same plate as match detail"
     const s = renderVerdict();
     await flush();
     expect(s.getByText("Watch film")).toBeTruthy();
-    expect(s.getByText("ANALYZING")).toBeTruthy();
+    // The phase tag and my row both say it (v2.4).
+    expect(s.getAllByText("ANALYZING")).toHaveLength(2);
+    expect(s.getByText("Your film is in. Analyzing now.")).toBeTruthy();
   });
 
   it("an angle still merging (no playable bytes) is not a reason to offer Watch film", async () => {

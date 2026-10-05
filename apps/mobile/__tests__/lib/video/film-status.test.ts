@@ -372,3 +372,84 @@ describe("playability is PLAYABLE, not analysed (coordinator decision 2026-10-05
     expect(v.playableVideoIds).toEqual([V_ME]);
   });
 });
+
+describe("review M1: the viewer's own highlight beats the match-level building phase", () => {
+  const reels = (mine: string, theirs: string) => [
+    { athlete_id: ME, state: mine, version: 1, origin: "auto" },
+    { athlete_id: OPP, state: theirs },
+  ];
+  const building = (mine: string, theirs = "building", over: Record<string, unknown> = {}) =>
+    view({ phase: "building", phase_reason: null, angles: [angle("me", "ready"), angle("opp", "ready")], reels: reels(mine, theirs), ...over });
+
+  it("A ready while B still renders: A reads Ready, not Building", () => {
+    const v = building("ready");
+    expect({ tag: v.phaseTag, line: v.line, helper: v.helper }).toEqual({ tag: "Ready", line: "Film and highlight ready.", helper: null });
+  });
+
+  it("A none while B builds: the film-only state", () => {
+    const v = building("none", "building", { reels: [{ athlete_id: ME, state: "none", none_reason: "no_clear_moment" }, { athlete_id: OPP, state: "building" }] });
+    expect({ tag: v.phaseTag, line: v.line, helper: v.helper }).toEqual({ tag: "Film ready", line: "Film ready to watch.", helper: "We couldn't find a clear highlight of you in this video." });
+  });
+
+  it("A failed while B builds: the failed state (Try again is on the highlight card)", () => {
+    const v = building("failed");
+    expect({ tag: v.phaseTag, line: v.line, helper: v.helper }).toEqual({ tag: "Film ready", line: "Film ready to watch.", helper: "We couldn't make your highlight." });
+  });
+
+  it("A still building: the match phase speaks", () => {
+    expect(building("building").line).toBe("Building your highlight.");
+  });
+
+  it("the timekeeper keeps the match-level phase (no reel of their own)", () => {
+    const v = deriveFilmStatus({ status: statusFixture({ phase: "building", phase_reason: null, angles: [angle("tk", "ready"), angle("me", "ready")], reels: reels("ready", "building") }), viewerId: TK, local: null, nowMs: NOW, clockOffsetMs: 0 });
+    expect(v.line).toBe("Building the players' highlights.");
+  });
+});
+
+describe("review M2 (v2.4): film in, analysing", () => {
+  it("bytes in for an angle, nothing analysed: Analyzing, 'Your film is in. Analyzing now.'", () => {
+    const v = view({ angles: [angle("me", "processing"), angle("opp", "uploading", { progress_pct: 30 })] }, { playable: new Map([[V_ME, 271]]) });
+    expect({ tag: v.phaseTag, line: v.line, helper: v.helper }).toEqual({ tag: "Analyzing", line: "Your film is in. Analyzing now.", helper: null });
+    // Rows keep their own states.
+    expect(row(v, "Your angle").tag).toBe("Analyzing");
+    expect(row(v, "D. Okafor's angle")).toMatchObject({ tag: "Uploading", percent: 30 });
+  });
+
+  it("nothing landed yet: still Uploading", () => {
+    expect(view({}).phaseTag).toBe("Uploading");
+  });
+});
+
+describe("review minors 1 to 3", () => {
+  it("1. a terminal local failure never forces 'on its way' over No video yet", () => {
+    const v = view(
+      { phase: "collecting", phase_reason: "no_video_yet", angles_expected: 0, angles: [angle("me", "not_recording"), angle("opp", "not_recording")] },
+      { local: local({ status: "error", terminal: true, message: "This clip is too big to upload (2 GB max)." }) },
+    );
+    expect(v.line).toBe("No video yet.");
+    expect(v.rows[0]).toMatchObject({ tag: "Didn't upload", helper: "This clip is too big to upload (2 GB max)." });
+  });
+
+  it("1. the timekeeper's keep-open helper is not shown for a terminal job", () => {
+    const v = deriveFilmStatus({ status: statusFixture({ angles: [angle("tk", "waiting_for_phone"), angle("me", "uploading")] }), viewerId: TK, local: local({ status: "error", terminal: true }), nowMs: NOW, clockOffsetMs: 0 });
+    expect(v.helper).toBeNull();
+  });
+
+  it("2. after a Discard the recording phone gets its own copy, and no 'on its way' for a clip that will never come", () => {
+    const v = view({ angles_expected: 1, angles: [angle("me", "waiting_for_phone"), angle("opp", "not_recording")] }, { discardedHere: true });
+    expect(row(v, "Your angle")).toMatchObject({ tag: "Not uploaded", helper: "The clip isn't on this phone anymore.", tone: "info" });
+    expect(v.line).toBe("No film for this match.");
+  });
+
+  it("2. after a Discard, another angle still coming keeps the collecting line, counting only it", () => {
+    const v = view({ angles_expected: 2, angles: [angle("me", "waiting_for_phone"), angle("opp", "uploading")] }, { discardedHere: true });
+    expect(v.line).toBe("Your film is on its way.");
+  });
+
+  it("3. a disputed result promises no highlight: helpers drop, lines stay", () => {
+    const v = view({ match_status: "disputed", phase: "building", phase_reason: null, angles: [angle("me", "ready"), angle("opp", "ready")] });
+    expect(v.line).toBe("Building your highlight.");
+    expect(v.helper).toBeNull();
+    expect(view({ match_status: "disputed" }).helper).toBeNull();
+  });
+});

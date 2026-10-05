@@ -5,7 +5,7 @@ import { useMatchVideoStatus } from "@jits/shared/hooks/use-match-video-status";
 import type { MatchVideoStatus } from "@jits/shared/api/match-video-status";
 import type { DomainError } from "@jits/shared/api/errors";
 import { localAngleJob } from "./angle-status";
-import { useMatchUpload, type MatchUploadEntry } from "./match-upload-store";
+import { useMatchUpload, wasDiscardedHere, type MatchUploadEntry } from "./match-upload-store";
 import { isBackgroundUploadSupported } from "./upload-capabilities";
 import { useIsScreenFocused } from "./use-upload-announcements";
 import { deriveFilmStatus, type FilmStatusView } from "./film-status";
@@ -15,7 +15,9 @@ import { countdownA11y, rowAnnouncement } from "./video-status-copy";
 export function subscribeAppForeground(onForeground: () => void): () => void {
   let last: AppStateStatus = AppState.currentState;
   const sub = AppState.addEventListener("change", (next) => {
-    if (next === "active" && last === "background") onForeground();
+    // A return from the background or from iOS "inactive" (notification
+    // shade, app switcher): a re-read is cheap and the realtime may have lagged.
+    if (next === "active" && last !== "active") onForeground();
     last = next;
   }) as { remove?: () => void } | undefined;
   return () => sub?.remove?.();
@@ -41,7 +43,7 @@ function useTicker(active: boolean): number {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [active]);
-  return active ? now : Date.now();
+  return now;
 }
 
 /**
@@ -65,7 +67,11 @@ export function useFilmStatus(
   const entry = useMatchUpload(matchId ?? "");
   const local = React.useMemo(() => localAngleJob(entry), [entry]);
   const ticking = status?.phase === "waiting_for_angle" && !!status.wait_deadline_at;
-  const now = useTicker(ticking);
+  const tick = useTicker(ticking);
+  // Idle: a stable clock per read, so the view memo holds across re-renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const idleNow = React.useMemo(() => Date.now(), [status, local]);
+  const now = ticking ? tick : idleNow;
 
   // This phone's job moving (landed, failed, retried) is news the server
   // will echo; re-read so "Your angle" hands over without a gap.
@@ -85,6 +91,7 @@ export function useFilmStatus(
             clockOffsetMs,
             backgroundUpload: isBackgroundUploadSupported(),
             playable,
+            discardedHere: matchId ? wasDiscardedHere(matchId) : false,
           })
         : null,
     [status, viewerId, local, now, clockOffsetMs, playable],
@@ -105,11 +112,13 @@ const COUNTDOWN_MARKS = [300, 60, 0];
 export function useFilmStatusAnnouncements(view: FilmStatusView | null): void {
   const focused = useIsScreenFocused();
   const lastPhase = React.useRef<string | null>(null);
-  const lastRows = React.useRef<Map<string, string> | null>(null);
+  const lastRows = React.useRef<Map<string, { tag: string; helper: string | null }> | null>(null);
   const lastMark = React.useRef<number | null>(null);
 
-  const phaseKey = view?.phaseKey ?? null;
-  const rowKey = view ? view.rows.map((r) => `${r.key}=${r.tag}`).join("|") : "";
+  // Keyed on the line, not the phase key: a key change with the same words
+  // (the grace window passing) is not news.
+  const phaseKey = view?.line ?? null;
+  const rowKey = view ? view.rows.map((r) => `${r.key}=${r.tag}|${r.isMine ? (r.helper ?? "") : ""}`).join("|") : "";
   // Seconds left while waiting; 0 once the deadline passed and the server
   // has not moved yet ("Any second now"); null otherwise.
   const remainingS =
@@ -119,14 +128,18 @@ export function useFilmStatusAnnouncements(view: FilmStatusView | null): void {
     if (!view) return;
     const prevPhase = lastPhase.current;
     const prevRows = lastRows.current;
-    lastPhase.current = view.phaseKey;
-    lastRows.current = new Map(view.rows.map((r) => [r.key, r.tag]));
+    lastPhase.current = view.line;
+    lastRows.current = new Map(view.rows.map((r) => [r.key, { tag: r.tag, helper: r.helper }]));
     if (!focused || prevPhase == null || prevRows == null) return;
     const said: string[] = [];
-    if (prevPhase !== view.phaseKey) said.push(view.line);
+    if (prevPhase !== view.line) said.push(view.line);
     for (const r of view.rows) {
       const before = prevRows.get(r.key);
-      if (before != null && before !== r.tag) said.push(rowAnnouncement(r.label, r.tag));
+      if (before == null) continue;
+      if (before.tag !== r.tag) said.push(rowAnnouncement(r.label, r.tag));
+      // Deck 10.4: a Try again that fails at once keeps the tag and changes
+      // the helper ("Still can't upload. Check your connection."): say it.
+      else if (r.isMine && r.helper && before.helper !== r.helper) said.push(r.helper);
     }
     if (said.length > 0) AccessibilityInfo.announceForAccessibility(said.join(" "));
     // eslint-disable-next-line react-hooks/exhaustive-deps

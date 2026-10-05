@@ -1,6 +1,7 @@
 # Match video status: copy deck v2 (jits-n2im.24, jits-n2im.2)
 
 v2.3 (2026-10-05, with the build, jits-n2im.25 / .15): section 13 (Best angle) and section 14 (build notes) added; sections 0 to 12 unchanged.
+v2.4 (2026-10-05, coordinator decisions on the PR #52 review): section 14 items 8 to 11 (film in and analysing, the viewer's own highlight outcome, disputed results, a Discarded clip).
 
 Status: DRAFT v2.2, 2026-10-05: v2 plus the round 2 changes (`REVIEW-round2.md`: N1, N2, m1 to m7, nits) and the owner's naming decisions (Timekeeper kept; both shipped nouns kept). Not published. This version
 applies every finding in `REVIEW-round1.md` (B1, B2, M1 to M14, the minors and the nits) and the
@@ -441,3 +442,29 @@ derives the one view every surface renders.
    full-screen players (the match video player and the highlight viewer). On a pushed screen the
    strip pads the bottom safe area itself and the screen above it is given a bottom inset of 0, so
    the safe area is never padded twice.
+8. **v2.4: film in, analysing (coordinator decision 2026-10-05, review M2).** While the server phase is
+   `collecting` and at least one angle's bytes have landed (`processing`) but nothing is analysed
+   yet, the plate and the verdict Film block read phase tag `Analyzing`, line `Your film is in.
+   Analyzing now.`, no helper. Rows keep their own states (another angle still uploading still reads
+   `Uploading {pct}%`). The Film Room card falls through to the shipped derivation once any library
+   video is past `uploading` (`PROCESSING FILM`, `ANALYZING n/m`), and shows `UPLOADING` only while
+   bytes are really moving. **Why:** in that window the strip has already said "Match video
+   uploaded", the compact line says "Your angle: uploaded", the row plays and the verdict reads
+   `Watch film`; the deck's collecting row ("Uploading", "Your film is on its way") contradicted them
+   on the same screen (contradiction rule 2), and analysis takes minutes on every match.
+9. **The viewer's own highlight outcome beats the match-level phase (review M1).** The phase is
+   `building` until EVERY competitor's reel is final. Once the viewer's own reel is final, their
+   plate, verdict block and Film Room card follow it: `ready` (or the fallback reel) reads `Ready` /
+   `Film and highlight ready.` (card: New, then Breakdown ready); `none` reads the film-only row
+   (`Film ready to watch.` + the no-clear-moment helper); `failed` reads `Film ready to watch.` +
+   `We couldn't make your highlight.` (Try again is on the highlight card). The timekeeper, who has no
+   reel, keeps the match-level phase.
+10. **Disputed results promise no highlight.** On a match under admin review the phase helpers that
+    promise or time a highlight (collecting, waiting, building, late-angle) are dropped; the lines
+    stay. Wave 2 hid the highlight note for the same reason.
+11. **A clip that will never upload, on the phone that recorded it.** After Discard (or with a
+    terminal failure before any reservation), "Your angle" reads 2a `Not uploaded` / `The clip isn't
+    on this phone anymore.`, never the other-device `Waiting for your phone`. That angle no longer
+    counts as coming: when nothing else is coming either, the plate reads `No film for this match.` /
+    `None of the video could be used. Your result and rating aren't affected.` A terminal local
+    failure never forces "Your film is on its way" over the server's "No video yet".
