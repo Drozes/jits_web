@@ -55,6 +55,9 @@ import * as tracking from "@/lib/error-tracking/sentry";
  *                       view's onFirstFrameRender for the new item, or the
  *                       first playback progress on it). Null with none.
  *   switchLatencyMaxMs  the slowest of those switches.
+ *   After a switch, `durationS` and `maxPositionS` are on the file then on
+ *   screen (each angle has its own clock), so across a switched session they
+ *   mix angles; read them per session, not as one timeline.
  */
 
 /** How long a seek's "the next load is ours" exemption lasts at most. */

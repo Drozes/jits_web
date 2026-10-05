@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getMyMatchLibrary, getVideoAnalysis, getVideoSyncOffsets, isMissingRpcError } from "./film-room";
+import { getMyMatchLibrary, getVideoAnalysis, isMissingRpcError } from "./film-room";
 import { signPosterKeys } from "./poster-signing";
 
 // ---------------------------------------------------------------------------
@@ -544,20 +544,5 @@ describe("getVideoAnalysis", () => {
       ok: false,
       error: { code: "UNKNOWN", message: "boom" },
     });
-  });
-});
-
-describe("getVideoSyncOffsets", () => {
-  it("reads offsets by id and is best effort", async () => {
-    const m = mockClient({});
-    m.inFn.mockResolvedValueOnce({ data: [{ id: VID, sync_offset_ms: 1200 }], error: null });
-    expect(await getVideoSyncOffsets(m.client, [VID, "not-a-uuid"])).toEqual({ [VID]: 1200 });
-    expect(m.select).toHaveBeenCalledWith("id, sync_offset_ms");
-    expect(m.inFn).toHaveBeenCalledWith("id", [VID]);
-
-    const failed = mockClient({});
-    failed.inFn.mockResolvedValueOnce({ data: null, error: { message: "x" } });
-    expect(await getVideoSyncOffsets(failed.client, [VID])).toEqual({});
-    expect(await getVideoSyncOffsets(failed.client, [])).toEqual({});
   });
 });

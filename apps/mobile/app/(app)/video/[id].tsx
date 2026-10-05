@@ -4,9 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { VideoView } from "expo-video";
-import { NO_MATCH_COPY, buildKeyMoments, captionAt, formatClock, isNoMatch, translateAngleTime } from "@jits/shared/utils";
-import { getVideoSyncOffsets } from "@jits/shared/api/film-room";
-import { supabase } from "@/lib/supabase/client";
+import { NO_MATCH_COPY, angleSyncExact, buildKeyMoments, captionAt, formatClock, isNoMatch, translateAngleTime } from "@jits/shared/utils";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
@@ -16,7 +14,7 @@ import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { AngleSwitcher } from "@/components/film-room/angle-switcher";
 import { SeekBar } from "@/components/film-room/seek-bar";
 import { MomentCaption, MomentChips, Transport, nextSpeed } from "@/components/film-room/player-controls";
-import type { PlaybackAngle } from "@/lib/video/playback-telemetry";
+import { playbackAngleOf } from "@/lib/video/playback-angle";
 import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useVideoAnalysis } from "@/lib/film-room/use-video-analysis";
@@ -58,11 +56,6 @@ export default function MatchVideoScreen() {
   return <PlayerBody id={id} start={start} approximate={approx === "1"} />;
 }
 
-/** The telemetry angle of a recording: the sideline one is "timekeeper", never "opponent". */
-export function playbackAngleOf(v: { is_mine: boolean; recording_type?: string | null }): PlaybackAngle {
-  if (v.recording_type === "timekeeper") return "timekeeper";
-  return v.is_mine ? "mine" : "opponent";
-}
 
 /** How long the "not synced" note stays up after an angle switch. */
 const APPROX_NOTE_MS = 5000;
@@ -75,7 +68,6 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   const activeId = playback.activeId;
   const details = useMatchDetail(source?.matchId ?? undefined);
   const { analysis } = useVideoAnalysis(activeId ?? null);
-  const [offsets, setOffsets] = React.useState<Record<string, number | null>>({});
   // The note's start time: a new unsynced switch restarts its 5 s.
   const [approxAt, setApproxAt] = React.useState<number | null>(approximate ? Date.now() : null);
   const showApprox = approxAt != null;
@@ -89,14 +81,21 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   const duration = durationS || source?.durationSeconds || 0;
   const view = details.state === "ready" ? details.data : null;
   // One telemetry session per screen: its angle is the one it opened on.
-  const [entryId] = React.useState(id);
+  const entryId = playback.entryId;
+  // An outside navigation reusing the screen starts its own note state
+  // from its own `approx` param (review m2).
+  const approxEntryRef = React.useRef(entryId);
+  React.useEffect(() => {
+    if (approxEntryRef.current === entryId) return;
+    approxEntryRef.current = entryId;
+    setApproxAt(approximate ? Date.now() : null);
+  }, [entryId, approximate]);
   const entryAngle = view?.videos.find((v) => v.id === entryId);
   const angleMeta = entryAngle ? playbackAngleOf(entryAngle) : null;
   const angleCount = view ? view.videos.length : null;
   React.useEffect(() => {
     if (angleMeta) telemetry.setMeta({ angle: angleMeta, angleCount });
   }, [telemetry, angleMeta, angleCount]);
-  const angleIds = view && view.videos.length > 1 ? view.videos.map((v) => v.id).join(",") : "";
   // Sign every other playable angle as soon as the match is known, so a
   // switch does not wait on the sign round trip.
   const playableIds = view
@@ -106,16 +105,6 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   React.useEffect(() => {
     if (playableIds) presign(playableIds.split(","));
   }, [presign, playableIds]);
-  React.useEffect(() => {
-    if (!angleIds) return;
-    let cancelled = false;
-    void getVideoSyncOffsets(supabase, angleIds.split(",")).then((o) => {
-      if (!cancelled) setOffsets(o);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [angleIds]);
   // A video with no match in it has no moments to mark (jr_be-0qf).
   const noMatch = isNoMatch(analysis);
   const moments = React.useMemo(
@@ -178,14 +167,19 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                 opponentName={view.opponent?.display_name}
                 onSelect={(other) => {
                   if (other === activeId) return;
-                  // Synced when both recordings carry sync_offset_ms (the
-                  // slicer writes it; primary = 0). The position is the
+                  // Offsets come with the match (get_match_details, jr_be
+                  // 20261005100400; primary = 0). The position is the
                   // player's own, carried in fractional seconds: flooring it
                   // threw away up to 999 ms of a 20 to 40 ms audio sync.
-                  const moved = translateAngleTime(playback.currentTimeNow(), offsets[activeId], offsets[other]);
+                  // Exact only when both ends are the primary or audio
+                  // matched: a clock offset can be seconds out.
+                  const from = view.videos.find((v) => v.id === activeId);
+                  const to = view.videos.find((v) => v.id === other);
+                  const moved = translateAngleTime(playback.currentTimeNow(), from?.sync_offset_ms, to?.sync_offset_ms);
+                  const exact = moved.synced && angleSyncExact(from) && angleSyncExact(to);
                   playback.switchAngle(other, moved.t);
-                  setApproxAt(moved.synced ? null : Date.now());
-                  router.setParams({ id: other, t: moved.t.toFixed(3), approx: moved.synced ? "0" : "1" });
+                  setApproxAt(exact ? null : Date.now());
+                  router.setParams({ id: other, t: moved.t.toFixed(3), approx: exact ? "0" : "1" });
                 }}
               />
             </View>

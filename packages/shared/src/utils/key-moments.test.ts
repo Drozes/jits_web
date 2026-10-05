@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
+import contract from "./__fixtures__/angle-sync-contract.json";
 import {
   buildKeyMoments,
   captionAt,
   formatClock,
   translateAngleTime,
+  angleSyncExact,
   humanizeAnalysisLabel,
 } from "./key-moments";
 
@@ -153,5 +155,34 @@ describe("translateAngleTime", () => {
   it("carries t unchanged and unsynced when either offset is unknown", () => {
     expect(translateAngleTime(42, null, 2500)).toEqual({ t: 42, synced: false });
     expect(translateAngleTime(42, 0, undefined)).toEqual({ t: 42, synced: false });
+  });
+});
+
+describe("angle sync contract shared with jr_be (jr_be-1qz.11 acceptance 3)", () => {
+  // Byte-identical to jr_be workers/video-slicer/test/fixtures/angle-sync-contract.json.
+  it.each(contract.cases)("t=$t from $from_offset_ms to $to_offset_ms -> $expected_t", (c) => {
+    const out = translateAngleTime(c.t, c.from_offset_ms, c.to_offset_ms);
+    expect(out.synced).toBe(true);
+    expect(out.t).toBeCloseTo(c.expected_t, 9);
+  });
+
+  it("AC1: the primary at 30.000 s is 28.500 s on an angle that started 1.5 s later, and back", () => {
+    expect(translateAngleTime(30, 0, 1500).t).toBeCloseTo(28.5, 9);
+    expect(translateAngleTime(28.5, 1500, 0).t).toBeCloseTo(30, 9);
+  });
+});
+
+describe("angleSyncExact", () => {
+  it("the primary and audio-matched angles are exact", () => {
+    expect(angleSyncExact({ is_primary: true, sync_offset_ms: 0, sync_source: null })).toBe(true);
+    expect(angleSyncExact({ sync_offset_ms: 0, sync_source: null })).toBe(true);
+    expect(angleSyncExact({ sync_offset_ms: -163, sync_source: "audio" })).toBe(true);
+  });
+  it("clock, manual, missing source or no offset is approximate", () => {
+    expect(angleSyncExact({ sync_offset_ms: 2400, sync_source: "clock" })).toBe(false);
+    expect(angleSyncExact({ sync_offset_ms: 200, sync_source: "manual" })).toBe(false);
+    expect(angleSyncExact({ sync_offset_ms: 200, sync_source: null })).toBe(false);
+    expect(angleSyncExact({ sync_offset_ms: null, sync_source: "audio" })).toBe(false);
+    expect(angleSyncExact(null)).toBe(false);
   });
 });

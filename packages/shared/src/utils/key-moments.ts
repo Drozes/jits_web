@@ -214,23 +214,20 @@ export function formatClock(seconds: number | null | undefined): string {
 /**
  * Carry a playback position from one angle of a match to the other.
  *
- * BACKEND FACTS (jr_be, checked 2026-09-27): `match_videos.sync_offset_ms`
- * exists (migration 20260313000000_video_tables.sql, comment "millisecond
- * offset relative to primary video for sync") but NOTHING writes it: no RPC,
- * trigger, edge function, slicer worker or frontend sets it, the chunked
- * pipeline spec marks it "v1: ignored", and no sign convention is defined.
- * The research note puts it on the SECONDARY video only (the primary angle,
- * `primary_video_id` NULL, has no offset). So today both offsets are null
- * and every switch takes the unsynced path: `t` carries over and the caller
- * shows "Angles aren't synced; position is approximate".
+ * BACKEND CONTRACT (jr_be wave A, migration 20261005100000; INTEGRATION.md
+ * 10.1): `sync_offset_ms(V) = start(V) - start(primary)` in milliseconds,
+ * positive when V started later. The elected primary is stored as 0 (with a
+ * NULL source and confidence) and an unsynced angle as NULL, so
+ * `reference_time = video_time + sync_offset_ms / 1000` and the same instant
+ * on the target is `t + (fromOffset - toOffset) / 1000`. The slicer writes
+ * the offsets (`set_match_video_sync`); `get_match_details` returns them per
+ * video with `sync_source` and `sync_confidence` (10.5).
  *
- * If a writer ever lands, this ASSUMES the offset is how much later that
- * recording started than the reference, so reference time = video time +
- * offset and the same instant on the target is
- * `t + (fromOffset - toOffset) / 1000`. It only reports `synced` when BOTH
- * offsets are numbers, so a writer that leaves the primary NULL must also
- * store 0 on it (or this must learn `primary_video_id`) before angles sync.
- * Re-check the sign against the writer when it exists.
+ * `synced` only says both offsets are numbers. Whether the result is EXACT
+ * also depends on how the offsets were found: an audio match is within about
+ * a frame, a clock offset (the recorders' start times) can be off by
+ * seconds. Callers decide that with `angleSyncExact`. The result is never
+ * rounded: carry it in fractional seconds.
  */
 export function translateAngleTime(
   t: number,
@@ -247,4 +244,24 @@ export function translateAngleTime(
     return { t: safeT, synced: false };
   }
   return { t: Math.max(0, safeT + (fromOffsetMs - toOffsetMs) / 1000), synced: true };
+}
+
+/** The sync fields of a match video (`get_match_details`). */
+export interface AngleSyncFields {
+  is_primary?: boolean | null;
+  sync_offset_ms?: number | null;
+  sync_source?: string | null;
+}
+
+/**
+ * Whether an angle's offset is trustworthy to the frame: the primary (the
+ * reference, offset 0) or an audio-matched angle. A clock or manual offset,
+ * or none, is approximate.
+ */
+export function angleSyncExact(v: AngleSyncFields | null | undefined): boolean {
+  if (!v || typeof v.sync_offset_ms !== "number" || !Number.isFinite(v.sync_offset_ms)) return false;
+  if (v.is_primary === true) return true;
+  // The contract stores the primary as (0, NULL, NULL); trust that shape too.
+  if (v.sync_offset_ms === 0 && v.sync_source == null) return true;
+  return typeof v.sync_source === "string" && v.sync_source.trim().toLowerCase() === "audio";
 }

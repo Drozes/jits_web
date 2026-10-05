@@ -33,10 +33,8 @@ jest.mock("@/lib/match-detail/use-match-detail", () => ({
   useMatchDetail: (id: string | undefined) => mockUseMatchDetail(id),
 }));
 const mockGetVideoAnalysis = jest.fn();
-const mockGetVideoSyncOffsets = jest.fn();
 jest.mock("@jits/shared/api/film-room", () => ({
   getVideoAnalysis: (...a: unknown[]) => mockGetVideoAnalysis(...a),
-  getVideoSyncOffsets: (...a: unknown[]) => mockGetVideoSyncOffsets(...a),
 }));
 
 /**
@@ -243,7 +241,10 @@ beforeEach(() => {
   mockId = "vid-1";
   mockT = undefined;
   mockApprox = undefined;
-  mockGetVideoSyncOffsets.mockResolvedValue({});
+  // The route follows setParams, like expo-router (tests rerender to apply it).
+  mockSetParams.mockImplementation((p: { id?: string }) => {
+    if (p.id) mockId = p.id;
+  });
   mockUseMatchDetail.mockReturnValue({ state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() });
   mockGetVideoAnalysis.mockResolvedValue({ ok: true, data: null });
   mockCaptureMessage.mockReset();
@@ -561,11 +562,14 @@ function playableInMatch(url = "https://signed.example/v.mp4") {
   };
 }
 
-function detailView(videos = 2, extra: Record<string, unknown>[] = []) {
+function detailView(videos = 2, extra: Record<string, unknown>[] = [], sync: Record<string, Record<string, unknown>> = {}) {
   const vids = [
     { id: "vid-1", uploaded_by: "me-1", uploaded_by_name: "Kai Reyes", is_mine: true, angle_label: "Your recording", playability: "playable", has_analysis: true },
     { id: "vid-2", uploaded_by: "opp-1", uploaded_by_name: "Mina Park", is_mine: false, angle_label: "Mina Park's recording", playability: "playable", has_analysis: false },
-  ].slice(0, videos).concat(extra as never[]);
+  ]
+    .slice(0, videos)
+    .concat(extra as never[])
+    .map((v) => ({ ...v, ...(sync[v.id] ?? {}) }));
   return {
     state: "ready",
     error: null,
@@ -596,10 +600,12 @@ const ANALYSIS = {
   },
 };
 
-async function renderLoadedPlayer(opts: { videos?: number; analysis?: unknown; extra?: Record<string, unknown>[] } = {}) {
+const AUDIO_SYNC = { "vid-1": { is_primary: true, sync_offset_ms: 0 }, "vid-2": { sync_offset_ms: 2500, sync_source: "audio", sync_confidence: 0.8 } };
+
+async function renderLoadedPlayer(opts: { videos?: number; analysis?: unknown; extra?: Record<string, unknown>[]; sync?: Record<string, Record<string, unknown>> } = {}) {
   queries().getMatchVideoPlaybackResult.mockResolvedValue(playableInMatch());
   mockUseMatchDetail.mockImplementation((id: string | undefined) =>
-    id === MATCH ? detailView(opts.videos ?? 2, opts.extra) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
+    id === MATCH ? detailView(opts.videos ?? 2, opts.extra, opts.sync) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
   );
   mockGetVideoAnalysis.mockResolvedValue(opts.analysis ?? ANALYSIS);
   const utils = render(React.createElement(MatchVideoScreen));
@@ -724,14 +730,27 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "42.600", approx: "1" });
   });
 
-  it("translates the time by the sync offsets when both angles have one", async () => {
-    mockGetVideoSyncOffsets.mockResolvedValue({ "vid-1": 0, "vid-2": 2500 });
-    const utils = await renderLoadedPlayer();
-    await waitFor(() => expect(mockGetVideoSyncOffsets).toHaveBeenCalledWith({}, ["vid-1", "vid-2"]));
+  it("translates the time by the match's audio-synced offsets, with no approximate note", async () => {
+    const utils = await renderLoadedPlayer({ sync: AUDIO_SYNC });
     statusAt(42.6);
-    await act(async () => undefined);
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
     expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "40.100", approx: "0" });
+    expect(utils.queryByTestId("player-approx-note")).toBeNull();
+  });
+
+  it("AC1: 30.000 s on the primary lands on 28.500 s of an angle that started 1.5 s later", async () => {
+    const utils = await renderLoadedPlayer({ sync: { ...AUDIO_SYNC, "vid-2": { ...AUDIO_SYNC["vid-2"], sync_offset_ms: 1500 } } });
+    statusAt(30);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "28.500", approx: "0" });
+  });
+
+  it("a clock offset translates but still says the position is approximate (review M1)", async () => {
+    const utils = await renderLoadedPlayer({ sync: { ...AUDIO_SYNC, "vid-2": { sync_offset_ms: 2500, sync_source: "clock", sync_confidence: null } } });
+    statusAt(42.6);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "40.100", approx: "1" });
+    expect(utils.getByTestId("player-approx-note")).toBeTruthy();
   });
 
   it("shows the approximate-position note after an unsynced switch, then hides it", async () => {
@@ -821,17 +840,16 @@ describe("wave 2: the expo-video player offers only playable angles (jits-n2im.1
 });
 
 describe("angle switch in place (multi-angle P0)", () => {
-  async function renderTwoAngles(opts: { offsets?: Record<string, number | null>; poster?: boolean; videos?: Record<string, unknown>[] } = {}) {
+  async function renderTwoAngles(opts: { sync?: Record<string, Record<string, unknown>>; poster?: boolean; videos?: Record<string, unknown>[] } = {}) {
     queries().getMatchVideoPlaybackResult.mockImplementation((_c: unknown, vid: string) =>
       Promise.resolve({
         ok: true,
         data: { ...playableInMatch(`https://signed.example/${vid}.mp4`).data, posterUrl: opts.poster ? `https://signed.example/${vid}.jpg` : null },
       }),
     );
-    mockGetVideoSyncOffsets.mockResolvedValue(opts.offsets ?? {});
     mockUseMatchDetail.mockImplementation((id: string | undefined) => {
       if (id !== MATCH) return { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() };
-      const view = detailView(2);
+      const view = detailView(2, [], opts.sync);
       if (opts.videos) view.data.videos = opts.videos as never[];
       return view;
     });
@@ -846,7 +864,7 @@ describe("angle switch in place (multi-angle P0)", () => {
   }
 
   it("a switch mid-play keeps the ms position, play state and speed, with no remount and no new sign", async () => {
-    const utils = await renderTwoAngles({ offsets: { "vid-1": 0, "vid-2": 2500 } });
+    const utils = await renderTwoAngles({ sync: AUDIO_SYNC });
     fireEvent.press(utils.getByLabelText("Playback speed, 1x"));
     statusAt(42.637);
     const signs = queries().getMatchVideoPlaybackResult.mock.calls.length;
@@ -901,7 +919,10 @@ describe("angle switch in place (multi-angle P0)", () => {
       await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(2));
       ready(400);
       now.mockReturnValue(1_000_240);
+      // The view's first frame alone is not a landing (it may be frame 0);
+      // the resume seek reaching 20 s is.
       act(() => mockViewProps.current!.onFirstFrameRender());
+      statusAt(20);
       fireEvent.press(utils.getByLabelText("YOUR ANGLE"));
       await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(3));
       now.mockRestore();
@@ -926,5 +947,44 @@ describe("angle switch in place (multi-angle P0)", () => {
     utils.unmount();
     const payload = mockCaptureMessage.mock.calls[0][1];
     expect(payload.extra).toMatchObject({ videoId: "vid-tk", angle: "timekeeper", angleCount: 3 });
+  });
+});
+
+describe("route id changes after a switch (review m4)", () => {
+  it("the route catching up with setParams reloads nothing, even after A, B, A", async () => {
+    const utils = await renderLoadedPlayer();
+    statusAt(20);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(2));
+    ready(400);
+    statusAt(20);
+    fireEvent.press(utils.getByLabelText("YOUR ANGLE"));
+    await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(3));
+    const signs = queries().getMatchVideoPlaybackResult.mock.calls.length;
+    // Stale intermediate route render, then the current one.
+    mockId = "vid-2";
+    utils.rerender(React.createElement(MatchVideoScreen));
+    mockId = "vid-1";
+    utils.rerender(React.createElement(MatchVideoScreen));
+    await act(async () => undefined);
+    expect(queries().getMatchVideoPlaybackResult).toHaveBeenCalledTimes(signs);
+    expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(3);
+    expect(mockPlayers).toHaveLength(1);
+    expect(utils.getByLabelText("YOUR ANGLE").props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it("an outside navigation reusing the screen opens the new recording at its ?t= with its own note", async () => {
+    const utils = await renderLoadedPlayer();
+    statusAt(50);
+    mockId = "vid-9";
+    mockT = "15";
+    mockApprox = "1";
+    utils.rerender(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(queries().getMatchVideoPlaybackResult).toHaveBeenLastCalledWith({}, "vid-9"));
+    await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(2));
+    ready(400);
+    expect(lastPlayer().seeks.at(-1)).toBe(15);
+    expect(utils.getByTestId("player-approx-note")).toBeTruthy();
+    expect(mockPlayers).toHaveLength(1);
   });
 });

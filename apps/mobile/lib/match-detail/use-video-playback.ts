@@ -57,6 +57,8 @@ export interface VideoPlayback {
    * session (a switch used to remount all three).
    */
   activeId: string | undefined;
+  /** The angle this screen session opened on; moves only on an outside navigation. */
+  entryId: string | undefined;
   /**
    * Switch to another angle of the same match at `atSeconds` of ITS file
    * (already translated through the sync offsets, in fractional seconds:
@@ -188,6 +190,22 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const presigningRef = React.useRef(new Set<string>());
   /** The generation an angle switch loaded, until its first frame shows. */
   const switchGenRef = React.useRef<number | null>(null);
+  /**
+   * The switched-in item's resume seek has landed (or it needed none). Until
+   * then a first frame may be the item's frame 0, so the switch is not
+   * counted as landed and the held frame stays (review M2).
+   */
+  const switchSeekLandedRef = React.useRef(true);
+  /**
+   * Ids this hook switched to (or opened on). The route catches up with
+   * `setParams` a render later, so an `id` from this set is our own echo,
+   * never an outside navigation, even on a quick A, B, A (review m3).
+   */
+  const ownIdsRef = React.useRef(new Set<string>(id ? [id] : []));
+  /** The angle this screen session opened on (changes only on an outside navigation). */
+  const [entryId, setEntryId] = React.useState(id);
+  const startRef = React.useRef(startSeconds);
+  startRef.current = startSeconds;
 
   const [phase, setPhase] = React.useState<PlaybackPhase>("loading");
   const [source, setSource] = React.useState<PlaybackSource | null>(null);
@@ -294,16 +312,24 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   // navigation reusing the screen): load it from the top like a fresh open.
   React.useEffect(() => {
     if (id === activeIdRef.current) return;
+    if (id && ownIdsRef.current.has(id)) return;
+    ownIdsRef.current = new Set(id ? [id] : []);
     activeIdRef.current = id;
     setActiveId(id);
+    setEntryId(id);
+    telemetry.setMeta({ videoId: id ?? null });
     switchGenRef.current = null;
-    positionRef.current = 0;
-    setPositionS(0);
+    switchSeekLandedRef.current = true;
+    // Like a fresh open: start at the new route's `?t=` (review m2).
+    const s0 = startRef.current;
+    const start = s0 != null && Number.isFinite(s0) && s0 > 0 ? s0 : 0;
+    positionRef.current = start;
+    setPositionS(start);
     holdRef.current = null;
     streakRef.current = false;
     silentCountRef.current = 0;
     void sign(false);
-  }, [id, sign]);
+  }, [id, sign, telemetry]);
 
   const retry = React.useCallback(() => setAttempt((n) => n + 1), []);
 
@@ -358,8 +384,19 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         setDurationS(player.duration);
       }
     });
-    const at = resumeAtRef.current;
+    let at = resumeAtRef.current;
     resumeAtRef.current = null;
+    // A shorter angle cannot resume past its end (review m1).
+    let duration = 0;
+    safely(() => {
+      duration = player.duration;
+    });
+    if (at && duration > 0 && at > duration - END_EPSILON_S) {
+      at = Math.max(0, duration - END_EPSILON_S);
+      positionRef.current = at;
+      progressBaseRef.current = at;
+    }
+    if (current.generation === switchGenRef.current && !at) switchSeekLandedRef.current = true;
     if (at) {
       holdRef.current = { at, left: SEEK_HOLD_MAX_UPDATES };
       telemetry.expectWait();
@@ -380,6 +417,9 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   /** A frame of generation `gen` is on screen (lifts the poster; ends a switch's wait). */
   const frameLanded = React.useCallback(
     (gen: number) => {
+      // A switched-in item's frame before its resume seek lands may be its
+      // frame 0: keep the held frame and do not count the switch yet.
+      if (switchGenRef.current === gen && !switchSeekLandedRef.current) return;
       setFrameGen(gen);
       if (switchGenRef.current === gen) {
         switchGenRef.current = null;
@@ -478,6 +518,12 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
               return;
             }
             holdRef.current = null;
+            if (!switchSeekLandedRef.current && sourceRef.current?.generation === switchGenRef.current) {
+              // The switched-in item reached its resume point: now a frame
+              // on screen is the right instant.
+              switchSeekLandedRef.current = true;
+              frameLanded(sourceRef.current.generation);
+            }
           }
           positionRef.current = currentTime;
           setPositionS(currentTime);
@@ -591,6 +637,18 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       holdRef.current = null;
       durationRef.current = 0;
       setDurationS(0);
+      ownIdsRef.current.add(nextId);
+      // From here the outgoing item is gone, before any sign round trip
+      // (review B1): its time updates, play intent and errors no longer
+      // count, `currentTimeNow` answers with the target, and the new item
+      // resumes exactly at `at`.
+      loadedRef.current = false;
+      setLoaded(false);
+      resumeAtRef.current = at > 0 ? at : null;
+      progressBaseRef.current = at;
+      settledGenRef.current = null;
+      clearAutoplayTimer();
+      switchSeekLandedRef.current = !(at > 0);
       // A different file: its own re-sign budget.
       streakRef.current = false;
       silentCountRef.current = 0;
@@ -640,6 +698,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
 
   return {
     activeId,
+    entryId,
     switchAngle,
     presign,
     currentTimeNow,

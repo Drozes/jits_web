@@ -504,28 +504,3 @@ export async function getVideoAnalysis(
     };
   }
 }
-
-/**
- * `match_videos.sync_offset_ms` for the given recordings (RLS-scoped read),
- * keyed by video id. Best effort: a failed read returns {} and the player
- * treats the angles as unsynced.
- */
-export async function getVideoSyncOffsets(
-  supabase: Client,
-  videoIds: string[],
-): Promise<Record<string, number | null>> {
-  const ids = videoIds.filter(isUuid);
-  if (ids.length === 0) return {};
-  try {
-    const { data, error } = await supabase
-      .from("match_videos")
-      .select("id, sync_offset_ms")
-      .in("id", ids);
-    if (error || !data) return {};
-    const out: Record<string, number | null> = {};
-    for (const row of data) out[row.id] = row.sync_offset_ms ?? null;
-    return out;
-  } catch {
-    return {};
-  }
-}

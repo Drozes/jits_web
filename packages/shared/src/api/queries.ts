@@ -2935,6 +2935,9 @@ interface MatchDetailsVideoRow {
   upload_bytes_total?: number | null;
   upload_in_flight?: boolean | null;
   failure_code?: string | null;
+  sync_offset_ms?: number | null;
+  sync_source?: string | null;
+  sync_confidence?: number | null;
 }
 
 export interface MatchDetailVideo {
@@ -2985,6 +2988,14 @@ export interface MatchDetailVideo {
   upload_in_flight?: boolean | null;
   /** Machine reason for 'failed' (e.g. upload_abandoned). Never parse error_message. */
   failure_code?: string | null;
+  // Multi-angle sync (jr_be wave A, 20261005100400; INTEGRATION.md 10.1 and
+  // 10.5). getMatchDetailView always sets them (null on an older backend).
+  /** start(this) - start(primary) in ms; the primary is 0; null = unsynced. */
+  sync_offset_ms?: number | null;
+  /** "audio" | "clock" | "manual"; null on the primary and on an unsynced angle. */
+  sync_source?: string | null;
+  /** 0..1 for an audio match; null otherwise. */
+  sync_confidence?: number | null;
 }
 
 /**
@@ -3103,6 +3114,9 @@ export async function getMatchDetailView(
         upload_bytes_total: v.upload_bytes_total ?? null,
         upload_in_flight: typeof v.upload_in_flight === "boolean" ? v.upload_in_flight : null,
         failure_code: v.failure_code ?? null,
+        sync_offset_ms: typeof v.sync_offset_ms === "number" && Number.isFinite(v.sync_offset_ms) ? v.sync_offset_ms : null,
+        sync_source: typeof v.sync_source === "string" ? v.sync_source : null,
+        sync_confidence: typeof v.sync_confidence === "number" && Number.isFinite(v.sync_confidence) ? v.sync_confidence : null,
       };
     });
 
