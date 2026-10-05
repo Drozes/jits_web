@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Match video OTA wave 2: reserve before bytes, preflight, recording intent, live angles, primary angle (jits-n2im.11, .5 preflight, .14, .12, .15)
+
+JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): no native dependency, no `app.json` / `app.config.js` / `eas.json` / metro / babel change, and no native API beyond what build 25 already links (tus over the existing `expo-file-system/legacy` reader, supabase-js realtime over the existing WebSocket). **Needs the jr_be wave A migrations `20261005100000` to `20261005100700` (live in prod, 2026-10-05).** Contract: jr_be `specs/013-chunked-video-pipeline/INTEGRATION.md` section 10.
+
+**Added**
+- `@jits/shared/api/match-video-upload` (`packages/shared/src/api/match-video-upload.ts`): `reserveMatchVideoUpload` (INSERT at `uploading` with the final key, `upload_bytes_total`, `upload_transport: 'tus'`, `record_started_at`, `record_duration_ms`; on 23505 a re-path PATCH that takes the athlete's row over), `touchMatchVideoUpload`, `finalizeMatchVideoUpload` (PATCH to `ready` filtered on id and `storage_path`: landed / abandoned / moved / missing), `abandonMatchVideoUpload`, `canUploadMatchVideo`, `setMatchRecordingIntent`.
+- `useMatchVideosRealtime(supabase, matchId, onChange)` (`packages/shared/src/hooks/use-match-videos-realtime.ts`): match-level `match_videos` INSERT/UPDATE subscription, debounced, refetching on a rejoin; exported for the Film status UX (jits-n2im.25).
+- Shared helpers `defaultMatchAngle`, `angleLabel`, `angleTag`, `uploadPercent` (`packages/shared/src/utils/match-video.ts`); `getMatchDetailView` videos carry `is_primary`, `recording_type`, `upload_bytes_confirmed`, `upload_bytes_total`, `upload_in_flight`, `failure_code`.
+- Recording intent at face-off (jits-n2im.14): `apps/mobile/lib/match-flow/recording-intent.ts`, mounted by `useFaceoff`; declares the toggle on entering the face-off, on every change and on ready; latest value wins, one retry, never blocks ready.
+- The other athlete's (and the timekeeper's) angle on the verdict (`components/match-flow/verdict/verdict-angle-rows.tsx`) and on the match page FILM rows: `Uploading` + `{pct}%`, `Paused` with the deck's no-blame helper, `Processing`, `Ready to watch`, `Didn't upload` (by `failure_code`), from `apps/mobile/lib/video/angle-status.ts`.
+
+**Changed**
+- Upload manager (jits-n2im.11): new recordings run preflight, reserve, tus bytes with a heartbeat (at most every 30 s and once on pause), then the land PATCH. The reserved id is persisted before the first byte; a kill and relaunch resumes the same row (no second reservation), a row found already landed skips the bytes, 42501 `invalid_storage_path` re-keys once, an abandoned row is re-keyed, and Discard / a vanished clip / the 7-day expiry call `abandon_match_video_upload` (a landed object is deleted only when the row really gave up on it). Persisted jobs gain `protocol`, `videoId`, `recordStartedAt`, `recordDurationMs`; wave 1 jobs finish the old way, and phases stay `bytes` / `row` so an OTA rollback never drops a wave 2 job.
+- Preflight (jits-n2im.5): `can_upload_match_video` runs before the reservation; its reasons map to the wave 1 copy classes (no new failure strings). Gates now refuse before any byte is sent.
+- The verdict's poster poll is gone: realtime re-reads the match (`lib/match-flow/use-verdict-data.ts`); the poster comes from the primary angle. The match page re-reads in place on realtime (no pull spinner).
+- The primary angle is the default on the match page (jits-n2im.15); labels `Your angle` / `{Initial. Last}'s angle` with a `Timekeeper` tag (`components/film-room/angle-switcher.tsx`); timekeeper angles sort last; the FILM header counts the angles.
+- `packages/shared/src/types/database.ts` regenerated against a local stack with jr_be `origin/development` migrations.
+
 ### Match video playback on expo-video, playback telemetry (jits-n2im.19, .21, .10)
 
 JS-only on mobile (OTA-eligible on runtime 0.5.0): no native dependency, no `app.json` / `app.config.js` / `eas.json` change. `expo-video` 3.0.16 is already linked in build 25 (the reels use it) and every API called exists in that version. `expo-av` stays installed (removing a native package needs the next TestFlight build); nothing imports it any more. Shared gains one additive field.

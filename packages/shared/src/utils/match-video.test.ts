@@ -4,6 +4,10 @@ import {
   videoAngleLabel,
   sortMatchVideosForViewer,
   formatVideoDuration,
+  defaultMatchAngle,
+  angleLabel,
+  angleTag,
+  uploadPercent,
 } from "./match-video";
 
 describe("videoPlayability", () => {
@@ -94,5 +98,48 @@ describe("formatVideoDuration", () => {
   it("rounds fractional seconds", () => {
     expect(formatVideoDuration(59.6)).toBe("1:00");
     expect(formatVideoDuration(12.4)).toBe("0:12");
+  });
+});
+
+describe("wave A angle helpers (jits-n2im.15)", () => {
+  it("defaultMatchAngle picks the server-elected primary", () => {
+    const vids = [
+      { id: "mine", is_primary: false },
+      { id: "theirs", is_primary: true },
+    ];
+    expect(defaultMatchAngle(vids)?.id).toBe("theirs");
+  });
+
+  it("defaultMatchAngle falls back to the first (viewer-sorted) angle with no primary", () => {
+    expect(defaultMatchAngle([{ id: "mine" }, { id: "theirs", is_primary: null }])?.id).toBe("mine");
+    expect(defaultMatchAngle([])).toBeNull();
+  });
+
+  it("angleLabel follows the deck", () => {
+    expect(angleLabel(true, "D. Okafor")).toBe("Your angle");
+    expect(angleLabel(false, "D. Okafor")).toBe("D. Okafor's angle");
+    expect(angleLabel(false, "  ")).toBe("Opponent's angle");
+  });
+
+  it("angleTag marks only the timekeeper", () => {
+    expect(angleTag("timekeeper")).toBe("Timekeeper");
+    expect(angleTag("self")).toBeNull();
+    expect(angleTag(null)).toBeNull();
+  });
+
+  it("sortMatchVideosForViewer puts the timekeeper last", () => {
+    const vids = [
+      { id: "tk", uploaded_by: "T", recording_type: "timekeeper" },
+      { id: "opp", uploaded_by: "B", recording_type: "self" },
+      { id: "me", uploaded_by: "A", recording_type: "self" },
+    ];
+    expect(sortMatchVideosForViewer(vids, "A").map((v) => v.id)).toEqual(["me", "opp", "tk"]);
+  });
+
+  it("uploadPercent clamps and rejects unknowns", () => {
+    expect(uploadPercent(42, 100)).toBe(42);
+    expect(uploadPercent(150, 100)).toBe(100);
+    expect(uploadPercent(null, 100)).toBeNull();
+    expect(uploadPercent(5, 0)).toBeNull();
   });
 });

@@ -37,6 +37,12 @@ jest.mock("expo-image", () => {
   };
 });
 jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
+// Match-level match_videos realtime (jits-n2im.12): its own tests live in
+// packages/shared; here it is inert.
+const mockMatchVideosRealtime = jest.fn();
+jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
+  useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a),
+}));
 
 const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
@@ -654,5 +660,59 @@ describe("highlight note (spec 015 section 16.6.4)", () => {
     const s = renderVerdict({ uploadedVideoId: "v1" });
     await flush();
     expect(s.getByTestId("summary-highlight-note").props.accessibilityRole).toBeUndefined();
+  });
+});
+
+describe("the other athlete's angle on the verdict (jits-n2im.12)", () => {
+  const theirs = (over: Record<string, unknown> = {}) => ({
+    id: "v-opp",
+    uploaded_by: "opp",
+    uploaded_by_name: "Mina Park",
+    is_mine: false,
+    status: "uploading",
+    playability: "processing",
+    upload_bytes_confirmed: 420,
+    upload_bytes_total: 1000,
+    upload_in_flight: true,
+    poster_url: null,
+    ...over,
+  });
+
+  it("shows it uploading with its percent, then ready once realtime reports the change", async () => {
+    mockDetailView.mockResolvedValue({ ok: true, data: { videos: [theirs()] } });
+    const s = renderVerdict();
+    await flush();
+    const row = s.getByTestId("verdict-angle-v-opp");
+    expect(row).toHaveTextContent(/M\. PARK'S ANGLE/);
+    expect(row).toHaveTextContent(/UPLOADING/);
+    expect(row).toHaveTextContent(/42%/);
+    expect(row.props.accessibilityRole).toBe("progressbar");
+    expect(row.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 42 });
+    // Watch film only once something can play (deck rule 4).
+    s.getByText("Open match");
+
+    mockDetailView.mockResolvedValue({ ok: true, data: { videos: [theirs({ status: "ready", playability: "playable" })] } });
+    const onChange = mockMatchVideosRealtime.mock.calls[mockMatchVideosRealtime.mock.calls.length - 1][2] as () => void;
+    expect(mockMatchVideosRealtime.mock.calls[mockMatchVideosRealtime.mock.calls.length - 1][1]).toBe("M1");
+    await act(async () => {
+      onChange();
+    });
+    await flush();
+    expect(s.getByTestId("verdict-angle-v-opp")).toHaveTextContent(/READY TO WATCH/);
+    s.getByText("Watch film");
+  });
+
+  it("shows Processing between the upload and the pipeline", async () => {
+    mockDetailView.mockResolvedValue({ ok: true, data: { videos: [theirs({ status: "merging" })] } });
+    const s = renderVerdict();
+    await flush();
+    expect(s.getByTestId("verdict-angle-v-opp")).toHaveTextContent(/PROCESSING/);
+  });
+
+  it("never lists my own angle (this phone's upload card speaks for it)", async () => {
+    mockDetailView.mockResolvedValue({ ok: true, data: { videos: [theirs({ id: "v-me", uploaded_by: "me", is_mine: true })] } });
+    const s = renderVerdict();
+    await flush();
+    expect(s.queryByTestId("verdict-angle-rows")).toBeNull();
   });
 });

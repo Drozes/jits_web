@@ -4,17 +4,40 @@ import { StatePressable } from "@/components/ui/state-pressable";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { shortName } from "@/lib/film-room/format";
+import { angleLabel, angleTag } from "@jits/shared/utils";
 
 export interface AngleOption {
   id: string;
   is_mine: boolean;
   uploaded_by_name: string | null;
+  /** "timekeeper" for the sideline angle (jr_be-1qz.5); absent on older data. */
+  recording_type?: string | null;
 }
 
-/** "YOUR ANGLE" / "M. PARK'S ANGLE" */
+/**
+ * "Your angle" / "M. Park's angle" (COPY-DECK v2.2 section 1). A timekeeper's
+ * angle keeps its name label (`angleTag` adds "Timekeeper"); the opponent's
+ * name is only a fallback for a competitor's angle, never the timekeeper's.
+ */
+export function angleText(v: AngleOption, opponentName?: string | null): string {
+  const fallback = v.recording_type === "timekeeper" ? null : opponentName;
+  return angleLabel(v.is_mine, shortName(v.uploaded_by_name ?? fallback ?? "Opponent"));
+}
+
+/** The same label in the mono caps the switcher and rows render: "YOUR ANGLE" / "M. PARK'S ANGLE". */
 export function angleName(v: AngleOption, opponentName?: string | null): string {
-  if (v.is_mine) return "YOUR ANGLE";
-  return `${shortName(v.uploaded_by_name ?? opponentName ?? "Opponent").toUpperCase()}'S ANGLE`;
+  return angleText(v, opponentName).toUpperCase();
+}
+
+/**
+ * Screen-reader label: the rendered label plus its "Timekeeper" tag when it
+ * has one. Kept in the rendered caps so the player and the match-loop
+ * harness keep finding the segments by the labels they always had.
+ */
+export function angleA11yLabel(v: AngleOption, opponentName?: string | null): string {
+  const tag = angleTag(v.recording_type);
+  const label = angleName(v, opponentName);
+  return tag ? `${label}, ${tag.toUpperCase()}` : label;
 }
 
 interface AngleSwitcherProps {
@@ -50,13 +73,14 @@ export function AngleSwitcher({ angles, activeId, opponentName, onSelect, varian
       {angles.map((a) => {
         const on = a.id === activeId;
         const label = angleName(a, opponentName);
+        const a11y = angleA11yLabel(a, opponentName);
         return (
           <StatePressable
             dim
             key={a.id}
             testID={`angle-${a.id}`}
             accessibilityRole="tab"
-            accessibilityLabel={label}
+            accessibilityLabel={a11y}
             accessibilityState={{ selected: on }}
             onPress={() => onSelect(a.id)}
             className="flex-1 items-center justify-center"

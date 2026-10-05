@@ -2926,6 +2926,15 @@ interface MatchDetailsVideoRow {
   thumbnail_width?: number | null;
   thumbnail_height?: number | null;
   requested_tier?: string | null;
+  // Additive (jr_be wave A, 1qz.5); absent on an older backend.
+  is_primary?: boolean | null;
+  recording_type?: string | null;
+  recorded_by?: string | null;
+  created_at?: string | null;
+  upload_bytes_confirmed?: number | null;
+  upload_bytes_total?: number | null;
+  upload_in_flight?: boolean | null;
+  failure_code?: string | null;
 }
 
 export interface MatchDetailVideo {
@@ -2962,6 +2971,20 @@ export interface MatchDetailVideo {
   thumbnail_height?: number | null;
   /** "standard" | "premium" as requested at upload. */
   requested_tier?: string | null;
+  // Wave A multi-angle and upload fields (jr_be-1qz.3/.5). getMatchDetailView
+  // always sets them (null/false on an older backend).
+  /** The server-elected primary angle (the default to show). */
+  is_primary?: boolean;
+  /** "self" | "timekeeper" (server-derived), null on an older backend. */
+  recording_type?: string | null;
+  /** Bytes the uploader's heartbeat confirmed, while status is 'uploading'. */
+  upload_bytes_confirmed?: number | null;
+  /** Expected size declared at the reservation. */
+  upload_bytes_total?: number | null;
+  /** An 'uploading' row heard from within its grace window; null on an older backend. */
+  upload_in_flight?: boolean | null;
+  /** Machine reason for 'failed' (e.g. upload_abandoned). Never parse error_message. */
+  failure_code?: string | null;
 }
 
 /**
@@ -3074,6 +3097,12 @@ export async function getMatchDetailView(
         thumbnail_width: v.thumbnail_width ?? null,
         thumbnail_height: v.thumbnail_height ?? null,
         requested_tier: v.requested_tier ?? null,
+        is_primary: v.is_primary === true,
+        recording_type: v.recording_type ?? null,
+        upload_bytes_confirmed: v.upload_bytes_confirmed ?? null,
+        upload_bytes_total: v.upload_bytes_total ?? null,
+        upload_in_flight: typeof v.upload_in_flight === "boolean" ? v.upload_in_flight : null,
+        failure_code: v.failure_code ?? null,
       };
     });
 
