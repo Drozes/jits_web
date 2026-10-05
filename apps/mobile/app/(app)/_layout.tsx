@@ -4,7 +4,7 @@ import { useThemedTokens } from "@/lib/theme/use-theme";
 import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
 import { BellBootstrap } from "@/components/notifications/bell-bootstrap";
 import { AppStackTopTracker } from "@/lib/deep-links/tab-root-route";
-import { UploadStripSlot } from "@/components/video-status/upload-strip";
+import { StackStripFrame } from "@/components/video-status/upload-strip-slots";
 
 // Anchor the tab navigator beneath the pushed detail screens (athlete/[id],
 // match/[matchId], video/[id], highlight/[id], settings). Deep links / reloads into those routes otherwise land with an
@@ -19,43 +19,44 @@ export default function AppLayout() {
   return (
     <>
       <View style={{ flex: 1, backgroundColor: tokens.bgPrimary }}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            presentation: "card",
-            contentStyle: { backgroundColor: tokens.bgPrimary },
-            headerStyle: { backgroundColor: tokens.bgSecondary },
-            headerTintColor: tokens.textPrimary,
-            headerTitleStyle: { color: tokens.textPrimary },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="athlete/[id]" />
-          {/* A match with no session behind it: where an Arena challenge lands
-            both parties. Pushes over the tab bar like every other detail
-            screen. */}
-          <Stack.Screen name="match/[matchId]" />
-          {/* A past match opened from a history row: read-only, never the
-            live wizard, so it leaves live state alone. */}
-          <Stack.Screen name="match-detail/[matchId]" />
-          <Stack.Screen name="video/[id]" />
-          {/* One of the athlete's own highlight reels, full screen (push, bell,
-            Home, Profile, match detail). Header hidden: a dark video surface. */}
-          <Stack.Screen name="highlight/[id]" options={{ headerShown: false }} />
-          {/* The Film Room: every past match as a poster grid, from Profile. */}
-          <Stack.Screen name="film-room" />
-          <Stack.Screen name="settings" />
-          {/* The practice match: a local walk through one Arena match against
-            a scripted bot. Writes no match data. */}
-          <Stack.Screen name="practice" />
-          {/* Invites + friends (jr_be spec 016). */}
-          <Stack.Screen name="invite/index" />
-          <Stack.Screen name="invite/join" />
-          <Stack.Screen name="invite/claim" options={{ gestureEnabled: false }} />
-          <Stack.Screen name="friends" />
-        </Stack>
         {/* The upload strip on pushed screens (on the tabs it sits on the bar). */}
-        <UploadStripSlot placement="stack" />
+        <StackStripFrame>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              presentation: "card",
+              contentStyle: { backgroundColor: tokens.bgPrimary },
+              headerStyle: { backgroundColor: tokens.bgSecondary },
+              headerTintColor: tokens.textPrimary,
+              headerTitleStyle: { color: tokens.textPrimary },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="athlete/[id]" />
+            {/* A match with no session behind it: where an Arena challenge lands
+              both parties. Pushes over the tab bar like every other detail
+              screen. */}
+            <Stack.Screen name="match/[matchId]" />
+            {/* A past match opened from a history row: read-only, never the
+              live wizard, so it leaves live state alone. */}
+            <Stack.Screen name="match-detail/[matchId]" />
+            <Stack.Screen name="video/[id]" />
+            {/* One of the athlete's own highlight reels, full screen (push, bell,
+              Home, Profile, match detail). Header hidden: a dark video surface. */}
+            <Stack.Screen name="highlight/[id]" options={{ headerShown: false }} />
+            {/* The Film Room: every past match as a poster grid, from Profile. */}
+            <Stack.Screen name="film-room" />
+            <Stack.Screen name="settings" />
+            {/* The practice match: a local walk through one Arena match against
+              a scripted bot. Writes no match data. */}
+            <Stack.Screen name="practice" />
+            {/* Invites + friends (jr_be spec 016). */}
+            <Stack.Screen name="invite/index" />
+            <Stack.Screen name="invite/join" />
+            <Stack.Screen name="invite/claim" options={{ gestureEnabled: false }} />
+            <Stack.Screen name="friends" />
+          </Stack>
+        </StackStripFrame>
       </View>
       {/* Live state, lobby presence and the incoming-challenge prompt, once for
         the whole signed-in app, so being live survives switching tabs and a

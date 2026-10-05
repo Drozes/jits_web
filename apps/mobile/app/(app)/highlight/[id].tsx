@@ -2,6 +2,7 @@ import * as React from "react";
 import { useLocalSearchParams } from "expo-router";
 import { ViewerScreen } from "@/components/highlight-viewer/viewer-screen";
 import { parseHighlightSource } from "@/lib/highlight/discovery";
+import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 
 /**
  * Full-screen viewer for one of the athlete's own highlight reels
@@ -10,5 +11,7 @@ import { parseHighlightSource } from "@/lib/highlight/discovery";
  */
 export default function HighlightViewerRoute() {
   const { id, source } = useLocalSearchParams<{ id: string; source?: string }>();
+  // Full-screen video: no app-wide upload strip over it (jits-n2im.2).
+  useSuppressUploadStrip({ kind: "all" });
   return <ViewerScreen id={id} source={parseHighlightSource(source)} />;
 }

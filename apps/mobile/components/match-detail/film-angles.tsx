@@ -4,7 +4,7 @@ import { TRACKING, typeStep } from "@/lib/typography";
 import { PlayCircle } from "lucide-react-native";
 import { formatVideoDuration } from "@jits/shared/utils";
 import type { MatchDetailVideo } from "@jits/shared/api/queries";
-import { usePalette, TABULAR, type Palette } from "@/lib/theme/palette";
+import { usePalette, TABULAR } from "@/lib/theme/palette";
 import { angleName, angleText } from "@/components/film-room/angle-switcher";
 import { angleTag } from "@jits/shared/utils";
 import {
@@ -13,30 +13,18 @@ import {
   angleRowA11yLabel,
   angleStatus,
   angleWatchable,
-  type AngleTone,
   type LocalAngleJob,
 } from "@/lib/video/angle-status";
 import { shortName } from "@/lib/film-room/format";
+import { toneColor } from "@/components/video-status/film-status-bits";
+
+// The deck's color class for a row's tag lives with the Film status bits;
+// re-exported for the wave 2 rows that import it from here.
+export { toneColor };
 
 /** "Your recording" reads "Watch your recording"; a name keeps its case. */
 export function watchLabel(angleLabel: string): string {
   return angleLabel === "Your recording" ? "Watch your recording" : `Watch ${angleLabel}`;
-}
-
-/** The deck's color class for a row's tag (COPY-DECK v2.2 section 0.8). */
-export function toneColor(tone: AngleTone, p: Palette): string {
-  switch (tone) {
-    case "progress":
-      return p.text2;
-    case "waiting":
-      return p.amber;
-    case "negative":
-      return p.red;
-    case "info":
-      return p.text3;
-    default:
-      return p.text2;
-  }
 }
 
 interface FilmAnglesProps {

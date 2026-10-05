@@ -237,7 +237,10 @@ LIB_OK = re.compile(
     # Video upload states (jits-n2im.22): the hooks and tables that decide the verdict, match
     # page and Film Room upload copy, captions, CTA label and Try again / Discard actions.
     r"|use-match-film|use-verdict-data|film-section|use-upload-actions|upload-errors|upload-capabilities"
-    r"|recording-space)\.tsx?$"
+    r"|recording-space"
+    # Match video status UX (jits-n2im.25 / .2): the copy module and the view models that decide
+    # what the Film status plate, the Film Room badge and the upload strip say.
+    r"|film-status|upload-strip)\.tsx?$"
 )
 # packages/shared files whose strings or formatting are drawn on boards.
 SHARED_OK = {SH + p for p in [
@@ -245,6 +248,11 @@ SHARED_OK = {SH + p for p in [
     "utils/highlight-caption.ts", "utils/share.ts", "utils/match-detection.ts",  # NO_MATCH_COPY
     "constants/highlights.ts",
 ]}
+# The app-wide upload strip (jits-n2im.2) is mounted by the (app) and (tabs) layouts but only
+# shows while an upload is outstanding, and no Current app board draws it yet (it is on the
+# proposed page, P-VS-01 / P-VS-02). Like the offline banner it is kept off every board's walk;
+# its files sit in `undrawn` until a board draws it.
+STRIP = {M + "components/video-status/upload-strip-slots.tsx"}
 # The notification panel is mounted under every header bell but only drawn open on board 42.
 PANEL = {M + p for p in [
     "components/notifications/notification-panel.tsx",
@@ -266,6 +274,8 @@ def walk(seeds, exclude=(), panel_rule=True):
     ex = set(exclude)
     if panel_rule and not (PANEL & set(seeds)):
         ex |= PANEL
+    if not (STRIP & set(seeds)):
+        ex |= STRIP
     seen, out, st = set(), set(), list(seeds)
     while st:
         rel = st.pop()
@@ -321,6 +331,9 @@ def match(*keep):
 # Upload copy and error classes read through lib files (card-status, upload-banner-state) that
 # the walk does not traverse (jits-n2im.22).
 UPLOAD_LIB = [M + "lib/video/upload-copy.ts", M + "lib/video/upload-errors.ts"]
+# The Film status view model and its copy, read through hooks the walk does not traverse
+# (use-film-status), for the boards that draw the plate (verdict, match detail) or its badge.
+FILM_STATUS_LIB = [M + "lib/video/film-status.ts", M + "lib/video/video-status-copy.ts"]
 
 HV = "components/highlight-viewer/"
 SHARE_ONLY = [HV + x for x in ["pre-share-sheet.tsx", "share-sheet-body.tsx", "share-progress.tsx",
@@ -371,9 +384,9 @@ BOARDS = {
     "26-Result-Waiting.dc.html": match("steps/result-step.tsx", "steps/result-waiting.tsx", "steps/result-form.tsx"),
     "27-Confirm.dc.html": match("steps/confirm-step.tsx"),
     "28-Dispute.dc.html": match("steps/confirm-step.tsx", "steps/dispute-form.tsx"),
-    "29-Verdict.dc.html": match("verdict/verdict-step.tsx"),
-    "31-Film-Room.dc.html": dict(seeds=APP + ["app/(app)/film-room.tsx"], extra=UPLOAD_LIB),
-    "32-Match-Detail.dc.html": dict(seeds=APP + ["app/(app)/match-detail/[matchId].tsx"], extra=UPLOAD_LIB),
+    "29-Verdict.dc.html": dict(**{**match("verdict/verdict-step.tsx"), "extra": FILM_STATUS_LIB}),
+    "31-Film-Room.dc.html": dict(seeds=APP + ["app/(app)/film-room.tsx"], extra=UPLOAD_LIB + [M + "lib/video/video-status-copy.ts"]),
+    "32-Match-Detail.dc.html": dict(seeds=APP + ["app/(app)/match-detail/[matchId].tsx"], extra=UPLOAD_LIB + FILM_STATUS_LIB),
     "33-Video-Player.dc.html": dict(seeds=APP + ["app/(app)/video/[id].tsx"]),
     "34-Highlight-Viewer.dc.html": dict(seeds=APP + ["app/(app)/highlight/[id].tsx"],
                                         exclude=SHARE_ONLY + [HV + "viewer-improve-sheet.tsx"]),

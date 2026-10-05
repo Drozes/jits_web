@@ -65,6 +65,9 @@ describe("video-status-copy", () => {
     const surfaces = [
       "components/video-status/film-status-plate.tsx",
       "components/video-status/film-status-row.tsx",
+      "components/video-status/film-row-info.tsx",
+      "components/video-status/film-status-header.tsx",
+      "components/video-status/upload-strip-slots.tsx",
       "components/video-status/upload-strip.tsx",
       "components/match-flow/match-upload-line.tsx",
       "lib/video/film-status.ts",

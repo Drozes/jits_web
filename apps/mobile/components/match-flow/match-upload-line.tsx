@@ -1,8 +1,8 @@
 import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { AlertTriangle, Check, Loader, Minus, Pause, Upload } from "lucide-react-native";
-import { toneColor } from "@/components/match-detail/film-angles";
-import { CONTROL_HEIGHT, ProgressTrack } from "@/components/video-status/film-status-row";
+import { toneColor } from "@/components/video-status/film-status-bits";
+import { CONTROL_HEIGHT, ProgressTrack } from "@/components/video-status/film-status-bits";
 import { usePalette } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { useMatchUpload } from "@/lib/video/match-upload-store";
