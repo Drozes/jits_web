@@ -8,6 +8,7 @@ import { NO_MATCH_COPY, buildKeyMoments, captionAt, formatClock, isNoMatch, tran
 import { getVideoSyncOffsets } from "@jits/shared/api/film-room";
 import { supabase } from "@/lib/supabase/client";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
+import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
 import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
 import { FilmScrim } from "@/components/film-room/film-scrim";
@@ -44,6 +45,8 @@ const CURRENT_HOLD_S = 10;
 export default function MatchVideoScreen() {
   const { id, t, approx } = useLocalSearchParams<{ id: string; t?: string; approx?: string }>();
   const start = t != null && Number.isFinite(Number(t)) ? Number(t) : null;
+  // Full-screen video: no app-wide upload strip over it (jits-n2im.2).
+  useSuppressUploadStrip({ kind: "all" });
   // Keyed by id: switching angles remounts the player on the other recording.
   return <PlayerBody key={id ?? "none"} id={id} start={start} approximate={approx === "1"} />;
 }

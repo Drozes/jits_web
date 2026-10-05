@@ -14,7 +14,7 @@
 import * as React from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useWindowInsets } from "@/lib/layout/window-insets";
 import { useCanGoOffline, useRegisterLiveMenuOpen } from "@/lib/arena/arena-store";
 import { ARENA_HREF } from "@/lib/arena/constants";
 import { goOfflineWithFeedback } from "@/lib/arena/go-live-feedback";
@@ -33,7 +33,7 @@ interface LiveMenuPopoverProps {
 
 export function LiveMenuPopover({ visible, onClose }: LiveMenuPopoverProps) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const insets = useWindowInsets();
   // Always, with an owner mounted: the choice is recorded at once (round 3).
   const canGoOffline = useCanGoOffline();
   const locked = !canGoOffline;

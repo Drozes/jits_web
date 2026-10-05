@@ -106,6 +106,21 @@ function arenaHref(v: unknown): string | null {
 /** The push `data.type` of a ready highlight reel (jr_be push function, B10). */
 export const HIGHLIGHT_READY_PUSH_TYPE = "highlight_ready";
 
+/**
+ * The match video pushes (jr_be-1qz.16, INTEGRATION 11.3: one per athlete
+ * per match). Each carries `data.route = "/match-detail/<match_id>"`, which
+ * opens the match page on its Film status plate (jits-n2im.13).
+ */
+export const MATCH_VIDEO_PUSH_TYPES: ReadonlySet<string> = new Set(["film_ready", "no_film", "timekeeper_film_ready"]);
+
+const MATCH_DETAIL_ROUTE_RE = /^\/(?:\(app\)\/)?match-detail\/[0-9a-f-]{36}$/;
+
+/** A match video push (film ready, no film, the timekeeper's film ready). */
+export function isMatchVideoNotification(data: unknown): boolean {
+  const d = (data ?? {}) as NotificationData;
+  return typeof d.type === "string" && MATCH_VIDEO_PUSH_TYPES.has(d.type);
+}
+
 /** Where a tapped notification leads, or null when it carries nowhere to go. */
 export function notificationTarget(data: unknown): string | null {
   const d = (data ?? {}) as NotificationData;
@@ -115,6 +130,11 @@ export function notificationTarget(data: unknown): string | null {
   if (!route) route = arenaHref(d.arena_href);
   if (!route && d.type === HIGHLIGHT_READY_PUSH_TYPE && typeof d.id === "string" && d.id) {
     route = `/highlight/${encodeURIComponent(d.id)}?source=push`;
+  }
+  // A video push without a usable route still knows its match (`data.id`).
+  if (route && isMatchVideoNotification(d) && !MATCH_DETAIL_ROUTE_RE.test(route)) route = null;
+  if (!route && isMatchVideoNotification(d) && typeof d.id === "string" && /^[0-9a-f-]{36}$/.test(d.id)) {
+    route = `/match-detail/${d.id}`;
   }
   if (!route) return null;
   return isRetiredRoute(route) ? HOME_HREF : route;
@@ -129,11 +149,12 @@ export function isHighlightNotification(data: unknown): boolean {
 }
 
 /**
- * A tap that waits for the match to end: a highlight (never urgent). Only
- * highlights are held, so one held slot never has to choose between kinds.
+ * A tap that waits for the match to end: a highlight or a match video push
+ * (film ready, no film): never urgent, and never worth pushing a page over a
+ * live match. One held slot keeps the latest such tap.
  */
 export function holdsDuringMatch(data: unknown): boolean {
-  return isHighlightNotification(data);
+  return isHighlightNotification(data) || isMatchVideoNotification(data);
 }
 
 /**
@@ -228,8 +249,8 @@ export function setupNotificationHandlers(): void {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
       // A reel is never worth a banner over a live match; it stays in the list.
-      const quiet =
-        isInArenaMatch() && isHighlightNotification(notification?.request?.content?.data);
+      const data = notification?.request?.content?.data;
+      const quiet = isInArenaMatch() && (isHighlightNotification(data) || isMatchVideoNotification(data));
       return {
         shouldPlaySound: false,
         shouldSetBadge: true,

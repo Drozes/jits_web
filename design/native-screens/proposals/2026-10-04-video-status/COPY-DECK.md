@@ -1,5 +1,9 @@
 # Match video status: copy deck v2 (jits-n2im.24, jits-n2im.2)
 
+v2.3 (2026-10-05, with the build, jits-n2im.25 / .15): section 13 (Best angle) and section 14 (build notes) added; sections 0 to 12 unchanged.
+v2.4 (2026-10-05, coordinator decisions on the PR #52 review): section 14 items 8 to 11 (film in and analysing, the viewer's own highlight outcome, disputed results, a Discarded clip).
+v2.5 (2026-10-05, review round 2): section 14 item 12 (whose film is in, the Processing tag, the disputed building line, the Discard marker across restarts).
+
 Status: DRAFT v2.2, 2026-10-05: v2 plus the round 2 changes (`REVIEW-round2.md`: N1, N2, m1 to m7, nits) and the owner's naming decisions (Timekeeper kept; both shipped nouns kept). Not published. This version
 applies every finding in `REVIEW-round1.md` (B1, B2, M1 to M14, the minors and the nits) and the
 coordinator's default answers to the open questions. Boards for the canvas page "Proposed (Oct 4
@@ -380,3 +384,100 @@ Terminal helpers that pair with it (section 8): `This clip is too big to upload 
 can't take a video anymore.`
 
 Shipped in M-UPLOAD (`apps/mobile/lib/video/use-upload-actions.ts`, `DISCARD_*`).
+
+## 13. Best angle (jits-n2im.15; added 2026-10-05 with the build)
+
+The server-elected primary angle (`is_primary` on a `get_match_video_status` angle, the
+`primary_video_id` of the match; jr_be-1qz.10) gets a small marker so the athlete knows which angle
+the match opens on and which one the breakdown is timed to.
+
+| Element | Copy | Notes |
+|---|---|---|
+| Tag on the angle's row in Film status (match detail plate and the verdict Film block) | `Best angle` | Mono caps (`BEST ANGLE`), the same bordered chip as the `Timekeeper` tag: `ink-2` text, `hairline-strong` border, 2px corners, beside the angle label. Never colored: it is not a state. |
+| Tag on the angle's chip in the angle switcher (full-screen player and match detail) | `Best angle` | A second line under the chip label, mono 10 caps, `ink-2` on the page / `ON_MEDIA.text2` over video (the selected chip uses its own selected ink). The chip stays 44 px. |
+| Accessibility | `Best angle` | Appended to the element's label: `D. OKAFOR'S ANGLE, Best angle` (chip), `Watch Demo Red's recording, Best angle` (row). |
+
+Shown only when **2+ angles are playable** (section 14, item 6) and the server has elected a primary among them.
+One ready angle, no election (the multi-angle flag is off, so prod elects none today), or a primary
+that is not ready yet: no marker anywhere. The marker never moves with the athlete's own selection;
+the selection is the switcher's selected state.
+
+## 14. Build notes (jits-n2im.25; how the gates and gaps are resolved in code)
+
+All strings live in `apps/mobile/lib/video/video-status-copy.ts`; `lib/video/film-status.ts`
+derives the one view every surface renders.
+
+1. **Multi-angle gate.** "Fusion live" means the status document carries any fusion field
+   (`wait_extended` not null, `dispatched_at`, `angles_used`, `angles_used_count` or
+   `late_angle_until`). Without it: the collecting helper for `{k}` >= 2 is the single-angle
+   `Your {term} starts as soon as it's in.`, building reads `Building your {term}.` (never `from {n}
+   angles`), and no after-dispatch, late-angle or "updated with" helper is shown.
+2. **Timekeeper building, one angle or no fusion count:** `Building the players' {term}s.` (4b with
+   the "from {n} angles" clause dropped, as 4a does for `{n}` = 1).
+3. **Merge rule edge:** while this phone holds an upload job, `no_video_yet` and `nobody_recorded`
+   render as collecting (`Your film is on its way.`), so the plate never says "No video yet" over
+   "Your angle: Uploading".
+4. **Not drawn yet:** `Upload now` (2a, waiting_for_phone with the clip found) and the "late angle in
+   after you shared" plate helper (4a) have no server or client signal today; the strip's `Preparing
+   upload` state is not shown (the store's `pending` entry also means "recording started").
+5. **The timekeeper's match page** is the plate alone (`get_match_details` refuses the timekeeper;
+   the status RPC admits them), titled with the two competitors' short names.
+6. **Rule 4 reads PLAYABLE, not analysed (coordinator decision 2026-10-05).** An angle is watchable
+   as soon as the playback query can open its bytes (the shipped `angleWatchable` rule: a
+   normalized or original file, whether the angle is ready, sliced, analysing, analysed, or
+   pipeline-failed with the file still there). Analysis never gates playback. This applies to the
+   match detail hero, the plate's rows, the angle switcher and the verdict CTA (`Open match` until an
+   angle is playable, then `Watch film`). Row tags keep the shipped distinctions:
+   | Server state | Playable | Tag | Class |
+   |---|---|---|---|
+   | processing | yes | `Analyzing` | waiting (it plays: duration and chevron) |
+   | processing | no (still merging) | `Processing` | waiting |
+   | ready | yes | `Ready to watch` | done |
+   | failed (pipeline) | yes | `Analysis failed · may still play` | info (grey, never red) |
+   | failed (pipeline) | no file | `Not used` | info |
+   | no_match | yes | `Not used` (with its helper) | info |
+   The playable set comes from `get_match_details` (match detail and verdict). Where the status is
+   read alone (the timekeeper's page, or before that read lands), only ready and no-match angles
+   count as playable.
+7. **Upload strip placement (coordinator decision 2026-10-05).** The strip is also hidden on the
+   full-screen players (the match video player and the highlight viewer). On a pushed screen the
+   strip pads the bottom safe area itself and the screen above it is given a bottom inset of 0, so
+   the safe area is never padded twice.
+8. **v2.4: film in, analysing (coordinator decision 2026-10-05, review M2).** While the server phase is
+   `collecting` and at least one angle's bytes have landed (`processing`) but nothing is analysed
+   yet, the plate and the verdict Film block read phase tag `Analyzing`, line `Your film is in.
+   Analyzing now.`, no helper. Rows keep their own states (another angle still uploading still reads
+   `Uploading {pct}%`). The Film Room card falls through to the shipped derivation once any library
+   video is past `uploading` (`PROCESSING FILM`, `ANALYZING n/m`), and shows `UPLOADING` only while
+   bytes are really moving. **Why:** in that window the strip has already said "Match video
+   uploaded", the compact line says "Your angle: uploaded", the row plays and the verdict reads
+   `Watch film`; the deck's collecting row ("Uploading", "Your film is on its way") contradicted them
+   on the same screen (contradiction rule 2), and analysis takes minutes on every match.
+9. **The viewer's own highlight outcome beats the match-level phase (review M1).** The phase is
+   `building` until EVERY competitor's reel is final. Once the viewer's own reel is final, their
+   plate, verdict block and Film Room card follow it: `ready` (or the fallback reel) reads `Ready` /
+   `Film and highlight ready.` (card: New, then Breakdown ready); `none` reads the film-only row
+   (`Film ready to watch.` + the no-clear-moment helper); `failed` reads `Film ready to watch.` +
+   `We couldn't make your highlight.` (Try again is on the highlight card). The timekeeper, who has no
+   reel, keeps the match-level phase.
+10. **Disputed results promise no highlight.** On a match under admin review the phase helpers that
+    promise or time a highlight (collecting, waiting, building, late-angle) are dropped; the lines
+    stay. Wave 2 hid the highlight note for the same reason.
+11. **A clip that will never upload, on the phone that recorded it.** After Discard (or with a
+    terminal failure before any reservation), "Your angle" reads 2a `Not uploaded` / `The clip isn't
+    on this phone anymore.`, never the other-device `Waiting for your phone`. That angle no longer
+    counts as coming: when nothing else is coming either, the plate reads `No film for this match.` /
+    `None of the video could be used. Your result and rating aren't affected.` A terminal local
+    failure never forces "Your film is on its way" over the server's "No video yet".
+12. **v2.5: whose film is in (coordinator decision 2026-10-05, review round 2 R2-M1).** Item 8's
+    `Your film is in. Analyzing now.` shows ONLY when the processing angle is the viewer's own and
+    nothing of the viewer's is still coming (no local job running, own angle not waiting for its
+    phone, uploading or paused). Otherwise, for example when the opponent's upload finished first
+    while the viewer's own still uploads, the line is `Film is coming in. Analyzing what's here so
+    far.` The phase tag is `Analyzing` only when a processing angle already plays; while none does
+    (still merging) it is `Processing`, the same word as that angle's row. The timekeeper keeps its
+    own 4b copy (`Film is coming in.`) and never reads either variant. On a disputed match a
+    `building` phase reads `Film ready` / `Film ready to watch.` (never "Building your highlight").
+    The "discarded on this phone" marker (item 11) is kept per athlete and match on the phone next
+    to the upload jobs, with the same 7-day expiry, so it survives an app restart; the server's
+    recording intent is frozen after the match and is not cleared.

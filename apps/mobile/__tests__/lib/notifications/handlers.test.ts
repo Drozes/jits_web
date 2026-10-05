@@ -537,3 +537,56 @@ describe("invite and friend pushes (jr_be spec 016, contract 5)", () => {
     expect(notificationTarget({ profile_href: "https://evil.example/athlete/x" })).toBeNull();
   });
 });
+
+describe("match video pushes land on the Film status plate (jits-n2im.13)", () => {
+  const MATCH = "11111111-1111-4111-8111-111111111111";
+  const kinds = ["film_ready", "no_film", "timekeeper_film_ready"] as const;
+  const push = (type: string, over: Record<string, unknown> = {}) => ({ type, id: MATCH, route: `/match-detail/${MATCH}`, ...over });
+
+  beforeEach(async () => {
+    markNotificationRouterReady();
+    await flush();
+  });
+
+  it.each(kinds)("%s routes to the match page (the plate is its canonical film surface)", (type) => {
+    expect(notificationTarget(push(type))).toBe(`/match-detail/${MATCH}`);
+    tap(push(type));
+    expect(mockPush).toHaveBeenCalledWith(`/match-detail/${MATCH}`);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it.each(kinds)("%s without a route still opens its match from data.id", (type) => {
+    expect(notificationTarget({ type, id: MATCH })).toBe(`/match-detail/${MATCH}`);
+  });
+
+  it("a video push with a route that is not its match page falls back to data.id", () => {
+    expect(notificationTarget(push("film_ready", { route: "/arena" }))).toBe(`/match-detail/${MATCH}`);
+    expect(notificationTarget(push("no_film", { route: `/(app)/match-detail/${MATCH}` }))).toBe(`/(app)/match-detail/${MATCH}`);
+  });
+
+  it.each(kinds)("%s is held during a live match and opens on the way out, never dropped", async (type) => {
+    expect(holdsDuringMatch(push(type))).toBe(true);
+    expect(dropsDuringMatch(push(type))).toBe(false);
+    const leave = enterMatch();
+    tap(push(type));
+    expect(mockPush).not.toHaveBeenCalled();
+    leave();
+    await tick();
+    expect(mockPush).toHaveBeenCalledWith(`/match-detail/${MATCH}`);
+  });
+
+  it("an unknown type falls back as before (its route, else nothing)", () => {
+    expect(notificationTarget({ type: "angle_arriving", id: MATCH })).toBeNull();
+    expect(holdsDuringMatch({ type: "angle_arriving", route: `/match-detail/${MATCH}` })).toBe(false);
+  });
+
+  it("no banner over a live match for a video push; it stays in the list", async () => {
+    const handler = mockSetHandler.mock.calls[mockSetHandler.mock.calls.length - 1][0].handleNotification;
+    const leave = enterMatch();
+    const during = await handler({ request: { content: { data: push("film_ready") } } });
+    expect(during).toMatchObject({ shouldShowBanner: false, shouldShowList: true });
+    leave();
+    const after = await handler({ request: { content: { data: push("film_ready") } } });
+    expect(after.shouldShowBanner).toBe(true);
+  });
+});

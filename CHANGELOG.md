@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Match video status UX: Film status plate, upload strip, Best angle, video push landing (jits-n2im.25, .2, .15, .13)
+
+JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): no native dependency, no `app.json` / `app.config.js` / `eas.json` / metro / babel change; uses only `AccessibilityInfo`, `AppState` and supabase-js realtime, all in build 25. **Needs the jr_be wave B migrations `20261006100000` to `20261006100200` (live in prod, 2026-10-05).** The fusion fields (section 12) are NULL in prod (`multi_angle_highlights_enabled = false`), and the client never claims a multi-angle highlight without them. Copy: COPY-DECK v2.3 (sections 13 and 14 added).
+
+**Added**
+- `@jits/shared/api/match-video-status` (`packages/shared/src/api/match-video-status.ts`): `getMatchVideoStatus` (a `Result`, never an empty status on error) and `parseMatchVideoStatus`.
+- `useMatchVideoStatus(supabase, matchId, { subscribeForeground })` (`packages/shared/src/hooks/use-match-video-status.ts`): the RPC plus the `match_media_events` realtime (400 ms debounce, re-read on every join), foreground re-read, latest-response-wins with an `event_seq` guard, the server clock offset from `server_now`, and timed re-reads at the wait deadline (then a short poll while "Any second now"), the grace and film windows, and 130 s after a read with an uploading angle.
+- `apps/mobile/lib/video/video-status-copy.ts` (every status string, one module) and `lib/video/film-status.ts` (`deriveFilmStatus`: phase, rows, countdown, ready ids, Best angle; the local job wins only for "Your angle"); `lib/video/use-film-status.ts` (the hook plus screen-reader announcements on phase and row changes and at 5 min, 1 min and 0).
+- `components/video-status/film-status-plate.tsx` + `film-status-row.tsx`: the canonical Film status plate (match detail) and the verdict's Film block (same component), with 44 px Try again / Discard, the Timekeeper and Best angle tags, and the harness `match-video-watch-<id>` rows for ready angles.
+- `components/video-status/upload-strip.tsx`, `lib/video/upload-strip.ts`, `lib/video/upload-strip-visibility.ts`: the app-wide upload strip above the tab bar and above the safe area on pushed screens (jits-n2im.2), hidden on the countdown and live and on the same match's verdict and match detail; "Match video uploaded" for 4 s.
+- `components/match-flow/match-upload-line.tsx`: the compact line under End, Result and Confirm.
+- `components/match-detail/timekeeper-film.tsx`: the timekeeper's match page (the plate alone; `get_match_details` refuses them).
+- `lib/film-room/use-film-room-phases.ts`: the Film Room and Profile preview badges read the server phase for the newest matches (Waiting {mm:ss}, Building highlight, Uploading, No film).
+- Best angle (jits-n2im.15): the tag on the primary's row and on its angle switcher chip (player and match page), only with 2+ ready angles and an elected primary.
+
+**Changed**
+- Match detail: the plate sits under the result and replaces the upload card, FILM rows and no-video plate; only ready angles play (hero, rows, switcher hidden under two ready). The wave 2 rows stay as the fallback when the status read fails.
+- Verdict: the Film block replaces the upload card, the angle rows and the highlight note (the card stays only for "Finishing recording", a camera failure and a short clip); `Watch film` needs a ready angle; the hero caption follows the status (`NO VIDEO YET` in the grace window).
+- Notifications (jits-n2im.13): `film_ready`, `no_film` and `timekeeper_film_ready` open `/match-detail/<id>` (from `data.id` when the route is missing), are held during a live match and opened on the way out, with no banner over the match.
+- `packages/shared/src/types/database.ts` regenerated (additive) against a local stack at jr_be head `20261006200400`.
+
+**Changed (coordinator review, 2026-10-05)**
+- Playback is never gated on analysis: an angle plays as soon as the playback query can open its bytes (`Analyzing` while the pipeline runs, `Analysis failed · may still play` on a pipeline failure with the file, `Not used` only when there is no file); deck rule 4 reads playable, applied to the hero, rows, switcher and verdict CTA (COPY-DECK 14 item 6).
+- The upload strip is hidden on the match video player and the highlight viewer; on pushed screens it pads the bottom safe area once (`StackStripFrame` gives the Stack a 0 bottom inset).
+- Status components split smaller (`film-status-bits`, `film-row-info`, `film-status-header`, `upload-strip-slots`, `lib/video/use-upload-strip.ts`); `toneColor` moved to `film-status-bits` (film-angles re-exports it).
+- `design/native-screens/build-board-map.py` keeps the strip off every board's walk and maps the Film status view model and copy to boards 29, 31 and 32; `board-map.json` regenerated.
+
+**Fixed (independent review `REVIEW-status-ux.md`, COPY-DECK v2.4)**
+- M1: once the viewer's own reel is final it beats the match-level "Building" on the plate, verdict and Film Room card (`CardPhase.ownReel`).
+- M2: film in and analysing reads `Analyzing` / "Your film is in. Analyzing now."; the Film Room card falls through to the shipped `ANALYZING n/m` once bytes have landed.
+- M3: the Film Room phase reads share one cache between the Film Room and the Profile preview (`lib/film-room/use-film-room-phases.ts`), run only while focused and in the foreground, re-read only moving matches with a 30 s to 5 min backoff, stop past the film window, and keep each card's phase object between ticks.
+- Minors: a terminal local job no longer overrides the server phase; a Discarded clip keeps this phone's own copy (`wasDiscardedHere` in `match-upload-store.ts`); disputed results promise no highlight; the short-clip notice is back on match detail; "Still can't upload" is announced again; full-window sheets read the real bottom inset (`lib/layout/window-insets.ts`); the practice countdown and live hide the strip; the timekeeper landing shows the skeleton, not an error flash; no extra `get_match_details` read on open; the switcher's Best angle comes from the plate's view on match detail; a stable clock when idle; nits (label case, state hints, foreground on inactive, line-keyed announcements, the timekeeper title fallback in the copy module).
+- Round 2: a failed Film Room status read backs off (30 s to 5 min from the last attempt) and stops after 5 failures until the next focus, pull or library re-read (it used to retry at once, forever); "Your film is in. Analyzing now." only when the analysing angle is the viewer's own and nothing of theirs is still coming, else "Film is coming in. Analyzing what's here so far.", with an `Analyzing` / `Processing` tag that matches the rows and the timekeeper on its own copy (COPY-DECK v2.5); the Discard marker is persisted per athlete and match (`lib/video/discard-markers.ts`, 7-day expiry); a disputed match never reads "Building your highlight".
+
 ### Instant go-live: location ladder, device location store, optimistic chip, proximity flag, drift check (jits-jko7.1 to .4)
 
 Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) and the UX spec `research/019-optimistic-go-live-ux.md` (which wins on UX and copy; orchestrator rulings C1 to C7). JS-only on mobile (OTA-eligible: no dependency, no `app.json` / `app.config.js` change; `expo-secure-store`, `expo-location` and `@react-native-community/netinfo` are already in the binary). Safe before the jr_be migration `20261004100000_instant_go_live.sql`: a `PGRST202` for `p_captured_at` flips the app to the old fresh-reading flow and keeps the 60 s refresh for that backend.

@@ -23,12 +23,24 @@ import { videoHref } from "@/lib/film-room/href";
 import { usePalette } from "@/lib/theme/palette";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { angleWatchable, localAngleJob } from "@/lib/video/angle-status";
+import { useFilmStatus } from "@/lib/video/use-film-status";
+import { useAuth } from "@/lib/auth/hooks";
+import { deriveUploadBannerState, showRecorderBanner } from "@/lib/video/upload-banner-state";
+import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
+import { FilmStatusPlate } from "@/components/video-status/film-status-plate";
+import { TimekeeperFilm } from "@/components/match-detail/timekeeper-film";
+import { watchLabel } from "@/components/match-detail/film-angles";
+import type { FilmRow } from "@/lib/video/film-status";
 
 /**
  * One past match, the Film Room's match page: the opening still with play,
  * the verdict and rating change, the AI breakdown of the selected angle, its
  * key moments (each opens the player at that second), technique tags, the
- * angle switcher when both athletes recorded, and a Watch row per recording.
+ * angle switcher when both athletes recorded, and the Film status plate
+ * (jits-n2im.25): the canonical status of every angle, a Watch row per
+ * ready angle, Try again for this phone's own upload. The video pushes
+ * (film_ready, no_film, timekeeper_film_ready) route here and land on it.
+ * The timekeeper, who has no participant row, gets the plate alone.
  *
  * This is a plain pushed screen, NOT the live match wizard (`match/[matchId]`):
  * it must never call `useArenaMatchScreen`, which takes the athlete offline
@@ -44,6 +56,31 @@ export default function MatchDetailScreen() {
   const [pastHero, setPastHero] = React.useState(false);
   const { state, data, error, refreshing, refetch } = useMatchDetail(matchId);
   const film = useMatchFilm(state === "ready" ? data : null, matchId ?? "");
+  // The canonical Film status (jits-n2im.25). Until it has loaded, or if
+  // the status read fails, the wave 2 rows below stand in.
+  const { athlete } = useAuth();
+  // Playability is the playback query's (wave 2 `angleWatchable`): an angle
+  // plays once it has bytes, whatever its analysis is doing.
+  const playable = React.useMemo(
+    () => (state === "ready" && data ? new Map(data.videos.filter(angleWatchable).map((v) => [v.id, v.duration_seconds])) : null),
+    [state, data],
+  );
+  const filmStatus = useFilmStatus(matchId, athlete?.id, playable);
+  const fsView = filmStatus.view;
+  // The wave 2 film rows stand in when the status could not be read.
+  const legacyFilm = !fsView && !filmStatus.loading;
+  useSuppressUploadStrip(matchId ? { kind: "match", matchId } : null);
+  // An angle the server newly calls ready (analysed) brings a poster and a
+  // breakdown: re-read the match.
+  const readyKey = filmStatus.status ? filmStatus.status.angles.filter((a) => a.state === "ready").map((a) => a.video_id).join(",") : null;
+  // Seeded by the first status read (no extra get_match_details on open).
+  const lastReady = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (readyKey == null) return;
+    const prev = lastReady.current;
+    lastReady.current = readyKey;
+    if (prev != null && prev !== readyKey) refetch();
+  }, [readyKey, refetch]);
   // The row lands when the upload settles, usually while this page is open:
   // re-read then instead of waiting for a focus or a pull (jits-n2im.4).
   const settledIds = React.useMemo(() => (matchId ? [matchId] : []), [matchId]);
@@ -72,6 +109,23 @@ export default function MatchDetailScreen() {
   const play = (videoId: string, t?: number) => router.push(videoHref(videoId, t));
   const active = film.active;
   const section = deriveFilmSection(film.localUpload, state === "ready" && data ? data.videos.length : 0);
+  const rowWatchLabel = (row: FilmRow) => {
+    const v = data?.videos.find((x) => x.id === row.videoId);
+    return v ? watchLabel(v.angle_label) : `Watch ${row.label.toLowerCase()}`;
+  };
+
+  // The timekeeper: get_match_details refuses them, the status admits them.
+  // While the status read is still out, keep the skeleton (no error flash).
+  const awaitingRole = state === "error" && error?.code === "NOT_PARTICIPANT" && filmStatus.loading;
+  if (state === "error" && error?.code === "NOT_PARTICIPANT" && fsView?.role === "timekeeper" && filmStatus.status && matchId) {
+    return (
+      <View className="flex-1 bg-surface">
+        <ThemedStatusBar />
+        <TimekeeperFilm matchId={matchId} status={filmStatus.status} view={fsView} onWatch={(id) => play(id)} />
+        <HarnessMarker testID="match-detail-screen" label="Match detail, timekeeper" />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-surface">
@@ -98,9 +152,17 @@ export default function MatchDetailScreen() {
           />
           <View style={{ paddingHorizontal: 16, paddingTop: 14, gap: 20 }}>
             <MatchVerdict view={data} />
+            {fsView ? (
+              <FilmStatusPlate matchId={data.match.id} view={fsView} onWatch={(id) => play(id)} watchLabel={rowWatchLabel} />
+            ) : null}
+            {/* What the plate has no row for: a landed clip that stops before the end. */}
+            {fsView && film.localUpload && showRecorderBanner(deriveUploadBannerState("idle", null, film.localUpload)) ? (
+              <MatchUploadCard matchId={data.match.id} entry={film.localUpload} />
+            ) : null}
             {data.videos.length > 1 && active ? (
               <AngleSwitcher
                 angles={data.videos}
+                bestId={fsView ? fsView.bestVideoId : undefined}
                 activeId={active.id}
                 opponentName={data.opponent?.display_name}
                 onSelect={film.setActiveId}
@@ -115,8 +177,8 @@ export default function MatchDetailScreen() {
                 onJump={(t) => play(active.id, t)}
               />
             ) : null}
-            {section.upload && film.localUpload ? <MatchUploadCard matchId={data.match.id} entry={film.localUpload} /> : null}
-            {section.films ? (
+            {legacyFilm && section.upload && film.localUpload ? <MatchUploadCard matchId={data.match.id} entry={film.localUpload} /> : null}
+            {legacyFilm && section.films ? (
               <FilmAngles
                 videos={data.videos}
                 opponentName={data.opponent?.display_name ?? null}
@@ -124,7 +186,7 @@ export default function MatchDetailScreen() {
                 local={localAngleJob(film.localUpload)}
               />
             ) : null}
-            {section.noVideo ? <MatchNoVideo /> : null}
+            {legacyFilm && section.noVideo ? <MatchNoVideo /> : null}
             {/* The viewer's own reel of each recording, under the film. */}
             <HighlightSection videos={data.videos} reloadToken={highlightReload} />
             {data.opponent ? (
@@ -140,7 +202,7 @@ export default function MatchDetailScreen() {
           <View style={{ paddingHorizontal: 4, height: 48, justifyContent: "center" }}>
             <FilmBackButton label="Go back" fallback="/" color={p.text} />
           </View>
-          {state === "error" ? (
+          {state === "error" && !awaitingRole ? (
             <MatchDetailError code={error?.code ?? "UNKNOWN"} onBack={goBack} onRetry={refetch} />
           ) : (
             <MatchDetailSkeleton />

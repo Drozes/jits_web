@@ -1,7 +1,7 @@
 import * as React from "react";
 import type { MatchLibraryItem } from "@jits/shared/api/film-room";
 import { useMatchUpload } from "@/lib/video/match-upload-store";
-import { cardOffersRetry, deriveCardStatus } from "@/lib/film-room/card-status";
+import { cardOffersRetry, deriveCardStatus, type CardPhase } from "@/lib/film-room/card-status";
 import { useUploadActions } from "@/lib/video/use-upload-actions";
 import { PosterCard } from "./poster-card";
 import type { StillAthlete } from "./opening-still";
@@ -15,6 +15,8 @@ interface LibraryPosterProps {
   variant?: "grid" | "compact";
   testID?: string;
   accessibilityLabel?: string;
+  /** The server's Film status phase for a recent match (`useFilmRoomPhases`). */
+  phase?: CardPhase | null;
 }
 
 /**
@@ -23,9 +25,9 @@ interface LibraryPosterProps {
  * memo keeps every other card still (pass a memoized `viewer` and a stable
  * `onOpen`).
  */
-export const LibraryPoster = React.memo(function LibraryPoster({ item, viewer, seen, onOpen, variant, testID, accessibilityLabel }: LibraryPosterProps) {
+export const LibraryPoster = React.memo(function LibraryPoster({ item, viewer, seen, onOpen, variant, testID, accessibilityLabel, phase = null }: LibraryPosterProps) {
   const upload = useMatchUpload(item.match_id);
-  const status = React.useMemo(() => deriveCardStatus(item, upload, seen), [item, upload, seen]);
+  const status = React.useMemo(() => deriveCardStatus(item, upload, seen, Date.now(), phase), [item, upload, seen, phase]);
   const onPress = React.useCallback(() => onOpen(item.match_id), [onOpen, item.match_id]);
   const { retry } = useUploadActions(item.match_id);
   return (

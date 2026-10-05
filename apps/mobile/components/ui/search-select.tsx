@@ -1,7 +1,7 @@
 import * as React from "react";
 import { FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
 import { PressableScale } from "@/components/ui/pressable-scale";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useWindowInsets } from "@/lib/layout/window-insets";
 import { X } from "lucide-react-native";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -101,7 +101,7 @@ export function SearchSelect({
 }: SearchSelectProps) {
   const tokens = useThemedTokens();
   const animationType = useModalAnimation("slide");
-  const insets = useSafeAreaInsets();
+  const insets = useWindowInsets();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
 

@@ -1,3 +1,4 @@
+import { markDiscardedHere } from "./discard-markers";
 import { AppState, type AppStateStatus } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { backoffDelayMs, classifyUploadError } from "@jits/shared/utils";
@@ -1611,6 +1612,9 @@ export async function discardMatchVideoUpload(matchId: string): Promise<boolean>
   const job = await loadUploadJob(matchId);
   clearMatchUpload(matchId);
   if (!job) return false;
+  // This phone recorded and dropped the clip: remembered across restarts so
+  // the Film status keeps this phone's own copy (jits-n2im.25).
+  void markDiscardedHere(job.uploaderAthleteId, matchId);
   await abandonJob(job, "discarded by the athlete");
   return true;
 }

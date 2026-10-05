@@ -28,7 +28,7 @@ export function uploadAnnouncement(state: Pick<UploadBannerState, "kind" | "mess
  * Focus without requiring a navigator (the banner also renders in tests
  * and outside a screen). Same pattern as `header-status-chip.tsx`.
  */
-function useIsScreenFocused(): boolean {
+export function useIsScreenFocused(): boolean {
   const navigation = React.useContext(NavigationContext);
   const [focused, setFocused] = React.useState(() => navigation?.isFocused() ?? true);
   React.useEffect(() => {

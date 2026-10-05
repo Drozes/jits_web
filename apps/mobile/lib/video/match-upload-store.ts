@@ -1,6 +1,7 @@
 import * as React from "react";
 import type { RecordingTruncation } from "./use-video-recorder";
 import type { UploadErrorClass } from "./upload-errors";
+import { clearDiscardedHere } from "./discard-markers";
 
 /**
  * Match-scoped store for the outcome of a match-video upload (jits-od3).
@@ -216,6 +217,8 @@ export function setMatchUpload(
  * outcome is still the truth about this match.
  */
 export function beginMatchUploadAttempt(matchId: string): MatchUploadEntry {
+  // A new recording supersedes an earlier Discard on this match.
+  void clearDiscardedHere(matchId);
   const next: MatchUploadEntry = {
     matchId,
     status: "pending",
