@@ -34,7 +34,7 @@ interface LiveMenuPopoverProps {
 export function LiveMenuPopover({ visible, onClose }: LiveMenuPopoverProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // Ready, queued in the cooldown, or cancelling a go-live in flight (QA A, D).
+  // Always, with an owner mounted: the choice is recorded at once (round 3).
   const canGoOffline = useCanGoOffline();
   const locked = !canGoOffline;
   // The drift prompt waits while this menu is up.

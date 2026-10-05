@@ -18,6 +18,7 @@ import {
   useArenaState,
   useGoLiveCancellable,
   useGoLiveDisplay,
+  useLiveIntent,
   useHasArenaController,
   useNeedsLocation,
   useIncomingReopenSurface,
@@ -139,6 +140,7 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
   const display = useGoLiveDisplay();
   const needsLocation = useNeedsLocation();
   const cancellable = useGoLiveCancellable();
+  const intent = useLiveIntent();
   const focused = useScreenFocused();
   // While on screen the chip can bring a tucked challenge back, so the prompt
   // may offer Later (AC-S4). Tab roots stay mounted (blurred) under pushed
@@ -166,6 +168,7 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
     display,
     needsLocation,
     cancellable,
+    intent,
     now: Date.now(),
   });
 

@@ -12,7 +12,8 @@ import { supabase } from "../supabase/client";
 import { SecureStoreAdapter } from "../supabase/secure-storage";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
-import { takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
+import { resetLiveOverlayState, takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
+import { loadPersistedLiveIntent } from "../arena/live-intent-persist";
 import { clearShareCache } from "../highlight-share";
 import { resetNotificationRouterReady } from "../notifications/handlers";
 import { unregisterPushDeviceOnSignOut } from "../notifications/register-push";
@@ -156,9 +157,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resetHighlightStore();
         void clearShareCache().catch(() => undefined);
         // The athlete's last accepted location and the instant go-live
-        // flags never outlive the session either (review round 1, S4).
+        // flags never outlive the session either (review round 1, S4), nor
+        // does any go-live overlay (a stale OFFLINE · RETRY, review round 3).
         clearAllDeviceLocations();
         resetLocationFlags();
+        resetLiveOverlayState();
       } else if (needsAthleteLoad(nextUser.id, loadedAthleteForUserId.current)) {
         // Freshly signed-in user whose athlete row we have NOT loaded yet. Hold
         // the gate on "Loading..." (synchronously, in the same render that sets
@@ -201,6 +204,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // (review round 1, S1). Never awaited; a failed read is "no tag".
         if (result.data?.id) {
           void loadDeviceLocation(result.data.id);
+          // And the athlete's last live choice (review round 3).
+          void loadPersistedLiveIntent(result.data.id);
           // And the permission (read, never asked), for the same first frame
           // (QA E: FINDING YOU at once when there is no tag).
           void readLocationPermission();

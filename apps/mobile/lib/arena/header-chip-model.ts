@@ -167,11 +167,13 @@ export interface ChipInput {
   display?: GoLiveDisplay | null;
   /** The last attempt ended for location: the offline chip says why to VoiceOver. */
   needsLocation?: boolean;
-  /**
-   * A go-live in flight can be cancelled by a go-offline (QA A): the
-   * optimistic LIVE chip and RECONNECTING open the live menu meanwhile.
-   */
+  /** Kept for callers; an offline choice is always possible now (review round 3). */
   cancellable?: boolean;
+  /**
+   * The athlete's last choice (review round 3): a decided offline choice is
+   * drawn offline at once, whatever the server still says or is doing.
+   */
+  intent?: { decided: boolean; live: boolean } | null;
   now: number;
 }
 
@@ -207,15 +209,15 @@ function remaining(
 export function describeHeaderChip(input: ChipInput): ChipModel {
   const { phase, now } = input;
   const display = input.display ?? null;
-  // Live as the athlete sees it: the committed flag, or an optimistic /
-  // restore overlay (a valid tag is in hand and the write is in flight).
-  const isLive = displayDrawsLive(display, input.isLive);
+  const intendedOffline = !!input.intent && input.intent.decided && !input.intent.live;
+  // Live as the athlete sees it: their offline choice first; else the
+  // committed flag, or an optimistic / restore overlay.
+  const isLive = intendedOffline ? false : displayDrawsLive(display, input.isLive);
   const saving = phase === "saving";
-  // A go-live tap needs an owner to run it (with no controller registered
-  // the call is a silent no-op) and no transition in flight. During the
-  // cooldown the tap is queued, last choice wins (QA D).
-  const canGoLive = phase !== "saving" && input.controllerReady;
-  const cancellable = input.cancellable === true;
+  // A choice only needs an owner to run it (with no controller registered
+  // the call is a silent no-op). Nothing in flight ever locks the opposite
+  // choice: it is recorded at once and the server follows (review round 3).
+  const canGoLive = input.controllerReady;
 
   // Someone wants you.
   if (input.incoming && input.incomingCount >= 2) {
@@ -296,6 +298,32 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
     live: isLive,
   });
 
+  // The last choice is offline: drawn offline now, the way back one tap away.
+  if (intendedOffline) {
+    const n = input.onMat;
+    if (display === "retry" || input.lastLiveWriteFailed) {
+      return base({
+        kind: "retry",
+        tone: "neutral",
+        glyph: "○",
+        lead: "OFFLINE · RETRY",
+        action: "go-live",
+        disabled: !canGoLive,
+        accessibilityLabel: `${CHIP_LABEL_PREFIX} going live failed. Retry going live`,
+      });
+    }
+    return base({
+      kind: "offline",
+      tone: "neutral",
+      glyph: "○",
+      lead: n === null ? "GO LIVE" : `GO LIVE · ${formatBadgeCount(n)}`,
+      action: "go-live",
+      disabled: !canGoLive,
+      accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Go live`,
+      ...(input.needsLocation ? { accessibilityHint: NEEDS_LOCATION_HINT } : {}),
+    });
+  }
+
   // A go-live in progress (instant go-live display overlay, UX 019).
   if ((display === "hold" || display === "leaving") && !isLive) {
     // The first 240 ms after the tap: nothing pending yet, and no taps.
@@ -329,8 +357,8 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
       glyph: "◌",
       lead: "RECONNECTING",
       action: "popover",
-      // The live menu's Go offline cancels the go-live in flight (QA A).
-      disabled: !cancellable,
+      // The live menu's Go offline is always there (QA 4, appendix B2).
+      disabled: !input.controllerReady,
       accessibilityLabel: `${CHIP_LABEL_PREFIX} reconnecting. Open live menu`,
     });
   }
@@ -369,7 +397,7 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
       glyph: "◌",
       lead: "RECONNECTING",
       action: "popover",
-      disabled: saving,
+      disabled: !input.controllerReady,
       accessibilityLabel: `${CHIP_LABEL_PREFIX} reconnecting. Open live menu`,
     });
   }
@@ -380,11 +408,9 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
       tone: "live",
       glyph: "●",
       lead: n === null ? "LIVE" : n === 0 ? "LIVE · JUST YOU" : `LIVE · ${formatBadgeCount(n)}`,
+      // The live menu (and its Go offline) is always one tap away.
       action: "popover",
-      // A go-offline in flight keeps the live styling but takes no taps; a
-      // go-live in flight (drawn live) opens the menu, whose Go offline
-      // cancels it (QA A).
-      disabled: saving && !cancellable,
+      disabled: !input.controllerReady,
       accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Open live menu`,
     });
   }

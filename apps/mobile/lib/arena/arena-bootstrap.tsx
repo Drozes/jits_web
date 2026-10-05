@@ -66,11 +66,7 @@ function locationFlagHint(): boolean {
     .peekMatchLocationRequired;
   return peek?.() ?? true;
 }
-import {
-  setDeviceLocationOwner,
-  validDeviceReading,
-  validDeviceTag,
-} from "@/lib/location/device-location-store";
+import { setDeviceLocationOwner } from "@/lib/location/device-location-store";
 import { registerGoLiveDevHooks } from "./dev-go-live-hooks";
 import {
   getPresenceCapability,
@@ -80,8 +76,11 @@ import {
   getGoLiveDisplay,
   isInArenaMatch,
   registerGoLiveCanceller,
+  registerIntentPersister,
+  setAppLiveIntent,
   setGoLiveDisplay,
 } from "./arena-store";
+import { loadPersistedLiveIntent, persistLiveIntent } from "./live-intent-persist";
 import { useLobbyIds, useLobbyKnown, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
 import { useActiveMatchOwner } from "../match-flow/active-match-store";
@@ -143,7 +142,10 @@ function useServerEndedLiveCheck(
       void checkRef
         .current()
         .then((dropped) => {
-          if (dropped) showServerEndedLiveCta();
+          if (!dropped) return;
+          // The server ended it: held offline until the athlete chooses again.
+          setAppLiveIntent(false);
+          showServerEndedLiveCta();
         })
         .catch(() => undefined);
     };
@@ -208,6 +210,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   // clears the previous one's entry); read it into memory now.
   React.useLayoutEffect(() => {
     setDeviceLocationOwner(athlete.id);
+    void loadPersistedLiveIntent(athlete.id);
   }, [athlete.id]);
   // Cold start while the server says live: draw the restore from the first
   // frame (UX 019, 3h), before the arrival restore has read anything.
@@ -269,9 +272,16 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
       }),
     // Leaving for the background while live with a valid tag: the chip is
     // already drawn live for the return (UX 019, 3i).
+    // Leaving for the background while live: the chip is already drawn as
+    // the restore will draw it on return (LIVE with a valid tag, FINDING YOU
+    // with none and permission granted), so the frame committed while away
+    // is never a GO LIVE hold (UX 019, 3i; QA 5).
     onResumeParked: () => {
-      if (validDeviceTag(athlete.id) || validDeviceReading(athlete.id)) setGoLiveDisplay("restore-live");
+      setGoLiveDisplay(restoreFirstFrame(athlete.id, locationFlagHint()));
     },
+    // The athlete's last choice, persisted: offline means a cold start clears
+    // a stale `true` instead of restoring (review round 3).
+    loadPersistedIntent: () => loadPersistedLiveIntent(athlete.id),
   });
   // Read by the refresh handlers below and the controller (registered once).
   const liveRef = React.useRef(live);
@@ -346,6 +356,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
         .dropIfServerOffline(() => getMyLookingForRanked(supabase, athleteId))
         .then((dropped) => {
           if (!dropped) return;
+          setAppLiveIntent(false);
           if (outcome === "permission") showLocationOffGoLiveCta();
           else toast.info("You're offline. Go live again in the Arena.");
         })
@@ -447,6 +458,8 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
         lastRefusal: () => liveRef.current.lastGoLiveRefusal(),
       });
     };
+    // Every choice is persisted for this athlete (a kill and relaunch honours it).
+    const unregisterPersister = registerIntentPersister((live) => persistLiveIntent(athleteIdRef.current, live));
     const unregister = registerArenaController({
       toggle: async () => {
         const l = liveRef.current;
@@ -460,6 +473,14 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
         return liveRef.current.toggle();
       },
       goOffline: () => liveRef.current.goOffline(),
+      ensureOffline: () => {
+        const l = liveRef.current;
+        return typeof l.ensureOffline === "function" ? l.ensureOffline() : l.goOffline();
+      },
+      committed: () => {
+        const l = liveRef.current;
+        return typeof l.committed === "function" ? l.committed() : { live: l.isLive, settled: !l.isSaving };
+      },
       goLive,
       sendChallenge: (id, name) => challengeRef.current.sendChallenge(id, name),
       cancelOutgoing: () => challengeRef.current.cancelOutgoing(),
@@ -470,6 +491,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
     });
     return () => {
       unregister();
+      unregisterPersister();
       publishArenaState(IDLE_ARENA_STATE);
       // A Go Live waiting on the location sheet would otherwise hold the
       // live switch locked with nothing left to answer it.

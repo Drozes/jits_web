@@ -44,8 +44,10 @@ jest.mock("@/lib/supabase/secure-storage", () => ({
 jest.mock("@/lib/splash/elo-cache", () => ({ setCachedElo: jest.fn(() => Promise.resolve()) }));
 // eslint-disable-next-line no-var
 var mockArenaOffline = jest.fn(() => Promise.resolve());
+const mockResetOverlay = jest.fn();
 jest.mock("@/lib/arena/arena-store", () => ({
   takeArenaOfflineBeforeSignOut: () => mockArenaOffline(),
+  resetLiveOverlayState: () => mockResetOverlay(),
 }));
 const mockClearLocations = jest.fn();
 const mockLoadLocation = jest.fn((_id: string) => Promise.resolve(null));

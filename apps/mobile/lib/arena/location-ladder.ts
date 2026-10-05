@@ -89,6 +89,7 @@ import {
   setNeedsLocation,
   beginRestoreRun,
   registerGoLiveCanceller,
+  setAppLiveIntent,
   type LiveSwitchIgnored,
 } from "./arena-store";
 import { ANNOUNCE_FINDING, ANNOUNCE_LIVE, ANNOUNCE_RECONNECTING, announce } from "./go-live-announce";
@@ -240,6 +241,8 @@ class Attempt {
 
   /** Draw the chip live now (a valid tag is in hand). */
   flip(): void {
+    // Cancelled work never draws anything (review round 3).
+    if (this.aborted()) return;
     this.green = true;
     setGoLiveDisplay(this.tapped ? "optimistic" : "restore-live");
     if (!this.tapped) return;
@@ -253,7 +256,7 @@ class Attempt {
 
   /** A write or report did not land at once: RECONNECTING, only over a green chip. */
   recovering(): void {
-    if (!this.green) return;
+    if (!this.green || this.aborted()) return;
     const d = getGoLiveDisplay();
     if (d !== "optimistic" && d !== "restore-live") return;
     setGoLiveDisplay("recovering");
@@ -265,6 +268,7 @@ class Attempt {
 
   /** A fresh fix is starting: FINDING YOU (after the 240 ms hold on a tap). */
   finding(): void {
+    if (this.aborted()) return;
     const kind = this.tapped ? "finding-you" : "restore-finding";
     if (this.green || !this.tapped || getGoLiveDisplay() === "going-live") {
       // Green (or a restore) and now a fresh fix: the one allowed flicker.
@@ -770,7 +774,12 @@ export async function restoreLiveSilently(w: RestoreWriter): Promise<RestoreOutc
   let outcome: RestoreOutcome = "failed";
   const active = () => AppState.currentState === "active";
   const fail = (toast: () => void): RestoreOutcome => {
-    if (active()) toast();
+    if (active()) {
+      toast();
+      // Said in front of the athlete: held offline until they choose again,
+      // so nothing resumes it behind their back (review round 3).
+      setAppLiveIntent(false);
+    }
     return "failed";
   };
   const fromWrite = (r: WriteResult): RestoreOutcome | null => {

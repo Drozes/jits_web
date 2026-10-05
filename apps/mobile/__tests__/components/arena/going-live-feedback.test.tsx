@@ -19,9 +19,11 @@ function bar(p: { isLive: boolean; saving: boolean; goingLive?: boolean }) {
   return render(
     <MatControlBar
       isLive={p.isLive}
-      locked={p.saving}
+      locked={false}
       saving={p.saving}
       goingLive={p.goingLive}
+      // A live choice on its way (round 3: the screen derives it from the intent).
+      pending={p.saving && p.goingLive === true && !p.isLive}
       counts="3 ON MAT"
       onGoLive={jest.fn()}
       onGoOffline={jest.fn()}
@@ -34,6 +36,11 @@ describe("MatControlBar going-live pulse", () => {
     const s = bar({ isLive: false, saving: true, goingLive: true });
     expect(s.getByTestId("arena-segment-live-pending", { includeHiddenElements: true })).toBeTruthy();
     expect(s.getByTestId("arena-segment-live").props.accessibilityState).toMatchObject({ busy: true });
+    // QA 4: OFFLINE is not drawn selected meanwhile, and stays tappable.
+    expect(s.getByTestId("arena-segment-offline").props.accessibilityState).toMatchObject({
+      selected: false,
+      disabled: false,
+    });
   });
 
   it("no pulse at rest", () => {

@@ -56,6 +56,7 @@ import {
   useCanGoOffline,
   useGoLiveDisplay,
   useIsArenaDisplayLive,
+  useLiveIntent,
   useLiveSwitchDirection,
   useLiveSwitchPhase,
 } from "@/lib/arena/arena-store";
@@ -114,9 +115,9 @@ export default function ArenaScreen() {
     capReached,
   } = useArenaState();
   const { sendChallenge, cancelOutgoing, clearCap } = arenaActions;
-  // The switch guard (saving + cooldown): show it disabled, not dead.
+  // A transition in flight (for Challenge only): a live choice itself is
+  // never locked (review round 3).
   const switchPhase = useLiveSwitchPhase();
-  const switchLocked = switchPhase !== "ready";
   // Any live transition in flight, from any surface: no Challenge meanwhile.
   const liveSaving = switchPhase === "saving";
   const goingLive = useLiveSwitchDirection() === "going-live";
@@ -124,10 +125,20 @@ export default function ArenaScreen() {
   // the tap with a valid tag, nothing pending for the first 240 ms.
   const liveDisplay = useGoLiveDisplay();
   const displayLive = useIsArenaDisplayLive();
-  // Per segment (QA A, D): LIVE is queued during the cooldown; OFFLINE also
-  // cancels a go-live in flight.
+  // Both choices are always open with an owner mounted (review round 3).
   const canGoLive = useCanGoLive();
   const canGoOffline = useCanGoOffline();
+  const switchLocked = !canGoLive;
+  // The athlete chose live and it is on its way (QA 4): LIVE shows pending,
+  // OFFLINE stays selectable.
+  const intent = useLiveIntent();
+  const livePending =
+    !displayLive &&
+    !(intent.decided && !intent.live) &&
+    (liveDisplay === "going-live" ||
+      liveDisplay === "finding-you" ||
+      liveDisplay === "restore-finding" ||
+      liveDisplay === "recovering");
   const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {
@@ -320,12 +331,7 @@ export default function ArenaScreen() {
         offlineLocked={!canGoOffline}
         saving={isSaving || liveSaving}
         goingLive={goingLive && liveDisplay !== "hold"}
-        pending={
-          liveDisplay === "going-live" ||
-          liveDisplay === "finding-you" ||
-          liveDisplay === "restore-finding" ||
-          liveDisplay === "recovering"
-        }
+        pending={livePending}
         counts={formatMatCounts(onMat, inBand)}
         onGoLive={goLive}
         onGoOffline={() => void goOfflineWithFeedback()}

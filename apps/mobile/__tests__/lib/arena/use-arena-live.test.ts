@@ -52,7 +52,12 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 import { CLEAR_RETRY_MS, useArenaLive, type UseArenaLiveArgs } from "@/lib/arena/use-arena-live";
 import { GO_OFFLINE_FAILED_MESSAGE } from "@/lib/arena/constants";
-import { __resetArenaStoreForTests, liveSwitch, registerArenaController } from "@/lib/arena/arena-store";
+import {
+  __resetArenaStoreForTests,
+  liveSwitch,
+  registerArenaController,
+  takeArenaOfflineBeforeSignOut,
+} from "@/lib/arena/arena-store";
 
 // ---- fixtures ----
 
@@ -1986,5 +1991,103 @@ describe("round 2: single-flight restores, cancel races, an abandoned tap", () =
     // Not restored on return (spec 2.2: pending flows are cancelled).
     expect(calls).toHaveLength(0);
     expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review round 3: resume derived from the athlete's last choice
+// ---------------------------------------------------------------------------
+
+describe("round 3: the athlete's last choice decides every resume", () => {
+  type Ctx = Parameters<NonNullable<UseArenaLiveArgs["autoLive"]>>[0];
+
+  function wire(result: { current: ReturnType<typeof useArenaLive> }) {
+    return registerArenaController({
+      toggle: jest.fn(),
+      goOffline: () => result.current.goOffline(),
+      goLive: () => result.current.goLive(),
+      committed: () => result.current.committed(),
+      ensureOffline: () => result.current.ensureOffline(),
+      sendChallenge: jest.fn(),
+      cancelOutgoing: jest.fn(),
+      clearCap: jest.fn(),
+      tuckIncoming: jest.fn(),
+      reopenIncoming: jest.fn(),
+    });
+  }
+
+  it("X1: live, Go offline chosen, then the background: back in front stays OFFLINE (no restore)", async () => {
+    const autoLive = jest.fn(async (ctx: Ctx) => ((await ctx.write()) ? "live" : "failed")) as never;
+    const { result } = mount({ autoLive });
+    wire(result);
+    await act(async () => {
+      await liveSwitch.goLive();
+    });
+    expect(result.current.isLive).toBe(true);
+    // Hung clear: the offline choice is not even written yet.
+    const hung = deferred<{ ok: true; data: undefined }>();
+    mockToggleMatchPreferences.mockReturnValueOnce(hung.promise);
+    act(() => {
+      void liveSwitch.goOffline();
+    });
+    await act(async () => {
+      setAppState("background");
+      appStateHandler?.("background");
+      await flush();
+      hung.resolve({ ok: true, data: undefined });
+      await flush();
+      setAppState("active");
+      appStateHandler?.("active");
+      await flush();
+    });
+    expect(autoLive).not.toHaveBeenCalled();
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+  });
+
+  it("kill and relaunch after choosing offline: the persisted choice clears the stale true, never restores", async () => {
+    const autoLive = jest.fn(async () => "live" as const);
+    mount({ initialRanked: true, autoLive, loadPersistedIntent: () => Promise.resolve(false) });
+    await act(async () => {
+      await flush();
+    });
+    expect(autoLive).not.toHaveBeenCalled();
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: false });
+  });
+
+  it("kill and relaunch after choosing live: restored as before", async () => {
+    const autoLive = jest.fn(async () => "live" as const);
+    mount({ initialRanked: true, autoLive, loadPersistedIntent: () => Promise.resolve(true) });
+    await act(async () => {
+      await flush();
+    });
+    expect(autoLive).toHaveBeenCalledTimes(1);
+  });
+
+  it("an offline choice makes the executor refuse any live write (one source of truth)", async () => {
+    const { result } = mount();
+    wire(result);
+    act(() => {
+      void liveSwitch.goOffline();
+    });
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.goLive();
+    });
+    expect(ok).toBe(false);
+    expect(mockToggleMatchPreferences.mock.calls.some((c) => (c[2] as { lookingForRanked: boolean }).lookingForRanked)).toBe(false);
+  });
+
+  it("sign-out started: the executor refuses any live write", async () => {
+    const { result } = mount();
+    wire(result);
+    await act(async () => {
+      await takeArenaOfflineBeforeSignOut(10);
+    });
+    let ok: boolean | undefined;
+    await act(async () => {
+      ok = await result.current.goLive();
+    });
+    expect(ok).toBe(false);
+    expect(mockToggleMatchPreferences.mock.calls.some((c) => (c[2] as { lookingForRanked: boolean }).lookingForRanked)).toBe(false);
   });
 });

@@ -239,6 +239,7 @@ describe("ArenaBootstrap", () => {
       onManualOffline: expect.any(Function),
       autoLive: expect.any(Function),
       onResumeParked: expect.any(Function),
+      loadPersistedIntent: expect.any(Function),
     });
     expect(mockActiveMatchOwner).toHaveBeenCalledWith("me-1");
     expect(mockUseArenaChallenge).toHaveBeenLastCalledWith(
@@ -427,12 +428,10 @@ describe("ArenaBootstrap", () => {
     );
 
     await act(async () => {
+      // A choice (review round 3): live now, so the toggle chooses offline.
       await arenaActions.toggle();
-      // Programmatic (sign-out), so not held by the cooldown the toggle
-      // just started.
       await takeArenaOfflineBeforeSignOut();
     });
-    expect(mockToggle).toHaveBeenCalled();
     expect(mockGoOffline).toHaveBeenCalled();
 
     // Sign-out: the athlete goes away and the owner unmounts.

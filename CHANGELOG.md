@@ -48,6 +48,15 @@ Built to jr_be `specs/016-invites/addendum-optimistic-go-live.md` (section 4) an
 - The drift prompt's Go offline goes through the same path and is logged only when it happened.
 - UX spec appendix B records the settled behaviour.
 
+**Fixed (review round 3)**
+- One source of truth for the athlete's live intent (`arena-store`): every tap sets it at once and is drawn at once; one serialized loop drives the server toward the latest choice; the cooldown only paces live writes and never drops, delays or disables a choice. Replaces the round 2 cooldown queue.
+- The live hook refuses any live write while the intent is offline or after sign-out has started; resumes (foreground, after a match, cold start) are derived from the last choice, which is persisted per athlete (`lib/arena/live-intent-persist.ts`) so a relaunch after choosing offline clears a stale `true` instead of restoring.
+- Sign-out, the background (for an unlanded tapped go-live) and match entry drop pending live choices and cancel work in flight; sign-out clears every overlay (no stale OFFLINE · RETRY).
+- RECONNECTING draws LIVE pending on the Arena bar with OFFLINE tappable; after a cancel the athlete can choose again at once; RETRY is tappable at 15 s; a cancelled write that lands never flashes LIVE.
+- A parked restore with an aged tag and permission granted is drawn FINDING YOU while away (no GO LIVE frame on return).
+- `report_match_presence` calls are aborted after 15 s (`PRESENCE_REPORT_TIMEOUT_MS`); the live write is never aborted.
+- Seeded randomized test of the intent model (`live-intent-property.test.ts`, 3,000 sequences by default).
+
 ### Live location fixes: Allow Once rejoin, GOING LIVE feedback, Precise Location copy, platform header, attempt logging (jits-3i0n.1 to .6)
 
 Built to jr_be `specs/016-invites/addendum-live-location-fixes.md` section 4. JS-only on mobile (OTA-eligible: no native dependency, no `app.json` / `app.config.js` change; `expo-location`, `expo-application` and `expo-updates` are already in build 25). Item 3b (the Swift accuracy module and `NSLocationTemporaryUsageDescriptionDictionary`) is NOT in this slice and needs a TestFlight build.

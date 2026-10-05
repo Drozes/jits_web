@@ -4,6 +4,7 @@ import {
   getMatchLocationRequired,
   parseArenaNearby,
   parseStartInviteBooking,
+  PRESENCE_REPORT_TIMEOUT_MS,
   reportBrowsePresence,
   reportArenaPresence,
   reportGoLivePresence,
@@ -320,5 +321,54 @@ describe("arenaProximityTitle (matches the message)", () => {
     expect(
       arenaProximityTitle({ hint: "proximity_required", detail: "challenger", selfRole: "opponent", opponentName: " " }),
     ).toBe("Waiting for your opponent");
+  });
+});
+
+describe("report_match_presence abort (review round 3)", () => {
+  function hangingClient() {
+    let signal: AbortSignal | undefined;
+    const rpc = vi.fn(() => {
+      const pending = {
+        abortSignal(s: AbortSignal) {
+          signal = s;
+          return pending;
+        },
+        then(resolve: (v: unknown) => void, reject: (e: unknown) => void) {
+          // Never answers on its own; the abort rejects it, as supabase-js does.
+          signal?.addEventListener("abort", () => reject(new Error("AbortError: aborted")));
+          void resolve;
+        },
+      };
+      return pending;
+    });
+    return { supabase: { rpc } as never, rpc, signal: () => signal };
+  }
+
+  it("a hung go_live report is aborted after 15 s and reads as a failure", async () => {
+    vi.useFakeTimers();
+    try {
+      const { supabase, signal } = hangingClient();
+      const res = reportGoLivePresence(supabase, READING);
+      await vi.advanceTimersByTimeAsync(PRESENCE_REPORT_TIMEOUT_MS - 1);
+      expect(signal()?.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(signal()?.aborted).toBe(true);
+      expect((await res).ok).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("arena and browse reports carry the same abort", async () => {
+    const { supabase, signal } = hangingClient();
+    void reportArenaPresence(supabase, READING, "c1");
+    expect(signal()).toBeDefined();
+    const b = hangingClient();
+    void reportBrowsePresence(b.supabase, READING);
+    expect(b.signal()).toBeDefined();
+  });
+
+  it("is 15 s", () => {
+    expect(PRESENCE_REPORT_TIMEOUT_MS).toBe(15_000);
   });
 });

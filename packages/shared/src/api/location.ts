@@ -96,6 +96,13 @@ function readingArgs(reading: LocationReading) {
 }
 
 /**
+ * Every `report_match_presence` call is aborted after this long (review round
+ * 3): a report never hangs a go-live. The live write itself is never aborted
+ * (a client abort does not stop the server committing it).
+ */
+export const PRESENCE_REPORT_TIMEOUT_MS = 15_000;
+
+/**
  * `report_match_presence` refusals the instant go-live migration adds for a
  * `go_live` reading sent with `p_captured_at` (addendum 3.4).
  */
@@ -139,6 +146,7 @@ export function reportGoLivePresence(
       ...(capturedAt ? { p_captured_at: capturedAt } : {}),
     },
     parsePresence,
+    { timeoutMs: PRESENCE_REPORT_TIMEOUT_MS },
   );
 }
 
@@ -157,6 +165,7 @@ export function reportArenaPresence(
     "report_match_presence",
     { ...readingArgs(reading), p_context: "arena", p_challenge_id: challengeId, p_invite_id: null },
     parsePresence,
+    { timeoutMs: PRESENCE_REPORT_TIMEOUT_MS },
   );
 }
 
@@ -240,6 +249,7 @@ export function reportBrowsePresence(supabase: Client, reading: LocationReading)
     "report_match_presence",
     { ...readingArgs(reading), p_context: "browse", p_challenge_id: null, p_invite_id: null },
     parsePresence,
+    { timeoutMs: PRESENCE_REPORT_TIMEOUT_MS },
   );
 }
 

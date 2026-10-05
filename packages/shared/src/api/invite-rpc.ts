@@ -45,13 +45,23 @@ export async function rpc<T>(
   fn: RpcName,
   args: Record<string, unknown>,
   parse: (data: unknown) => T | null,
+  opts: { timeoutMs?: number } = {},
 ): Promise<InviteResult<T>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const call = supabase.rpc as unknown as (
-      f: string,
-      a: Record<string, unknown>,
-    ) => PromiseLike<{ data: unknown; error: RawError }>;
-    const { data, error } = await call.call(supabase, fn, args);
+    type Pending = PromiseLike<{ data: unknown; error: RawError }> & {
+      abortSignal?: (signal: AbortSignal) => Pending;
+    };
+    const call = supabase.rpc as unknown as (f: string, a: Record<string, unknown>) => Pending;
+    let pending = call.call(supabase, fn, args);
+    // A request that never answers is aborted (the caller treats it as a
+    // network failure and retries or gives up on its own clock).
+    if (opts.timeoutMs && typeof pending.abortSignal === "function" && typeof AbortController !== "undefined") {
+      const controller = new AbortController();
+      timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+      pending = pending.abortSignal(controller.signal);
+    }
+    const { data, error } = await pending;
     if (error) {
       return {
         ok: false,
@@ -67,6 +77,8 @@ export async function rpc<T>(
     return { ok: true, data: parsed };
   } catch (err) {
     return { ok: false, error: { hint: "unknown", message: err instanceof Error ? err.message : String(err) } };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

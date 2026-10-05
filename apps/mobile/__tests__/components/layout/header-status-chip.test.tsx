@@ -170,8 +170,9 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     const m = describeHeaderChip(input({ phase: "cooldown" }));
     expect(chipCopy(m)).toBe("○ GO LIVE · 12");
     expect(m.disabled).toBe(false);
-    // Still locked while a transition is in flight.
-    expect(describeHeaderChip(input({ phase: "saving" })).disabled).toBe(true);
+    // Never locked by work in flight either (review round 3): the choice is
+    // recorded at once and the server follows.
+    expect(describeHeaderChip(input({ phase: "saving" })).disabled).toBe(false);
   });
 
   it("QA A: the optimistic LIVE chip and RECONNECTING open the live menu when the go-live can be cancelled", () => {
@@ -182,8 +183,8 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     expect(rec.kind).toBe("reconnecting");
     expect(rec.action).toBe("popover");
     expect(rec.disabled).toBe(false);
-    // Nothing to cancel: locked, as before.
-    expect(describeHeaderChip(input({ phase: "saving", display: "optimistic" })).disabled).toBe(true);
+    // Always open (review round 3), with or without anything to cancel.
+    expect(describeHeaderChip(input({ phase: "saving", display: "optimistic" })).disabled).toBe(false);
   });
 
   it("live shows the count in green and opens the popover (AC-H5)", () => {
@@ -199,13 +200,27 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     );
   });
 
-  it("a go-offline in flight keeps the live styling but takes no taps", () => {
+  it("an offline choice is drawn at once, while the server still says live (review round 3)", () => {
     const m = describeHeaderChip(
-      input({ isLive: true, phase: "saving", direction: "going-offline" }),
+      input({
+        isLive: true,
+        phase: "saving",
+        direction: "going-offline",
+        intent: { decided: true, live: false },
+      }),
     );
-    expect(chipCopy(m)).toBe("● LIVE · 12");
-    expect(m.tone).toBe("live");
-    expect(m.disabled).toBe(true);
+    expect(chipCopy(m)).toBe("○ GO LIVE · 12");
+    expect(m.action).toBe("go-live");
+    // The way back is one tap away.
+    expect(m.disabled).toBe(false);
+  });
+
+  it("QA 6: OFFLINE · RETRY takes the tap while a hung write is still in flight", () => {
+    const m = describeHeaderChip(
+      input({ phase: "saving", display: "retry", intent: { decided: true, live: true } }),
+    );
+    expect(chipCopy(m)).toBe("○ OFFLINE · RETRY");
+    expect(m.disabled).toBe(false);
   });
 
   it("waiting counts down the outgoing challenge's fresh window (AC-H7)", () => {
@@ -1043,7 +1058,7 @@ describe("HeaderStatusChip", () => {
     expect(queryByTestId("live-menu")).toBeNull();
   });
 
-  it("popover: Go offline during the cooldown is queued and runs when it ends (QA D)", async () => {
+  it("popover: Go offline right after a go-live (inside the cooldown) goes out at once (round 3)", async () => {
     setArena({ isLive: true });
     const { getByTestId, getByLabelText } = render(<HeaderStatusChip />);
     // A go-live just landed through the guard: cooldown.
@@ -1057,13 +1072,10 @@ describe("HeaderStatusChip", () => {
     await act(async () => {
       fireEvent.press(off);
     });
-    expect(ctl.goOffline).not.toHaveBeenCalled();
-    // Drawn offline at once.
-    expect(chipText(getByTestId)).toContain("GO LIVE · 12");
-    await act(async () => {
-      jest.advanceTimersByTime(LIVE_SWITCH_COOLDOWN_MS);
-    });
+    // Recorded and written at once (an offline write is never held back),
+    // drawn offline at once.
     expect(ctl.goOffline).toHaveBeenCalledTimes(1);
+    expect(chipText(getByTestId)).toContain("GO LIVE · 12");
   });
 
   it("live with nobody else reads JUST YOU (AC-H5)", () => {

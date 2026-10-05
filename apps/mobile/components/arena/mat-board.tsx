@@ -188,9 +188,11 @@ export function MatControlBar({
   onGoOffline,
 }: ControlBarProps) {
   const segment = (live: boolean) => {
-    const selected = isLive === live;
+    // A live choice on its way (pending) is neither segment's selection:
+    // LIVE shows the pending ring, OFFLINE stays tappable (QA 4).
+    const selected = live ? isLive : !isLive && !pending;
     const segmentLocked = live ? locked : (offlineLocked ?? locked);
-    const disabled = selected || segmentLocked;
+    const disabled = selected || segmentLocked || (live && pending);
     return (
       <PressableScale
         testID={live ? "arena-segment-live" : "arena-segment-offline"}
@@ -198,7 +200,7 @@ export function MatControlBar({
         accessibilityLabel={
           selected ? (live ? "You are live" : "You are offline") : live ? "Go live" : "Go offline"
         }
-        accessibilityState={{ selected, disabled, busy: (saving || pending) && !selected }}
+        accessibilityState={{ selected, disabled, busy: live && pending && !selected }}
         onPress={live ? onGoLive : onGoOffline}
         disabled={disabled}
         hitSlop={{ top: 6, bottom: 6 }}
@@ -208,7 +210,7 @@ export function MatControlBar({
         )}
         style={!selected && segmentLocked ? { opacity: 0.6 } : undefined}
       >
-        {live && ((saving && goingLive) || pending) && !selected ? (
+        {live && pending && !selected ? (
           // Going live (live location fixes 4.2): the pulse from the tap
           // until the flow resolves, never a still bar that reads as dead.
           <PendingDot size={6} testID="arena-segment-live-pending" />

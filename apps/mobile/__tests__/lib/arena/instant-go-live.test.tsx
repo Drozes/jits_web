@@ -914,6 +914,41 @@ describe("restores (foreground, after a match, cold start)", () => {
     act(() => onResumeParked());
     expect(getGoLiveDisplay()).toBe("restore-live");
   });
+
+  it("QA 5: an aged tag, permission granted: FINDING YOU is drawn while away, so the return never shows a GO LIVE frame first", async () => {
+    // Cause (QA 5): the parked restore's display was only set once the
+    // ladder started on return, after the foreground reading, so the frame
+    // committed while away (and the first ~300 ms back) was the GO LIVE hold.
+    seedTag(GO_LIVE_TAG_MAX_AGE_MS + 10 * MIN);
+    mount();
+    await flush();
+    // The athlete row's load reads the permission (auth-context).
+    await act(async () => {
+      await readLocationPermission();
+    });
+    const { onResumeParked } = mockLiveArgs.mock.calls.at(-1)[0] as { onResumeParked: () => void };
+    act(() => onResumeParked());
+    expect(getGoLiveDisplay()).toBe("restore-finding");
+    expect(lead()).toBe("FINDING YOU");
+    frames = [];
+    // Back in front: the ladder runs; every frame until it lands is FINDING YOU.
+    const fix = deferred<unknown>();
+    mockCurrent.mockReturnValue(fix.promise);
+    let p!: Promise<string>;
+    act(() => {
+      p = autoLive()(ctx());
+    });
+    await flush();
+    expect(lead()).toBe("FINDING YOU");
+    let r = "";
+    await act(async () => {
+      fix.resolve({ ...FRESH, timestamp: Date.now() });
+      r = await p;
+    });
+    expect(r).toBe("live");
+    expect(lead()).toBe("LIVE");
+    expect(frames.some((f) => f.startsWith("none:off") || f.startsWith("hold:"))).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

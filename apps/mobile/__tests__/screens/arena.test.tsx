@@ -254,6 +254,7 @@ jest.mock("@/lib/arena/use-arena-roster", () => ({
 }));
 
 const mockToastBelowBar = jest.fn();
+let mockIntent = { live: false, seq: 0, decided: false, explicit: false };
 jest.mock("@/components/ui/toast", () => ({
   toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() },
   useToastBelowScreenBar: (...a: unknown[]) => mockToastBelowBar(...a),
@@ -296,6 +297,7 @@ jest.mock("@/lib/arena/arena-store", () => ({
   useArenaState: () => ({ isLive: mockIsLive, isSaving: false, ...mockChallenge }),
   useIsArenaLive: () => mockIsLive,
   useIsArenaDisplayLive: () => mockIsLive,
+  useLiveIntent: () => mockIntent,
   useCanGoLive: () => mockSwitchPhase !== "saving",
   useCanGoOffline: () => mockSwitchPhase !== "saving",
   useGoLiveDisplay: () => null,

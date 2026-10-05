@@ -93,6 +93,18 @@ export interface ArenaController {
    * go-live for it either. Optional so a test controller may omit it.
    */
   isIncomingDismissed?: (challengeId: string) => boolean;
+  /**
+   * The server state the owner has committed: `live`, and `settled` (nothing
+   * in flight, the request matches it). The driver reads it to know whether
+   * the athlete's choice is met. Optional: without it, `isLive` is used.
+   */
+  committed?: () => { live: boolean; settled: boolean };
+  /**
+   * Bring the server offline without the manual go-offline's side effects
+   * (the app decided, not the athlete). Serialized behind any write in
+   * flight. Optional: `goOffline` is used without it.
+   */
+  ensureOffline?: () => Promise<boolean>;
 }
 
 export const IDLE_ARENA_STATE: ArenaState = Object.freeze({
@@ -312,6 +324,9 @@ export function displayDrawsLive(display: GoLiveDisplay | null, isLive: boolean)
 }
 
 function getDisplayLive(): boolean {
+  // The athlete's (or the app's) offline choice is drawn at once, whatever
+  // the server still says while the clear goes out (review round 3).
+  if (intent.decided && !intent.live) return false;
   return displayDrawsLive(goLiveDisplay, state.isLive);
 }
 
@@ -455,11 +470,26 @@ let controller: ArenaController | null = null;
  */
 export function registerArenaController(next: ArenaController): () => void {
   const changed = controller === null;
+  if (changed) {
+    // A new owner (sign-in, an athlete switch): its own intent, and writes
+    // allowed again. (Its arrival frame may already be drawn: kept.) A
+    // driver loop left from the last owner stops at its next step.
+    driverGen += 1;
+    driving = false;
+    switchInFlight = false;
+    switchDirection = null;
+    liveWritesBlocked = false;
+    settleAllWaiters("ignored");
+    intent = Object.freeze({ live: false, seq: intent.seq + 1, decided: false, explicit: false });
+  }
   controller = next;
   if (changed) emitArena();
   return () => {
     if (controller === next) {
       controller = null;
+      // The owner left: nothing it drew (a stale OFFLINE · RETRY) outlives it (QA 3).
+      settleAllWaiters("ignored");
+      resetLiveOverlayState();
       emitArena();
     }
   };
@@ -488,42 +518,142 @@ export function isIncomingChallengeDismissed(challengeId: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Live switch guard (spec 4.3, F11)
+// The athlete's live intent: the single source of truth (review round 3)
 // ---------------------------------------------------------------------------
 
 /**
- * What the athlete-facing live switch (header chip, Arena toggle) may do now:
- *  - "saving": a transition is in flight (`isSaving`, a guarded call that
- *    has not settled, or a programmatic restore: `liveTransition`); the
- *    switch is disabled and the chip reads GOING LIVE when that is the way
- *    it is heading;
- *  - "cooldown": a guarded go-live or go-offline completed less than
- *    `LIVE_SWITCH_COOLDOWN_MS` ago; the switch is disabled;
- *  - "ready": a tap is honoured.
- * There is deliberately no undo: the realtime server closes the presence
- * channel past 5 track/untrack calls per 30s (jits-fa9x), and an undo is one
- * more of them.
+ * What the live surfaces may do now, for information only (a transition in
+ * flight, or the throttle after one). Controls never lock on it any more:
+ * every tap records the athlete's choice at once (see `LiveIntent`), and the
+ * phase only paces SERVER writes.
+ *  - "saving": a go-live attempt or a restore is running, or a write is in
+ *    flight (`isSaving`, `liveTransition`);
+ *  - "cooldown": the last server transition ended less than
+ *    `LIVE_SWITCH_COOLDOWN_MS` ago; the next LIVE write waits (presence rate
+ *    limit, jits-fa9x);
+ *  - "ready".
  */
 export type LiveSwitchPhase = "ready" | "saving" | "cooldown";
 
-/**
- * Which way a "saving" switch is going, so the chip can say GOING LIVE only
- * when it is, and keep its live styling while a go-offline is in flight.
- */
+/** Which way a transition in flight is going. */
 export type LiveSwitchDirection = "going-live" | "going-offline";
 
 /**
- * What a guarded call did. `"ignored"` means the tap was swallowed by the
- * guard ("saving" or "cooldown") and nothing was attempted: never report it
- * as a failure. Otherwise the call's own result (true once the transition
- * landed, false when it failed).
+ * A choice that did not run to its own result: a newer choice replaced it,
+ * there is no owner (signed out), or the app is not in front. Never a
+ * failure a caller would toast.
  */
 export type LiveSwitchIgnored = "ignored";
 
-/** When the athlete's last guarded go-live settled (ms epoch), or null. */
+/**
+ * The athlete's last choice, live or offline (review round 3). Every tap (the
+ * chip, the live menu, the Arena bar and rows, the drift prompt, a toast's
+ * call to action) sets it at once and synchronously, whatever is in flight,
+ * and the live surfaces draw it at once. One serialized driver then moves the
+ * SERVER toward it; writes are serialized and the LIVE write is paced, but a
+ * choice is never dropped, delayed or disabled.
+ *  - `seq`: bumped by every choice, so work started for an older one can tell.
+ *  - `decided`: some choice was made since this owner mounted (false on a
+ *    cold start until the athlete or the app decides).
+ *  - `explicit`: the athlete chose (a tap); false when the app decided: a
+ *    go-live that could not be met, a tapped go-live abandoned by the
+ *    background or a match, the server ending the session, sign-out.
+ * Resume (background, a match, a kill and relaunch) is derived from it: an
+ * athlete whose last choice is offline is never put back live.
+ */
+export interface LiveIntent {
+  live: boolean;
+  seq: number;
+  decided: boolean;
+  explicit: boolean;
+}
+
+let intent: LiveIntent = Object.freeze({ live: false, seq: 0, decided: false, explicit: false });
+/** Persists the choice for the owner's athlete (a kill and relaunch honours it). */
+let intentPersister: ((live: boolean) => void) | null = null;
+/** Each choice's caller waits on its own result. */
+const intentWaiters = new Map<number, (r: boolean | LiveSwitchIgnored) => void>();
+
+export function getLiveIntent(): LiveIntent {
+  return intent;
+}
+
+/** The intent, as a stable snapshot (re-renders only when it changes). */
+export function useLiveIntent(): LiveIntent {
+  return useSyncExternalStore(subscribe, getLiveIntent, getLiveIntent);
+}
+
+/** The owner registers how to persist the athlete's choice; returns the unregister. */
+export function registerIntentPersister(persist: (live: boolean) => void): () => void {
+  intentPersister = persist;
+  return () => {
+    if (intentPersister === persist) intentPersister = null;
+  };
+}
+
+function settleWaiter(seq: number, r: boolean | LiveSwitchIgnored): void {
+  const w = intentWaiters.get(seq);
+  if (!w) return;
+  intentWaiters.delete(seq);
+  w(r);
+}
+
+function settleAllWaiters(r: boolean | LiveSwitchIgnored): void {
+  const all = [...intentWaiters.values()];
+  intentWaiters.clear();
+  for (const w of all) w(r);
+}
+
+function waiterFor(seq: number): Promise<boolean | LiveSwitchIgnored> {
+  return new Promise((resolve) => {
+    intentWaiters.set(seq, resolve);
+  });
+}
+
+function setIntent(live: boolean, explicit: boolean): LiveIntent {
+  // Every older choice is over: never a result (or a toast) for it.
+  settleAllWaiters("ignored");
+  intent = Object.freeze({ live, seq: intent.seq + 1, decided: true, explicit });
+  try {
+    intentPersister?.(live);
+  } catch {
+    // Persisting is best effort.
+  }
+  emitArena();
+  return intent;
+}
+
+/**
+ * The app (not the athlete) decides the intent: a restore that could not be
+ * met in front of the athlete, the server ending the session. Offline also
+ * makes sure the server follows (a live write still in flight may land: the
+ * clear is serialized behind it).
+ */
+export function setAppLiveIntent(live: boolean): void {
+  setIntent(live, false);
+  if (!live) ensureServerOffline();
+}
+
+/** The server follows an app-decided offline intent (never a manual go-offline). */
+function ensureServerOffline(): void {
+  const c = controller;
+  if (!c) return;
+  const k = c.committed?.();
+  if (k && k.settled && !k.live) return;
+  const run = c.ensureOffline ?? c.goOffline;
+  void Promise.resolve()
+    .then(() => run())
+    .catch(() => undefined);
+}
+
+// ---------------------------------------------------------------------------
+// Pacing, restores, cancelling
+// ---------------------------------------------------------------------------
+
+/** When the athlete's last go-live attempt settled (ms epoch), or null. */
 let athleteGoLiveSettledAt: number | null = null;
 
-/** How long after a guarded go-live settles a live flip is still its doing. */
+/** How long after a go-live attempt settles a live flip is still its doing. */
 const ATHLETE_GO_LIVE_WINDOW_MS = 2000;
 
 /**
@@ -543,18 +673,33 @@ try {
   // No AppState (some test environments): nothing to clear on.
 }
 
+/** A go-live attempt for the athlete's choice is running (the driver). */
 let switchInFlight = false;
 let switchDirection: LiveSwitchDirection | null = null;
-let switchCooldown = false;
+/** When the last server transition ended (the LIVE write waits the cooldown after it). */
+let lastTransitionAt = 0;
 let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
 
+function markTransition(): void {
+  lastTransitionAt = Date.now();
+  if (cooldownTimer) clearTimeout(cooldownTimer);
+  cooldownTimer = setTimeout(() => {
+    cooldownTimer = null;
+    emitArena();
+  }, LIVE_SWITCH_COOLDOWN_MS);
+  emitArena();
+}
+
+function cooldownLeft(): number {
+  return lastTransitionAt + LIVE_SWITCH_COOLDOWN_MS - Date.now();
+}
+
 /**
- * Automatic restores running their location ladder (instant go-live): the
- * switch is "saving" toward live for their whole length, not only for the
- * live write. A count owned by each run (review round 2, SF1): a run that
- * ends never unlocks the switch for another one still running.
+ * Automatic restores running their location ladder: a count owned by each run
+ * (review round 2, SF1), so one run ending never clears another's.
  */
 let restoreRuns = 0;
+const restoreIdleWaiters = new Set<() => void>();
 
 /** Mark a restore run as started; call the returned function once when it ends. */
 export function beginRestoreRun(): () => void {
@@ -565,6 +710,11 @@ export function beginRestoreRun(): () => void {
     if (ended) return;
     ended = true;
     restoreRuns = Math.max(0, restoreRuns - 1);
+    if (restoreRuns === 0) {
+      const waiting = [...restoreIdleWaiters];
+      restoreIdleWaiters.clear();
+      for (const w of waiting) w();
+    }
     emitArena();
   };
 }
@@ -573,324 +723,302 @@ function restoreInFlight(): boolean {
   return restoreRuns > 0;
 }
 
-// ---------------------------------------------------------------------------
-// Cancelling a go-live in flight (review round 2, QA A)
-// ---------------------------------------------------------------------------
+function restoreIdle(): Promise<void> {
+  if (!restoreInFlight()) return Promise.resolve();
+  return new Promise((resolve) => restoreIdleWaiters.add(resolve));
+}
 
 /**
- * The go-live in flight (a tapped attempt or a restore) registers how to
- * cancel itself. A go-offline the athlete chooses meanwhile calls it, so the
- * optimistic LIVE chip, RECONNECTING and a restore drawn live always have a
- * way out (UX 019, 2.2 and 6.8).
+ * The go-live work in flight (a tapped attempt or a restore) registers how to
+ * cancel itself; an offline choice, sign-out, the background or a match calls
+ * it, and the work never sends a live write after that.
  */
 let goLiveCanceller: (() => void) | null = null;
 
 /** Register the cancel for the go-live now in flight; returns the unregister. */
 export function registerGoLiveCanceller(cancel: () => void): () => void {
   goLiveCanceller = cancel;
-  emitArena();
   return () => {
-    if (goLiveCanceller === cancel) {
-      goLiveCanceller = null;
-      emitArena();
-    }
+    if (goLiveCanceller === cancel) goLiveCanceller = null;
   };
 }
 
-function getGoLiveCancellable(): boolean {
-  return goLiveCanceller !== null;
-}
-
-/** A go-live in flight can be cancelled by a go-offline now. */
-export function useGoLiveCancellable(): boolean {
-  return useSyncExternalStore(subscribe, getGoLiveCancellable, getGoLiveCancellable);
-}
-
-/** Cancel the go-live in flight, quietly: the chip goes straight to GO LIVE. */
-function cancelGoLiveInFlight(): boolean {
+function cancelGoLiveWork(): void {
   const cancel = goLiveCanceller;
-  if (!cancel) return false;
   goLiveCanceller = null;
+  if (!cancel) return;
   try {
     cancel();
   } catch {
-    // The flow unwinds on its own.
+    // The work unwinds on its own.
   }
+}
+
+/**
+ * Sign-out has started: no live write may go out until a new owner mounts
+ * (review round 3). `useArenaLive` checks it before every live write.
+ */
+let liveWritesBlocked = false;
+
+export function areLiveWritesBlocked(): boolean {
+  return liveWritesBlocked;
+}
+
+/** Drop every go-live overlay (display, hint, kept display): sign-out, a new owner. */
+export function resetLiveOverlayState(): void {
+  cancelReveal();
   clearDisplayOnLive = false;
-  // Drawn offline at once (GO LIVE, no taps) until the cancelled attempt
-  // unwinds; its write in flight still settles first (never GOING LIVE).
-  setGoLiveDisplay("leaving");
-  return true;
+  if (clearDisplayTimer) clearTimeout(clearDisplayTimer);
+  clearDisplayTimer = null;
+  goLiveDisplay = null;
+  needsLocation = false;
+  emitArena();
+}
+
+// ---------------------------------------------------------------------------
+// The driver: moves the server toward the athlete's intent, serialized
+// ---------------------------------------------------------------------------
+
+let driving = false;
+/**
+ * Bumped whenever the driver must stop being the one (a new owner, a reset):
+ * a loop from an older generation exits at its next step and never touches
+ * the new owner's intent or display.
+ */
+let driverGen = 0;
+
+/** The server state the owner has committed: live, and whether anything is still moving. */
+function committedLive(c: ArenaController): boolean | null {
+  const k = c.committed?.();
+  if (!k) return state.isLive;
+  return k.settled ? k.live : null;
+}
+
+/**
+ * One serialized loop. While the intent is live and not met: wait out a
+ * restore or the cooldown, then run ONE go-live attempt (`controller.goLive`,
+ * the location ladder) for it; re-read the intent after every await, so an
+ * attempt that was overtaken never decides anything. An offline choice is not
+ * driven here: it goes out at once (`chooseOffline`), serialized behind any
+ * write in flight by `useArenaLive`.
+ */
+async function drive(): Promise<void> {
+  if (driving) return;
+  driving = true;
+  const gen = driverGen;
+  emitArena();
+  try {
+    for (;;) {
+      if (gen !== driverGen) return;
+      const c = controller;
+      const target = intent;
+      if (!c || !target.live || liveWritesBlocked) break;
+      if (committedLive(c) === true) {
+        settleWaiter(target.seq, true);
+        if (goLiveDisplay === "going-live" || goLiveDisplay === "hold") setGoLiveDisplay(null);
+        break;
+      }
+      // Never live unseen: the background / match handlers own resuming.
+      // ("inactive" is a system sheet over the app, not the athlete leaving.)
+      if (AppState.currentState === "background" || getInMatch()) {
+        settleWaiter(target.seq, "ignored");
+        break;
+      }
+      if (restoreInFlight()) {
+        await restoreIdle();
+        continue;
+      }
+      const wait = cooldownLeft();
+      if (wait > 0) {
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
+      }
+      // One attempt for this choice. Nothing pending is drawn for the first
+      // 240 ms (UX 019, 2.3), unless a pending ring is already up.
+      switchInFlight = true;
+      switchDirection = "going-live";
+      goLiveMomentSpent = false;
+      clearDisplayOnLive = false;
+      if (goLiveDisplay !== "going-live") {
+        cancelReveal();
+        goLiveDisplay = "hold";
+        scheduleGoLiveReveal("going-live", Date.now() + PENDING_REVEAL_MS);
+      }
+      emitArena();
+      let r: boolean | LiveSwitchIgnored;
+      try {
+        r = await c.goLive();
+      } catch {
+        r = false;
+      }
+      // An older generation (the owner changed meanwhile): not ours to settle.
+      if (gen !== driverGen) return;
+      switchInFlight = false;
+      switchDirection = null;
+      athleteGoLiveSettledAt = Date.now();
+      cancelReveal();
+      markTransition();
+      if (intent.seq !== target.seq) {
+        // Overtaken: its caller already heard "ignored". An offline choice
+        // draws offline by itself; a newer live choice loops on.
+        if (!intent.live && getGoLiveDisplay() !== "retry") goLiveDisplay = null;
+        emitArena();
+        continue;
+      }
+      if (r === true) {
+        if (!state.isLive) keepDisplayUntilLive();
+        else goLiveDisplay = null;
+        settleWaiter(target.seq, true);
+        break;
+      }
+      // Not met (a failure, or a location sheet the athlete closed): the app
+      // holds the athlete offline now, so nothing resumes it later.
+      if (getGoLiveDisplay() !== "retry") goLiveDisplay = null;
+      settleWaiter(target.seq, r);
+      setIntent(false, false);
+      ensureServerOffline();
+      break;
+    }
+  } finally {
+    if (gen === driverGen) {
+      driving = false;
+      emitArena();
+    }
+  }
+}
+
+/** The athlete chose live (the chip, the Arena, a CTA, RETRY). */
+function chooseLive(): Promise<boolean | LiveSwitchIgnored> {
+  const c = controller;
+  if (!c || liveWritesBlocked) return Promise.resolve("ignored");
+  // Already live and nothing moving: nothing to do.
+  if (intent.live && intent.decided && !driving && committedLive(c) === true) return Promise.resolve("ignored");
+  const busy = driving || restoreInFlight() || cooldownLeft() > 0;
+  const next = setIntent(true, true);
+  const result = waiterFor(next.seq);
+  // Immediate feedback: the pending ring when the attempt must wait;
+  // otherwise the driver starts right now (hold, then the ladder decides).
+  if (busy) setGoLiveDisplay("going-live");
+  void drive();
+  return result;
+}
+
+/** The athlete chose offline: drawn at once, written at once (serialized). */
+function chooseOffline(): Promise<boolean | LiveSwitchIgnored> {
+  const c = controller;
+  if (!c) return Promise.resolve("ignored");
+  setIntent(false, true);
+  // No live write after this choice: the go-live work in flight stops.
+  cancelGoLiveWork();
+  cancelReveal();
+  clearDisplayOnLive = false;
+  goLiveDisplay = null;
+  emitArena();
+  return c.goOffline().then(
+    (r) => {
+      markTransition();
+      return r;
+    },
+    () => false,
+  );
+}
+
+/**
+ * The app abandons a tapped go-live that has not landed (the background, a
+ * match: UX 019, 2.2): cancelled quietly, held offline, never resumed.
+ */
+export function abandonTappedGoLive(): void {
+  if (!(switchInFlight && switchDirection === "going-live")) return;
+  cancelGoLiveWork();
+  setIntent(false, false);
+  ensureServerOffline();
+  cancelReveal();
+  if (goLiveDisplay !== "retry") goLiveDisplay = null;
+  emitArena();
 }
 
 function getLiveSwitchPhase(): LiveSwitchPhase {
   if (state.isSaving || state.liveTransition || switchInFlight || restoreInFlight()) return "saving";
-  if (switchCooldown) return "cooldown";
+  if (cooldownLeft() > 0) return "cooldown";
   return "ready";
 }
 
-/** The switch phase, as a primitive (re-renders only when it changes). */
+/** The switch phase, as a primitive (re-renders only when it changes). For information only. */
 export function useLiveSwitchPhase(): LiveSwitchPhase {
   return useSyncExternalStore(subscribe, getLiveSwitchPhase, getLiveSwitchPhase);
 }
 
-/** True while the live switch must ignore taps ("saving" or "cooldown"). */
+/** Kept for callers that read it; the switch never locks a choice now. */
 export function useLiveSwitchLocked(): boolean {
-  return useLiveSwitchPhase() !== "ready";
+  return !useHasArenaController();
 }
 
 function getLiveSwitchDirection(): LiveSwitchDirection | null {
   if (switchInFlight) return switchDirection;
-  // A restore the app started knows where it is heading.
   if (state.liveTransition) return state.liveTransition;
   if (restoreInFlight()) return "going-live";
-  // A toggle outside the guard cannot happen (arenaActions.toggle is
-  // guarded), but `isSaving` alone still has a direction: away from now.
   if (state.isSaving) return state.isLive ? "going-offline" : "going-live";
   return null;
 }
 
-/**
- * The direction of the transition in flight, or null when the switch is not
- * "saving". A primitive, so it re-renders only when it changes.
- */
+/** The direction of the transition in flight, or null. */
 export function useLiveSwitchDirection(): LiveSwitchDirection | null {
   return useSyncExternalStore(subscribe, getLiveSwitchDirection, getLiveSwitchDirection);
 }
 
-/**
- * Run one athlete-initiated live transition under the guard.
- *
- * The cooldown starts once the attempt settles, whether it landed, failed or
- * threw: a failed go-live may still have spent a presence track/untrack
- * (jits-fa9x), so a failure is not a free retry. The chip's
- * `OFFLINE · RETRY` (AC-H11) therefore reads phase "cooldown" for 2s after a
- * failure and must render DISABLED then (read `useLiveSwitchPhase()`), not as
- * a live button that swallows the tap. A call made
- * while the switch is not "ready" is IGNORED (resolves "ignored"), not
- * queued: a queued tap would fire after the athlete has already seen the
- * state they asked for. With no owner mounted (signed out, before
- * `<ArenaBootstrap />`) nothing was attempted either, so the tap is
- * "ignored" too (never a failure a caller would toast) and no cooldown
- * starts, so a harmless no-op tap never locks the switch.
- */
-async function runGuarded<T>(
-  direction: LiveSwitchDirection,
-  work: (c: ArenaController) => Promise<T>,
-): Promise<T | LiveSwitchIgnored> {
-  if (!controller) return "ignored";
-  if (getLiveSwitchPhase() !== "ready") return "ignored";
-  const current = controller;
-  switchInFlight = true;
-  switchDirection = direction;
-  // A tapped go-live: nothing pending is drawn for the first 240 ms (UX 019,
-  // 2.3); the flow replaces `hold` as soon as it knows more (optimistic,
-  // FINDING YOU, a sheet). Still `hold` at 240 ms: GOING LIVE.
-  if (direction === "going-offline" && goLiveDisplay === "retry") goLiveDisplay = null;
-  if (direction === "going-live") {
-    goLiveMomentSpent = false;
-    clearDisplayOnLive = false;
-    cancelReveal();
-    // A queued go-live already shows its pending ring: keep it.
-    if (goLiveDisplay !== "going-live") {
-      goLiveDisplay = "hold";
-      scheduleGoLiveReveal("going-live", Date.now() + PENDING_REVEAL_MS);
-    }
-  }
-  emitArena();
-  let result: T | undefined;
-  try {
-    result = await work(current);
-    return result;
-  } finally {
-    // The flow leaves `retry` up after a recovery window ran out; anything
-    // else it showed belongs to the attempt that just ended. A go-live that
-    // landed keeps its display until the store says live (no GO LIVE frame).
-    if (direction === "going-live") {
-      cancelReveal();
-      if (result === true && !state.isLive) keepDisplayUntilLive();
-      else if (goLiveDisplay !== "retry") goLiveDisplay = null;
-    }
-    if (direction === "going-live") athleteGoLiveSettledAt = Date.now();
-    switchInFlight = false;
-    switchDirection = null;
-    switchCooldown = true;
-    if (cooldownTimer) clearTimeout(cooldownTimer);
-    cooldownTimer = setTimeout(() => {
-      cooldownTimer = null;
-      switchCooldown = false;
-      emitArena();
-      runQueuedIntent();
-    }, LIVE_SWITCH_COOLDOWN_MS);
-    emitArena();
-  }
-}
-
-// ---------------------------------------------------------------------------
-// The cooldown queue (review round 2, QA D)
-// ---------------------------------------------------------------------------
-
-/**
- * A choice made during the 2 s cooldown is queued, not dropped: the LAST
- * choice wins and runs when the cooldown ends (the cooldown itself stays,
- * for the presence rate limit, jits-fa9x). Its feedback is immediate: a
- * queued go-offline draws offline (`leaving`), a queued go-live its pending
- * ring. A choice that matches where the athlete already is clears the queue.
- */
-interface QueuedIntent {
-  direction: LiveSwitchDirection;
-  work: (c: ArenaController) => Promise<unknown>;
-  resolve: (v: unknown) => void;
-}
-let queuedIntent: QueuedIntent | null = null;
-
-function queueIntent<T>(
-  direction: LiveSwitchDirection,
-  work: (c: ArenaController) => Promise<T>,
-): Promise<T | LiveSwitchIgnored> {
-  if (queuedIntent) queuedIntent.resolve("ignored");
-  queuedIntent = null;
-  const already = direction === "going-live" ? state.isLive : !state.isLive;
-  if (already) {
-    if (goLiveDisplay === "leaving" || goLiveDisplay === "going-live") setGoLiveDisplay(null);
-    return Promise.resolve("ignored");
-  }
-  setGoLiveDisplay(direction === "going-offline" ? "leaving" : "going-live");
-  return new Promise((resolve) => {
-    queuedIntent = { direction, work: work as QueuedIntent["work"], resolve: resolve as (v: unknown) => void };
-  });
-}
-
-function runQueuedIntent(): void {
-  const q = queuedIntent;
-  queuedIntent = null;
-  if (!q) return;
-  if (q.direction === "going-offline") {
-    // Keep drawing offline through the clear; nothing in between.
-    void runGuarded(q.direction, q.work).then(
-      (r) => {
-        if (goLiveDisplay === "leaving") setGoLiveDisplay(null);
-        q.resolve(r);
-      },
-      () => {
-        if (goLiveDisplay === "leaving") setGoLiveDisplay(null);
-        q.resolve(false);
-      },
-    );
-    return;
-  }
-  void runGuarded(q.direction, q.work).then(q.resolve, () => q.resolve(false));
-}
-
-/** Guarded, cancelling, or queued: how a tap-facing call is routed. */
-function routeTap<T>(
-  direction: LiveSwitchDirection,
-  work: (c: ArenaController) => Promise<T>,
-): Promise<T | LiveSwitchIgnored> {
-  if (!controller) return Promise.resolve("ignored");
-  const phase = getLiveSwitchPhase();
-  // A go-offline during a go-live in flight cancels it quietly, then goes
-  // offline (QA A): never live after the athlete chose offline, because
-  // the clear is serialized behind any write already in flight.
-  if (direction === "going-offline" && phase === "saving" && getLiveSwitchDirection() === "going-live") {
-    if (!cancelGoLiveInFlight()) return Promise.resolve("ignored");
-    return work(controller);
-  }
-  if (phase === "cooldown") return queueIntent(direction, work);
-  return runGuarded(direction, work);
-}
-
-/** The athlete can choose offline right now (ready, cooldown, or a cancellable go-live). */
-function getCanGoOffline(): boolean {
-  if (!controller) return false;
-  const phase = getLiveSwitchPhase();
-  if (phase !== "saving") return true;
-  return getLiveSwitchDirection() === "going-live" && goLiveCanceller !== null;
-}
-
+/** The athlete can choose offline (an owner is mounted). Always, otherwise. */
 export function useCanGoOffline(): boolean {
-  return useSyncExternalStore(subscribe, getCanGoOffline, getCanGoOffline);
+  return useHasArenaController();
 }
 
-/** The athlete can choose live right now (ready, or queued during the cooldown). */
-function getCanGoLive(): boolean {
-  return controller !== null && getLiveSwitchPhase() !== "saving";
-}
-
+/** The athlete can choose live (an owner is mounted). Always, otherwise. */
 export function useCanGoLive(): boolean {
-  return useSyncExternalStore(subscribe, getCanGoLive, getCanGoLive);
+  return useHasArenaController();
 }
 
-/**
- * A tapped go-live is in flight and has not landed. The background handler
- * of `useArenaLive` does not restore it on return (QA B: pending flows are
- * cancelled on background, nothing is queued for later).
- */
+/** Kept for the chip's model input: an offline choice is always possible now. */
+export function useGoLiveCancellable(): boolean {
+  return useHasArenaController();
+}
+
+/** A tapped go-live attempt is running (not a restore). */
 export function isTappedGoLiveInFlight(): boolean {
   return switchInFlight && switchDirection === "going-live";
 }
 
 /**
  * Whether a live flip happening NOW was caused by the athlete's own go-live
- * (a guarded `goLive` / `toggle` toward live that is in flight or settled in
- * the last 2s), as opposed to the app restoring live on foreground, after a
- * match, or on arrival. The Arena tab's blade clash and its `goLive` haptic
- * (Motion Rule: a Moment, never on app foreground) play only for the former.
+ * (an attempt in flight or settled in the last 2 s), as opposed to the app
+ * restoring live on foreground, after a match, or on arrival. The Arena tab's
+ * blade clash and its `goLive` haptic play only for the former.
  */
 export function isAthleteGoLiveFlip(now: number = Date.now()): boolean {
   if (switchInFlight && switchDirection === "going-live") return true;
-  return (
-    athleteGoLiveSettledAt !== null && now - athleteGoLiveSettledAt <= ATHLETE_GO_LIVE_WINDOW_MS
-  );
+  return athleteGoLiveSettledAt !== null && now - athleteGoLiveSettledAt <= ATHLETE_GO_LIVE_WINDOW_MS;
 }
 
 /**
- * The athlete-facing live switch: the header chip and the Arena toggle go
- * through these (or the same guarded calls on `arenaActions`), so both share
- * one "disabled while saving" and one 2s cooldown (AC-H3, AC-H4).
- * `goOffline` here is a MANUAL go-offline, which also drops a challenge
- * tucked into the chip without declining it (decision Q3).
+ * The athlete-facing live switch: every live surface goes through these.
+ * Each records the athlete's choice at once and resolves with that choice's
+ * own result: true once met, false when it failed (say so), "ignored" when a
+ * newer choice replaced it or nothing could be attempted (stay silent).
+ * `goOffline` is a MANUAL go-offline, which also drops a challenge tucked
+ * into the chip without declining it (decision Q3).
  */
 export const liveSwitch = Object.freeze({
-  /**
-   * Resolves "ignored" for a swallowed tap; the toggle toasts its own failure.
-   * The controller's toggle reverses the live INTENT, not the committed
-   * `isLive`. The two differ only while a transition is in flight, and then
-   * the phase is "saving" (`isSaving` or `liveTransition`) and the tap never
-   * gets here, so the direction reported from `isLive` is what toggle does.
-   */
   toggle: (): Promise<void | LiveSwitchIgnored> =>
-    routeTap(state.isLive ? "going-offline" : "going-live", (c) => c.toggle()),
-  goLive: (): Promise<boolean | LiveSwitchIgnored> => routeTap("going-live", (c) => c.goLive()),
-  goOffline: (): Promise<boolean | LiveSwitchIgnored> => routeTap("going-offline", (c) => c.goOffline()),
+    (getDisplayLive() ? chooseOffline() : chooseLive()).then((r) => (r === "ignored" ? "ignored" : undefined)),
+  goLive: (): Promise<boolean | LiveSwitchIgnored> => chooseLive(),
+  goOffline: (): Promise<boolean | LiveSwitchIgnored> => chooseOffline(),
 });
 
-/**
- * What the rest of the app calls. `toggle`, `goLive` and `goOffline` are the
- * TAP-facing calls and run under the live switch guard, exactly like
- * `liveSwitch` (they are the same functions): a swallowed tap resolves
- * "ignored", never a failure. There is deliberately no unguarded go-offline:
- * a programmatic go-offline is sign-out, which uses
- * `takeArenaOfflineBeforeSignOut`.
- *
- * `toggle` has no UI caller since the Arena control bar moved to explicit
- * `goLiveWithFeedback` / `goOfflineWithFeedback`. It is kept, guarded, as the
- * one reversing entry point to the controller (the guard tests drive it, and
- * `useArenaLive.toggle` still owns the reversing semantics). New UI should
- * call `goLive` / `goOffline`, which say which way they go.
- */
-export interface ArenaActions
-  extends Omit<ArenaController, "goLive" | "goOffline"> {
+/** What the rest of the app calls; `goLive` / `goOffline` are the switch above. */
+export interface ArenaActions extends Omit<ArenaController, "goLive" | "goOffline" | "committed"> {
   goLive: () => Promise<boolean | LiveSwitchIgnored>;
   goOffline: () => Promise<boolean | LiveSwitchIgnored>;
 }
 
-/**
- * Stable delegates; safe to hold across renders and across owner remounts.
- * The header chip, its popover and the Arena toggle may call `toggle`,
- * `goLive` and `goOffline` here or on `liveSwitch`: both share one "disabled
- * while saving" and one 2s cooldown (AC-H2, AC-H3, AC-H4).
- */
+/** Stable delegates; safe to hold across renders and across owner remounts. */
 export const arenaActions: ArenaActions = Object.freeze({
   toggle: () => liveSwitch.toggle().then(() => undefined),
   goOffline: liveSwitch.goOffline,
@@ -1132,11 +1260,18 @@ export const SIGN_OUT_OFFLINE_TIMEOUT_MS = 4_000;
 export async function takeArenaOfflineBeforeSignOut(
   timeoutMs = SIGN_OUT_OFFLINE_TIMEOUT_MS,
 ): Promise<void> {
+  // From here on no live write may go out (review round 3): the latch is
+  // checked before every live write, the go-live work in flight is
+  // cancelled, and the intent is offline (nothing resumes).
+  liveWritesBlocked = true;
+  cancelGoLiveWork();
+  if (intent.decided && !intent.live) settleAllWaiters("ignored");
+  else setIntent(false, false);
   // Left matches belong to this athlete; the next one to sign in starts clean.
   leftMatchIds.clear();
   clearAthleteGoLive();
-  setGoLiveDisplay(null);
-  setNeedsLocation(false);
+  // No overlay (a stale OFFLINE · RETRY) survives into the next sign-in (QA 3).
+  resetLiveOverlayState();
   // Not gated on `isLive`: a go-live still in flight has not flipped it yet,
   // and the reconcile queue turns an already-offline call into a no-op.
   if (!controller) return;
@@ -1153,6 +1288,11 @@ export async function takeArenaOfflineBeforeSignOut(
   }
 }
 
+/** Test-only: the published snapshot, without a render. */
+export function __peekArenaStateForTests(): ArenaState {
+  return state;
+}
+
 /** Test-only: drop all module state between suites. */
 export function __resetArenaStoreForTests(): void {
   state = IDLE_ARENA_STATE;
@@ -1163,9 +1303,18 @@ export function __resetArenaStoreForTests(): void {
   switchInFlight = false;
   switchDirection = null;
   athleteGoLiveSettledAt = null;
-  switchCooldown = false;
   if (cooldownTimer) clearTimeout(cooldownTimer);
   cooldownTimer = null;
+  lastTransitionAt = 0;
+  driving = false;
+  driverGen += 1;
+  liveWritesBlocked = false;
+  intentWaiters.clear();
+  // Sequence numbers stay monotonic, so nothing from before the reset can
+  // ever pass for a current choice.
+  intent = Object.freeze({ live: false, seq: intent.seq + 1, decided: false, explicit: false });
+  intentPersister = null;
+  restoreIdleWaiters.clear();
   matchScreens = 0;
   matchExits = 0;
   matchListeners.clear();
@@ -1180,8 +1329,6 @@ export function __resetArenaStoreForTests(): void {
   goLiveMomentSpent = false;
   restoreRuns = 0;
   goLiveCanceller = null;
-  if (queuedIntent) queuedIntent.resolve("ignored");
-  queuedIntent = null;
   liveMenusOpen = 0;
   menuListeners.clear();
 }

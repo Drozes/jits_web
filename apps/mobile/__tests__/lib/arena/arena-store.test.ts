@@ -24,6 +24,7 @@ import {
   useArenaSelfId,
   useArenaState,
   useHasArenaController,
+  useIsArenaDisplayLive,
   useIsArenaLive,
   useIsInArenaMatch,
   useLiveSwitchDirection,
@@ -31,10 +32,17 @@ import {
   useLiveSwitchPhase,
   useMatchExitCount,
   type ArenaController,
+  abandonTappedGoLive,
+  areLiveWritesBlocked,
   beginRestoreRun,
   getGoLiveDisplay,
+  getLiveIntent,
+  isTappedGoLiveInFlight,
   registerGoLiveCanceller,
+  registerIntentPersister,
   setGoLiveDisplay,
+  setNeedsLocation,
+  useArenaState as useArenaStateHook,
 } from "@/lib/arena/arena-store";
 import { LIVE_SWITCH_COOLDOWN_MS } from "@/lib/arena/constants";
 
@@ -56,6 +64,11 @@ beforeEach(() => {
   __resetArenaStoreForTests();
   jest.useRealTimers();
 });
+
+/** The published snapshot, read through a hook. */
+function state() {
+  return renderHook(() => useArenaStateHook()).result.current;
+}
 
 describe("state", () => {
   it("reads idle (not live) before any owner publishes", () => {
@@ -159,10 +172,11 @@ describe("actions", () => {
     const c = controller();
     registerArenaController(c);
 
+    // The toggle is a choice now (review round 3): offline, so it goes live.
     await arenaActions.toggle();
     await arenaActions.sendChallenge("a-1", "Alpha");
 
-    expect(c.toggle).toHaveBeenCalled();
+    expect(c.goLive).toHaveBeenCalledTimes(1);
     expect(c.sendChallenge).toHaveBeenCalledWith("a-1", "Alpha");
   });
 
@@ -189,7 +203,8 @@ describe("actions", () => {
     unregisterFirst();
     await arenaActions.toggle();
 
-    expect(second.toggle).toHaveBeenCalled();
+    expect(second.goLive).toHaveBeenCalledTimes(1);
+    expect(first.goLive).not.toHaveBeenCalled();
   });
 
   it("useHasArenaController follows the owner registering and leaving", () => {
@@ -416,360 +431,221 @@ describe("new snapshot fields", () => {
   });
 });
 
-describe("live switch guard (F11: disabled while saving, 2s cooldown, no undo)", () => {
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  it("reads 'saving' with the restore's direction while a transition it did not start is in flight", async () => {
-    const toggle = jest.fn().mockResolvedValue(undefined);
-    registerArenaController(controller({ toggle }));
-    const phase = renderHook(() => useLiveSwitchPhase());
-    const direction = renderHook(() => useLiveSwitchDirection());
-    act(() => {
-      publishArenaState({ ...IDLE_ARENA_STATE, liveTransition: "going-live" });
-    });
-    expect(phase.result.current).toBe("saving");
-    expect(direction.result.current).toBe("going-live");
-
-    let out: unknown;
-    await act(async () => {
-      out = await liveSwitch.toggle();
-    });
-    expect(out).toBe("ignored");
-    expect(toggle).not.toHaveBeenCalled();
-
-    act(() => {
-      publishArenaState({ ...IDLE_ARENA_STATE, isLive: true, liveTransition: null });
-    });
-    expect(phase.result.current).toBe("ready");
-    expect(direction.result.current).toBeNull();
-  });
-
-  it("reads 'saving' while the owner reports isSaving, and ignores taps", async () => {
-    const c = controller();
-    registerArenaController(c);
-    const { result } = renderHook(() => useLiveSwitchPhase());
-    act(() => {
-      publishArenaState({ ...IDLE_ARENA_STATE, isSaving: true });
-    });
-    expect(result.current).toBe("saving");
-
-    let ok: boolean | "ignored" | undefined;
-    await act(async () => {
-      ok = await liveSwitch.goLive();
-    });
-    // Ignored, not failed: a caller must not toast "Couldn't take you live".
-    expect(ok).toBe("ignored");
-    expect(c.goLive).not.toHaveBeenCalled();
-  });
-
-  it("is 'saving' while a guarded call is in flight, so a double tap is one call (AC-H2/H3)", async () => {
-    let release!: (v: boolean) => void;
+describe("the athlete's intent (review round 3: one source of truth, last choice wins)", () => {
+  /** A controller whose writes publish the committed state, like the owner. */
+  function liveController(over: Partial<ArenaController> = {}) {
+    let live = false;
     const c = controller({
-      goLive: jest.fn(() => new Promise<boolean>((r) => (release = r))),
+      goLive: jest.fn(async () => {
+        live = true;
+        publishArenaState({ ...IDLE_ARENA_STATE, isLive: true });
+        return true;
+      }),
+      goOffline: jest.fn(async () => {
+        live = false;
+        publishArenaState({ ...IDLE_ARENA_STATE, isLive: false });
+        return true;
+      }),
+      committed: () => ({ live, settled: true }),
+      ...over,
     });
-    registerArenaController(c);
-    const { result } = renderHook(() => useLiveSwitchPhase());
+    return c;
+  }
 
-    let first!: Promise<boolean | "ignored">;
+  it("records each choice at once, drawn at once, whatever is in flight", async () => {
+    let release!: (v: boolean) => void;
+    const c = liveController({ goLive: jest.fn(() => new Promise<boolean>((r) => (release = r))) });
+    registerArenaController(c);
+    let p!: Promise<unknown>;
+    act(() => {
+      p = liveSwitch.goLive();
+    });
+    expect(getLiveIntent()).toMatchObject({ live: true, decided: true, explicit: true });
+    // Offline while the go-live is in flight: recorded and drawn at once.
+    act(() => {
+      void liveSwitch.goOffline();
+    });
+    expect(getLiveIntent()).toMatchObject({ live: false, explicit: true });
+    expect(c.goOffline).toHaveBeenCalledTimes(1);
+    // The overtaken go-live never reports anything (no toast).
+    await act(async () => {
+      release(true);
+      expect(await p).toBe("ignored");
+    });
+  });
+
+  it("an offline choice cancels the go-live work in flight", () => {
+    registerArenaController(liveController({ goLive: jest.fn(() => new Promise<boolean>(() => undefined)) }));
+    const cancel = jest.fn();
+    act(() => {
+      void liveSwitch.goLive();
+    });
+    registerGoLiveCanceller(cancel);
+    act(() => {
+      void liveSwitch.goOffline();
+    });
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("nit: a cancelled go-live write that lands after the offline choice never draws a LIVE frame", async () => {
+    let release!: (v: boolean) => void;
+    registerArenaController(
+      liveController({ goLive: jest.fn(() => new Promise<boolean>((r) => (release = r))) }),
+    );
+    const frames: boolean[] = [];
+    renderHook(() => {
+      const live = useIsArenaDisplayLive();
+      if (frames[frames.length - 1] !== live) frames.push(live);
+    });
+    act(() => {
+      void liveSwitch.goLive();
+    });
+    act(() => {
+      void liveSwitch.goOffline();
+    });
+    const after = frames.length;
+    await act(async () => {
+      // The write that was in flight lands: the owner publishes live for a
+      // moment before the clear (serialized behind it) takes it back.
+      release(true);
+      publishArenaState({ ...IDLE_ARENA_STATE, isLive: true });
+      await Promise.resolve();
+      publishArenaState({ ...IDLE_ARENA_STATE, isLive: false });
+    });
+    expect(frames.slice(after)).not.toContain(true);
+    expect(frames[frames.length - 1]).toBe(false);
+  });
+
+  it("QA 1: O, L, O inside the cooldown ends OFFLINE (the last choice), never a live write after it", async () => {
+    jest.useFakeTimers();
+    const c = liveController();
+    registerArenaController(c);
+    await act(async () => {
+      await liveSwitch.goLive();
+    });
+    expect(c.goLive).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      void liveSwitch.goOffline();
+      void liveSwitch.goLive();
+      void liveSwitch.goOffline();
+      await jest.advanceTimersByTimeAsync(LIVE_SWITCH_COOLDOWN_MS * 3);
+    });
+    expect(getLiveIntent().live).toBe(false);
+    // The queued live never ran: the last choice overtook it.
+    expect(c.goLive).toHaveBeenCalledTimes(1);
+    expect(state().isLive).toBe(false);
+  });
+
+  it("the LIVE write is paced by the cooldown after a transition; a choice inside it waits, shown pending", async () => {
+    jest.useFakeTimers();
+    const c = liveController();
+    registerArenaController(c);
+    await act(async () => {
+      await liveSwitch.goLive();
+      await liveSwitch.goOffline();
+    });
+    let p!: Promise<unknown>;
+    act(() => {
+      p = liveSwitch.goLive();
+    });
+    expect(getGoLiveDisplay()).toBe("going-live");
+    expect(c.goLive).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(LIVE_SWITCH_COOLDOWN_MS);
+      expect(await p).toBe(true);
+    });
+    expect(c.goLive).toHaveBeenCalledTimes(2);
+  });
+
+  it("a go-live that fails resolves false (say so) and holds the intent offline (nothing resumes it)", async () => {
+    registerArenaController(liveController({ goLive: jest.fn().mockResolvedValue(false) }));
+    let r: unknown;
+    await act(async () => {
+      r = await liveSwitch.goLive();
+    });
+    expect(r).toBe(false);
+    expect(getLiveIntent()).toMatchObject({ live: false, decided: true, explicit: false });
+  });
+
+  it("a RETRY (a new live choice) during a hung attempt waits for it and never runs alongside", async () => {
+    let release!: (v: boolean) => void;
+    const goLive = jest.fn(() => new Promise<boolean>((r) => (release = r)));
+    registerArenaController(liveController({ goLive }));
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
     act(() => {
       first = liveSwitch.goLive();
     });
-    expect(result.current).toBe("saving");
-    let second: boolean | "ignored" | undefined;
-    await act(async () => {
-      second = await liveSwitch.goLive();
-    });
-    expect(second).toBe("ignored");
-    expect(c.goLive).toHaveBeenCalledTimes(1);
-
-    let firstResult: boolean | "ignored" | undefined;
-    await act(async () => {
-      release(true);
-      firstResult = await first;
-    });
-    expect(firstResult).toBe(true);
-    expect(result.current).toBe("cooldown");
-  });
-
-  it("reports a failed transition as false, distinct from an ignored tap", async () => {
-    const c = controller({ goOffline: jest.fn().mockResolvedValue(false) });
-    registerArenaController(c);
-    let first: boolean | "ignored" | undefined;
-    let second: boolean | "ignored" | undefined;
-    await act(async () => {
-      first = await liveSwitch.goOffline();
-      second = await liveSwitch.goOffline();
-    });
-    expect(first).toBe(false);
-    expect(second).toBe("ignored");
-    expect(c.goOffline).toHaveBeenCalledTimes(1);
-  });
-
-  it("exposes the direction of the transition in flight, and null otherwise", async () => {
-    let release!: (v: boolean) => void;
-    const c = controller({
-      goOffline: jest.fn(() => new Promise<boolean>((r) => (release = r))),
-      toggle: jest.fn(() => new Promise<void>(() => {})),
-    });
-    registerArenaController(c);
-    const { result } = renderHook(() => useLiveSwitchDirection());
-    expect(result.current).toBeNull();
-
-    let p!: Promise<boolean | "ignored">;
     act(() => {
-      p = liveSwitch.goOffline();
-    });
-    // The chip keeps its live styling: this is not GOING LIVE.
-    expect(result.current).toBe("going-offline");
-    await act(async () => {
-      release(true);
-      await p;
-    });
-    expect(result.current).toBeNull();
-  });
-
-  it("derives a toggle's direction from the live state it starts from", () => {
-    jest.useFakeTimers();
-    const c = controller({ toggle: jest.fn(() => new Promise<void>(() => {})) });
-    registerArenaController(c);
-    const { result } = renderHook(() => useLiveSwitchDirection());
-    act(() => {
-      publishArenaState({ ...IDLE_ARENA_STATE, isLive: true });
-    });
-    act(() => {
-      void liveSwitch.toggle();
-    });
-    expect(result.current).toBe("going-offline");
-  });
-
-  it("no-ops without an owner and never starts a cooldown for it", async () => {
-    const { result } = renderHook(() => useLiveSwitchPhase());
-    let live: boolean | "ignored" | undefined;
-    let off: boolean | "ignored" | undefined;
-    await act(async () => {
-      live = await liveSwitch.goLive();
-      off = await liveSwitch.goOffline();
-      await liveSwitch.toggle();
-    });
-    // Nothing was attempted, so nothing for a caller to toast.
-    expect(live).toBe("ignored");
-    expect(off).toBe("ignored");
-    expect(result.current).toBe("ready");
-
-    // An owner that mounts right after is honoured at once.
-    const c = controller();
-    registerArenaController(c);
-    await act(async () => {
-      await liveSwitch.goLive();
-    });
-    expect(c.goLive).toHaveBeenCalledTimes(1);
-  });
-
-  it("QA D: a choice within the 2 s cooldown is queued (shown at once), not dropped, and runs when it ends", async () => {
-    jest.useFakeTimers();
-    const c = controller();
-    registerArenaController(c);
-    const { result } = renderHook(() => useLiveSwitchLocked());
-
-    await act(async () => {
-      await liveSwitch.goLive();
-    });
-    act(() => {
-      publishArenaState({ ...IDLE_ARENA_STATE, isLive: true });
-    });
-    expect(c.goLive).toHaveBeenCalledTimes(1);
-    expect(result.current).toBe(true);
-
-    let queued: Promise<boolean | "ignored"> | null = null;
-    act(() => {
-      queued = liveSwitch.goOffline();
-    });
-    // Not run yet (the cooldown stays, for the presence rate limit), but
-    // drawn offline at once.
-    expect(c.goOffline).not.toHaveBeenCalled();
-    expect(getGoLiveDisplay()).toBe("leaving");
-
-    await act(async () => {
-      jest.advanceTimersByTime(LIVE_SWITCH_COOLDOWN_MS);
-    });
-    expect(c.goOffline).toHaveBeenCalledTimes(1);
-    let r: unknown;
-    await act(async () => {
-      r = await queued;
-    });
-    expect(r).toBe(true);
-  });
-
-  it("QA D: the last choice wins: offline then live again within the cooldown runs nothing", async () => {
-    jest.useFakeTimers();
-    const c = controller();
-    registerArenaController(c);
-    await act(async () => {
-      await liveSwitch.goLive();
-    });
-    act(() => {
-      publishArenaState({ ...IDLE_ARENA_STATE, isLive: true });
-    });
-    let first: Promise<boolean | "ignored"> | null = null;
-    let second: Promise<boolean | "ignored"> | null = null;
-    act(() => {
-      first = liveSwitch.goOffline();
       second = liveSwitch.goLive();
     });
-    expect(getGoLiveDisplay()).toBeNull();
+    expect(goLive).toHaveBeenCalledTimes(1);
     await act(async () => {
-      jest.advanceTimersByTime(LIVE_SWITCH_COOLDOWN_MS);
+      release(false);
+      expect(await first).toBe("ignored");
     });
-    expect(await first).toBe("ignored");
-    expect(await second).toBe("ignored");
-    expect(c.goOffline).not.toHaveBeenCalled();
-    expect(c.goLive).toHaveBeenCalledTimes(1);
   });
 
-  it("starts the cooldown even when the transition failed", async () => {
-    const c = controller({ goLive: jest.fn().mockRejectedValue(new Error("x")) });
-    registerArenaController(c);
-    const { result } = renderHook(() => useLiveSwitchPhase());
-    await act(async () => {
-      await liveSwitch.goLive().catch(() => undefined);
-    });
-    expect(result.current).toBe("cooldown");
+  it("no-ops without an owner (\"ignored\", never a failure)", async () => {
+    await expect(liveSwitch.goLive()).resolves.toBe("ignored");
+    await expect(liveSwitch.goOffline()).resolves.toBe("ignored");
   });
 
-  it("never gates the raw programmatic sign-out call", async () => {
-    const c = controller();
-    registerArenaController(c);
-    await act(async () => {
-      await liveSwitch.goLive();
-    });
-    await act(async () => {
-      await takeArenaOfflineBeforeSignOut();
-    });
-    expect(c.goLive).toHaveBeenCalledTimes(1);
-    expect(c.goOffline).toHaveBeenCalledTimes(1);
-    // No unguarded MANUAL go-offline exists (it would drop a tucked
-    // challenge, Q3, outside the athlete's own tap), and the verdict's
-    // Rematch (the only unguarded go-live) is gone (jits-02vo.8).
-    expect("goOfflineUnguarded" in arenaActions).toBe(false);
-    expect("goLiveUnguarded" in arenaActions).toBe(false);
-  });
-
-  it("guards the tap-facing arenaActions.goLive/goOffline exactly like liveSwitch (AC-H2..H4)", async () => {
+  it("phase is information only: 'saving' during an attempt, 'cooldown' after, choices never locked", async () => {
+    jest.useFakeTimers();
     let release!: (v: boolean) => void;
-    const c = controller({
-      goLive: jest.fn(() => new Promise<boolean>((r) => (release = r))),
-    });
-    registerArenaController(c);
+    registerArenaController(liveController({ goLive: jest.fn(() => new Promise<boolean>((r) => (release = r))) }));
     const { result } = renderHook(() => useLiveSwitchPhase());
-
-    let first!: Promise<boolean | "ignored">;
     act(() => {
-      first = arenaActions.goLive();
+      void liveSwitch.goLive();
     });
     expect(result.current).toBe("saving");
-    let second: boolean | "ignored" | undefined;
-    let off: boolean | "ignored" | undefined;
-    await act(async () => {
-      second = await arenaActions.goLive();
-      off = await arenaActions.goOffline();
-    });
-    expect(second).toBe("ignored");
-    expect(off).toBe("ignored");
-    expect(c.goLive).toHaveBeenCalledTimes(1);
-    expect(c.goOffline).not.toHaveBeenCalled();
-
     await act(async () => {
       release(true);
-      await first;
+      await jest.advanceTimersByTimeAsync(0);
     });
     expect(result.current).toBe("cooldown");
-    let during: boolean | "ignored" | undefined;
+    const locked = renderHook(() => useLiveSwitchLocked());
+    expect(locked.result.current).toBe(false);
     await act(async () => {
-      during = await arenaActions.goOffline();
+      await jest.advanceTimersByTimeAsync(LIVE_SWITCH_COOLDOWN_MS);
     });
-    expect(during).toBe("ignored");
-    expect(c.goOffline).not.toHaveBeenCalled();
+    expect(result.current).toBe("ready");
   });
 
-  it("a RETRY tapped during the cooldown after a failed go-live is queued and runs when it ends (QA D)", async () => {
-    jest.useFakeTimers();
-    const goLive = jest.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-    registerArenaController(controller({ goLive }));
-    const { result } = renderHook(() => useLiveSwitchPhase());
-
-    let failed: boolean | "ignored" | undefined;
-    await act(async () => {
-      failed = await liveSwitch.goLive();
-    });
-    expect(failed).toBe(false);
-    expect(result.current).toBe("cooldown");
-    let early: Promise<boolean | "ignored"> | null = null;
+  it("reads 'saving' with the restore's direction while a restore runs", () => {
+    registerArenaController(liveController());
+    const phase = renderHook(() => useLiveSwitchPhase());
+    const dir = renderHook(() => useLiveSwitchDirection());
+    let end!: () => void;
     act(() => {
-      early = liveSwitch.goLive();
+      end = beginRestoreRun();
     });
-    // Queued (shows its pending ring), not run inside the cooldown.
-    expect(goLive).toHaveBeenCalledTimes(1);
-    expect(getGoLiveDisplay()).toBe("going-live");
-    await act(async () => {
-      jest.advanceTimersByTime(LIVE_SWITCH_COOLDOWN_MS);
-    });
-    let retried: unknown;
-    await act(async () => {
-      retried = await early;
-    });
-    expect(retried).toBe(true);
-    expect(goLive).toHaveBeenCalledTimes(2);
+    expect(phase.result.current).toBe("saving");
+    expect(dir.result.current).toBe("going-live");
+    act(() => end());
+    expect(phase.result.current).toBe("ready");
   });
 
-  it("QA A: a go-offline during a cancellable go-live cancels it at once and goes offline", async () => {
-    let finish!: (v: boolean) => void;
-    const c = controller({ goLive: jest.fn(() => new Promise<boolean>((r) => (finish = r))) });
+  it("a live choice during a restore waits for it, then is met without a second attempt", async () => {
+    const c = liveController();
     registerArenaController(c);
-    const cancel = jest.fn();
-    let pending: Promise<boolean | "ignored"> | null = null;
+    let end!: () => void;
     act(() => {
-      pending = liveSwitch.goLive();
+      end = beginRestoreRun();
     });
-    const unregister = registerGoLiveCanceller(cancel);
-    act(() => setGoLiveDisplay("optimistic"));
-    let off: unknown;
-    await act(async () => {
-      off = await liveSwitch.goOffline();
-    });
-    expect(cancel).toHaveBeenCalledTimes(1);
-    expect(c.goOffline).toHaveBeenCalledTimes(1);
-    expect(off).toBe(true);
-    // Drawn offline while the cancelled attempt unwinds.
-    expect(getGoLiveDisplay()).toBe("leaving");
-    unregister();
-    await act(async () => {
-      finish(false);
-      await pending;
-    });
-    // Unwound: nothing drawn over the committed (offline) state.
-    expect(getGoLiveDisplay()).toBeNull();
-  });
-
-  it("QA A: with nothing cancellable in flight, a go-offline during a go-live is still ignored", async () => {
-    let finish!: (v: boolean) => void;
-    const c = controller({ goLive: jest.fn(() => new Promise<boolean>((r) => (finish = r))) });
-    registerArenaController(c);
-    let pending: Promise<boolean | "ignored"> | null = null;
+    let p!: Promise<unknown>;
     act(() => {
-      pending = liveSwitch.goLive();
+      p = liveSwitch.goLive();
     });
-    let off: unknown;
+    expect(c.goLive).not.toHaveBeenCalled();
+    // The restore landed meanwhile.
     await act(async () => {
-      off = await liveSwitch.goOffline();
+      await c.goLive();
+      end();
+      expect(await p).toBe(true);
     });
-    expect(off).toBe("ignored");
-    expect(c.goOffline).not.toHaveBeenCalled();
-    await act(async () => {
-      finish(true);
-      await pending;
-    });
+    expect(c.goLive).toHaveBeenCalledTimes(1);
   });
 
   it("SF1: restore runs own their lock: one ending never unlocks another still running", () => {
@@ -784,10 +660,77 @@ describe("live switch guard (F11: disabled while saving, 2s cooldown, no undo)",
     expect(result.current).toBe("saving");
     act(() => endA());
     expect(result.current).toBe("saving");
-    act(() => endA()); // idempotent
+    act(() => endA());
     expect(result.current).toBe("saving");
     act(() => endB());
     expect(result.current).toBe("ready");
+  });
+
+  it("X2: sign-out drops a pending live choice and no live write runs after it starts", async () => {
+    jest.useFakeTimers();
+    const c = liveController();
+    const unregister = registerArenaController(c);
+    await act(async () => {
+      await liveSwitch.goLive();
+      await liveSwitch.goOffline();
+    });
+    let p!: Promise<unknown>;
+    act(() => {
+      p = liveSwitch.goLive(); // waiting out the cooldown
+    });
+    await act(async () => {
+      await takeArenaOfflineBeforeSignOut(10);
+      await jest.advanceTimersByTimeAsync(LIVE_SWITCH_COOLDOWN_MS * 3);
+    });
+    expect(await p).toBe("ignored");
+    expect(c.goLive).toHaveBeenCalledTimes(1);
+    expect(areLiveWritesBlocked()).toBe(true);
+    // A choice after sign-out started does nothing either.
+    await expect(liveSwitch.goLive()).resolves.toBe("ignored");
+    // The owner unmounts; a new one (the next sign-in) may write again, with
+    // a fresh intent.
+    act(() => {
+      unregister();
+      registerArenaController(liveController());
+    });
+    expect(areLiveWritesBlocked()).toBe(false);
+    expect(getLiveIntent().decided).toBe(false);
+  });
+
+  it("QA 3: sign-out leaves no OFFLINE · RETRY (or any overlay) behind", async () => {
+    registerArenaController(liveController());
+    act(() => {
+      setGoLiveDisplay("retry");
+      setNeedsLocation(true);
+    });
+    await act(async () => {
+      await takeArenaOfflineBeforeSignOut(10);
+    });
+    expect(getGoLiveDisplay()).toBeNull();
+  });
+
+  it("persists every choice through the owner's persister", async () => {
+    const persisted: boolean[] = [];
+    registerArenaController(liveController());
+    registerIntentPersister((live) => persisted.push(live));
+    await act(async () => {
+      await liveSwitch.goLive();
+      await liveSwitch.goOffline();
+    });
+    expect(persisted).toEqual([true, false]);
+  });
+
+  it("abandonTappedGoLive (background, a match) holds offline and cancels the work", () => {
+    registerArenaController(liveController({ goLive: jest.fn(() => new Promise<boolean>(() => undefined)) }));
+    const cancel = jest.fn();
+    act(() => {
+      void liveSwitch.goLive();
+    });
+    registerGoLiveCanceller(cancel);
+    expect(isTappedGoLiveInFlight()).toBe(true);
+    act(() => abandonTappedGoLive());
+    expect(cancel).toHaveBeenCalled();
+    expect(getLiveIntent()).toMatchObject({ live: false, explicit: false });
   });
 });
 
