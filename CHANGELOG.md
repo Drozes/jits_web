@@ -29,6 +29,8 @@ JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): no native dependenc
 - Only playable angles are offered by the angle switcher (match page and player) and count as playable in the Film Room card and `getMyMatchVideos`.
 - The verdict re-reads every 60 s while realtime has not joined; the realtime debounce is 2 s; recording intents are keyed by athlete and match.
 
+- Local-stack integration suite `packages/shared/src/__integration__/video-wave2.int.test.ts` (`npm run test:integration -w @jits/shared`, see its README): two signed-in athletes against a local stack at jr_be `origin/development`; covers the opponent seeing the reservation over realtime within 2 s, both intent rows, the B1 re-record keeping the old video, the M1 takeover refused after the server flip, and a kill after the last byte giving one ready row and exactly one slicer dispatch. Excluded from `npm test`.
+
 **Rollback note (OTA to the wave 1 bundle, review minor 10).** Wave 1 finishes a wave 2 job through the INSERT, 23505 and same-key UPDATE to `ready`, which is correct in the normal case. Two edge cases need a 7-day stall under the rolled-back bundle: (a) if the reserved row was abandoned (by the reaper), wave 1's same-key `ready` is silently reverted and wave 1 reports success and releases the clip; (b) wave 1's own 7-day expiry in phase `row` deletes the object even when the trigger already made the row `ready`. Pending-abandon records written by wave 2 are ignored by wave 1 (the server reaper covers them).
 
 ### Match video playback on expo-video, playback telemetry (jits-n2im.19, .21, .10)
