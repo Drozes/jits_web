@@ -140,7 +140,7 @@ Hard rules:
 Onboarding: 01-Splash, 02-Login, 03-Signup, 04-Signup-Confirm, 05-Forgot-Password, 06-Setup-Terms, 07-Setup-Who, 08-Setup-Where
 Tabs: Main (Home), 11-Home-Resume, 12-Arena-Offline, 13-Arena-Live, 14-Arena-Waiting, 15-Challenge-Sheet, 16-Rankings, 17-Profile, 18-Profile-Stats
 Match: 21-Faceoff-Weight, 22-Ready-Check, 23-Countdown, 24-Live-Broadcast, 25-Result-Entry, 26-Result-Waiting, 27-Confirm, 28-Dispute, 29-Verdict
-Film: 31-Film-Room, 32-Match-Detail, 33-Video-Player, 34-Highlight-Viewer, 35-Highlight-Share, 36-Athlete, 37-Compare-Stats
+Film: 31-Film-Room, 32-Match-Detail, 33-Video-Player, 34-Highlight-Viewer, 35-Highlight-Share, 36-Athlete, 37-Compare-Stats, 38-Upload-States
 Other: 41-Practice, 42-Notifications-Panel, 43-Settings, 44-Settings-Notifications, 45-Feedback, 46-Help, 47-Admin, 48-System-Overlays
 (all end in `.dc.html`)
 

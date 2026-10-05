@@ -1176,6 +1176,33 @@
         "packages/shared/src/utils/shared.ts"
       ]
     },
+    "38-Upload-States.dc.html": {
+      "title": "Upload states",
+      "sources": [
+        "apps/mobile/components/film-room/athlete-tile.tsx",
+        "apps/mobile/components/film-room/film-scrim.tsx",
+        "apps/mobile/components/film-room/opening-still.tsx",
+        "apps/mobile/components/film-room/poster-card.tsx",
+        "apps/mobile/components/film-room/status-badge.tsx",
+        "apps/mobile/components/match-detail/match-upload-card.tsx",
+        "apps/mobile/components/match-flow/upload-progress-banner.tsx",
+        "apps/mobile/components/ui/elo-system/button.tsx",
+        "apps/mobile/components/ui/pressable-scale.tsx",
+        "apps/mobile/components/ui/state-pressable.tsx",
+        "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/components/ui/toast.tsx",
+        "apps/mobile/lib/film-room/card-status.ts",
+        "apps/mobile/lib/film-room/format.ts",
+        "apps/mobile/lib/match-detail/film-section.ts",
+        "apps/mobile/lib/video/upload-background-notice.ts",
+        "apps/mobile/lib/video/upload-banner-state.ts",
+        "apps/mobile/lib/video/upload-capabilities.ts",
+        "apps/mobile/lib/video/upload-copy.ts",
+        "apps/mobile/lib/video/upload-errors.ts",
+        "apps/mobile/lib/video/use-upload-actions.ts",
+        "packages/shared/src/utils/shared.ts"
+      ]
+    },
     "41-Practice.dc.html": {
       "title": "Practice match (coach tip)",
       "sources": [

@@ -384,6 +384,14 @@ BOARDS = {
                                        extra=["packages/shared/src/utils/highlight-caption.ts"]),
     "36-Athlete.dc.html": dict(seeds=APP + ["app/(app)/athlete/[id].tsx"], exclude=["components/compare-stats-modal.tsx"]),
     "37-Compare-Stats.dc.html": dict(seeds=APP + ["app/(app)/athlete/[id].tsx"]),
+    # Upload states sheet (approved 2026-10-05): the verdict / match page upload card in every
+    # state, the Film Room card upload badges, and the backgrounded-upload local notification.
+    "38-Upload-States.dc.html": dict(seeds=[
+        "components/match-flow/upload-progress-banner.tsx", "components/match-detail/match-upload-card.tsx",
+        "components/film-room/poster-card.tsx", "components/film-room/status-badge.tsx",
+        "lib/film-room/card-status.ts", "lib/match-detail/film-section.ts",
+        "lib/video/upload-copy.ts", "lib/video/upload-errors.ts", "lib/video/upload-banner-state.ts",
+        "lib/video/use-upload-actions.ts", "lib/video/upload-capabilities.ts", "lib/video/upload-background-notice.ts"]),
     "41-Practice.dc.html": dict(seeds=APP + ["app/(app)/practice.tsx"], exclude=ALLSTEPS),
     # Home with the bell's notification panel open.
     "42-Notifications-Panel.dc.html": dict(
