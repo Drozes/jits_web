@@ -1,5 +1,10 @@
 import * as React from "react";
-import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+import { act, configure, fireEvent, render, waitFor, within } from "@testing-library/react-native";
+
+// Same load-sensitivity guard as film-room.test.tsx: this suite timed out on
+// its 1 s waitFor under a loaded pre-commit run and passes alone in ~9 s.
+jest.setTimeout(30_000);
+configure({ asyncUtilTimeout: 5_000 });
 
 // ---- mocks ----
 
@@ -606,7 +611,9 @@ describe("MatchDetailScreen (Film Room match page)", () => {
   it("marks the match seen so the Film Room drops its NEW badge", async () => {
     expect(isMatchSeen(mockMatchId)).toBe(false);
     await renderLoaded(view());
-    expect(isMatchSeen(mockMatchId)).toBe(true);
+    // The mark is a passive effect of the ready render: under load it can
+    // trail the loading marker's removal, so wait for it.
+    await waitFor(() => expect(isMatchSeen(mockMatchId)).toBe(true));
   });
 
   it("explains NOT_PARTICIPANT and goes back", async () => {

@@ -117,11 +117,20 @@ jest.mock("expo-video", () => {
  * still declares its own `jest.mock`, which wins.
  */
 jest.mock("@sentry/react-native", () => {
+  // A plain object (no Proxy): babel's import-star interop copies own keys
+  // only, and a Proxy fallback would also make the module thenable.
   const noop = () => undefined;
-  return new Proxy(
-    { wrap: (c) => c, init: noop, captureException: noop, captureMessage: noop, addBreadcrumb: noop, setUser: noop, setTag: noop },
-    { get: (target, prop) => (prop in target ? target[prop] : prop === "__esModule" ? false : noop) },
-  );
+  return {
+    wrap: (c) => c,
+    init: noop,
+    captureException: noop,
+    captureMessage: noop,
+    addBreadcrumb: noop,
+    setUser: noop,
+    setTag: noop,
+    showFeedbackForm: noop,
+    feedbackIntegration: () => ({ name: "Feedback" }),
+  };
 });
 
 // The fake VideoView's fullscreen hook (see the expo-video mock above) never
