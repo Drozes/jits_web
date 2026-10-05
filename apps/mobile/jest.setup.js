@@ -18,6 +18,27 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 );
 
 /**
+ * NetInfo's real JS module drives a native event emitter and a reachability
+ * probe, which under Jest throws asynchronously ("Cannot read properties of
+ * undefined (reading 'isInternetReachable')") and fails whatever suite was
+ * running. The match upload banner reads the connection type (it shows the
+ * clip size on cellular, jits-n2im.6), so every suite that renders a verdict
+ * now touches it. Default: online on wifi, no events. A suite that needs
+ * more (cellular, offline, reconnects) declares its own `jest.mock`.
+ */
+jest.mock("@react-native-community/netinfo", () => {
+  const state = { type: "wifi", isConnected: true, isInternetReachable: true, details: null };
+  const NetInfo = {
+    fetch: jest.fn(() => Promise.resolve(state)),
+    refresh: jest.fn(() => Promise.resolve(state)),
+    addEventListener: jest.fn(() => () => undefined),
+    configure: jest.fn(),
+    useNetInfo: jest.fn(() => state),
+  };
+  return { __esModule: true, default: NetInfo, ...NetInfo };
+});
+
+/**
  * expo-video's JS entry extends a native SharedObject class at module load,
  * which does not exist under Jest ("Cannot read properties of undefined
  * (reading 'prototype')"). The highlight card on match detail imports it, so

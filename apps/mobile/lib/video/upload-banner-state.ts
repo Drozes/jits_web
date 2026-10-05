@@ -1,5 +1,6 @@
 import type { MatchUploadEntry } from "./match-upload-store";
 import type { RecordingState, RecordingTruncation } from "./use-video-recorder";
+import { isTerminalUploadClass, type UploadErrorClass } from "./upload-errors";
 
 /**
  * What the persistent status chip should say, given the two things that
@@ -18,14 +19,17 @@ export type UploadBannerKind =
   | "hidden"
   | "stopping"
   | "uploading"
+  /** Parked; it retries on its own (jits-n2im.3). Retry runs it now. */
+  | "paused"
   | "uploaded"
+  /** Failed: the recorder, or an upload that waits for the athlete. */
   | "error";
 
 export interface UploadBannerState {
   kind: UploadBannerKind;
-  /** Only set for "error". */
+  /** Set for "paused" and "error": friendly copy, never raw server text. */
   message: string | null;
-  /** Only set for "uploaded"; turns a success into a warning. */
+  /** Set for "uploaded", "paused" and "error"; the clip is short. */
   truncation: RecordingTruncation | null;
   /**
    * Only meaningful for "uploading": 0..1 of the clip the server has
@@ -34,6 +38,25 @@ export interface UploadBannerState {
    * the exception rather than the only thing we can show.
    */
   progress: number | null;
+  /**
+   * The upload failure's class, for "paused" and "error" from the store;
+   * null for a recorder failure (nothing to retry there).
+   */
+  errorClass?: UploadErrorClass | null;
+  /** Clip size in bytes when known (shown on cellular). */
+  bytesTotal?: number | null;
+}
+
+/** The upload actions a banner state offers (jits-n2im.3 / .5). */
+export function uploadBannerActions(state: UploadBannerState): { retry: boolean; discard: boolean } {
+  if (state.kind === "paused") return { retry: true, discard: false };
+  if (state.kind !== "error" || state.errorClass == null) return { retry: false, discard: false };
+  // A terminal failure cannot be fixed by retrying. A missing file has
+  // already been dropped, so there is nothing to discard either.
+  if (isTerminalUploadClass(state.errorClass)) {
+    return { retry: false, discard: state.errorClass !== "file_missing" };
+  }
+  return { retry: true, discard: false };
 }
 
 export function deriveUploadBannerState(
@@ -84,7 +107,13 @@ export function deriveUploadBannerState(
   //    genuinely running. An upload in flight is therefore checked FIRST
   //    below, exactly as the previous author prescribed.
   if (upload?.status === "uploading") {
-    return { kind: "uploading", message: null, truncation: null, progress: upload.progress };
+    return {
+      kind: "uploading",
+      message: null,
+      truncation: null,
+      progress: upload.progress,
+      bytesTotal: upload.bytesTotal ?? null,
+    };
   }
 
   if (recorderState === "error") {
@@ -108,12 +137,24 @@ export function deriveUploadBannerState(
     if (upload.status === "uploaded") {
       return { kind: "uploaded", message: null, truncation: upload.truncation, progress: 1 };
     }
+    if (upload.status === "paused") {
+      return {
+        kind: "paused",
+        message: upload.error ?? "Upload paused. It will retry automatically.",
+        truncation: upload.truncation,
+        progress: upload.progress,
+        errorClass: upload.errorClass ?? null,
+        bytesTotal: upload.bytesTotal ?? null,
+      };
+    }
     if (upload.status === "error") {
       return {
         kind: "error",
         message: upload.error ?? "Upload failed",
         truncation: upload.truncation,
         progress: null,
+        errorClass: upload.errorClass ?? "unknown",
+        bytesTotal: upload.bytesTotal ?? null,
       };
     }
     // "pending": something is known about the recording (a truncation, or

@@ -12,6 +12,9 @@ import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { useMatchSyncContext, useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { rankStripText, useRankChange, useVerdictVideos } from "@/lib/match-flow/use-verdict-data";
 import type { UploadBannerState } from "@/lib/video/upload-banner-state";
+import { watchFilmBusyLabel } from "@/lib/video/upload-copy";
+import { isTerminalUploadClass } from "@/lib/video/upload-errors";
+import { useUploadActions } from "@/lib/video/use-upload-actions";
 import { buildShareText, buildShareUrl } from "@jits/shared/utils";
 import { UploadProgressBanner } from "../upload-progress-banner";
 import { usePalette } from "@/lib/theme/palette";
@@ -149,8 +152,21 @@ export function VerdictStep(props: VerdictStepProps) {
   const oppShort = shortName(opponent.display_name);
 
   const uploadBusy = upload.kind === "uploading" || upload.kind === "stopping";
-  const filmExpected = videos.hasVideo || uploadBusy || uploadedVideoId != null;
-  const watchLabel = filmExpected ? "Watch film" : "Match details";
+  // A paused or failed UPLOAD (not a recorder failure, which has no class)
+  // can still deliver the film: it is expected, never "no film" (jits-n2im.4
+  // item 3). A terminal one cannot, so it is not.
+  const uploadOwed =
+    upload.kind === "paused" || (upload.kind === "error" && upload.errorClass != null && !isTerminalUploadClass(upload.errorClass));
+  const hasServerVideo = videos.hasVideo || uploadedVideoId != null;
+  const filmExpected = hasServerVideo || uploadBusy || uploadOwed;
+  // Disabled while the clip is still going up, and the label says why
+  // (jits-n2im.4 item 5): a greyed "Watch film" read as broken.
+  const watchLabel = uploadBusy
+    ? watchFilmBusyLabel(upload.kind as "stopping" | "uploading", upload.progress)
+    : filmExpected
+      ? "Watch film"
+      : "Match details";
+  const uploadActions = useUploadActions(matchId);
   const watch = () => router.push(matchDetailHref(matchId));
   const back = () => exitMatchTo(router, exitHref);
 
@@ -183,6 +199,7 @@ export function VerdictStep(props: VerdictStepProps) {
         right={outcome === "loss" ? me.display_name : opponent.display_name}
         upload={upload}
         filmExpected={filmExpected}
+        hasServerVideo={hasServerVideo}
         topInset={insets.top}
       />
       {win ? <Confetti play={play} /> : null}
@@ -240,13 +257,15 @@ export function VerdictStep(props: VerdictStepProps) {
           <Mono size="micro" spacing="caps">{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. Heavier athlete’s ELO was adjusted.`}</Mono>
         ) : null}
 
-        {upload.kind !== "hidden" ? <UploadProgressBanner {...upload} /> : null}
+        {upload.kind !== "hidden" ? (
+          <UploadProgressBanner {...upload} onRetry={uploadActions.retry} onDiscard={uploadActions.discard} />
+        ) : null}
 
         {/* A reel is on its way when THIS phone's clip landed or is still
             uploading (spec 015 section 16.6.4; the pre-redesign summary's
             videoId || videoPending). Not on a disputed result: the match is
             under admin review, so no reel is promised. */}
-        <SummaryHighlightNote hasVideo={(uploadedVideoId != null || uploadBusy) && !disputed} />
+        <SummaryHighlightNote hasVideo={(uploadedVideoId != null || uploadBusy || upload.kind === "paused") && !disputed} />
 
         <View style={{ gap: 12 }}>
           <FightButton

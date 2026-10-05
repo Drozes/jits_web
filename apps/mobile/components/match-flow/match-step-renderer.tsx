@@ -105,7 +105,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     return <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />;
   }
   if (step === "weight" || step === "ready") {
-    return <FaceoffBody phase={step} me={me} opponent={opponent} />;
+    return <FaceoffBody phase={step} me={me} opponent={opponent} durationSeconds={durationSeconds} />;
   }
   if (step === "live") {
     return (

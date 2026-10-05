@@ -2,6 +2,8 @@ import { StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { StillScrims } from "./scrim";
 import type { UploadBannerState } from "@/lib/video/upload-banner-state";
+import type { MatchUploadEntry } from "@/lib/video/match-upload-store";
+import { filmStillCaption } from "@/lib/video/upload-copy";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { InitialsBlock, Mono, shortName } from "../fight/fight-ui";
@@ -18,6 +20,8 @@ interface VerdictHeroProps {
   upload: UploadBannerState;
   /** Some film exists or is on its way (a video row, or this phone's upload). */
   filmExpected: boolean;
+  /** The server already has a video row (either athlete), or this phone's landed. */
+  hasServerVideo?: boolean;
   topInset: number;
 }
 
@@ -29,7 +33,24 @@ function pct(p: number | null): string | null {
  * The verdict's hero: the match's opening still (the slicer poster), or
  * while there is none yet both athletes on a plate with where the still is.
  */
-export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExpected, topInset }: VerdictHeroProps) {
+/** The banner state as the upload entry the shared caption reads. */
+function localOf(upload: UploadBannerState): Pick<MatchUploadEntry, "status" | "progress"> | null {
+  switch (upload.kind) {
+    case "uploading":
+      return { status: "uploading", progress: upload.progress };
+    case "paused":
+      return { status: "paused", progress: upload.progress };
+    case "uploaded":
+      return { status: "uploaded", progress: 1 };
+    case "error":
+      // Only an UPLOAD failure; a recorder failure has no class and no film.
+      return upload.errorClass != null ? { status: "error", progress: null } : null;
+    default:
+      return null;
+  }
+}
+
+export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExpected, hasServerVideo, topInset }: VerdictHeroProps) {
   const p = usePalette();
   if (posterUrl) {
     return (
@@ -55,15 +76,14 @@ export function VerdictHero({ posterUrl, posterKey, left, right, upload, filmExp
     );
   }
 
-  const uploading = upload.kind === "uploading" ? pct(upload.progress) : null;
+  const uploading = upload.kind === "uploading" || upload.kind === "paused" ? pct(upload.progress) : null;
+  // One caption table for every film surface (lib/video/upload-copy.ts):
+  // "PROCESSING FILM" once the bytes are in, never "after upload"
+  // (jits-n2im.4 item 6).
   const label =
     upload.kind === "stopping"
       ? "FINISHING RECORDING"
-      : upload.kind === "uploading"
-        ? `UPLOADING${uploading ? ` ${uploading}` : ""} · STILL ARRIVES AFTER UPLOAD`
-        : filmExpected
-          ? "STILL ARRIVES AFTER UPLOAD"
-          : "NO FILM FOR THIS MATCH";
+      : filmStillCaption(localOf(upload), hasServerVideo ?? filmExpected, "NO FILM FOR THIS MATCH");
   return (
     <View testID="verdict-still-fallback" style={{ height: HERO_HEIGHT, backgroundColor: p.plate, borderBottomWidth: 1, borderColor: p.hairline }}>
       <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 20, paddingTop: topInset }}>

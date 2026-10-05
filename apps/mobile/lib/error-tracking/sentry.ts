@@ -178,3 +178,33 @@ export function captureException(
 
   Sentry.captureException(error, context ? { extra: context } : undefined);
 }
+
+/**
+ * Leave a breadcrumb on the current scope: attached to the next event this
+ * launch sends, never sent on its own. Safe to call before init.
+ */
+export function addBreadcrumb(crumb: {
+  category: string;
+  message: string;
+  level?: "debug" | "info" | "warning" | "error";
+  data?: Record<string, unknown>;
+}): void {
+  if (!initialized) return;
+  Sentry.addBreadcrumb({ level: "info", ...crumb });
+}
+
+/**
+ * Send one non-exception event (a funnel outcome such as an upload that
+ * landed). Safe to call before init; the call is dropped.
+ */
+export function captureMessage(
+  message: string,
+  options: { level?: "info" | "warning" | "error"; tags?: Record<string, string>; extra?: Record<string, unknown> } = {},
+): void {
+  if (!initialized) return;
+  Sentry.captureMessage(message, {
+    level: options.level ?? "info",
+    tags: options.tags,
+    extra: options.extra,
+  });
+}

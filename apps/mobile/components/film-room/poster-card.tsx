@@ -52,13 +52,20 @@ interface PosterCardProps {
   accessibilityLabel?: string;
   /** "compact" (the 120 pt Profile preview) uses short badge labels. */
   variant?: "grid" | "compact";
+  /** Retry this phone's paused or failed upload (grid only, jits-n2im.3). */
+  onRetry?: () => void;
 }
 
 /** Short badge copy for the narrow Profile preview tiles. */
 export function compactBadgeLabel(status: CardStatus): string | null {
   switch (status.kind) {
     case "failed":
+    case "upload_failed":
       return "FAILED";
+    case "paused":
+      return "PAUSED";
+    case "processing":
+      return "PROCESSING";
     case "analyzing":
       return status.total ? `${status.done ?? 0}/${status.total}` : "ANALYZING";
     case "new":
@@ -72,9 +79,14 @@ export function compactBadgeLabel(status: CardStatus): string | null {
 
 function fallbackLabel(item: MatchLibraryItem, status: CardStatus): string {
   if (status.kind === "uploading") return uploadingLabel(status.progress);
+  if (status.kind === "paused") return "UPLOAD PAUSED";
+  if (status.kind === "upload_failed") return "UPLOAD FAILED";
+  if (status.kind === "processing") return "PROCESSING FILM";
   if (item.videos.length === 0) return "NO FILM RECORDED";
   if (status.kind === "failed") return "FILM FAILED TO PROCESS";
-  return "STILL ARRIVES AFTER UPLOAD";
+  // The film is on the server and its still is not cut yet: the upload is
+  // done, so never "after upload" here (jits-n2im.4 item 6).
+  return "PROCESSING FILM";
 }
 
 /**
@@ -83,7 +95,7 @@ function fallbackLabel(item: MatchLibraryItem, status: CardStatus): string {
  * and a top-right badge column (status, DISPUTED, angles) stacked so no two
  * badges share a row even on a narrow card.
  */
-export const PosterCard = React.memo(function PosterCard({ item, status, viewer, onPress, testID, accessibilityLabel, variant = "grid" }: PosterCardProps) {
+export const PosterCard = React.memo(function PosterCard({ item, status, viewer, onPress, testID, accessibilityLabel, variant = "grid", onRetry }: PosterCardProps) {
   const p = usePalette();
   const compact = variant === "compact";
   const letter = outcomeLetter(item.outcome);
@@ -126,6 +138,18 @@ export const PosterCard = React.memo(function PosterCard({ item, status, viewer,
           {badge ? <FilmBadge testID="film-card-badge" label={badge} tone={toneFor(status)} /> : null}
           {disputed ? <FilmBadge testID="film-card-disputed" label="DISPUTED" tone="amber" /> : null}
           {angles ? <FilmBadge testID="film-card-angles" label={angles} tone="outline" /> : null}
+          {onRetry && !compact ? (
+            <Pressable
+              testID="film-card-retry"
+              accessibilityRole="button"
+              accessibilityLabel="Retry upload"
+              onPress={onRetry}
+              hitSlop={8}
+              className="active:opacity-70"
+            >
+              <FilmBadge label="RETRY" tone="outline" />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
       {uploading && poster ? (

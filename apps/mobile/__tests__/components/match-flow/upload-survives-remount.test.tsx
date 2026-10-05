@@ -496,8 +496,9 @@ describe("the confirm-to-summary refresh cannot erase the upload", () => {
     // refresh() rebuilt the recorder idle here and the chip vanished.
     await waitFor(() => expect(screen.getByText("Back to Arena")).toBeTruthy());
     screen.getByTestId("upload-status-banner");
-    screen.getByText(/saving the record failed/i);
-    screen.getByText(/row-level security/i);
+    screen.getByText(/isn't attached to the match yet/i);
+    // Friendly copy only: the raw server text is telemetry (jits-n2im.5).
+    expect(screen.queryByText(/row-level security/i)).toBeNull();
   });
 
   it("still offers Watch film on the verdict after the row completes", async () => {
@@ -599,7 +600,7 @@ describe("an upload that finishes LATE still reaches the summary", () => {
       held.release();
     });
 
-    await waitFor(() => expect(screen.getByText(/saving the record failed/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/isn't attached to the match yet/i)).toBeTruthy());
     screen.getByTestId("upload-status-banner");
   });
 });

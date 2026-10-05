@@ -19,7 +19,7 @@ const TONES: Record<Tone, { bg: string; fg: string; border: string }> = {
 
 export function toneFor(status: CardStatus): Tone {
   if (status.kind === "new") return "light";
-  if (status.kind === "failed") return "red";
+  if (status.kind === "failed" || status.kind === "upload_failed") return "red";
   if (status.kind === "ready") return "outline";
   return "amber";
 }

@@ -322,9 +322,62 @@ describe("actions", () => {
     });
     await flush();
     expect(s.getByTestId("summary-watch-film").props.accessibilityState.disabled).toBe(true);
+    // A disabled button says why (jits-n2im.4 item 5).
+    expect(s.getByText("Film uploading 64%")).toBeTruthy();
     expect(s.getByText(/UPLOADING 64% · STILL ARRIVES AFTER UPLOAD/)).toBeTruthy();
     // The upload card replaced the banner over every post-live step.
     expect(s.getByTestId("upload-status-banner")).toBeTruthy();
+  });
+
+  it("a PAUSED upload still expects film: Watch film, never 'no film' (jits-n2im.4 item 3)", async () => {
+    const s = renderVerdict({
+      upload: { kind: "paused", message: "Upload paused: no connection.", truncation: null, progress: 0.4, errorClass: "offline" },
+    });
+    await flush();
+    expect(s.getByText("Watch film")).toBeTruthy();
+    expect(s.queryByText("Match details")).toBeNull();
+    expect(s.queryByText(/NO FILM/)).toBeNull();
+    expect(s.getByText("UPLOAD PAUSED · 40%")).toBeTruthy();
+    expect(s.getByTestId("upload-retry")).toBeTruthy();
+  });
+
+  it("a FAILED upload that a retry can still deliver expects film too", async () => {
+    const s = renderVerdict({
+      upload: { kind: "error", message: "Upload failed: the server didn't accept this video.", truncation: null, progress: null, errorClass: "not_allowed" },
+    });
+    await flush();
+    expect(s.getByText("Watch film")).toBeTruthy();
+    expect(s.queryByText(/NO FILM/)).toBeNull();
+    expect(s.getByText("UPLOAD FAILED")).toBeTruthy();
+  });
+
+  it("a TERMINAL upload failure cannot deliver film: Match details, with Discard", async () => {
+    const s = renderVerdict({
+      upload: { kind: "error", message: "This video is too large to upload (2 GB max).", truncation: null, progress: null, errorClass: "too_large" },
+    });
+    await flush();
+    expect(s.getByText("Match details")).toBeTruthy();
+    expect(s.getByTestId("upload-discard")).toBeTruthy();
+    expect(s.queryByTestId("upload-retry")).toBeNull();
+  });
+
+  it("a RECORDER failure (camera denied) is not an upload: no film is the truth", async () => {
+    const s = renderVerdict({
+      upload: { kind: "error", message: "Camera permission required", truncation: null, progress: null },
+    });
+    await flush();
+    expect(s.getByText("Match details")).toBeTruthy();
+    expect(s.getByText("NO FILM FOR THIS MATCH")).toBeTruthy();
+  });
+
+  it("after the upload lands, the still is processing, not 'after upload' (jits-n2im.4 item 6)", async () => {
+    const s = renderVerdict({
+      upload: { kind: "uploaded", message: null, truncation: null, progress: 1 },
+      uploadedVideoId: "VID-1",
+    });
+    await flush();
+    expect(s.getByText("PROCESSING FILM")).toBeTruthy();
+    expect(s.queryByText(/AFTER UPLOAD/)).toBeNull();
   });
 
   it("no film at all: the secondary action is Match details and the hero says so", async () => {
@@ -380,10 +433,13 @@ describe("opening still", () => {
     expect(s.getByTestId("still-image").props.cacheKey).toBe("film-still-matches/M1/v1/poster.jpg");
   });
 
-  it("falls back to the athletes with STILL ARRIVES AFTER UPLOAD while a video has no poster", async () => {
+  it("falls back to the athletes with PROCESSING FILM while a video has no poster (jits-n2im.4 item 6)", async () => {
+    // The video is on the server, so the upload is done: the still waits on
+    // processing, never "after upload".
     mockDetailView.mockResolvedValue({ ok: true, data: { videos: [{ id: "v1", poster_url: null }] } });
     const s = renderVerdict();
-    await waitFor(() => expect(s.getByText("STILL ARRIVES AFTER UPLOAD")).toBeTruthy());
+    await waitFor(() => expect(s.getByText("PROCESSING FILM")).toBeTruthy());
+    expect(s.queryByText(/STILL ARRIVES AFTER UPLOAD/)).toBeNull();
     expect(s.getByTestId("verdict-still-fallback")).toBeTruthy();
   });
 });

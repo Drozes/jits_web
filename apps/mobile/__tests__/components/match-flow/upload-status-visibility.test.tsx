@@ -20,7 +20,7 @@
  * failure, is covered in `record-upload-sequence.test.tsx`.
  */
 import * as React from "react";
-import { render, fireEvent, act } from "@testing-library/react-native";
+import { render, fireEvent, act, within } from "@testing-library/react-native";
 import type { RecordingState, RecordingTruncation } from "@/lib/video/use-video-recorder";
 
 // ---- the recorder under the wizard ----
@@ -282,14 +282,14 @@ describe("upload status survives the step that started it", () => {
   it("shows a FAILED upload on the summary step, with the reason", () => {
     // The worst case of the defect: the user was never told the upload
     // failed, because the only surface that could say so had unmounted.
-    const { getByTestId, getByText } = renderSummary({
+    const { getByTestId } = renderSummary({
       status: "error",
       error: "Upload failed: Video uploaded but saving the record failed: permission denied",
     });
 
-    getByTestId("upload-status-banner");
-    getByText(/upload failed/i);
-    getByText(/permission denied/i);
+    const banner = within(getByTestId("upload-status-banner"));
+    banner.getByText(/upload failed/i);
+    banner.getByText(/permission denied/i);
   });
 
   it("does not congratulate the user on a truncated clip", () => {
@@ -305,17 +305,29 @@ describe("upload status survives the step that started it", () => {
     expect(queryByText(/^match video uploaded$/i)).toBeNull();
   });
 
+  it("tells a truncated clip whose upload FAILED both facts (jits-5tj9.5)", () => {
+    const { getByTestId } = renderSummary({
+      status: "error",
+      error: "Upload failed: the server didn't accept this video.",
+      errorClass: "not_allowed",
+      truncation: "limit",
+    });
+    const banner = within(getByTestId("upload-status-banner"));
+    banner.getByText(/server didn't accept this video/i);
+    banner.getByText(/recording hit its time limit/i);
+  });
+
   it("says nothing at all when no recording was made", () => {
     const { queryByTestId } = renderSummary(null);
     expect(queryByTestId("upload-status-banner")).toBeNull();
   });
 
   it("keeps reporting the upload on a DISPUTED match's summary", () => {
-    const { getByText } = renderSummary(
+    const { getByTestId } = renderSummary(
       { status: "error", error: "Upload failed: network died" },
       { status: "disputed" },
     );
-    getByText(/upload failed/i);
+    within(getByTestId("upload-status-banner")).getByText(/upload failed/i);
   });
 });
 

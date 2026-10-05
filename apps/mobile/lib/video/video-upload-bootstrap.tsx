@@ -2,25 +2,34 @@ import * as React from "react";
 import { useAuth } from "@/lib/auth/hooks";
 import { setSentryTag } from "@/lib/error-tracking/sentry";
 import { backupExclusionStatus } from "@/modules/backup-exclusion";
-import { ensureUploadListeners, resumeMatchVideoUploads } from "./video-upload-manager";
+import { bindUploadBackgroundNotice } from "./upload-background-notice";
+import { bindUploadKeepAwake } from "./upload-keep-awake";
+import {
+  ensureUploadListeners,
+  resumeMatchVideoUploads,
+  setUploadOwner,
+} from "./video-upload-manager";
 
 /**
  * Picks up match-video uploads that an earlier app launch could not finish
- * and binds the foreground / reconnect resume triggers.
+ * and binds the foreground / reconnect resume triggers, the app-wide
+ * upload keep-awake and the backgrounding notice (jits-n2im.1).
  *
  * Renders null. Placed inside `<AuthProvider>` in `_layout.tsx` next to the
  * other bootstraps.
  *
- * Gated on a signed-in user because every tus request needs a live access
- * token: resuming before auth settles would spend an attempt on a
- * guaranteed 401. It is keyed on the user id so a different account
- * signing in on the same device re-runs the sweep (the jobs are that
- * account's; a job whose athlete no longer matches simply fails RLS and is
- * abandoned rather than silently retried forever).
+ * Gated on a signed-in ATHLETE because every tus request needs a live
+ * access token, and scoped to that athlete (jits-n2im.6): the manager only
+ * ever resumes jobs whose `uploaderAthleteId` is this athlete. A different
+ * account signing in on the same phone re-runs the sweep for ITS jobs; the
+ * previous athlete's stay on disk and resume when they sign back in.
+ * Sign-out stops the runners and clears the owner itself
+ * (`stopMatchVideoUploadsForSignOut`, from the auth context), before the
+ * session drops.
  */
 export function VideoUploadBootstrap() {
-  const { user } = useAuth();
-  const userId = user?.id ?? null;
+  const { athlete } = useAuth();
+  const athleteId = athlete?.id ?? null;
 
   // Reported once per launch, and deliberately NOT gated on auth: it is a
   // fact about the binary, and an error raised before sign-in should carry
@@ -28,26 +37,34 @@ export function VideoUploadBootstrap() {
   //
   // WHY IT IS REPORTED AT ALL. A parked clip is excluded from iCloud backup
   // by a NATIVE module, and JS ships over the air while native code does
-  // not. `expo.version` is 0.2.0 with a `runtimeVersion` policy of
-  // `appVersion`, so the TestFlight build that adds the module and every
-  // already-installed 0.2.0 binary share a runtime version and accept the
-  // same OTA. Without this, the installs where the exclusion is silently
-  // inert are indistinguishable from the ones where it works: same JS, same
-  // version string, no error, and 300-600 MB clips quietly going to iCloud.
+  // not. The `runtimeVersion` policy is `appVersion`, so every installed
+  // binary of one `expo.version` accepts the same OTA whether or not it
+  // embeds the module. Without this, the installs where the exclusion is
+  // silently inert are indistinguishable from the ones where it works:
+  // same JS, same version string, no error, and 300-600 MB clips quietly
+  // going to iCloud.
   //
   // A Sentry TAG rather than an event: it is a property of every report
-  // from this install, so it can be filtered and grouped on, which is the
-  // question being asked ("which population is this?"). The log line is
-  // there because the Sentry DSN is not wired for release builds yet (see
-  // the pre-launch blockers in CLAUDE.md), so until it is, a device console
-  // is the only place this is visible.
+  // from this install, so it can be filtered and grouped on. The log line
+  // stays for device consoles; whether a release build reports to Sentry at
+  // all depends on EXPO_PUBLIC_SENTRY_DSN being set in the EAS environment
+  // the build or update was made from (see jits-n2im.7), which the repo
+  // cannot show.
   React.useEffect(() => {
     setSentryTag("video.backup_exclusion", backupExclusionStatus);
     console.log(`[video] backup exclusion: ${backupExclusionStatus}`);
   }, []);
 
+  // Process-lifetime bindings: the keep-awake follows live runners and the
+  // notice follows backgrounding, whoever is signed in.
   React.useEffect(() => {
-    if (!userId) return;
+    bindUploadKeepAwake();
+    bindUploadBackgroundNotice();
+  }, []);
+
+  React.useEffect(() => {
+    if (!athleteId) return;
+    setUploadOwner(athleteId);
     const unbind = ensureUploadListeners();
     void resumeMatchVideoUploads();
     // Deliberately NOT unbinding on unmount: the listeners are what let an
@@ -56,7 +73,7 @@ export function VideoUploadBootstrap() {
     return () => {
       void unbind;
     };
-  }, [userId]);
+  }, [athleteId]);
 
   return null;
 }

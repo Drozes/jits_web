@@ -54,3 +54,45 @@ describe("PosterCard badges", () => {
     expect(utils.queryByTestId("film-card-badges")).toBeNull();
   });
 });
+
+describe("this phone's paused or failed upload on the card (jits-n2im.3/.4)", () => {
+  const { fireEvent } = require("@testing-library/react-native");
+
+  it("shows UPLOAD PAUSED with a Retry that does not open the match", () => {
+    const onPress = jest.fn();
+    const onRetry = jest.fn();
+    const utils = render(
+      <PosterCard item={libItem({ videos: [] })} status={{ kind: "paused", progress: 0.4 }} viewer={viewer} onPress={onPress} onRetry={onRetry} />,
+    );
+    expect(badgeTexts(utils)).toContain("UPLOAD PAUSED");
+    expect(utils.getAllByText("UPLOAD PAUSED").length).toBeGreaterThan(0);
+    fireEvent.press(utils.getByTestId("film-card-retry"));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it("shows UPLOAD FAILED, never NO FILM RECORDED, while the phone still owes the clip", () => {
+    const utils = render(
+      <PosterCard item={libItem({ videos: [] })} status={{ kind: "upload_failed", terminal: false }} viewer={viewer} onPress={jest.fn()} />,
+    );
+    expect(utils.queryByText("NO FILM RECORDED")).toBeNull();
+    expect(utils.getAllByText("UPLOAD FAILED").length).toBeGreaterThan(0);
+  });
+
+  it("says PROCESSING FILM, not 'after upload', once the film is on the server", () => {
+    const utils = render(
+      <PosterCard item={libItem({ videos: [libVideo({ poster_url: null })] })} status={{ kind: "none" }} viewer={viewer} onPress={jest.fn()} />,
+    );
+    expect(utils.getByText("PROCESSING FILM")).toBeTruthy();
+    expect(utils.queryByText(/AFTER UPLOAD/)).toBeNull();
+  });
+
+  it("keeps the compact Profile tile free of the Retry", () => {
+    const utils = render(
+      <PosterCard variant="compact" item={libItem({ videos: [] })} status={{ kind: "paused", progress: 0.4 }} viewer={viewer} onPress={jest.fn()} onRetry={jest.fn()} />,
+    );
+    expect(utils.queryByTestId("film-card-retry")).toBeNull();
+    expect(compactBadgeLabel({ kind: "paused", progress: null })).toBe("PAUSED");
+    expect(compactBadgeLabel({ kind: "upload_failed", terminal: true })).toBe("FAILED");
+  });
+});
