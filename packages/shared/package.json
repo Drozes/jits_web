@@ -17,6 +17,7 @@
     "./api/film-room": "./src/api/film-room.ts",
     "./api/match-rank-change": "./src/api/match-rank-change.ts",
     "./api/match-video-upload": "./src/api/match-video-upload.ts",
+    "./api/match-video-status": "./src/api/match-video-status.ts",
     "./api/athlete-weight": "./src/api/athlete-weight.ts",
     "./api/match-weights": "./src/api/match-weights.ts",
     "./api/match-weight-checks": "./src/api/match-weight-checks.ts",
