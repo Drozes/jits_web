@@ -661,6 +661,14 @@ function scheduleForegroundRetry(matchId: string): void {
  * Stop a run without landing it: persist the failure, tell the store, and
  * either arm the foreground retry (paused) or wait for the athlete (failed).
  */
+/** Causes where "Still can't upload. Check your connection." is the truth (R2-1). */
+const RETRY_FAILED_AGAIN_CLASSES: ReadonlySet<UploadErrorClass> = new Set<UploadErrorClass>([
+  "offline",
+  "server",
+  "unknown",
+  "not_allowed",
+]);
+
 async function park(
   job: PendingUploadJob,
   failure: { klass: UploadErrorClass; status: number | null; raw: string | null },
@@ -683,8 +691,11 @@ async function park(
   await patchUploadJob(job.matchId, { errorClass: klass, needsUser: failed });
   if (!isCurrent()) return stale();
   // The athlete tapped Try again and it failed again in this same run: the
-  // deck's "Still can't upload" (section 8), unless the cause is terminal.
-  const message = trigger === "retry" && !copy.terminal ? RETRY_FAILED_AGAIN_COPY : copy.message;
+  // deck's "Still can't upload. Check your connection." (section 8), but
+  // only for the causes that sentence is true of. Every other class (auth,
+  // daily limit, uploads off, not in cohort, save failed, terminal ones)
+  // keeps its own message, which says what is actually wrong.
+  const message = trigger === "retry" && RETRY_FAILED_AGAIN_CLASSES.has(klass) ? RETRY_FAILED_AGAIN_COPY : copy.message;
   setMatchUpload(job.matchId, {
     status: failed ? "error" : "paused",
     error: message,

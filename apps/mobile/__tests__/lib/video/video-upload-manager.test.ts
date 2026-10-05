@@ -25,6 +25,8 @@ const mockSetItemGate: { match: RegExp | null; wait: Promise<void> | null; reach
   wait: null,
   reached: null,
 };
+/** Holds the next removeItem open (the abandon's job delete). */
+const mockRemoveItemGate: { wait: Promise<void> | null; reached: (() => void) | null } = { wait: null, reached: null };
 jest.mock("@react-native-async-storage/async-storage", () => ({
   __esModule: true,
   default: {
@@ -38,6 +40,12 @@ jest.mock("@react-native-async-storage/async-storage", () => ({
       mockStore.set(key, value);
     },
     removeItem: async (key: string) => {
+      if (mockRemoveItemGate.wait) {
+        const wait = mockRemoveItemGate.wait;
+        mockRemoveItemGate.wait = null;
+        mockRemoveItemGate.reached?.();
+        await wait;
+      }
       mockStore.delete(key);
     },
     getAllKeys: async () => [...mockStore.keys()],
@@ -1531,5 +1539,70 @@ describe("review fixes", () => {
     expect(raw).not.toMatch(/supabase\.co|SECRETID|secret body/);
     expect(raw).toMatch(/<url>/);
     expect(raw.length).toBeLessThanOrEqual(300);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Round 2 review fixes (R2-1, file-missing guard)
+// ---------------------------------------------------------------------------
+
+describe("round 2 review fixes", () => {
+  it("R2-1: a failed Try again keeps its own message for an auth cause", async () => {
+    seedJob({ needsUser: true, errorClass: "not_allowed" });
+    mockUploadFileResumable.mockRejectedValue(httpError(401));
+    await retryMatchVideoUpload("M1");
+    for (let i = 0; i < UPLOAD_MAX_ATTEMPTS * 2; i++) await flush();
+    expect(getMatchUpload("M1")).toMatchObject({ status: "paused", error: describeUploadFailure("auth").message });
+  });
+
+  it.each([
+    ["rate_limited", "limit"],
+    ["disabled", "disabled"],
+    ["not_in_cohort", "not_in_cohort"],
+  ] as const)("R2-1: a failed Try again on the %s gate keeps the gate's message", async (gate, klass) => {
+    seedJob({ phase: "row", needsUser: true, errorClass: klass });
+    mockWriteMatchVideoRow.mockRejectedValue(Object.assign(new Error("gated"), { gate }));
+    await retryMatchVideoUpload("M1");
+    for (let i = 0; i < 4; i++) await flush();
+    expect(getMatchUpload("M1")?.error).toBe(describeUploadFailure(klass).message);
+  });
+
+  it("R2-1: a failed Try again on a save failure keeps its own message", async () => {
+    seedJob({ phase: "row", needsUser: true, errorClass: "not_allowed" });
+    mockWriteMatchVideoRow.mockRejectedValue(new Error("row write failed"));
+    await retryMatchVideoUpload("M1");
+    for (let i = 0; i < ROW_MAX_ATTEMPTS * 2; i++) await flush();
+    expect(getMatchUpload("M1")?.error).toBe(describeUploadFailure("save_failed").message);
+  });
+
+  it.each([
+    ["offline", new Error("Network request failed")],
+    ["server", null],
+  ] as const)("R2-1: a failed Try again with a %s cause says Still can't upload", async (_klass, err) => {
+    seedJob({ needsUser: true, errorClass: "not_allowed" });
+    mockUploadFileResumable.mockRejectedValue(err ?? httpError(503));
+    await retryMatchVideoUpload("M1");
+    for (let i = 0; i < UPLOAD_MAX_ATTEMPTS * 2; i++) await flush();
+    expect(getMatchUpload("M1")?.error).toBe("Still can't upload. Check your connection.");
+  });
+
+  it("file-missing guard: a run that loses its slot during the abandon never writes the wiped store", async () => {
+    // Hold the abandon's job delete and sign out inside it.
+    let release: () => void = () => undefined;
+    const reached = new Promise<void>((res) => {
+      mockRemoveItemGate.reached = res;
+    });
+    mockRemoveItemGate.wait = new Promise<void>((res) => (release = res));
+    seedJob();
+    mockGetRecordingSize.mockResolvedValue(null);
+
+    void resumeMatchVideoUploads();
+    await reached;
+    stopMatchVideoUploadsForSignOut();
+    release();
+    for (let i = 0; i < 3; i++) await flush();
+
+    expect(getMatchUpload("M1")).toBeNull();
+    expect(await loadUploadJob("M1")).toBeNull();
   });
 });

@@ -117,3 +117,14 @@ describe("this phone's paused or failed upload on the card (jits-n2im.3/.4)", ()
     expect(compactBadgeLabel({ kind: "failed" })).toBe("FAILED");
   });
 });
+
+describe("DIDN'T UPLOAD badge tone (R2-2, deck 0.6)", () => {
+  const { toneFor } = require("@/components/film-room/status-badge");
+
+  it("is red only while Try again can work, grey when terminal", () => {
+    expect(toneFor({ kind: "upload_failed", terminal: false })).toBe("red");
+    expect(toneFor({ kind: "upload_failed", terminal: true })).toBe("muted");
+    // The server's processing failure is unchanged.
+    expect(toneFor({ kind: "failed" })).toBe("red");
+  });
+});
