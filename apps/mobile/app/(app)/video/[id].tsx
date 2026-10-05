@@ -16,6 +16,7 @@ import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { AngleSwitcher } from "@/components/film-room/angle-switcher";
 import { SeekBar } from "@/components/film-room/seek-bar";
 import { MomentCaption, MomentChips, Transport, nextSpeed } from "@/components/film-room/player-controls";
+import type { PlaybackAngle } from "@/lib/video/playback-telemetry";
 import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useVideoAnalysis } from "@/lib/film-room/use-video-analysis";
@@ -32,6 +33,12 @@ const CURRENT_HOLD_S = 10;
  * moment, ±10 s, speed, and the angle switcher when both athletes recorded.
  * `?t=<seconds>` starts playback there (key moments link in with it).
  *
+ * An angle switch happens in place (multi-angle P0): the screen, the player
+ * and the telemetry session stay; the other angle's (pre-signed) URL is
+ * swapped in at the exact translated position, keeping play/pause and speed.
+ * The route params follow along (`setParams`) only so the URL names what is
+ * on screen; nothing is keyed on them.
+ *
  * `useVideoPlayback` signs a 1-hour URL (normalized MP4 preferred), re-signs
  * silently once when the player errors and resumes where it was. The player is
  * expo-video (jits-n2im.19), linked in the field build since the reels, so
@@ -47,8 +54,14 @@ export default function MatchVideoScreen() {
   const start = t != null && Number.isFinite(Number(t)) ? Number(t) : null;
   // Full-screen video: no app-wide upload strip over it (jits-n2im.2).
   useSuppressUploadStrip({ kind: "all" });
-  // Keyed by id: switching angles remounts the player on the other recording.
-  return <PlayerBody key={id ?? "none"} id={id} start={start} approximate={approx === "1"} />;
+  // NOT keyed by id: an angle switch must keep the screen and the player.
+  return <PlayerBody id={id} start={start} approximate={approx === "1"} />;
+}
+
+/** The telemetry angle of a recording: the sideline one is "timekeeper", never "opponent". */
+export function playbackAngleOf(v: { is_mine: boolean; recording_type?: string | null }): PlaybackAngle {
+  if (v.recording_type === "timekeeper") return "timekeeper";
+  return v.is_mine ? "mine" : "opponent";
 }
 
 /** How long the "not synced" note stays up after an angle switch. */
@@ -59,26 +72,40 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   const insets = useSafeAreaInsets();
   const playback = useVideoPlayback(id, start);
   const { phase, source, stateLabel, player, retry, positionS, durationS, playing, seek, toggle, telemetry } = playback;
+  const activeId = playback.activeId;
   const details = useMatchDetail(source?.matchId ?? undefined);
-  const { analysis } = useVideoAnalysis(id ?? null);
+  const { analysis } = useVideoAnalysis(activeId ?? null);
   const [offsets, setOffsets] = React.useState<Record<string, number | null>>({});
-  const [showApprox, setShowApprox] = React.useState(approximate);
+  // The note's start time: a new unsynced switch restarts its 5 s.
+  const [approxAt, setApproxAt] = React.useState<number | null>(approximate ? Date.now() : null);
+  const showApprox = approxAt != null;
 
   React.useEffect(() => {
-    if (!showApprox) return;
-    const timer = setTimeout(() => setShowApprox(false), APPROX_NOTE_MS);
+    if (approxAt == null) return;
+    const timer = setTimeout(() => setApproxAt(null), APPROX_NOTE_MS);
     return () => clearTimeout(timer);
-  }, [showApprox]);
+  }, [approxAt]);
 
   const duration = durationS || source?.durationSeconds || 0;
   const view = details.state === "ready" ? details.data : null;
-  const thisAngle = view?.videos.find((v) => v.id === id);
-  const angleMeta = thisAngle ? (thisAngle.is_mine ? "mine" : "opponent") : null;
+  // One telemetry session per screen: its angle is the one it opened on.
+  const [entryId] = React.useState(id);
+  const entryAngle = view?.videos.find((v) => v.id === entryId);
+  const angleMeta = entryAngle ? playbackAngleOf(entryAngle) : null;
   const angleCount = view ? view.videos.length : null;
   React.useEffect(() => {
     if (angleMeta) telemetry.setMeta({ angle: angleMeta, angleCount });
   }, [telemetry, angleMeta, angleCount]);
   const angleIds = view && view.videos.length > 1 ? view.videos.map((v) => v.id).join(",") : "";
+  // Sign every other playable angle as soon as the match is known, so a
+  // switch does not wait on the sign round trip.
+  const playableIds = view
+    ? view.videos.filter((v) => v.playability == null || v.playability === "playable").map((v) => v.id).join(",")
+    : "";
+  const { presign } = playback;
+  React.useEffect(() => {
+    if (playableIds) presign(playableIds.split(","));
+  }, [presign, playableIds]);
   React.useEffect(() => {
     if (!angleIds) return;
     let cancelled = false;
@@ -142,20 +169,23 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
           <FilmScrim stops={[[0, 0.75], [1, 0]]} style={{ left: 0, right: 0, top: 0, height: insets.top + 150 }} />
           <FilmScrim stops={[[0, 0], [1, 0.9]]} style={{ left: 0, right: 0, bottom: 0, height: "45%" }} />
           {topBar}
-          {view && view.videos.length > 1 && id ? (
+          {view && view.videos.length > 1 && activeId ? (
             <View style={{ position: "absolute", left: 16, right: 16, top: insets.top + 60 }}>
               <AngleSwitcher
                 variant="film"
                 angles={view.videos}
-                activeId={id}
+                activeId={activeId}
                 opponentName={view.opponent?.display_name}
                 onSelect={(other) => {
-                  if (other === id) return;
-                  // Synced only when both recordings carry sync_offset_ms. Nothing
-                  // in the backend writes it yet (see translateAngleTime), so in
-                  // practice this carries the second and says it is approximate.
-                  const moved = translateAngleTime(positionS, offsets[id], offsets[other]);
-                  router.setParams({ id: other, t: String(Math.floor(moved.t)), approx: moved.synced ? "0" : "1" });
+                  if (other === activeId) return;
+                  // Synced when both recordings carry sync_offset_ms (the
+                  // slicer writes it; primary = 0). The position is the
+                  // player's own, carried in fractional seconds: flooring it
+                  // threw away up to 999 ms of a 20 to 40 ms audio sync.
+                  const moved = translateAngleTime(playback.currentTimeNow(), offsets[activeId], offsets[other]);
+                  playback.switchAngle(other, moved.t);
+                  setApproxAt(moved.synced ? null : Date.now());
+                  router.setParams({ id: other, t: moved.t.toFixed(3), approx: moved.synced ? "0" : "1" });
                 }}
               />
             </View>

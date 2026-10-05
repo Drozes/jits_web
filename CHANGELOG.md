@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Match player: angle switch in place (multi-angle P0)
+
+JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): uses only expo-video 3.0.16 APIs build 25 already links (`replaceAsync`, `currentTime`, `pause`, `playbackRate`, `onFirstFrameRender`). No backend change. Research: `research/2026-10-multi-angle-playback/`.
+
+**Fixed**
+- An angle switch no longer remounts the player screen (`apps/mobile/app/(app)/video/[id].tsx` keyed `PlayerBody` on the route id): the same expo-video player swaps the other angle's URL in, so there is no new player, no new telemetry session, and no reset of speed or play/pause.
+- The switch carries the position in fractional seconds read from the player at the tap (`currentTimeNow`), through `translateAngleTime`, instead of `Math.floor` of a value up to 250 ms stale; a paused athlete lands paused, a playing one keeps playing at the same speed.
+- The outgoing frame is held while the new angle loads (no flash of the new angle's start-of-match poster).
+- Playback telemetry logs a timekeeper's angle as `timekeeper`, not `opponent`; `angleCount` can be 3.
+
+**Changed**
+- `useVideoPlayback` (`apps/mobile/lib/match-detail/use-video-playback.ts`) owns the active angle (`activeId`, `switchAngle`), pre-signs every playable angle when the screen learns them (`presign`; a URL older than 45 min is re-signed at the switch), and exposes `currentTimeNow`.
+- One playback telemetry session per screen across switches, with `switchCount`, `switchLatencyMs` (median, tap to the new angle's first frame) and `switchLatencyMaxMs` (`apps/mobile/lib/video/playback-telemetry.ts`).
+- The route params follow the angle on screen (`setParams`, `t` with millisecond precision) without driving it.
+
 ### Match video status UX: Film status plate, upload strip, Best angle, video push landing (jits-n2im.25, .2, .15, .13)
 
 JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25): no native dependency, no `app.json` / `app.config.js` / `eas.json` / metro / babel change; uses only `AccessibilityInfo`, `AppState` and supabase-js realtime, all in build 25. **Needs the jr_be wave B migrations `20261006100000` to `20261006100200` (live in prod, 2026-10-05).** The fusion fields (section 12) are NULL in prod (`multi_angle_highlights_enabled = false`), and the client never claims a multi-angle highlight without them. Copy: COPY-DECK v2.3 (sections 13 and 14 added).

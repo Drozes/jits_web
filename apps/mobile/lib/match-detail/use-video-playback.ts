@@ -42,9 +42,37 @@ export interface PlaybackSource {
   durationSeconds: number | null;
   /** Bumped on every sign, so the player reloads even an identical URL. */
   generation: number;
+  /**
+   * Loaded by an angle switch while a frame of the previous angle was on
+   * screen: that frame stays up until the new one draws (never the poster,
+   * which is the start of the match).
+   */
+  holdFrame?: boolean;
 }
 
 export interface VideoPlayback {
+  /**
+   * The angle on screen. Starts as the route's id and moves with
+   * `switchAngle`, which keeps this screen, this player and its telemetry
+   * session (a switch used to remount all three).
+   */
+  activeId: string | undefined;
+  /**
+   * Switch to another angle of the same match at `atSeconds` of ITS file
+   * (already translated through the sync offsets, in fractional seconds:
+   * never floored). Keeps the play/pause intent and the speed, swaps the
+   * new angle's URL (pre-signed when `presign` got to it) into the same
+   * player, and holds the outgoing frame instead of the poster.
+   */
+  switchAngle: (nextId: string, atSeconds: number) => void;
+  /** Sign these angles now (best effort) so a switch to one skips the round trip. */
+  presign: (ids: string[]) => void;
+  /**
+   * The exact playback position right now, read from the player (a seek in
+   * flight answers with its target). `positionS` trails it by up to one
+   * 250 ms time update, too coarse to carry across a switch.
+   */
+  currentTimeNow: () => number;
   phase: PlaybackPhase;
   source: PlaybackSource | null;
   stateLabel: PlayerStateLabel;
@@ -93,6 +121,11 @@ const END_EPSILON_S = 0.5;
  * at once). The resume seek then lands on the later readyToPlay.
  */
 const AUTOPLAY_FALLBACK_MS = 3000;
+/**
+ * A signed URL lives 1 h; a pre-signed one older than this is signed again
+ * at the switch rather than risk it expiring mid-angle.
+ */
+const PRESIGN_FRESH_MS = 45 * 60 * 1000;
 
 function phaseFor(result: Result<MatchVideoPlayback | null>): PlaybackPhase {
   if (!result.ok) {
@@ -129,6 +162,14 @@ function safely(fn: () => void): void {
  * are ignored (the item being replaced can still report). `retry` always
  * re-signs and resets both limits.
  *
+ * Angle switch (multi-angle P0): the screen no longer remounts on a switch.
+ * `switchAngle` swaps the other angle's URL into this same player at the
+ * translated position in fractional seconds, keeps the play/pause intent and
+ * the speed, holds the outgoing frame instead of flashing the poster, and
+ * keeps the one telemetry session (it counts the switch and times tap to the
+ * new angle's first frame). `presign` signs the other playable angles when
+ * the screen learns them, so a switch normally skips the sign round trip.
+ *
  * Silent switch: expo-video always runs the iOS audio session in the
  * `.playback` category, so the film is audible with the ringer off (expo-av
  * needed `playsInSilentModeIOS`).
@@ -138,7 +179,15 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     p.timeUpdateEventInterval = TIME_UPDATE_S;
     p.preservesPitch = true;
   });
+  // One session per screen: `videoId` stays the angle it opened on.
   const telemetry = usePlaybackTelemetry(player, { surface: "match", videoId: id ?? null, angle: null, angleCount: null });
+  const [activeId, setActiveId] = React.useState(id);
+  const activeIdRef = React.useRef(id);
+  /** Signed sources by angle id (the active one and every pre-signed one). */
+  const signedRef = React.useRef(new Map<string, { data: MatchVideoPlayback; at: number }>());
+  const presigningRef = React.useRef(new Set<string>());
+  /** The generation an angle switch loaded, until its first frame shows. */
+  const switchGenRef = React.useRef<number | null>(null);
 
   const [phase, setPhase] = React.useState<PlaybackPhase>("loading");
   const [source, setSource] = React.useState<PlaybackSource | null>(null);
@@ -150,6 +199,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const [playing, setPlaying] = React.useState(true);
   const [rate, setRate] = React.useState(1);
   const [frameGen, setFrameGen] = React.useState<number | null>(null);
+  const frameGenRef = React.useRef<number | null>(null);
+  frameGenRef.current = frameGen;
 
   const epochRef = React.useRef(0);
   // A `?t=` start is just a resume point the first load seeks to.
@@ -177,9 +228,33 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     };
   }, []);
 
+  /** Hand a signed source to the player, resuming at the current position. */
+  const attach = React.useCallback(
+    (data: MatchVideoPlayback, epoch: number, holdFrame: boolean) => {
+      const resumeAt = positionRef.current > 0 ? positionRef.current : null;
+      resumeAtRef.current = resumeAt;
+      progressBaseRef.current = resumeAt ?? 0;
+      loadedRef.current = false;
+      setLoaded(false);
+      const nextSource: PlaybackSource = {
+        url: data.url,
+        posterUrl: data.posterUrl,
+        matchId: data.matchId ?? null,
+        durationSeconds: data.durationSeconds ?? null,
+        generation: epoch,
+        ...(holdFrame ? { holdFrame: true } : null),
+      };
+      sourceRef.current = nextSource;
+      setSource(nextSource);
+      telemetry.sourceAttached(data.sourceKind ?? "original");
+    },
+    [telemetry],
+  );
+
   const sign = React.useCallback(
-    async (silent: boolean) => {
-      if (!id) {
+    async (silent: boolean, opts: { switched?: boolean; holdFrame?: boolean } = {}) => {
+      const target = activeIdRef.current;
+      if (!target) {
         telemetry.signOutcome("absent");
         setPhase("absent");
         return;
@@ -187,32 +262,22 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       const epoch = ++epochRef.current;
       signingRef.current = true;
       if (!silent) setPhase("loading");
-      const result = await getMatchVideoPlaybackResult(supabase, id);
-      // A newer sign started, or the screen unmounted.
+      const result = await getMatchVideoPlaybackResult(supabase, target);
+      // A newer sign (or switch) started, or the screen unmounted.
       if (epoch !== epochRef.current) return;
       signingRef.current = false;
       const next = phaseFor(result);
       telemetry.signOutcome(next === "ready" ? "ok" : next === "loading" ? "pending" : next);
       if (next === "ready" && result.ok && result.data) {
-        const resumeAt = positionRef.current > 0 ? positionRef.current : null;
-        resumeAtRef.current = resumeAt;
-        progressBaseRef.current = resumeAt ?? 0;
-        loadedRef.current = false;
-        setLoaded(false);
-        const nextSource = {
-          url: result.data.url,
-          posterUrl: result.data.posterUrl,
-          matchId: result.data.matchId ?? null,
-          durationSeconds: result.data.durationSeconds ?? null,
-          generation: epoch,
-        };
-        sourceRef.current = nextSource;
-        setSource(nextSource);
-        telemetry.sourceAttached(result.data.sourceKind ?? "original");
+        signedRef.current.set(target, { data: result.data, at: Date.now() });
+        if (opts.switched) switchGenRef.current = epoch;
+        attach(result.data, epoch, opts.holdFrame === true);
+      } else if (opts.switched) {
+        switchGenRef.current = null;
       }
       setPhase(next);
     },
-    [id, telemetry],
+    [telemetry, attach],
   );
 
   React.useEffect(() => {
@@ -224,6 +289,21 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       signingRef.current = false;
     };
   }, [sign, attempt]);
+
+  // The route moved to a recording this hook did not switch to (an outside
+  // navigation reusing the screen): load it from the top like a fresh open.
+  React.useEffect(() => {
+    if (id === activeIdRef.current) return;
+    activeIdRef.current = id;
+    setActiveId(id);
+    switchGenRef.current = null;
+    positionRef.current = 0;
+    setPositionS(0);
+    holdRef.current = null;
+    streakRef.current = false;
+    silentCountRef.current = 0;
+    void sign(false);
+  }, [id, sign]);
 
   const retry = React.useCallback(() => setAttempt((n) => n + 1), []);
 
@@ -296,6 +376,18 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     autoplayTimerRef.current = null;
   };
   React.useEffect(() => clearAutoplayTimer, []);
+
+  /** A frame of generation `gen` is on screen (lifts the poster; ends a switch's wait). */
+  const frameLanded = React.useCallback(
+    (gen: number) => {
+      setFrameGen(gen);
+      if (switchGenRef.current === gen) {
+        switchGenRef.current = null;
+        telemetry.switchLanded();
+      }
+    },
+    [telemetry],
+  );
 
   // Swap each newly signed URL into the one player. Only the latest swap's
   // outcome counts; a superseded swap that settles after it reloads the
@@ -392,7 +484,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
           if (currentTime > progressBaseRef.current + 0.1 && sourceRef.current) {
             // Moving past the start point means a frame is on screen (the
             // fallback for an onFirstFrameRender that iOS can skip).
-            setFrameGen(sourceRef.current.generation);
+            frameLanded(sourceRef.current.generation);
           }
           if (streakRef.current && currentTime > progressBaseRef.current + PROGRESS_S) {
             streakRef.current = false;
@@ -407,7 +499,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     return () => {
       for (const sub of subs) safely(() => sub.remove());
     };
-  }, [player, markLoaded]);
+  }, [player, markLoaded, frameLanded]);
 
   // expo-video pauses in the background (staysActiveInBackground is off):
   // show it paused, so the athlete resumes with Play instead of a Pause
@@ -466,8 +558,76 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const onFirstFrameRender = React.useCallback(() => {
     telemetry.firstFrame();
     const current = sourceRef.current;
-    if (current && settledGenRef.current === current.generation) setFrameGen(current.generation);
-  }, [telemetry]);
+    if (current && settledGenRef.current === current.generation) frameLanded(current.generation);
+  }, [telemetry, frameLanded]);
+
+  const currentTimeNow = React.useCallback(() => {
+    // A seek (or a switch's resume seek) in flight: its target is the truth.
+    const hold = holdRef.current;
+    if (hold) return hold.at;
+    if (!loadedRef.current) return positionRef.current;
+    let t = positionRef.current;
+    safely(() => {
+      const now = player.currentTime;
+      if (Number.isFinite(now) && now >= 0) t = now;
+    });
+    return t;
+  }, [player]);
+
+  const switchAngle = React.useCallback(
+    (nextId: string, atSeconds: number) => {
+      if (!nextId || nextId === activeIdRef.current) return;
+      const at = Number.isFinite(atSeconds) && atSeconds > 0 ? atSeconds : 0;
+      telemetry.switchStarted();
+      // Hold the outgoing frame only if one is up (else the poster stays).
+      const current = sourceRef.current;
+      const holdFrame = current != null && (frameGenRef.current === current.generation || current.holdFrame === true);
+      activeIdRef.current = nextId;
+      setActiveId(nextId);
+      // The new file resumes exactly here; play intent and speed carry over
+      // untouched (the play-intent effect re-applies them once it loads).
+      positionRef.current = at;
+      setPositionS(at);
+      holdRef.current = null;
+      durationRef.current = 0;
+      setDurationS(0);
+      // A different file: its own re-sign budget.
+      streakRef.current = false;
+      silentCountRef.current = 0;
+      // Stop the outgoing angle so it does not run on (or the new item start
+      // from 0 at the old rate) before the resume seek lands.
+      safely(() => player.pause());
+      const cached = signedRef.current.get(nextId);
+      if (cached && Date.now() - cached.at < PRESIGN_FRESH_MS) {
+        const epoch = ++epochRef.current;
+        signingRef.current = false;
+        switchGenRef.current = epoch;
+        attach(cached.data, epoch, holdFrame);
+        setPhase("ready");
+        return;
+      }
+      void sign(true, { switched: true, holdFrame });
+    },
+    [player, telemetry, attach, sign],
+  );
+
+  const presign = React.useCallback((ids: string[]) => {
+    for (const vid of ids) {
+      if (!vid || vid === activeIdRef.current || presigningRef.current.has(vid)) continue;
+      const cached = signedRef.current.get(vid);
+      if (cached && Date.now() - cached.at < PRESIGN_FRESH_MS) continue;
+      presigningRef.current.add(vid);
+      void getMatchVideoPlaybackResult(supabase, vid)
+        .then((result) => {
+          if (!mountedRef.current) return;
+          if (result.ok && result.data && result.data.playability !== "processing") {
+            signedRef.current.set(vid, { data: result.data, at: Date.now() });
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => presigningRef.current.delete(vid));
+    }
+  }, []);
 
   const stateLabel: PlayerStateLabel =
     phase === "ready"
@@ -479,6 +639,10 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         : phase;
 
   return {
+    activeId,
+    switchAngle,
+    presign,
+    currentTimeNow,
     phase,
     source,
     stateLabel,
@@ -492,7 +656,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     seek,
     rate,
     setRate,
-    frameShown: source != null && frameGen === source.generation,
+    frameShown: source != null && (frameGen === source.generation || source.holdFrame === true),
     onFirstFrameRender,
     telemetry,
   };
