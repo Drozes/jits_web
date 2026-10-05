@@ -1156,6 +1156,7 @@ async function runJob(
   await removeUploadJob(current.matchId);
   releaseRecording(current.fileUri);
   clearRetryTimer(current.matchId);
+  if (current.videoId) lastHeartbeatAt.delete(current.videoId);
   setMatchUpload(current.matchId, {
     status: "uploaded",
     videoId,
