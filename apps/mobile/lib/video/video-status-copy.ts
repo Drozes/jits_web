@@ -35,6 +35,8 @@ export const PHASE_TAG = {
   uploading: "Uploading",
   /** v2.4: bytes in, analysis running (COPY-DECK 14 item 8). */
   analyzing: "Analyzing",
+  /** v2.5: bytes in but not playable yet (still merging). */
+  processing: "Processing",
   anySecond: "Any second now",
   waiting: "Waiting",
   building: "Building",
@@ -56,6 +58,8 @@ export const PHASE_COPY = {
   collectingOneLine: "Your film is on its way.",
   /** v2.4 (coordinator 2026-10-05): film in, analysis running. */
   filmInLine: "Your film is in. Analyzing now.",
+  /** v2.5 (coordinator 2026-10-05): another angle is in, the viewer's own is still coming. */
+  filmComingInLine: "Film is coming in. Analyzing what's here so far.",
   collectingOneHelper: `Your ${TERM} starts as soon as it's in.`,
   collectingManyLine: (k: number) => `Film is coming in from ${k} phones.`,
   /** Multi-angle claim: only when the server's fusion fields are live. */

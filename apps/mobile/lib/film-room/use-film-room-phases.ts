@@ -45,6 +45,14 @@ function fingerprint(s: MatchVideoStatus): string {
 // ---- one cache for every surface (the Film Room screen and the Profile preview) ----
 
 const cache = new Map<string, Entry>();
+/**
+ * Consecutive failed reads per id (round 2 B1): the next attempt waits
+ * `phaseBackoffMs(count - 1)` after the last one, and after
+ * `PHASE_MAX_FAILURES` the id is not re-read until the next focus, pull or
+ * library re-read. A failure is never retried at once.
+ */
+const failures = new Map<string, { count: number; lastAttemptAt: number }>();
+export const PHASE_MAX_FAILURES = 5;
 const inflight = new Map<string, Promise<void>>();
 const interests = new Map<number, string[]>();
 const listeners = new Set<() => void>();
@@ -65,8 +73,12 @@ function fetchOne(id: string): Promise<void> {
   const running = inflight.get(id);
   if (running) return running;
   const p = (async () => {
-    const res = await getMatchVideoStatus(supabase, id);
-    if (res.ok) {
+    const res = await getMatchVideoStatus(supabase, id).catch(() => ({ ok: false as const }));
+    if (!res.ok) {
+      const f = failures.get(id);
+      failures.set(id, { count: (f?.count ?? 0) + 1, lastAttemptAt: Date.now() });
+    } else {
+      failures.delete(id);
       const now = Date.now();
       const server = res.data.server_now ? Date.parse(res.data.server_now) : NaN;
       const prev = cache.get(id);
@@ -88,6 +100,8 @@ function fetchOne(id: string): Promise<void> {
 }
 
 function dueAt(id: string): number | null {
+  const f = failures.get(id);
+  if (f) return f.count >= PHASE_MAX_FAILURES ? null : f.lastAttemptAt + phaseBackoffMs(f.count - 1);
   const e = cache.get(id);
   if (!e) return 0;
   return isMoving(e.status, e.offset, Date.now()) ? e.fetchedAt + phaseBackoffMs(e.quiet) : null;
@@ -118,7 +132,12 @@ function reschedule(): void {
 export function watchMatchPhases(ids: string[]): () => void {
   const token = ++seq;
   interests.set(token, ids);
-  for (const id of ids) if (!cache.has(id)) void fetchOne(id);
+  for (const id of ids) {
+    // A focus is a fresh start for an id that gave up after its failures.
+    const f = failures.get(id);
+    if (f && f.count >= PHASE_MAX_FAILURES) failures.delete(id);
+    if (!cache.has(id) && !failures.has(id)) void fetchOne(id);
+  }
   reschedule();
   return () => {
     interests.delete(token);
@@ -131,6 +150,7 @@ export function refreshMatchPhases(ids: string[]): void {
   for (const id of ids) {
     const e = cache.get(id);
     if (e) cache.set(id, { ...e, quiet: 0 });
+    failures.delete(id);
     void fetchOne(id);
   }
 }
@@ -148,6 +168,7 @@ export function __resetFilmRoomPhasesForTests(): void {
   if (timer) clearTimeout(timer);
   timer = null;
   cache.clear();
+  failures.clear();
   inflight.clear();
   interests.clear();
   version = 0;

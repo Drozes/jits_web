@@ -117,6 +117,8 @@ export interface FilmStatusInput {
 
 const PENDING: ReadonlySet<MatchVideoAngleState> = new Set(["waiting_for_phone", "uploading", "upload_paused", "processing"]);
 const IN_FLIGHT: ReadonlySet<MatchVideoAngleState> = new Set(["uploading", "processing", "ready"]);
+/** The viewer's own angle is still on its way to the server. */
+const COMING: ReadonlySet<MatchVideoAngleState> = new Set(["waiting_for_phone", "uploading", "upload_paused"]);
 
 function iso(v: string | null): number | null {
   if (!v) return null;
@@ -449,17 +451,29 @@ function derivePhase(c: Ctx): PhaseOut {
       if (s.phase_reason === "no_video_yet" && !ownJobActive) {
         return phaseOut("no_video_yet", PHASE_TAG.noVideoYet, "info", PHASE_COPY.noVideoLine, PHASE_COPY.noVideoHelper);
       }
-      // v2.4 (M2): bytes are in for an angle and analysis is running. Never
-      // "Uploading" / "on its way" beside a strip that says it uploaded.
-      if (live.some((a) => a.state === "processing")) {
-        return phaseOut("collecting_in", PHASE_TAG.analyzing, "waiting", PHASE_COPY.filmInLine);
-      }
       // Nothing else is coming and mine never will: no film from this phone's view.
       if (mineGone && !ownJobActive && pending.length === 0 && !live.some((a) => IN_FLIGHT.has(a.state))) {
         return phaseOut("no_film_here", PHASE_TAG.noFilm, "info", PHASE_COPY.noFilmLine, tk ? TIMEKEEPER_PHASE_COPY.noFilmHelper : PHASE_COPY.noneUsableHelper);
       }
+      // The timekeeper keeps its own 4b copy, before the analysing variants.
       if (tk) {
         return phaseOut("collecting", PHASE_TAG.uploading, "progress", TIMEKEEPER_PHASE_COPY.collectingLine, ownJobActive ? c.keepOpen : null);
+      }
+      // v2.4 / v2.5 (review M2, R2-M1): bytes are in for an angle and analysis
+      // is running. "Your film is in" only when the processing angle is the
+      // viewer's own and nothing of theirs is still coming; otherwise (the
+      // opponent finished first) "Film is coming in. Analyzing what's here so
+      // far." The tag says Analyzing only when a processing angle already
+      // plays, else Processing (still merging), matching its row.
+      const processing = live.filter((a) => a.state === "processing");
+      if (processing.length > 0) {
+        const mine = live.find((a) => a.recorder_athlete_id === c.viewerId) ?? null;
+        const mineComing = ownJobActive || (mine != null && COMING.has(mine.state));
+        const mineIn = processing.some((a) => a.recorder_athlete_id === c.viewerId);
+        const tag = processing.some((a) => canPlay(a, c)) ? PHASE_TAG.analyzing : PHASE_TAG.processing;
+        return mineIn && !mineComing
+          ? phaseOut("collecting_in", tag, "waiting", PHASE_COPY.filmInLine)
+          : phaseOut("collecting_in_partial", tag, "waiting", PHASE_COPY.filmComingInLine);
       }
       const k = Math.max(s.angles_expected - (mineGone ? 1 : 0), ownJobActive ? 1 : 0);
       const line = k >= 2 ? PHASE_COPY.collectingManyLine(k) : PHASE_COPY.collectingOneLine;
@@ -549,7 +563,11 @@ const PROMISE_KEYS = /^(collecting_(one|many)|waiting_|building_|ready_late)/;
  * (wave 2 hid the note for the same reason): the line stays, the helper goes.
  */
 function withoutPromises(ph: PhaseOut, disputed: boolean): PhaseOut {
-  return disputed && PROMISE_KEYS.test(ph.key) ? { ...ph, helper: null } : ph;
+  if (!disputed) return ph;
+  // Building implies a ready angle: on a disputed match it reads as film
+  // only, never "Building your highlight" (round 2 nit).
+  if (ph.key.startsWith("building_")) return { ...ph, key: "disputed_film", tag: PHASE_TAG.filmReady, tone: "done", line: PHASE_COPY.filmOnlyLine, helper: null };
+  return PROMISE_KEYS.test(ph.key) ? { ...ph, helper: null } : ph;
 }
 
 export function deriveFilmStatus(input: FilmStatusInput): FilmStatusView {

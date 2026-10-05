@@ -40,14 +40,14 @@ describe("FilmStatusPlate", () => {
     );
     const s = render(<FilmStatusPlate matchId={MATCH_ID} view={view} />);
     expect(s.getByText("FILM STATUS")).toBeTruthy();
-    // Their bytes are in and analysing (v2.4): the phase says so, my row keeps its own state.
-    expect(s.getByText("ANALYZING")).toBeTruthy();
-    expect(s.getByText("Your film is in. Analyzing now.")).toBeTruthy();
+    // Their bytes are in, mine is still coming (v2.5): never "Your film is in"; the
+    // tag matches their row (Processing, not playable yet).
+    expect(s.getByText("Film is coming in. Analyzing what's here so far.")).toBeTruthy();
+    expect(s.getAllByText("PROCESSING")).toHaveLength(2);
     expect(s.getByText("YOUR ANGLE")).toBeTruthy();
     expect(s.getByText("PAUSED")).toBeTruthy();
     expect(s.getByText("No connection right now. It picks up where it left off.")).toBeTruthy();
     expect(s.getByText("D. OKAFOR'S ANGLE")).toBeTruthy();
-    expect(s.getByText("PROCESSING")).toBeTruthy();
   });
 
   it("Try again is its own 44 px control with the deck's label and calls the retry", () => {

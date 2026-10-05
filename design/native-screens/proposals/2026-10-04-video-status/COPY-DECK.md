@@ -2,6 +2,7 @@
 
 v2.3 (2026-10-05, with the build, jits-n2im.25 / .15): section 13 (Best angle) and section 14 (build notes) added; sections 0 to 12 unchanged.
 v2.4 (2026-10-05, coordinator decisions on the PR #52 review): section 14 items 8 to 11 (film in and analysing, the viewer's own highlight outcome, disputed results, a Discarded clip).
+v2.5 (2026-10-05, review round 2): section 14 item 12 (whose film is in, the Processing tag, the disputed building line, the Discard marker across restarts).
 
 Status: DRAFT v2.2, 2026-10-05: v2 plus the round 2 changes (`REVIEW-round2.md`: N1, N2, m1 to m7, nits) and the owner's naming decisions (Timekeeper kept; both shipped nouns kept). Not published. This version
 applies every finding in `REVIEW-round1.md` (B1, B2, M1 to M14, the minors and the nits) and the
@@ -468,3 +469,15 @@ derives the one view every surface renders.
     counts as coming: when nothing else is coming either, the plate reads `No film for this match.` /
     `None of the video could be used. Your result and rating aren't affected.` A terminal local
     failure never forces "Your film is on its way" over the server's "No video yet".
+12. **v2.5: whose film is in (coordinator decision 2026-10-05, review round 2 R2-M1).** Item 8's
+    `Your film is in. Analyzing now.` shows ONLY when the processing angle is the viewer's own and
+    nothing of the viewer's is still coming (no local job running, own angle not waiting for its
+    phone, uploading or paused). Otherwise, for example when the opponent's upload finished first
+    while the viewer's own still uploads, the line is `Film is coming in. Analyzing what's here so
+    far.` The phase tag is `Analyzing` only when a processing angle already plays; while none does
+    (still merging) it is `Processing`, the same word as that angle's row. The timekeeper keeps its
+    own 4b copy (`Film is coming in.`) and never reads either variant. On a disputed match a
+    `building` phase reads `Film ready` / `Film ready to watch.` (never "Building your highlight").
+    The "discarded on this phone" marker (item 11) is kept per athlete and match on the phone next
+    to the upload jobs, with the same 7-day expiry, so it survives an app restart; the server's
+    recording intent is frozen after the match and is not cleared.

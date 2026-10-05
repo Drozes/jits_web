@@ -5,7 +5,8 @@ import { useMatchVideoStatus } from "@jits/shared/hooks/use-match-video-status";
 import type { MatchVideoStatus } from "@jits/shared/api/match-video-status";
 import type { DomainError } from "@jits/shared/api/errors";
 import { localAngleJob } from "./angle-status";
-import { useMatchUpload, wasDiscardedHere, type MatchUploadEntry } from "./match-upload-store";
+import { useMatchUpload, type MatchUploadEntry } from "./match-upload-store";
+import { useDiscardedHere } from "./discard-markers";
 import { isBackgroundUploadSupported } from "./upload-capabilities";
 import { useIsScreenFocused } from "./use-upload-announcements";
 import { deriveFilmStatus, type FilmStatusView } from "./film-status";
@@ -65,6 +66,7 @@ export function useFilmStatus(
     { subscribeForeground: subscribeAppForeground },
   );
   const entry = useMatchUpload(matchId ?? "");
+  const discardedHere = useDiscardedHere(viewerId, matchId);
   const local = React.useMemo(() => localAngleJob(entry), [entry]);
   const ticking = status?.phase === "waiting_for_angle" && !!status.wait_deadline_at;
   const tick = useTicker(ticking);
@@ -91,10 +93,10 @@ export function useFilmStatus(
             clockOffsetMs,
             backgroundUpload: isBackgroundUploadSupported(),
             playable,
-            discardedHere: matchId ? wasDiscardedHere(matchId) : false,
+            discardedHere,
           })
         : null,
-    [status, viewerId, local, now, clockOffsetMs, playable],
+    [status, viewerId, local, now, clockOffsetMs, playable, discardedHere],
   );
 
   return { view, status, error, loading, localUpload: entry, refetch };

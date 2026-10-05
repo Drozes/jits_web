@@ -446,10 +446,37 @@ describe("review minors 1 to 3", () => {
     expect(v.line).toBe("Your film is on its way.");
   });
 
-  it("3. a disputed result promises no highlight: helpers drop, lines stay", () => {
+  it("3. a disputed result promises no highlight: building reads as film only, other helpers drop", () => {
     const v = view({ match_status: "disputed", phase: "building", phase_reason: null, angles: [angle("me", "ready"), angle("opp", "ready")] });
-    expect(v.line).toBe("Building your highlight.");
-    expect(v.helper).toBeNull();
+    expect({ tag: v.phaseTag, line: v.line, helper: v.helper }).toEqual({ tag: "Film ready", line: "Film ready to watch.", helper: null });
     expect(view({ match_status: "disputed" }).helper).toBeNull();
+  });
+});
+
+describe("round 2 R2-M1 (v2.5): whose film is in", () => {
+  it("the opponent finished first while mine still uploads: 'Film is coming in', not 'Your film is in'", () => {
+    const v = view({ angles: [angle("me", "uploading", { progress_pct: 42 }), angle("opp", "processing")] });
+    expect({ tag: v.phaseTag, line: v.line }).toEqual({ tag: "Processing", line: "Film is coming in. Analyzing what's here so far." });
+    expect(row(v, "Your angle")).toMatchObject({ tag: "Uploading", percent: 42 });
+  });
+
+  it("the same race with the opponent's angle already playable: tag Analyzing", () => {
+    const v = view({ angles: [angle("me", "uploading"), angle("opp", "processing")] }, { playable: new Map([[V_OPP, 200]]) });
+    expect({ tag: v.phaseTag, line: v.line }).toEqual({ tag: "Analyzing", line: "Film is coming in. Analyzing what's here so far." });
+  });
+
+  it("this phone's own job still running counts as mine still coming", () => {
+    const v = view({ angles: [angle("me", "waiting_for_phone"), angle("opp", "processing")] }, { local: local({ status: "uploading" }) });
+    expect(v.line).toBe("Film is coming in. Analyzing what's here so far.");
+  });
+
+  it("mine in and analysing, nothing of mine still coming: 'Your film is in'", () => {
+    const v = view({ angles: [angle("me", "processing"), angle("opp", "uploading")] });
+    expect({ tag: v.phaseTag, line: v.line }).toEqual({ tag: "Processing", line: "Your film is in. Analyzing now." });
+  });
+
+  it("the timekeeper keeps its own copy while a competitor's angle analyses", () => {
+    const v = deriveFilmStatus({ status: statusFixture({ angles: [angle("tk", "uploading"), angle("me", "processing")] }), viewerId: TK, local: local({ status: "uploading" }), nowMs: NOW, clockOffsetMs: 0 });
+    expect({ tag: v.phaseTag, line: v.line, helper: v.helper }).toEqual({ tag: "Uploading", line: "Film is coming in.", helper: "Keep ELO RATED open until your film uploads." });
   });
 });

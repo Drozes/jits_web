@@ -134,4 +134,34 @@ describe("useFilmRoomPhases", () => {
     await flush();
     expect(mockGet).toHaveBeenCalledTimes(2);
   });
+
+  it("round 2 B1: a read that always fails is re-sent at most once per 30 s and stops after 5", async () => {
+    mockGet.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    renderHook(() => useFilmRoomPhases(items.slice(0, 1), null, null));
+    await flush();
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    // Never retried at once.
+    await act(async () => {
+      jest.advanceTimersByTime(29_000);
+    });
+    await flush();
+    expect(mockGet).toHaveBeenCalledTimes(1);
+    const times: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      const before = mockGet.mock.calls.length;
+      await act(async () => {
+        jest.advanceTimersByTime(30_000);
+      });
+      await flush();
+      if (mockGet.mock.calls.length > before) times.push(Date.now());
+      expect(mockGet.mock.calls.length - before).toBeLessThanOrEqual(1);
+    }
+    // 1 + 4 retries (30 s, 60 s, 120 s, 240 s), then it stops.
+    expect(mockGet).toHaveBeenCalledTimes(5);
+    for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(30_000);
+    // A pull (or the next focus) is a fresh start.
+    act(() => refreshMatchPhases([A]));
+    await flush();
+    expect(mockGet).toHaveBeenCalledTimes(6);
+  });
 });
