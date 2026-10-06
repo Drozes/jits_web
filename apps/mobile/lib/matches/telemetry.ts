@@ -23,3 +23,28 @@ export function logEmptyCta(tags: { surface: EmptyCtaSurface; state: EmptyCtaSta
     /* telemetry is never allowed to fail a tap */
   }
 }
+
+export type MilestoneTag = "first_match" | "first_win" | "first_highlight";
+export const MILESTONE_SHOWN_EVENT = "matches.milestone_shown";
+
+/** A celebration started (spec 13, AC 6.14). */
+export function logMilestoneShown(milestone: MilestoneTag): void {
+  try {
+    tracking.captureMessage(MILESTONE_SHOWN_EVENT, { level: "info", tags: { milestone } });
+  } catch {
+    /* never fails the celebration */
+  }
+}
+
+/** How the Matches tab was reached (spec 13). `redirect` is reserved for the Film Room redirect, which does not tag itself yet. */
+export type TabOpenedEntry = "tab" | "redirect" | "see_all";
+export const TAB_OPENED_BREADCRUMB = "matches.tab_opened";
+
+/** A breadcrumb, not an event, to keep volume low (spec 13). */
+export function logTabOpened(entry: TabOpenedEntry): void {
+  try {
+    tracking.addBreadcrumb({ category: "matches", message: TAB_OPENED_BREADCRUMB, data: { entry } });
+  } catch {
+    /* telemetry never throws */
+  }
+}

@@ -11,9 +11,13 @@ configure({ asyncUtilTimeout: 5_000 });
 type HostNode = ReturnType<typeof render>["UNSAFE_root"];
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
+const mockSetParams = jest.fn();
+let mockParams: Record<string, string | undefined> = {};
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
+  useRouter: () => ({ push: mockPush, navigate: mockNavigate, setParams: mockSetParams, back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
   useFocusEffect: jest.fn(),
+  useLocalSearchParams: () => mockParams,
 }));
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -67,11 +71,35 @@ jest.mock("@/lib/profile/use-profile-data", () => ({
     ],
   }),
 }));
-jest.mock("@/lib/highlight/use-highlight-flags", () => ({ useHighlightFlags: () => ({ clipsEnabled: mockClips(), shareEnabled: false }) }));
+// The screen owns the Matches reel lane: a controllable lane result here
+// (the lane hook has its own suite). Clips come from the lane read.
 let mockClipsOn = true;
-function mockClips() {
-  return mockClipsOn;
-}
+let mockLaneOver: Record<string, unknown> = {};
+const mockLaneRefetch = jest.fn();
+const mockUseReelLane = jest.fn();
+jest.mock("@/lib/highlight/use-reel-lane", () => ({
+  useReelLane: (...a: unknown[]) => {
+    mockUseReelLane(...a);
+    return {
+      items: [],
+      inFlight: [],
+      clipsEnabled: mockClipsOn,
+      loading: false,
+      error: null,
+      loadMoreError: null,
+      hasMore: false,
+      loadingMore: false,
+      cursor: null,
+      loadMore: jest.fn(),
+      refetch: mockLaneRefetch,
+      markSeenLocally: jest.fn(),
+      ...mockLaneOver,
+    };
+  },
+  fetchReelPage: jest.fn(),
+}));
+jest.mock("@/components/reels/reel-motion", () => ({ runRingPulse: jest.fn(), runReveal: jest.fn(), runShimmer: jest.fn() }));
+jest.mock("@/lib/highlight/highlight-event", () => ({ logHighlightEvent: jest.fn() }));
 const mockFlagState = jest.fn();
 jest.mock("@/lib/invites/use-invites-enabled", () => ({ useInvitesFlagState: () => mockFlagState() }));
 jest.mock("@/lib/match-flow/use-my-active-match", () => ({ useMyActiveMatch: () => ({ match: null, refresh: jest.fn() }) }));
@@ -97,6 +125,12 @@ import MatchesScreen from "@/app/(app)/(tabs)/matches/index";
 import { __resetSeenMatches, isMatchSeen, loadSeenMatches, markMatchSeen } from "@/lib/film-room/seen-store";
 import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 import { libItem, libVideo } from "../support/film-fixtures";
+import { reelItem } from "../support/reel-tile-fixtures";
+
+/** A lane with three ready reels: the carousel shows no C-L5 ghost, so no C-L6 there. */
+function withReels() {
+  mockLaneOver = { items: [reelItem("r1"), reelItem("r2"), reelItem("r3")] };
+}
 
 const NOW = new Date();
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
@@ -148,6 +182,8 @@ beforeEach(async () => {
   jest.clearAllMocks();
   mockSeq += 1;
   mockClipsOn = true;
+  mockLaneOver = {};
+  mockParams = {};
   mockFlagState.mockReturnValue({ enabled: true, known: true, state: "on" });
   __resetSeenMatches();
   resetMatchUploadStore();
@@ -169,8 +205,9 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     // A tab root: no back button, and no Film Room title any more.
     expect(utils.queryByLabelText("Go back")).toBeNull();
     expect(utils.queryByText("FILM ROOM")).toBeNull();
-    // The carousel slot stays empty until the carousel lands (jits-a4fw.4).
-    expect(utils.queryByTestId("matches-carousel-slot")).toBeNull();
+    // The carousel slot holds the lane's skeleton while the library loads.
+    expect(utils.getByTestId("matches-carousel-slot")).toBeTruthy();
+    expect(utils.getByText("Your highlights")).toBeTruthy();
   });
 
   it("lists full-width feed cards under a month heading; the meta row opens the match page and clears NEW", async () => {
@@ -244,19 +281,21 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
   });
 
   it("uses the signed still when there is one and the two-athlete fallback otherwise", async () => {
+    withReels();
     const utils = await renderLoaded();
     const still = within(utils.getByTestId("match-feed-card-m-new")).getByTestId("feed-poster");
     expect(still.props.source).toEqual({ uri: "https://signed/k.jpg", cacheKey: "film-still-k.jpg" });
     const failed = utils.getByTestId("match-feed-card-m-failed");
     expect(within(failed).getByTestId("opening-still-fallback")).toBeTruthy();
     expect(within(failed).getByText("FILM FAILED TO PROCESS")).toBeTruthy();
-    // No video rows at all: C-L7, and the first such card teaches C-L6 (the carousel slot is empty).
+    // No video rows at all: C-L7, and the first such card teaches C-L6 (the carousel shows reels, so no C-L6 there).
     const noFilm = utils.getByTestId("match-feed-card-m-up");
     expect(within(noFilm).getByText("NO FILM FOR THIS ONE")).toBeTruthy();
     expect(within(noFilm).getByTestId("film-card-helper")).toHaveTextContent("Turn on Record from my phone at face-off.");
   });
 
   it("a zero-video card still uploading on this phone is skipped: the helper moves to the next C-L7 card", async () => {
+    withReels();
     act(() => {
       setMatchUpload("nf-1", { status: "uploading", progress: 0.2 });
     });
@@ -278,6 +317,7 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
   });
 
   it("teaches the recording helper on the first no-film card only (AC 6.7)", async () => {
+    withReels();
     const utils = await renderLoaded(
       page([
         libItem({ match_id: "f", completed_at: daysAgo(0) }),
@@ -494,6 +534,74 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
       fireEvent.press(utils.getByLabelText("Try again"));
     });
     await waitFor(() => expect(utils.getByTestId("film-card-m-new")).toBeTruthy());
+  });
+
+  it("mounts the Your highlights carousel over its own lane, with the library's phases as the building fallback", async () => {
+    withReels();
+    const utils = await renderLoaded();
+    expect(mockUseReelLane).toHaveBeenLastCalledWith(mockAthleteId(), "matches", { fallbackInFlight: expect.any(Array) });
+    expect(within(utils.getByTestId("matches-carousel-slot")).getByText("Your highlights")).toBeTruthy();
+    expect(utils.getByTestId("reel-tile-ready:r1")).toBeTruthy();
+  });
+
+  it("the card helper is suppressed while the carousel shows C-L6 (no reels yet, AC 6.7)", async () => {
+    const utils = await renderLoaded();
+    const slot = utils.getByTestId("matches-carousel-slot");
+    expect(within(slot).getByLabelText("Record your next match to get a highlight")).toBeTruthy();
+    expect(within(slot).getByText("Turn on Record from my phone at face-off.")).toBeTruthy();
+    expect(within(utils.getByTestId("match-feed-card-m-up")).getByText("NO FILM FOR THIS ONE")).toBeTruthy();
+    expect(utils.queryByTestId("film-card-helper")).toBeNull();
+  });
+
+  it("a short shelf (1 to 2 reels) appends the C-L5 ghost, so the card helper is suppressed too (AC 6.7a)", async () => {
+    mockLaneOver = { items: [reelItem("r1")] };
+    const utils = await renderLoaded();
+    expect(within(utils.getByTestId("matches-carousel-slot")).getByLabelText("Record your next match to get a highlight")).toBeTruthy();
+    expect(utils.queryByTestId("film-card-helper")).toBeNull();
+  });
+
+  it("clips off hides the carousel entirely (AC 6.11)", async () => {
+    mockClipsOn = false;
+    const utils = await renderLoaded();
+    expect(utils.queryByTestId("matches-carousel-slot")).toBeNull();
+    // With no carousel C-L6, the first no-film card teaches it.
+    expect(within(utils.getByTestId("match-feed-card-m-up")).getByTestId("film-card-helper")).toBeTruthy();
+  });
+
+  it("zero matches: the carousel shows the first-highlight ghosts above the hero (AC 6.1)", async () => {
+    const utils = await renderLoaded(page([]));
+    const slot = utils.getByTestId("matches-carousel-slot");
+    expect(within(slot).getByLabelText("Your first highlight lands here")).toBeTruthy();
+    expect(utils.getByTestId("matches-zero")).toBeTruthy();
+  });
+
+  it("zero matches waits for the lane's clips read instead of flashing the clips-off copy", async () => {
+    mockClipsOn = false;
+    mockLaneOver = { loading: true };
+    const utils = await renderLoaded(page([]));
+    expect(utils.queryByTestId("matches-zero")).toBeNull();
+    expect(utils.queryByText("Your first match lands here")).toBeNull();
+    mockLaneOver = { loading: false };
+    utils.rerender(<MatchesScreen />);
+    expect(utils.getByText("Your first match lands here")).toBeTruthy();
+  });
+
+  it("zero matches when the lane read failed: fail-closed film copy, no carousel", async () => {
+    mockClipsOn = false;
+    mockLaneOver = { error: { code: "UNKNOWN", message: "offline" } };
+    const utils = await renderLoaded(page([]));
+    expect(utils.queryByTestId("matches-carousel-slot")).toBeNull();
+    expect(utils.getByText("Your first match lands here")).toBeTruthy();
+  });
+
+  it("pull to refresh re-reads the reel lane too, forcing past the read throttle (AC 2.3)", async () => {
+    const utils = await renderLoaded();
+    mockLaneRefetch.mockClear();
+    const list = utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0];
+    await act(async () => {
+      list.props.refreshControl.props.onRefresh();
+    });
+    expect(mockLaneRefetch).toHaveBeenCalledWith(true);
   });
 
   it("never uses an em dash in its copy", () => {

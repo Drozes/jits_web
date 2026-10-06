@@ -202,6 +202,12 @@ jest.mock("@jits/shared/api/highlight-share", () => ({
   logHighlightShareEvent: (...a: unknown[]) => mockLogEvent(...a),
 }));
 const mockRouterReady = jest.fn();
+const mockCapture = jest.fn();
+jest.mock("@/lib/error-tracking/sentry", () => ({
+  captureMessage: (...a: unknown[]) => mockCapture(...a),
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+}));
 jest.mock("@/lib/notifications/handlers", () => ({
   markNotificationRouterReady: () => mockRouterReady(),
 }));
@@ -782,12 +788,15 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
     expect(cta.props.className ?? "").not.toMatch(/bg-cta/);
     fireEvent.press(cta);
     expect(mockNavigate).toHaveBeenCalledWith("/arena");
+    expect(mockCapture).toHaveBeenCalledWith("matches.empty_cta", { level: "info", tags: { surface: "home", state: "zero", cta: "arena" } });
   });
 
   it("matches but no reels: the C-L2 CTA tile then the C-L5 ghost with the recording helper", async () => {
     const utils = render(React.createElement(DashboardScreen));
-    expect(await utils.findByLabelText("Find a match. Opens the Arena tab")).toBeTruthy();
+    const cta = await utils.findByLabelText("Find a match. Opens the Arena tab");
     expect(utils.getByLabelText("Record your next match to get a highlight")).toBeTruthy();
+    fireEvent.press(cta);
+    expect(mockCapture).toHaveBeenCalledWith("matches.empty_cta", { level: "info", tags: { surface: "home", state: "no_reels", cta: "arena" } });
     expect(utils.getByText("Turn on Record from my phone at face-off.")).toBeTruthy();
   });
 

@@ -370,3 +370,20 @@ describe("claimSessionPulse", () => {
     expect(claimSessionPulse("b")).toBe(true);
   });
 });
+
+describe("laneShowsRecordingHelper (C-L6 dedupe, spec 10.3)", () => {
+  const { laneShowsRecordingHelper: shows, buildLaneTiles: build } = require("@/lib/highlight/reel-lane") as typeof import("@/lib/highlight/reel-lane");
+  const base = { laneKey: "matches" as const, building: [], clipsEnabled: true, loading: false, hasMore: false };
+  it("is true for the no-reels ghosts with matches, and for a short shelf", () => {
+    expect(shows(build({ ...base, items: [], matchCount: 3 }))).toBe(true);
+    const { reelItem } = require("../../support/reel-tile-fixtures");
+    expect(shows(build({ ...base, items: [reelItem("a")] }))).toBe(true);
+  });
+  it("is false for zero matches (C-Z2 ghosts), three reels, skeletons and clips off", () => {
+    const { reelItem } = require("../../support/reel-tile-fixtures");
+    expect(shows(build({ ...base, items: [], matchCount: 0 }))).toBe(false);
+    expect(shows(build({ ...base, items: [reelItem("a"), reelItem("b"), reelItem("c")] }))).toBe(false);
+    expect(shows(build({ ...base, items: [], loading: true }))).toBe(false);
+    expect(shows(build({ ...base, items: [], clipsEnabled: false }))).toBe(false);
+  });
+});

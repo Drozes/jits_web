@@ -28,6 +28,7 @@ import { useHasEverPlayed } from "@/lib/practice/use-has-ever-played";
 import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
 import { HomeHighlightsCarousel } from "@/components/reels/lane-carousels";
 import { useHomeHighlights } from "@/lib/highlight/use-home-highlights";
+import { logEmptyCta } from "@/lib/matches/telemetry";
 import { requestBellRefresh } from "@/lib/highlight/highlight-store";
 import { markNotificationRouterReady } from "@/lib/notifications/handlers";
 import { formatRecord, recordA11yLabel } from "@/lib/athlete/record";
@@ -184,6 +185,9 @@ export default function DashboardScreen() {
           tiles={highlights.tiles}
           pageSource={highlights.pageSource}
           markSeenLocally={highlights.markSeenLocally}
+          onCtaPress={(tile) =>
+            logEmptyCta({ surface: "home", state: tile.variant === "first_highlight" ? "zero" : "no_reels", cta: "arena" })
+          }
         />
 
         <View>

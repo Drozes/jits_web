@@ -348,6 +348,15 @@ export function buildLaneTiles(input: LaneTileInputs): ReelTileModel[] {
   return tiles;
 }
 
+/**
+ * True when the tiles draw the recording helper C-L6 (under the first,
+ * non-faint C-L5 ghost). The Matches screen suppresses the card helper while
+ * this holds, so the tip never shows twice on one screen (spec 10.3, AC 6.7).
+ */
+export function laneShowsRecordingHelper(tiles: readonly ReelTileModel[]): boolean {
+  return tiles.some((t) => t.kind === "ghost" && t.variant === "next_highlight" && !t.faint);
+}
+
 /** The pages a viewer opened from this lane can swipe through: ready items only, in tile order. */
 export function pagerItems(tiles: readonly ReelTileModel[]): ReelItem[] {
   return tiles.flatMap((t) => (t.kind === "ready" ? [t.item] : []));
