@@ -158,19 +158,23 @@ export function mergeFirstPage(current: readonly ReelItem[], firstPage: readonly
   const currentIds = new Set(current.map((i) => i.highlightId));
   const fresh = unseenFirst(page.filter((i) => !currentIds.has(i.highlightId)));
   const anchor = page.length > 0 ? page[page.length - 1] : null;
-  // The tail is chosen by POSITION: reels after the anchor in the list on
-  // screen (no timestamp parsing, so an odd readyAt spelling cannot drop it).
-  const anchorIndex = firstPageHasMore && anchor ? current.findIndex((i) => i.highlightId === anchor.highlightId) : -1;
+  // The on-screen list is not in server order (an unseen-first first load,
+  // new reels at the front), so "older than the anchor" cannot be read off
+  // positions or (reliably) timestamps. When the new first page is full and
+  // its last reel is already on screen, every on-screen reel missing from it
+  // stays, in place: none can be lost past the old cursor. When the first
+  // page is the last page, reels missing from it are gone (deletions clear).
+  const anchorOnScreen = firstPageHasMore && anchor !== null && current.some((i) => i.highlightId === anchor.highlightId);
   const kept: ReelItem[] = [];
   let tailKept = false;
-  current.forEach((old, index) => {
+  for (const old of current) {
     const updated = pageById.get(old.highlightId);
     if (updated) kept.push(updated);
-    else if (anchorIndex >= 0 && index > anchorIndex) {
+    else if (anchorOnScreen) {
       kept.push(old);
       tailKept = true;
     }
-  });
+  }
   // True only when tail reels were actually kept: the caller then keeps the old (deeper) cursor.
   return { items: [...fresh, ...kept], keptTail: tailKept };
 }

@@ -130,7 +130,7 @@ describe("ordering", () => {
     expect(ids(out.items).slice(-1)).toEqual(["o19"]);
   });
 
-  it("selects the tail by position: an unparseable readyAt never drops it", () => {
+  it("keeps on-screen reels without parsing timestamps: an unparseable readyAt never drops them", () => {
     const old = Array.from({ length: 15 }, (_, i) => reel(`o${i}`, { readyAt: "not a timestamp" }));
     const page = [reel("n0", { readyAt: "also junk" }), ...old.slice(0, 9)];
     const out = mergeFirstPage(old, page, true);
@@ -138,10 +138,26 @@ describe("ordering", () => {
     expect(ids(out.items)).toEqual(["n0", ...ids(old)]);
   });
 
-  it("keptTail is false when nothing past the anchor was kept", () => {
+  it("regression: an unseen reel shown before the anchor is never lost (probe)", () => {
+    // Loaded A..J (only J unseen) then tail K, L: the screen reads J, A..I, K, L.
+    const letters = "ABCDEFGHIJ".split("");
+    const first = mergeFirstPage([], letters.map((l) => reel(l, { unseen: l === "J" })), true).items;
+    const screen = appendReelPage(first, [reel("K"), reel("L")]);
+    expect(ids(screen)).toEqual(["J", "A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L"]);
+    // A new reel N arrives; the full new first page is N, A..I (anchor I).
+    const page = [reel("N"), ..."ABCDEFGHI".split("").map((l) => reel(l))];
+    const out = mergeFirstPage(screen, page, true);
+    expect(out.keptTail).toBe(true);
+    expect(ids(out.items)).toEqual(["N", "J", "A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L"]);
+  });
+
+  it("keptTail is false when no on-screen reel outside the new page was kept", () => {
     const old = [reel("a"), reel("b")];
-    // Anchor b is the last reel on screen: no tail to keep, so the new first cursor applies.
+    // Every reel on screen is in the new page: nothing extra kept, so the new first cursor applies.
     expect(mergeFirstPage(old, [reel("n"), reel("a"), reel("b")], true).keptTail).toBe(false);
+    // Anchor not on screen: missing reels are dropped.
+    expect(mergeFirstPage(old, [reel("n"), reel("m")], true)).toMatchObject({ keptTail: false });
+    expect(ids(mergeFirstPage(old, [reel("n"), reel("m")], true).items)).toEqual(["n", "m"]);
     // A short (last) page never keeps a tail.
     expect(mergeFirstPage(old, [reel("a")], false)).toEqual({ items: [old[0]], keptTail: false });
   });
