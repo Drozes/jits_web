@@ -14,7 +14,16 @@ const mockTelemetry = {
   syncResidual: jest.fn(),
   decoderCap: jest.fn(),
   error: jest.fn(),
+  setQuality: jest.fn(),
+  renditionAttached: jest.fn(),
+  qualitySwitchStarted: jest.fn(),
+  qualitySwitchLanded: jest.fn(),
+  onStall: jest.fn((cb: (e: { kind: "start" | "end"; at: number }) => void) => {
+    mockStallListeners.add(cb);
+    return () => mockStallListeners.delete(cb);
+  }),
 };
+const mockStallListeners = new Set<(e: { kind: "start" | "end"; at: number }) => void>();
 jest.mock("@/lib/video/use-playback-telemetry", () => ({ usePlaybackTelemetry: () => mockTelemetry }));
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 jest.mock("@/lib/motion", () => ({ haptics: { select: jest.fn(async () => undefined) } }));
@@ -316,5 +325,110 @@ describe("useMultiAnglePlayback on Android", () => {
     act(() => readyPlayer(P.opp));
     expect(result.current.plan?.hot).toEqual(["ref"]);
     expect(result.current.plan?.warm).toContain("opp");
+  });
+});
+
+describe("useMultiAnglePlayback adaptive quality (same policy as the single player)", () => {
+  type Avail = { "720": boolean; "360": boolean };
+  const BOTH: Avail = { "720": true, "360": true };
+  const NONE: Avail = { "720": false, "360": false };
+  function signCopies(copies: Record<string, Avail>) {
+    mockSign.mockImplementation((_c: unknown, id: string, opts: { rendition: string }) => {
+      const a = copies[id] ?? BOTH;
+      const served =
+        opts.rendition === "360" ? (a["360"] ? "360" : a["720"] ? "720" : "original") : a["720"] ? "720" : a["360"] ? "360" : "original";
+      return Promise.resolve({
+        ok: true,
+        data: {
+          url: `https://s/${id}.${served}.mp4`,
+          posterUrl: null,
+          status: "ready",
+          playability: "playable",
+          matchId: "m",
+          durationSeconds: 400,
+          sourceKind: served === "original" ? "original" : "normalized",
+          target: opts.rendition,
+          servedRendition: served,
+          available: a,
+          playbackProfile: null,
+        },
+      });
+    });
+  }
+  beforeEach(() => {
+    mockStallListeners.clear();
+    require("@/lib/video/quality/preference").__resetPlaybackQualityPreferenceForTests("auto");
+    require("@/lib/video/quality/history-store").__resetPlaybackHistoryForTests();
+    require("@/lib/video/quality/settings-store").__resetPlaybackSettingsStoreForTests();
+    require("@/lib/video/quality/network-store").__resetNetworkStoreForTests({ type: "wifi", details: null });
+  });
+  const stall = (kind: "start" | "end") => act(() => mockStallListeners.forEach((cb) => cb({ kind, at: clock })));
+
+  async function openAt(url: (id: string) => string) {
+    const base: MultiAngleInput = { entryId: "ref", startS: null, videos: null, device: IOS };
+    const hook = renderHook((props: MultiAngleInput) => useMultiAnglePlayback(props), { initialProps: base });
+    await waitFor(() => expect(fakePlayers[0].replaceAsync).toHaveBeenCalledWith({ uri: url("ref") }));
+    act(() => readyPlayer(0));
+    hook.rerender({ ...base, videos: match() });
+    await waitFor(() => expect(fakePlayers[2].replaceAsync).toHaveBeenCalled());
+    act(() => {
+      readyPlayer(1);
+      readyPlayer(2);
+    });
+    act(() => hook.result.current.slots[P.ref].onFirstFrameRender());
+    return hook;
+  }
+
+  it("every slot signs at the session's rendition (Data saver: 360)", async () => {
+    signCopies({});
+    require("@/lib/video/quality/preference").__resetPlaybackQualityPreferenceForTests("data_saver");
+    await openAt((id) => `https://s/${id}.360.mp4`);
+    for (const id of ["ref", "opp", "tk"]) expect(mockSign).toHaveBeenCalledWith({}, id, { rendition: "360" });
+    expect(mockSign).not.toHaveBeenCalledWith({}, expect.anything(), { rendition: "720" });
+  });
+
+  it("a step-down reloads the visible slot in place behind a held frame, without switchStarted", async () => {
+    signCopies({});
+    const { result } = await openAt((id) => `https://s/${id}.720.mp4`);
+    act(() => tick(P.ref, 10));
+    clock += 5000;
+    act(() => tick(P.ref, 15));
+    stall("start");
+    clock += 1000;
+    act(() => tick(P.ref, 15.05));
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledWith("720", "360", "stall_long", expect.anything());
+    expect(mockTelemetry.switchStarted).not.toHaveBeenCalled();
+    await waitFor(() => expect(fakePlayers[P.ref].replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/ref.360.mp4" }));
+    // Every slot follows the one level.
+    await waitFor(() => expect(fakePlayers[P.opp].replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/opp.360.mp4" }));
+    await waitFor(() => expect(result.current.heldFrame).not.toBeNull());
+    // A reloading slot is not switchable.
+    expect(result.current.angles.find((a) => a.id === "opp")?.switchable).toBe(false);
+    act(() => readyPlayer(P.ref));
+    const seekTo = fakePlayers[P.ref].seeks.at(-1)!;
+    expect(seekTo).toBeGreaterThan(14.9);
+    expect(mockTelemetry.qualitySwitchLanded).not.toHaveBeenCalled();
+    act(() => tick(P.ref, seekTo + 0.05));
+    expect(mockTelemetry.qualitySwitchLanded).toHaveBeenCalledTimes(1);
+    expect(result.current.heldFrame).toBeNull();
+    expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+    expect(fakePlayers[P.ref].playing).toBe(true);
+  });
+
+  it("a switch to an original-only angle makes the controller inert there", async () => {
+    signCopies({ opp: NONE });
+    const { result } = await openAt((id) => `https://s/${id}.720.mp4`);
+    // A seek switch to opp, landed by its 1.5 s timeout at the latest.
+    act(() => {
+      result.current.switchTo("opp");
+    });
+    await waitFor(() => expect(mockTelemetry.switchLanded).toHaveBeenCalled(), { timeout: 3000 });
+    expect(mockTelemetry.renditionAttached).toHaveBeenLastCalledWith("original", null);
+    clock += 5000;
+    act(() => tick(P.opp, 20));
+    stall("start");
+    clock += 3000;
+    act(() => tick(P.opp, 20.1));
+    expect(mockTelemetry.qualitySwitchStarted).not.toHaveBeenCalled();
   });
 });

@@ -7,7 +7,9 @@ import {
   type MatchVideoPlayback,
 } from "@jits/shared/api/queries";
 import type { Result } from "@jits/shared/api/errors";
+import type { QualityDecision, TargetRendition } from "@jits/shared/utils";
 import { usePlaybackTelemetry, type PlaybackTelemetry } from "@/lib/video/use-playback-telemetry";
+import { servedOf, useQualitySession } from "@/lib/video/quality/use-quality-session";
 
 /**
  * "absent", "missing" and "failed" are deliberately separate (jits-icei.5,
@@ -175,6 +177,15 @@ function safely(fn: () => void): void {
  * Silent switch: expo-video always runs the iOS audio session in the
  * `.playback` category, so the film is audible with the ringer off (expo-av
  * needed `playsInSilentModeIOS`).
+ *
+ * Adaptive quality (jits-xfvd.12): the start selection picks the 720p or
+ * 360p copy before the first sign, and `useQualitySession` may step it down
+ * or up mid-session. A quality swap is the SAME in-place swap as an angle
+ * switch (`swapSource`, same id at the exact current position, held frame,
+ * play intent and rate kept, landed only after the resume seek), but it is
+ * not an angle switch in telemetry. Signed sources are cached per (angle,
+ * rendition); every sign (first, re-sign, retry, angle switch, presign)
+ * asks for the session's current target rendition.
  */
 export function useVideoPlayback(id: string | undefined, startSeconds?: number | null): VideoPlayback {
   const player = useVideoPlayer(null, (p) => {
@@ -185,11 +196,17 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const telemetry = usePlaybackTelemetry(player, { surface: "match", videoId: id ?? null, angle: null, angleCount: null });
   const [activeId, setActiveId] = React.useState(id);
   const activeIdRef = React.useRef(id);
-  /** Signed sources by angle id (the active one and every pre-signed one). */
+  /** Signed sources by `${angle id}:${target rendition}` (the active one and every pre-signed one). */
   const signedRef = React.useRef(new Map<string, { data: MatchVideoPlayback; at: number }>());
   const presigningRef = React.useRef(new Set<string>());
-  /** The generation an angle switch loaded, until its first frame shows. */
+  /** The ids the screen last asked to pre-sign (re-signed at a new rendition after a quality swap). */
+  const presignIdsRef = React.useRef<string[]>([]);
+  /** The generation an angle switch or a quality swap loaded, until its first frame shows. */
   const switchGenRef = React.useRef<number | null>(null);
+  /** What the in-flight swap is (telemetry and the controller treat them apart). */
+  const swapKindRef = React.useRef<"angle" | "quality" | null>(null);
+  /** The served rendition and availability of the file on (or going to) the player. */
+  const servedRef = React.useRef<ReturnType<typeof servedOf> | null>(null);
   /**
    * The switched-in item's resume seek has landed (or it needed none). Until
    * then a first frame may be the item's frame 0, so the switch is not
@@ -240,6 +257,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const rateRef = React.useRef(1);
   const holdRef = React.useRef<{ at: number; left: number } | null>(null);
   const mountedRef = React.useRef(true);
+  /** The generation whose first frame is on screen (ahead of the `frameGen` render). */
+  const frameShownGenRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     mountedRef.current = true;
@@ -248,9 +267,28 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     };
   }, []);
 
+  // The quality policy (shared with the multi-angle player). A decision is
+  // applied with `swapSource` below, through a ref (it is defined later).
+  const applyQualityRef = React.useRef<(d: QualityDecision) => boolean>(() => false);
+  const quality = useQualitySession({
+    telemetry,
+    readConditions: () => {
+      const current = sourceRef.current;
+      return {
+        playing: playingRef.current,
+        seeking: holdRef.current != null,
+        rate: rateRef.current,
+        swapInFlight: signingRef.current || !loadedRef.current || switchGenRef.current != null,
+        frameShown: current != null && frameShownGenRef.current === current.generation,
+      };
+    },
+    apply: (d) => applyQualityRef.current(d),
+  });
+  const feed = quality.feed;
+
   /** Hand a signed source to the player, resuming at the current position. */
   const attach = React.useCallback(
-    (data: MatchVideoPlayback, epoch: number, holdFrame: boolean) => {
+    (data: MatchVideoPlayback, epoch: number, holdFrame: boolean, swapped = false) => {
       const resumeAt = positionRef.current > 0 ? positionRef.current : null;
       resumeAtRef.current = resumeAt;
       progressBaseRef.current = resumeAt ?? 0;
@@ -267,12 +305,24 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       sourceRef.current = nextSource;
       setSource(nextSource);
       telemetry.sourceAttached(data.sourceKind ?? "original");
+      const served = servedOf(data);
+      servedRef.current = served;
+      telemetry.renditionAttached(served.served, data.playbackProfile ?? null);
+      // A plain (re-)sign: the level follows what this file serves now. A
+      // swap's file is recorded when it lands (frameLanded).
+      if (!swapped) quality.attached(served.served, served.available);
     },
-    [telemetry],
+    [telemetry, quality],
   );
 
+  /** The in-flight quality swap will not land (superseded, failed or errored). */
+  const dropQualitySwap = React.useCallback(() => {
+    if (swapKindRef.current === "quality" && switchGenRef.current != null) quality.failed();
+    if (swapKindRef.current === "quality") swapKindRef.current = null;
+  }, [quality]);
+
   const sign = React.useCallback(
-    async (silent: boolean, opts: { switched?: boolean; holdFrame?: boolean } = {}) => {
+    async (silent: boolean, opts: { switched?: boolean; holdFrame?: boolean; rendition?: TargetRendition } = {}) => {
       const target = activeIdRef.current;
       if (!target) {
         telemetry.signOutcome("absent");
@@ -282,22 +332,25 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       const epoch = ++epochRef.current;
       signingRef.current = true;
       if (!silent) setPhase("loading");
-      const result = await getMatchVideoPlaybackResult(supabase, target);
+      const rendition = opts.rendition ?? (await quality.signTarget());
+      if (epoch !== epochRef.current) return;
+      const result = await getMatchVideoPlaybackResult(supabase, target, { rendition });
       // A newer sign (or switch) started, or the screen unmounted.
       if (epoch !== epochRef.current) return;
       signingRef.current = false;
       const next = phaseFor(result);
       telemetry.signOutcome(next === "ready" ? "ok" : next === "loading" ? "pending" : next);
       if (next === "ready" && result.ok && result.data) {
-        signedRef.current.set(target, { data: result.data, at: Date.now() });
+        signedRef.current.set(`${target}:${rendition}`, { data: result.data, at: Date.now() });
         if (opts.switched) switchGenRef.current = epoch;
-        attach(result.data, epoch, opts.holdFrame === true);
+        attach(result.data, epoch, opts.holdFrame === true, opts.switched === true);
       } else if (opts.switched) {
+        dropQualitySwap();
         switchGenRef.current = null;
       }
       setPhase(next);
     },
-    [telemetry, attach],
+    [telemetry, attach, quality, dropQualitySwap],
   );
 
   React.useEffect(() => {
@@ -321,7 +374,10 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     setEntryId(id);
     telemetry.setMeta({ videoId: id ?? null });
     switchGenRef.current = null;
+    swapKindRef.current = null;
     switchSeekLandedRef.current = true;
+    // A fresh open: a new start selection (and controller) for it.
+    void quality.begin();
     // Like a fresh open: start at the new route's `?t=` (review m2).
     const s0 = startRef.current;
     const start = s0 != null && Number.isFinite(s0) && s0 > 0 ? s0 : 0;
@@ -331,7 +387,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     streakRef.current = false;
     silentCountRef.current = 0;
     void sign(false);
-  }, [id, sign, telemetry]);
+  }, [id, sign, telemetry, quality]);
 
   const retry = React.useCallback(() => setAttempt((n) => n + 1), []);
 
@@ -347,9 +403,13 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       streakRef.current = true;
       silentCountRef.current += 1;
       telemetry.resigned();
+      // A quality swap that errored does not land; the re-sign uses its level.
+      dropQualitySwap();
+      // The re-sign is a new generation: the old swap can never land now.
+      switchGenRef.current = null;
       void sign(true);
     },
-    [sign, telemetry],
+    [sign, telemetry, dropQualitySwap],
   );
   const onPlayerErrorRef = React.useRef(onPlayerError);
   React.useEffect(() => {
@@ -423,13 +483,27 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       // A switched-in item's frame before its resume seek lands may be its
       // frame 0: keep the held frame and do not count the switch yet.
       if (switchGenRef.current === gen && !switchSeekLandedRef.current) return;
+      frameShownGenRef.current = gen;
       setFrameGen(gen);
       if (switchGenRef.current === gen) {
         switchGenRef.current = null;
-        telemetry.switchLanded();
+        const kind = swapKindRef.current;
+        swapKindRef.current = null;
+        const served = servedRef.current;
+        if (kind === "quality") {
+          // Not an angle switch: its own latency, and the level follows the served file.
+          telemetry.qualitySwitchLanded();
+          if (served) quality.landed(served.served, served.available);
+          // Other angles were pre-signed at the old rendition.
+          presignRef.current(presignIdsRef.current);
+        } else {
+          telemetry.switchLanded();
+          if (served) quality.angleChanged(served.served, served.available);
+        }
       }
+      feed();
     },
-    [telemetry],
+    [telemetry, quality, feed],
   );
 
   // Swap each newly signed URL into the one player. Only the latest swap's
@@ -538,6 +612,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
           if (streakRef.current && currentTime > progressBaseRef.current + PROGRESS_S) {
             streakRef.current = false;
           }
+          // The quality controller's tick (smooth time, an open stall's length).
+          feed();
         }),
         player.addListener("playToEnd", () => {
           playingRef.current = false;
@@ -548,7 +624,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     return () => {
       for (const sub of subs) safely(() => sub.remove());
     };
-  }, [player, markLoaded, frameLanded]);
+  }, [player, markLoaded, frameLanded, feed]);
 
   // expo-video pauses in the background (staysActiveInBackground is off):
   // show it paused, so the athlete resumes with Play instead of a Pause
@@ -564,18 +640,20 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   React.useEffect(() => {
     playingRef.current = playing;
     telemetry.playIntent(playing);
+    feed();
     if (!loadedRef.current) return;
     if (playing) startPlayback();
     else safely(() => player.pause());
-  }, [playing, loaded, player, startPlayback, telemetry]);
+  }, [playing, loaded, player, startPlayback, telemetry, feed]);
 
   React.useEffect(() => {
     rateRef.current = rate;
+    feed();
     if (!loadedRef.current || !playingRef.current) return;
     safely(() => {
       player.playbackRate = rate;
     });
-  }, [rate, loaded, player]);
+  }, [rate, loaded, player, feed]);
 
   const seek = React.useCallback(
     (seconds: number) => {
@@ -594,8 +672,9 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       safely(() => {
         player.currentTime = clamped;
       });
+      feed();
     },
-    [player, telemetry],
+    [player, telemetry, feed],
   );
 
   const toggle = React.useCallback(() => {
@@ -635,11 +714,23 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     return t;
   }, [player]);
 
-  const switchAngle = React.useCallback(
-    (nextId: string, atSeconds: number) => {
-      if (!nextId || nextId === activeIdRef.current) return;
+  /**
+   * The ONE in-place swap, for an angle switch and for a quality swap: a new
+   * URL into this same player at an exact fractional position, holding the
+   * outgoing frame, keeping play intent and speed, landed only after the
+   * resume seek lands. `kind` only changes the bookkeeping: an angle switch
+   * moves `activeId` and is timed as a switch; a quality swap reloads the
+   * same id at another rendition and is timed as a quality switch.
+   */
+  const swapSource = React.useCallback(
+    (nextId: string, atSeconds: number, target: TargetRendition, kind: "angle" | "quality") => {
+      if (!nextId) return;
+      if (kind === "angle" && nextId === activeIdRef.current) return;
       const at = Number.isFinite(atSeconds) && atSeconds > 0 ? atSeconds : 0;
-      telemetry.switchStarted();
+      // An angle switch supersedes a quality swap still in flight.
+      dropQualitySwap();
+      if (kind === "angle") telemetry.switchStarted();
+      swapKindRef.current = kind;
       // Hold the outgoing frame only if one is up (else the poster stays).
       const current = sourceRef.current;
       const holdFrame = current != null && (frameGenRef.current === current.generation || current.holdFrame === true);
@@ -650,8 +741,11 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       positionRef.current = at;
       setPositionS(at);
       holdRef.current = null;
-      durationRef.current = 0;
-      setDurationS(0);
+      if (kind === "angle") {
+        // Another file, another clock. A quality swap keeps the timeline.
+        durationRef.current = 0;
+        setDurationS(0);
+      }
       ownIdsRef.current.add(nextId);
       // From here the outgoing item is gone, before any sign round trip
       // (review B1): its time updates, play intent and errors no longer
@@ -670,37 +764,60 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       // Stop the outgoing angle so it does not run on (or the new item start
       // from 0 at the old rate) before the resume seek lands.
       safely(() => player.pause());
-      const cached = signedRef.current.get(nextId);
+      const cached = signedRef.current.get(`${nextId}:${target}`);
       if (cached && Date.now() - cached.at < PRESIGN_FRESH_MS) {
         const epoch = ++epochRef.current;
         signingRef.current = false;
         switchGenRef.current = epoch;
-        attach(cached.data, epoch, holdFrame);
+        attach(cached.data, epoch, holdFrame, true);
         setPhase("ready");
         return;
       }
-      void sign(true, { switched: true, holdFrame });
+      void sign(true, { switched: true, holdFrame, rendition: target });
     },
-    [player, telemetry, attach, sign],
+    [player, telemetry, attach, sign, dropQualitySwap],
   );
 
-  const presign = React.useCallback((ids: string[]) => {
-    for (const vid of ids) {
-      if (!vid || vid === activeIdRef.current || presigningRef.current.has(vid)) continue;
-      const cached = signedRef.current.get(vid);
-      if (cached && Date.now() - cached.at < PRESIGN_FRESH_MS) continue;
-      presigningRef.current.add(vid);
-      void getMatchVideoPlaybackResult(supabase, vid)
-        .then((result) => {
-          if (!mountedRef.current) return;
-          if (result.ok && result.data && result.data.playability !== "processing") {
-            signedRef.current.set(vid, { data: result.data, at: Date.now() });
-          }
-        })
-        .catch(() => undefined)
-        .finally(() => presigningRef.current.delete(vid));
-    }
-  }, []);
+  const switchAngle = React.useCallback(
+    // Angle switches keep the session's rendition.
+    (nextId: string, atSeconds: number) => swapSource(nextId, atSeconds, quality.currentTarget(), "angle"),
+    [swapSource, quality],
+  );
+
+  // A quality decision: the same id, at the exact position right now.
+  applyQualityRef.current = (d: QualityDecision) => {
+    const id = activeIdRef.current;
+    if (!id) return false;
+    swapSource(id, currentTimeNow(), d.to, "quality");
+    return true;
+  };
+
+  const presign = React.useCallback(
+    (ids: string[]) => {
+      presignIdsRef.current = ids;
+      void quality.signTarget().then((rendition) => {
+        for (const vid of ids) {
+          const key = `${vid}:${rendition}`;
+          if (!mountedRef.current || !vid || vid === activeIdRef.current || presigningRef.current.has(key)) continue;
+          const cached = signedRef.current.get(key);
+          if (cached && Date.now() - cached.at < PRESIGN_FRESH_MS) continue;
+          presigningRef.current.add(key);
+          void getMatchVideoPlaybackResult(supabase, vid, { rendition })
+            .then((result) => {
+              if (!mountedRef.current) return;
+              if (result.ok && result.data && result.data.playability !== "processing") {
+                signedRef.current.set(key, { data: result.data, at: Date.now() });
+              }
+            })
+            .catch(() => undefined)
+            .finally(() => presigningRef.current.delete(key));
+        }
+      });
+    },
+    [quality],
+  );
+  const presignRef = React.useRef(presign);
+  presignRef.current = presign;
 
   const stateLabel: PlayerStateLabel =
     phase === "ready"
