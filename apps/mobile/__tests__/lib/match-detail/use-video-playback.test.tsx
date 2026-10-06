@@ -21,6 +21,10 @@ const mockTelemetry = {
   firstFrame: jest.fn(),
   switchStarted: jest.fn(),
   switchLanded: jest.fn(),
+  switchHeldStill: jest.fn(),
+  switchPillShown: jest.fn(),
+  switchFailed: jest.fn(),
+  switchSuperseded: jest.fn(),
   error: jest.fn(),
   setQuality: jest.fn(),
   renditionAttached: jest.fn(),
@@ -42,78 +46,28 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchVideoPlaybackResult: (...a: unknown[]) => mockSign(...a),
 }));
 
-type Listener = { event: string; fn: (payload?: any) => void };
-interface FakePlayer {
-  source: { uri: string } | null;
-  status: string;
-  playing: boolean;
-  duration: number;
-  playbackRate: number;
-  seeks: number[];
-  currentTime: number;
-  timeUpdateEventInterval: number;
-  preservesPitch: boolean;
-  play: jest.Mock;
-  pause: jest.Mock;
-  replaceAsync: jest.Mock;
-  addListener: jest.Mock;
-  emit: (event: string, payload?: unknown) => void;
-}
-const mockPlayers: FakePlayer[] = [];
-jest.mock("expo-video", () => {
-  const R = require("react");
-  function useVideoPlayer(_s: unknown, setup?: (p: FakePlayer) => void) {
-    const ref = R.useRef(null);
-    if (!ref.current) {
-      const listeners: Listener[] = [];
-      let time = 0;
-      const p = {
-        source: null,
-        status: "idle",
-        playing: false,
-        duration: 0,
-        playbackRate: 1,
-        timeUpdateEventInterval: 0,
-        preservesPitch: false,
-        seeks: [] as number[],
-        get currentTime() {
-          return time;
-        },
-        set currentTime(v: number) {
-          time = v;
-          p.seeks.push(v);
-        },
-        play: jest.fn(() => {
-          p.playing = true;
-        }),
-        pause: jest.fn(() => {
-          p.playing = false;
-        }),
-        replaceAsync: jest.fn((src: { uri: string }) => {
-          p.source = src;
-          p.status = "loading";
-          return Promise.resolve();
-        }),
-        addListener: jest.fn((event: string, fn: (payload?: unknown) => void) => {
-          const e = { event, fn };
-          listeners.push(e);
-          return { remove: () => listeners.splice(listeners.indexOf(e), 1) };
-        }),
-        emit: (event: string, payload?: unknown) => {
-          if (event === "timeUpdate") time = (payload as { currentTime: number }).currentTime;
-          listeners.filter((l) => l.event === event).forEach((l) => l.fn(payload));
-        },
-      } as FakePlayer;
-      setup?.(p);
-      mockPlayers.push(p);
-      ref.current = p;
-    }
-    return ref.current;
-  }
-  return { useVideoPlayer };
-});
+// The shared fake player (it records seeks, play/pause, rate and interval
+// writes, and scripts settle order, thumbnails and the iOS paused stall).
+jest.mock("expo-video", () => require("../../support/fake-expo-video"));
+import {
+  deferReplace,
+  deferThumbnails,
+  failThumbnails,
+  fakePlayers as mockPlayers,
+  readyPlayer,
+  resetFakeVideo,
+  setNativeTime,
+} from "../../support/fake-expo-video";
 
-import { useVideoPlayback } from "@/lib/match-detail/use-video-playback";
+import {
+  HELD_FRAME_CAP_MS,
+  IDLE_SWITCH_STATE,
+  PAUSED_LAND_FALLBACK_MS,
+  SWITCH_HOLD_CAP_MS,
+  SWITCH_SETTLE_MS,
+  SWITCH_TIME_UPDATE_S,
+  useVideoPlayback,
+} from "@/lib/match-detail/use-video-playback";
 
 function playable(url: string, extra: Record<string, unknown> = {}) {
   return { ok: true, data: { url, posterUrl: null, status: "ready", playability: "playable", matchId: "m", durationSeconds: 400, sourceKind: "normalized", ...extra } };
@@ -136,7 +90,7 @@ const fail = async (message = "err") => {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockPlayers.length = 0;
+  resetFakeVideo();
 });
 
 describe("useVideoPlayback", () => {
@@ -499,13 +453,16 @@ describe("useVideoPlayback angle switch (multi-angle P0)", () => {
     ready();
     time(10);
     act(() => result.current.toggle());
+    // jits-xfvd.16: the resume seek now goes out at the replace's settle.
+    const swap = deferReplace(mockPlayers.length - 1);
     act(() => result.current.switchAngle("vid-2", 12.5));
     await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
-    // Before readyToPlay (no seek issued yet): may be frame 0, ignored.
+    // Before the settle (no seek issued yet): may be frame 0, ignored.
     act(() => result.current.onFirstFrameRender());
     expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
-    ready();
+    await act(async () => swap.resolve());
     expect(player().seeks.at(-1)).toBe(12.5);
+    ready();
     act(() => result.current.onFirstFrameRender());
     expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
     expect(result.current.frameShown).toBe(true);
@@ -723,8 +680,9 @@ describe("useVideoPlayback adaptive quality", () => {
     // The outgoing frame stays up, never the poster.
     expect(result.current.source?.holdFrame).toBe(true);
     expect(result.current.frameShown).toBe(true);
-    // Not an angle switch.
+    // Not an angle switch: the switch state never leaves idle (jits-xfvd.16).
     expect(mockTelemetry.switchStarted).not.toHaveBeenCalled();
+    expect(result.current.switchState).toEqual(IDLE_SWITCH_STATE);
     // The duration stays (same timeline).
     expect(result.current.durationS).toBe(400);
     player().play.mockClear();
@@ -1028,5 +986,579 @@ describe("useVideoPlayback adaptive quality", () => {
     clock += 5000;
     longStall(13.5);
     expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledWith("720", "360", "stall_long", expect.anything());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Angle switch phase 1 (jits-xfvd.16, contract sections 3 and 8): seek and
+// play at the settle, the held still, precise landing, failure and restore,
+// supersede, outside navigation.
+// ---------------------------------------------------------------------------
+
+describe("useVideoPlayback angle switch phase 1 (jits-xfvd.16)", () => {
+  type Playback = ReturnType<typeof useVideoPlayback>;
+  const idx = () => mockPlayers.length - 1;
+  const URLS: Record<string, string> = { "vid-1": "https://s/a.mp4", "vid-2": "https://s/b.mp4", "vid-3": "https://s/c.mp4" };
+  function signAll(overrides: Record<string, () => Promise<unknown>> = {}) {
+    mockSign.mockImplementation((_c: unknown, vid: string) =>
+      overrides[vid] ? overrides[vid]() : Promise.resolve(playable(URLS[vid] ?? "https://s/x.mp4")),
+    );
+  }
+  /** Open vid-1, ready, a frame on screen, playing at 10 s; vid-2 and vid-3 pre-signed. */
+  async function open(opts: { paused?: boolean } = {}) {
+    const hook = renderHook(({ id }: { id: string }) => useVideoPlayback(id), { initialProps: { id: "vid-1" } });
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+    ready();
+    act(() => hook.result.current.onFirstFrameRender());
+    time(10);
+    act(() => hook.result.current.presign(["vid-2", "vid-3"]));
+    await waitFor(() => expect(mockSign).toHaveBeenCalledWith({}, "vid-3", { rendition: "720" }));
+    await act(async () => undefined);
+    if (opts.paused) act(() => hook.result.current.toggle());
+    player().play.mockClear();
+    player().pause.mockClear();
+    player().intervals.length = 0;
+    return hook;
+  }
+  const flush = () => act(async () => undefined);
+  const state = (r: { current: Playback }) => r.current.switchState;
+
+  describe("seek and play at the settle (3.7)", () => {
+    it("seeks at the replace's settle, not at readyToPlay, and never again at ready", async () => {
+      signAll();
+      const { result } = await open();
+      const swap = deferReplace(idx());
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      expect(player().seeks).not.toContain(20.5);
+      mockTelemetry.expectWait.mockClear();
+      await act(async () => swap.resolve());
+      expect(player().seeks.at(-1)).toBe(20.5);
+      expect(mockTelemetry.expectWait).toHaveBeenCalledTimes(1);
+      const seeks = player().seeks.length;
+      ready();
+      expect(player().seeks).toHaveLength(seeks);
+    });
+
+    it("re-seeks at ready only when the item is more than 0.25 s from the target", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      expect(player().seeks.at(-1)).toBe(20.5);
+      // Within the tolerance: no second seek.
+      setNativeTime(idx(), 20.7);
+      const seeks = player().seeks.length;
+      ready();
+      expect(player().seeks).toHaveLength(seeks);
+
+      act(() => result.current.switchAngle("vid-3", 30));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(3));
+      await flush();
+      // The new item reports 0 at ready (the settle seek did not take): seek again.
+      setNativeTime(idx(), 0);
+      ready();
+      expect(player().seeks.slice(-2)).toEqual([30, 30]);
+    });
+
+    it("readyToPlay before the settle: the seek still goes out once, at the settle", async () => {
+      signAll();
+      const { result } = await open();
+      const swap = deferReplace(idx());
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      ready();
+      expect(result.current.stateLabel).toBe("loading");
+      await act(async () => swap.resolve());
+      expect(player().seeks.filter((t) => t === 20.5)).toHaveLength(1);
+      expect(result.current.stateLabel).toBe("loaded");
+    });
+
+    it("plays at the settle when the intent is play; never when paused", async () => {
+      signAll();
+      const { result } = await open();
+      const swap = deferReplace(idx());
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      expect(player().play).not.toHaveBeenCalled();
+      await act(async () => swap.resolve());
+      expect(player().play).toHaveBeenCalledTimes(1);
+      expect(result.current.stateLabel).toBe("loading");
+
+      act(() => result.current.toggle());
+      player().play.mockClear();
+      act(() => result.current.switchAngle("vid-3", 22));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(3));
+      await flush();
+      ready();
+      expect(player().seeks.at(-1)).toBe(22);
+      expect(player().play).not.toHaveBeenCalled();
+    });
+
+    it("keeps the speed into the settle's play", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.setRate(1.5));
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      expect(player().playbackRate).toBe(1.5);
+      expect(player().playing).toBe(true);
+    });
+  });
+
+  describe("landing (3.3)", () => {
+    it("pending at the tap; lands within 0.25 s of the target, not at the old 1.5 s hold", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      expect(state(result)).toMatchObject({
+        phase: "pending",
+        seq: 1,
+        fromId: "vid-1",
+        targetId: "vid-2",
+        approximate: false,
+        restoring: false,
+        landedAt: null,
+        failed: null,
+      });
+      expect(state(result).startedAt).toEqual(expect.any(Number));
+      expect(player().intervals).toEqual([SWITCH_TIME_UPDATE_S]);
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      ready();
+      // 0.9 s off: the old SEEK_LANDED_S hold would have landed here.
+      time(19.6);
+      expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+      expect(state(result).phase).toBe("pending");
+      time(20.7);
+      expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+      expect(state(result).phase).toBe("landing");
+      expect(state(result).landedAt).toEqual(expect.any(Number));
+    });
+
+    it("no landing before the seek is issued (a time or frame before the settle never lands)", async () => {
+      signAll();
+      const { result } = await open();
+      const swap = deferReplace(idx());
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      time(20.5);
+      act(() => result.current.onFirstFrameRender());
+      expect(state(result).phase).toBe("pending");
+      await act(async () => swap.resolve());
+      ready();
+      time(20.55);
+      expect(state(result).phase).toBe("landing");
+    });
+
+    it("paused: lands on the first frame after the settle seek", async () => {
+      signAll();
+      const { result } = await open({ paused: true });
+      act(() => result.current.switchAngle("vid-2", 12.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      act(() => result.current.onFirstFrameRender());
+      expect(state(result).phase).toBe("landing");
+      expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+      expect(result.current.playing).toBe(false);
+    });
+
+    it("iOS paused-buffer stall: the item stays loading, the post-seek first frame still lands it", async () => {
+      signAll();
+      const { result } = await open({ paused: true });
+      player().pausedBufferStall = true;
+      act(() => result.current.switchAngle("vid-2", 12.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      act(() => readyPlayer(idx()));
+      expect(player().status).toBe("loading");
+      expect(result.current.stateLabel).toBe("loading");
+      act(() => result.current.onFirstFrameRender());
+      expect(state(result).phase).toBe("landing");
+      expect(player().play).not.toHaveBeenCalled();
+      // The fake: play() fills the buffer and the held readyToPlay follows.
+      act(() => player().play());
+      expect(result.current.stateLabel).toBe("loaded");
+    });
+
+    it("a switch to 0 needs no seek and lands on its first frame", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 0));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      expect(player().seeks).not.toContain(0);
+      act(() => result.current.onFirstFrameRender());
+      expect(state(result).phase).toBe("landing");
+    });
+
+    describe("with fake timers", () => {
+      beforeEach(() => jest.useFakeTimers());
+      afterEach(() => jest.useRealTimers());
+
+      it("paused, no frame event: lands 350 ms after the post-seek readyToPlay", async () => {
+        signAll();
+        const { result } = await open({ paused: true });
+        act(() => result.current.switchAngle("vid-2", 12.5));
+        await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+        await flush();
+        ready();
+        act(() => jest.advanceTimersByTime(PAUSED_LAND_FALLBACK_MS - 1));
+        expect(state(result).phase).toBe("pending");
+        act(() => jest.advanceTimersByTime(1));
+        expect(state(result).phase).toBe("landing");
+        expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+      });
+
+      it("paused after the post-seek ready while still pending: the fallback lands it", async () => {
+        signAll();
+        const { result } = await open();
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+        await flush();
+        ready();
+        act(() => result.current.toggle());
+        expect(state(result).phase).toBe("pending");
+        act(() => jest.advanceTimersByTime(PAUSED_LAND_FALLBACK_MS));
+        expect(state(result).phase).toBe("landing");
+        expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+      });
+
+      it("landing returns to idle after 300 ms: the still clears and the 0.25 s interval returns", async () => {
+        signAll();
+        const { result } = await open();
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+        await flush();
+        expect(state(result).heldFrame).toEqual({ fakeThumbnail: true, t: 10 });
+        ready();
+        time(20.5);
+        expect(state(result)).toMatchObject({ phase: "landing", heldFrame: { fakeThumbnail: true, t: 10 } });
+        expect(mockTelemetry.switchHeldStill).toHaveBeenCalledTimes(1);
+        const landed = state(result);
+        act(() => jest.advanceTimersByTime(SWITCH_SETTLE_MS - 1));
+        expect(state(result).phase).toBe("landing");
+        act(() => jest.advanceTimersByTime(1));
+        expect(state(result)).toMatchObject({
+          phase: "idle",
+          heldFrame: null,
+          restoring: false,
+          seq: 1,
+          fromId: "vid-1",
+          targetId: "vid-2",
+          startedAt: landed.startedAt,
+          landedAt: landed.landedAt,
+        });
+        expect(player().intervals).toEqual([SWITCH_TIME_UPDATE_S, 0.25]);
+      });
+
+      it("the still is capped at 150 ms: replaceAsync goes out, and a late thumbnail is discarded", async () => {
+        signAll();
+        const { result } = await open();
+        const thumbs = deferThumbnails(idx());
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await flush();
+        expect(player().replaceAsync).toHaveBeenCalledTimes(1);
+        act(() => jest.advanceTimersByTime(HELD_FRAME_CAP_MS - 1));
+        expect(player().replaceAsync).toHaveBeenCalledTimes(1);
+        act(() => jest.advanceTimersByTime(1));
+        expect(player().replaceAsync).toHaveBeenCalledTimes(2);
+        await act(async () => thumbs.resolve([{ late: true }]));
+        expect(state(result).heldFrame).toBeNull();
+        expect(state(result).phase).toBe("pending");
+      });
+
+      it("the still is dropped 4 s after the tap; the switch stays pending", async () => {
+        signAll();
+        const { result } = await open();
+        deferReplace(idx()); // never settles
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await flush();
+        expect(state(result).heldFrame).not.toBeNull();
+        act(() => jest.advanceTimersByTime(SWITCH_HOLD_CAP_MS - 1));
+        expect(state(result).heldFrame).not.toBeNull();
+        act(() => jest.advanceTimersByTime(1));
+        expect(state(result)).toMatchObject({ phase: "pending", heldFrame: null });
+      });
+
+      it("unmount clears the switch timers", async () => {
+        signAll();
+        const { result, unmount } = await open();
+        deferReplace(idx());
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await flush();
+        const before = jest.getTimerCount();
+        expect(before).toBeGreaterThan(0);
+        unmount();
+        expect(jest.getTimerCount()).toBeLessThan(before);
+        const err = jest.spyOn(console, "error");
+        act(() => jest.advanceTimersByTime(SWITCH_HOLD_CAP_MS * 2));
+        expect(err).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("the held still (3.3)", () => {
+    it("is taken of the frame on screen BEFORE the pause and before replaceAsync", async () => {
+      signAll();
+      const { result } = await open();
+      const thumbs = deferThumbnails(idx());
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await flush();
+      expect(player().generateThumbnailsAsync).toHaveBeenCalledWith([10]);
+      expect(player().generateThumbnailsAsync.mock.invocationCallOrder[0]).toBeLessThan(player().pause.mock.invocationCallOrder[0]);
+      // replaceAsync waits for the still.
+      expect(player().replaceAsync).toHaveBeenCalledTimes(1);
+      await act(async () => thumbs.resolve([{ still: 10 }]));
+      expect(state(result).heldFrame).toEqual({ still: 10 });
+      expect(player().replaceAsync).toHaveBeenCalledTimes(2);
+      expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/b.mp4" });
+    });
+
+    it("waits for the sign too on a pre-sign miss (both run in parallel)", async () => {
+      let resolveSign!: (v: unknown) => void;
+      signAll({ "vid-9": () => new Promise((r) => (resolveSign = r)) });
+      const { result } = await open();
+      const thumbs = deferThumbnails(idx());
+      act(() => result.current.switchAngle("vid-9", 20.5));
+      await waitFor(() => expect(mockSign).toHaveBeenCalledWith({}, "vid-9", { rendition: "720" }));
+      await act(async () => thumbs.resolve([{ still: 10 }]));
+      expect(state(result).heldFrame).toEqual({ still: 10 });
+      expect(player().replaceAsync).toHaveBeenCalledTimes(1);
+      await act(async () => resolveSign(playable("https://s/nine.mp4")));
+      expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/nine.mp4" });
+    });
+
+    it("a rejected thumbnail leaves no still; the switch proceeds", async () => {
+      signAll();
+      const { result } = await open();
+      failThumbnails(idx());
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      expect(state(result)).toMatchObject({ phase: "pending", heldFrame: null });
+      await flush();
+      ready();
+      time(20.5);
+      expect(state(result).phase).toBe("landing");
+      expect(mockTelemetry.switchHeldStill).not.toHaveBeenCalled();
+    });
+
+    it("no still while the first load is still running (the poster rules apply)", async () => {
+      signAll();
+      const { result } = renderHook(() => useVideoPlayback("vid-1"));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(1));
+      act(() => result.current.switchAngle("vid-2", 5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      expect(player().generateThumbnailsAsync).not.toHaveBeenCalled();
+      expect(state(result)).toMatchObject({ phase: "pending", heldFrame: null });
+      expect(result.current.frameShown).toBe(false);
+    });
+  });
+
+  describe("supersede (3.6)", () => {
+    it("A to B to C before landing: the still is reused, B counts as superseded, only C lands", async () => {
+      signAll();
+      const { result } = await open();
+      const swapB = deferReplace(idx());
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      const still = state(result).heldFrame;
+      expect(still).not.toBeNull();
+      act(() => result.current.switchAngle("vid-3", 21, { approximate: true }));
+      expect(mockTelemetry.switchSuperseded).toHaveBeenCalledTimes(1);
+      expect(mockTelemetry.switchStarted).toHaveBeenCalledTimes(2);
+      expect(player().generateThumbnailsAsync).toHaveBeenCalledTimes(1);
+      expect(state(result)).toMatchObject({ phase: "pending", seq: 2, fromId: "vid-2", targetId: "vid-3", approximate: true, heldFrame: still });
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/c.mp4" }));
+      await flush();
+      // B's late settle never lands C (it reloads C, the latest).
+      await act(async () => swapB.resolve());
+      ready();
+      time(20.5);
+      expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+      time(21.1);
+      expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+      expect(state(result)).toMatchObject({ phase: "landing", seq: 2, targetId: "vid-3" });
+      expect(result.current.activeId).toBe("vid-3");
+    });
+
+    it("a switch during landing captures a new still and counts no supersede", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      ready();
+      time(20.5);
+      expect(state(result).phase).toBe("landing");
+      act(() => result.current.switchAngle("vid-3", 20.6));
+      expect(mockTelemetry.switchSuperseded).not.toHaveBeenCalled();
+      expect(player().generateThumbnailsAsync).toHaveBeenCalledTimes(2);
+      expect(player().generateThumbnailsAsync).toHaveBeenLastCalledWith([20.5]);
+      await flush();
+      expect(state(result)).toMatchObject({ phase: "pending", seq: 2, fromId: "vid-2", heldFrame: { fakeThumbnail: true, t: 20.5 } });
+    });
+  });
+
+  describe("failure and restore (3.5)", () => {
+    /** The switch to `target` failed: vid-1 comes back at its tap moment (10 s) at 1.5x, then lands as a restore. */
+    async function expectRestored(result: { current: Playback }, target = "vid-2") {
+      expect(mockTelemetry.switchFailed).toHaveBeenCalledTimes(1);
+      expect(result.current.activeId).toBe("vid-1");
+      expect(state(result)).toMatchObject({
+        phase: "pending",
+        restoring: true,
+        targetId: "vid-1",
+        fromId: target,
+        approximate: false,
+        seq: 1,
+        failed: { seq: 1, targetId: target, at: expect.any(Number) },
+      });
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/a.mp4" }));
+      await flush();
+      // Back at vid-1's own moment of the tap, play intent and speed kept.
+      expect(player().seeks.at(-1)).toBe(10);
+      expect(result.current.playing).toBe(true);
+      expect(player().playbackRate).toBe(1.5);
+      expect(result.current.phase).toBe("ready");
+      expect(mockTelemetry.resigned).not.toHaveBeenCalled();
+      ready();
+      time(10.05);
+      // The restore lands, but it is not a landed switch.
+      expect(state(result)).toMatchObject({ phase: "landing", restoring: true });
+      expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+      expect(mockTelemetry.switchHeldStill).not.toHaveBeenCalled();
+    }
+
+    it("a failed sign restores the previous angle at the tap moment", async () => {
+      signAll({ "vid-9": () => Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "down" } }) });
+      const { result } = await open();
+      act(() => result.current.setRate(1.5));
+      act(() => result.current.switchAngle("vid-9", 20.5));
+      await waitFor(() => expect(mockTelemetry.switchFailed).toHaveBeenCalled());
+      await expectRestored(result, "vid-9");
+    });
+
+    it("a processing target fails the switch too (no failed panel)", async () => {
+      signAll({ "vid-9": () => Promise.resolve(playable("https://s/p.mp4", { playability: "processing" })) });
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-9", 20.5));
+      await waitFor(() => expect(mockTelemetry.switchFailed).toHaveBeenCalledTimes(1));
+      expect(result.current.phase).toBe("ready");
+      expect(result.current.activeId).toBe("vid-1");
+    });
+
+    it("a thrown sign fails the switch", async () => {
+      signAll({ "vid-9": () => Promise.reject(new Error("network")) });
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-9", 20.5));
+      await waitFor(() => expect(mockTelemetry.switchFailed).toHaveBeenCalledTimes(1));
+      expect(result.current.activeId).toBe("vid-1");
+      expect(state(result).restoring).toBe(true);
+    });
+
+    it("a rejected replaceAsync restores the previous angle", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.setRate(1.5));
+      player().replaceAsync.mockImplementationOnce(() => Promise.reject(new Error("load failed")));
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(mockTelemetry.switchFailed).toHaveBeenCalled());
+      await expectRestored(result);
+    });
+
+    it("a player error on the switched-in item restores (no silent re-sign)", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.setRate(1.5));
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      const signs = mockSign.mock.calls.length;
+      await fail("decode");
+      expect(mockSign).toHaveBeenCalledTimes(signs);
+      await expectRestored(result);
+    });
+
+    it("the restore failing too shows the failed phase; the switch state goes idle with the failure kept", async () => {
+      signAll();
+      const { result } = await open();
+      player().replaceAsync.mockImplementationOnce(() => Promise.reject(new Error("load failed")));
+      player().replaceAsync.mockImplementationOnce(() => Promise.reject(new Error("still failing")));
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(result.current.phase).toBe("failed"));
+      expect(result.current.stateLabel).toBe("error");
+      expect(state(result)).toMatchObject({ phase: "idle", restoring: false, heldFrame: null, failed: { seq: 1, targetId: "vid-2" } });
+      expect(mockTelemetry.switchFailed).toHaveBeenCalledTimes(1);
+      expect(player().intervals.at(-1)).toBe(0.25);
+    });
+
+    it("the next switch clears the failure (superseding the restore counts as a supersede)", async () => {
+      signAll();
+      const { result } = await open();
+      player().replaceAsync.mockImplementationOnce(() => Promise.reject(new Error("load failed")));
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(state(result).failed).not.toBeNull());
+      act(() => result.current.switchAngle("vid-3", 20.5));
+      expect(state(result)).toMatchObject({ phase: "pending", restoring: false, failed: null, seq: 2, fromId: "vid-1" });
+      expect(mockTelemetry.switchSuperseded).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("quality and navigation", () => {
+    it("a player error after the switch landed still gets the silent re-sign (P0 behavior)", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      ready();
+      time(20.5);
+      time(22);
+      expect(state(result).phase).toBe("landing");
+      await fail("expired");
+      expect(mockTelemetry.resigned).toHaveBeenCalledTimes(1);
+      expect(mockTelemetry.switchFailed).not.toHaveBeenCalled();
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(3));
+      expect(result.current.activeId).toBe("vid-2");
+      expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/b.mp4" });
+      // The re-sign keeps today's ready-then-seek path.
+      await flush();
+      expect(player().seeks.at(-1)).toBe(20.5);
+      setNativeTime(idx(), 0);
+      ready();
+      expect(player().seeks.at(-1)).toBe(22);
+    });
+
+    it("an outside navigation resets the switch state (seq kept) and the 0.25 s interval", async () => {
+      signAll();
+      const { result, rerender } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      expect(state(result).phase).toBe("pending");
+      rerender({ id: "vid-7" });
+      expect(state(result)).toEqual({ ...IDLE_SWITCH_STATE, seq: 1 });
+      expect(player().intervals.at(-1)).toBe(0.25);
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/x.mp4" }));
+    });
+
+    it("the two-argument call still works (approximate defaults to false); the option sets it", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      expect(state(result).approximate).toBe(false);
+      act(() => result.current.switchAngle("vid-3", 20.5, { approximate: true }));
+      expect(state(result).approximate).toBe(true);
+    });
+
+    it("a switch to the angle on screen (or no id) is ignored and leaves the state alone", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-1", 3));
+      act(() => result.current.switchAngle("", 3));
+      expect(state(result)).toEqual(IDLE_SWITCH_STATE);
+      expect(player().intervals).toEqual([]);
+    });
   });
 });

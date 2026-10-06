@@ -53,9 +53,12 @@ export interface PlaybackSource {
 }
 
 /**
- * Angle switch phase 1 contract (jits-xfvd.16,
+ * Angle switch phase 1 (jits-xfvd.16, contract:
  * research/2026-10-multi-angle-playback/06-angle-switch-phase1-contract.md).
- * The base branch only declares these; slice B1 implements them.
+ * `switchState` tells the screen what one angle switch is doing: a held
+ * still of the outgoing frame while the new angle loads (`pending`), the
+ * landing on the exact moment (`landing`, the still fades out over it), and
+ * back to `idle`.
  */
 /** Phases of ONE angle switch. A quality swap never leaves "idle". */
 export type SwitchPhase = "idle" | "pending" | "landing";
@@ -134,7 +137,7 @@ export interface VideoPlayback {
    * player, and holds the outgoing frame instead of the poster.
    */
   switchAngle: (nextId: string, atSeconds: number, opts?: { approximate?: boolean }) => void;
-  /** The current angle switch (jits-xfvd.16). Idle on the base branch; slice B1 drives it. */
+  /** The current angle switch (jits-xfvd.16): its phase, held still, landing and failure. */
   switchState: SwitchState;
   /** Sign these angles now (best effort) so a switch to one skips the round trip. */
   presign: (ids: string[]) => void;
@@ -198,6 +201,15 @@ const AUTOPLAY_FALLBACK_MS = 3000;
  */
 const PRESIGN_FRESH_MS = 45 * 60 * 1000;
 
+type SwitchTimer = "gate" | "holdCap" | "settle" | "pausedLand";
+
+type SwapKind = "angle" | "quality" | "restore" | "angleRestore";
+
+/** Angle switches and their restores seek and play at the swap's settle (contract 3.7). */
+function seeksAtSettle(kind: SwapKind | null): boolean {
+  return kind === "angle" || kind === "angleRestore";
+}
+
 function phaseFor(result: Result<MatchVideoPlayback | null>): PlaybackPhase {
   if (!result.ok) {
     return result.error.code === "VIDEO_FILE_MISSING" ? "missing" : "failed";
@@ -237,9 +249,17 @@ function safely(fn: () => void): void {
  * `switchAngle` swaps the other angle's URL into this same player at the
  * translated position in fractional seconds, keeps the play/pause intent and
  * the speed, holds the outgoing frame instead of flashing the poster, and
- * keeps the one telemetry session (it counts the switch and times tap to the
- * new angle's first frame). `presign` signs the other playable angles when
- * the screen learns them, so a switch normally skips the sign round trip.
+ * keeps the one telemetry session (it counts the switch and times tap to
+ * landing). `presign` signs the other playable angles when the screen
+ * learns them, so a switch normally skips the sign round trip.
+ *
+ * Angle switch phase 1 (jits-xfvd.16): a switch takes a native still of the
+ * outgoing frame before the swap (`switchState.heldFrame`, for the screen's
+ * overlay), seeks and plays at the swap's settle instead of after
+ * readyToPlay, lands within LAND_TOLERANCE_S of the target (paused: the
+ * post-seek first frame, or PAUSED_LAND_FALLBACK_MS after the post-seek
+ * readyToPlay), and on failure restores the previous angle at its moment of
+ * the tap instead of failing playback. See `SwitchState`.
  *
  * Silent switch: expo-video always runs the iOS audio session in the
  * `.playback` category, so the film is audible with the ringer off (expo-av
@@ -270,8 +290,12 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const presignIdsRef = React.useRef<string[]>([]);
   /** The generation an angle switch or a quality swap loaded, until its first frame shows. */
   const switchGenRef = React.useRef<number | null>(null);
-  /** What the in-flight swap is (telemetry and the controller treat them apart). */
-  const swapKindRef = React.useRef<"angle" | "quality" | "restore" | null>(null);
+  /**
+   * What the in-flight swap is (telemetry and the controller treat them
+   * apart). "restore" puts the file back after a failed quality swap;
+   * "angleRestore" puts the previous angle back after a failed angle switch.
+   */
+  const swapKindRef = React.useRef<SwapKind | null>(null);
   /**
    * The quality swap in flight, from its start to its landing, failure or
    * supersession (review H1, H2): the file it replaces, so a failed sign
@@ -341,6 +365,70 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       mountedRef.current = false;
     };
   }, []);
+
+  // ---- One angle switch's state (jits-xfvd.16, contract section 3) ----
+  const [switchState, setSwitchStateValue] = React.useState<SwitchState>(IDLE_SWITCH_STATE);
+  const switchStateRef = React.useRef<SwitchState>(IDLE_SWITCH_STATE);
+  const setSwitch = React.useCallback((next: SwitchState) => {
+    switchStateRef.current = next;
+    if (mountedRef.current) setSwitchStateValue(next);
+  }, []);
+  /** The outgoing angle's own time at the tap (fractional seconds): a failed switch restores it there. */
+  const switchFromAtRef = React.useRef(0);
+  /** The resume target the switched-in item lands on (clamped to a shorter angle's end once known). */
+  const landAtRef = React.useRef(0);
+  /** The generation whose resume seek was issued at its replaceAsync settle, and the target it seeked to. */
+  const settleSeekRef = React.useRef<{ gen: number; at: number } | null>(null);
+  /**
+   * The held still's gate: while it is closed, `replace` parks the new
+   * source, so the thumbnail of the outgoing frame is taken while the player
+   * still describes the outgoing asset. It opens when the thumbnail settles
+   * or after HELD_FRAME_CAP_MS. `replaced`: a replaceAsync was issued since
+   * (a thumbnail resolving after that is discarded).
+   */
+  const gateRef = React.useRef<{ seq: number; open: boolean; pending: PlaybackSource | null; replaced: boolean } | null>(null);
+  const switchTimersRef = React.useRef<Partial<Record<SwitchTimer, ReturnType<typeof setTimeout>>>>({});
+  const clearSwitchTimer = React.useCallback((name: SwitchTimer) => {
+    const t = switchTimersRef.current[name];
+    if (t) clearTimeout(t);
+    delete switchTimersRef.current[name];
+  }, []);
+  const setSwitchTimer = React.useCallback(
+    (name: SwitchTimer, ms: number, fn: () => void) => {
+      clearSwitchTimer(name);
+      switchTimersRef.current[name] = setTimeout(() => {
+        delete switchTimersRef.current[name];
+        if (mountedRef.current) fn();
+      }, ms);
+    },
+    [clearSwitchTimer],
+  );
+  React.useEffect(
+    () => () => {
+      for (const name of Object.keys(switchTimersRef.current) as SwitchTimer[]) clearSwitchTimer(name);
+    },
+    [clearSwitchTimer],
+  );
+  const setUpdateInterval = React.useCallback(
+    (seconds: number) =>
+      safely(() => {
+        if (player.timeUpdateEventInterval !== seconds) player.timeUpdateEventInterval = seconds;
+      }),
+    [player],
+  );
+  /** Back to idle (the landing settled, the restore failed, or an outside navigation). */
+  const switchToIdle = React.useCallback(
+    (next: SwitchState) => {
+      for (const name of ["gate", "holdCap", "settle", "pausedLand"] as SwitchTimer[]) clearSwitchTimer(name);
+      setSwitch({ ...next, phase: "idle", heldFrame: null, restoring: false });
+      setUpdateInterval(TIME_UPDATE_S);
+    },
+    [clearSwitchTimer, setSwitch, setUpdateInterval],
+  );
+  // A failed switch restores the previous angle, and a failed restore shows
+  // the retry panel; both are defined further down (they need swapSource).
+  const failSwitchRef = React.useRef<() => void>(() => undefined);
+  const restoreFailedRef = React.useRef<() => void>(() => undefined);
 
   // The quality policy (shared with the multi-angle player). A decision is
   // applied with `swapSource` below, through a ref (it is defined later).
@@ -419,7 +507,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const sign = React.useCallback(
     async (
       silent: boolean,
-      opts: { switched?: boolean; holdFrame?: boolean; rendition?: TargetRendition; quality?: boolean } = {},
+      opts: { switched?: boolean; holdFrame?: boolean; rendition?: TargetRendition; quality?: boolean; kind?: SwapKind } = {},
     ) => {
       const target = activeIdRef.current;
       if (!target) {
@@ -432,11 +520,27 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       if (!silent) setPhase("loading");
       const rendition = opts.rendition ?? (await quality.signTarget());
       if (epoch !== epochRef.current) return;
-      const result = await getMatchVideoPlaybackResult(supabase, target, { rendition });
+      let result: Result<MatchVideoPlayback | null>;
+      try {
+        result = await getMatchVideoPlaybackResult(supabase, target, { rendition });
+      } catch (e) {
+        // A thrown sign fails an angle switch (or its restore) like a failed one.
+        if (opts.kind !== "angle" && opts.kind !== "angleRestore") throw e;
+        result = { ok: false, error: { code: "UNKNOWN", message: e instanceof Error ? e.message : String(e) } };
+      }
       // A newer sign (or switch) started, or the screen unmounted.
       if (epoch !== epochRef.current) return;
       signingRef.current = false;
       const next = phaseFor(result);
+      const playable = next === "ready" && result.ok && result.data != null;
+      if (!playable && (opts.kind === "angle" || opts.kind === "angleRestore")) {
+        // No silent fallback for a switch (contract 3.5): a failed switch
+        // restores the previous angle; a failed restore shows the retry panel.
+        telemetry.signOutcome(next === "loading" ? "pending" : next === "ready" ? "failed" : next);
+        if (opts.kind === "angle") failSwitchRef.current();
+        else restoreFailedRef.current();
+        return;
+      }
       if (opts.quality && !(next === "ready" && result.ok && result.data)) {
         // A failed quality swap is not a failed video (review H1).
         const pending = qualityPendingRef.current;
@@ -485,6 +589,10 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     swapKindRef.current = null;
     qualityPendingRef.current = null;
     switchSeekLandedRef.current = true;
+    // No switch carries over into another recording (contract 3.8).
+    gateRef.current = null;
+    settleSeekRef.current = null;
+    switchToIdle({ ...IDLE_SWITCH_STATE, seq: switchStateRef.current.seq });
     // A fresh open: a new start selection (and controller) for it.
     void quality.begin();
     // Like a fresh open: start at the new route's `?t=` (review m2).
@@ -496,13 +604,25 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     streakRef.current = false;
     silentCountRef.current = 0;
     void sign(false);
-  }, [id, sign, telemetry, quality]);
+  }, [id, sign, telemetry, quality, switchToIdle]);
 
   const retry = React.useCallback(() => setAttempt((n) => n + 1), []);
 
   const onPlayerError = React.useCallback(
     (_message?: string | null) => {
       if (signingRef.current) return;
+      // The item of a pending angle switch (or its restore) failed: no
+      // silent re-sign (contract 3.5).
+      const gen = sourceRef.current?.generation;
+      const pendingKind = gen != null && gen === switchGenRef.current ? swapKindRef.current : null;
+      if (pendingKind === "angle") {
+        failSwitchRef.current();
+        return;
+      }
+      if (pendingKind === "angleRestore") {
+        restoreFailedRef.current();
+        return;
+      }
       loadedRef.current = false;
       setLoaded(false);
       if (streakRef.current || silentCountRef.current >= MAX_SILENT_RESIGNS) {
@@ -573,7 +693,42 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       progressBaseRef.current = at;
     }
     if (current.generation === switchGenRef.current && !at) switchSeekLandedRef.current = true;
-    if (at) {
+    const settleSeek = settleSeekRef.current;
+    if (settleSeek && settleSeek.gen === current.generation) {
+      // The resume seek went out at the swap's settle (contract 3.7). Seek
+      // again only when the clamp moved the target or the item is more than
+      // LAND_TOLERANCE_S away from it (a fallback, counted nowhere).
+      settleSeekRef.current = null;
+      let now = Number.NaN;
+      safely(() => {
+        now = player.currentTime;
+      });
+      if (at && (at !== settleSeek.at || !(Math.abs(now - at) <= LAND_TOLERANCE_S))) {
+        landAtRef.current = at;
+        holdRef.current = { at, left: SEEK_HOLD_MAX_UPDATES };
+        feed();
+        telemetry.expectWait();
+        setPositionS(at);
+        const target = at;
+        safely(() => {
+          player.currentTime = target;
+        });
+      }
+      // Paused, the view may draw no new frame for a seek: land after a beat.
+      if (
+        seeksAtSettle(swapKindRef.current) &&
+        current.generation === switchGenRef.current &&
+        !switchSeekLandedRef.current &&
+        !playingRef.current
+      ) {
+        const gen = current.generation;
+        setSwitchTimer("pausedLand", PAUSED_LAND_FALLBACK_MS, () => {
+          if (switchGenRef.current !== gen || switchSeekLandedRef.current || playingRef.current) return;
+          switchSeekLandedRef.current = true;
+          frameLandedRef.current(gen);
+        });
+      }
+    } else if (at) {
       seekIssuedGenRef.current = current.generation;
       holdRef.current = { at, left: SEEK_HOLD_MAX_UPDATES };
       // The controller sees the seek hold BEFORE telemetry closes any open stall (review M3).
@@ -584,7 +739,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         player.currentTime = at;
       });
     }
-  }, [player, telemetry]);
+  }, [player, telemetry, feed, setSwitchTimer]);
 
   const autoplayTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearAutoplayTimer = () => {
@@ -592,6 +747,32 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     autoplayTimerRef.current = null;
   };
   React.useEffect(() => clearAutoplayTimer, []);
+
+  /**
+   * The angle switch (or its restore) landed (contract 3.3): the still stays
+   * up for the screen's crossfade, and the state settles to idle
+   * SWITCH_SETTLE_MS later. A restore is not a landed switch in telemetry.
+   */
+  const landSwitch = React.useCallback(
+    (kind: "angle" | "angleRestore") => {
+      const st = switchStateRef.current;
+      clearSwitchTimer("holdCap");
+      clearSwitchTimer("pausedLand");
+      if (kind === "angle") {
+        telemetry.switchLanded();
+        if (st.phase === "pending" && st.heldFrame != null) telemetry.switchHeldStill();
+      }
+      if (st.phase !== "pending") return;
+      const landed: SwitchState = { ...st, phase: "landing", landedAt: Date.now() };
+      setSwitch(landed);
+      setSwitchTimer("settle", SWITCH_SETTLE_MS, () => {
+        const cur = switchStateRef.current;
+        if (cur.seq !== landed.seq || cur.phase !== "landing") return;
+        switchToIdle(cur);
+      });
+    },
+    [telemetry, clearSwitchTimer, setSwitch, setSwitchTimer, switchToIdle],
+  );
 
   /** A frame of generation `gen` is on screen (lifts the poster; ends a switch's wait). */
   const frameLanded = React.useCallback(
@@ -613,15 +794,17 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
           if (served) quality.landed(served.served, served.available);
           // Other angles were pre-signed at the old rendition.
           presignRef.current(presignIdsRef.current);
-        } else if (kind === "angle") {
-          telemetry.switchLanded();
+        } else if (kind === "angle" || kind === "angleRestore") {
+          landSwitch(kind);
           if (served) quality.angleChanged(served.served, served.available);
         }
       }
       feed();
     },
-    [telemetry, quality, feed],
+    [telemetry, quality, feed, landSwitch],
   );
+  const frameLandedRef = React.useRef(frameLanded);
+  frameLandedRef.current = frameLanded;
 
   // Swap each newly signed URL into the one player. Only the latest swap's
   // outcome counts; a superseded swap that settles after it reloads the
@@ -629,6 +812,13 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const swapRef = React.useRef({ seq: 0, doneSeq: 0 });
   const replace = React.useCallback(
     (next: PlaybackSource) => {
+      const gate = gateRef.current;
+      if (gate && !gate.open) {
+        // The held still is being taken off the outgoing item: wait for it.
+        gate.pending = next;
+        return;
+      }
+      if (gate) gate.replaced = true;
       const state = swapRef.current;
       const seq = ++state.seq;
       settledGenRef.current = null;
@@ -656,6 +846,26 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
           return;
         }
         settledGenRef.current = next.generation;
+        if (next.generation === switchGenRef.current && seeksAtSettle(swapKindRef.current)) {
+          // An angle switch (or its restore) seeks and plays right at the
+          // settle, not after readyToPlay (contract 3.7): the new item then
+          // buffers at the target instead of at 0. iOS applies a time set
+          // during the replace right after it; Android can seek once
+          // replaceAsync has resolved.
+          const at = resumeAtRef.current;
+          if (at) {
+            settleSeekRef.current = { gen: next.generation, at };
+            landAtRef.current = at;
+            seekIssuedGenRef.current = next.generation;
+            holdRef.current = { at, left: SEEK_HOLD_MAX_UPDATES };
+            feed();
+            telemetry.expectWait();
+            safely(() => {
+              player.currentTime = at;
+            });
+          }
+          if (playingRef.current) startPlayback();
+        }
         // readyToPlay may have fired before this promise settled.
         markLoaded();
         if (!loadedRef.current) {
@@ -678,12 +888,28 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         (e: unknown) => settle(false, e instanceof Error ? e.message : String(e)),
       );
     },
-    [player, markLoaded, telemetry, startPlayback],
+    [player, markLoaded, telemetry, startPlayback, feed],
   );
+  const replaceRef = React.useRef(replace);
+  replaceRef.current = replace;
 
   React.useEffect(() => {
     if (source) replace(source);
   }, [source, replace]);
+
+  /** The held still's gate opens: issue the parked swap (the latest source). */
+  const openGate = React.useCallback(
+    (seq: number) => {
+      const gate = gateRef.current;
+      if (!gate || gate.seq !== seq || gate.open) return;
+      gate.open = true;
+      clearSwitchTimer("gate");
+      const parked = gate.pending;
+      gate.pending = null;
+      if (parked && mountedRef.current) replaceRef.current(sourceRef.current ?? parked);
+    },
+    [clearSwitchTimer],
+  );
 
   React.useEffect(() => {
     const subs: Array<{ remove: () => void }> = [];
@@ -712,12 +938,31 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
               return;
             }
             holdRef.current = null;
-            if (!switchSeekLandedRef.current && sourceRef.current?.generation === switchGenRef.current) {
-              // The switched-in item reached its resume point: now a frame
-              // on screen is the right instant.
+            if (
+              !switchSeekLandedRef.current &&
+              !seeksAtSettle(swapKindRef.current) &&
+              sourceRef.current?.generation === switchGenRef.current
+            ) {
+              // The quality-swapped item reached its resume point: now a
+              // frame on screen is the right instant.
               switchSeekLandedRef.current = true;
               frameLanded(sourceRef.current.generation);
             }
+          }
+          const gen = sourceRef.current?.generation;
+          if (
+            gen != null &&
+            gen === switchGenRef.current &&
+            !switchSeekLandedRef.current &&
+            seeksAtSettle(swapKindRef.current) &&
+            seekIssuedGenRef.current === gen &&
+            playingRef.current &&
+            Math.abs(currentTime - landAtRef.current) <= LAND_TOLERANCE_S
+          ) {
+            // An angle switch lands on a time within LAND_TOLERANCE_S of its
+            // target (contract 3.3), never on the looser seek hold.
+            switchSeekLandedRef.current = true;
+            frameLanded(gen);
           }
           positionRef.current = currentTime;
           setPositionS(currentTime);
@@ -761,8 +1006,26 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     telemetry.playIntent(playing);
     if (!loadedRef.current) return;
     if (playing) startPlayback();
-    else safely(() => player.pause());
-  }, [playing, loaded, player, startPlayback, telemetry, feed]);
+    else {
+      safely(() => player.pause());
+      // Paused mid-switch after the post-seek readyToPlay: no time update
+      // will land it, so the paused fallback does (contract 3.3).
+      const gen = sourceRef.current?.generation;
+      if (
+        gen != null &&
+        gen === switchGenRef.current &&
+        seeksAtSettle(swapKindRef.current) &&
+        seekIssuedGenRef.current === gen &&
+        !switchSeekLandedRef.current
+      ) {
+        setSwitchTimer("pausedLand", PAUSED_LAND_FALLBACK_MS, () => {
+          if (switchGenRef.current !== gen || switchSeekLandedRef.current || playingRef.current) return;
+          switchSeekLandedRef.current = true;
+          frameLandedRef.current(gen);
+        });
+      }
+    }
+  }, [playing, loaded, player, startPlayback, telemetry, feed, setSwitchTimer]);
 
   React.useEffect(() => {
     rateRef.current = rate;
@@ -839,16 +1102,22 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
    * outgoing frame, keeping play intent and speed, landed only after the
    * resume seek lands. `kind` only changes the bookkeeping: an angle switch
    * moves `activeId` and is timed as a switch; a quality swap reloads the
-   * same id at another rendition and is timed as a quality switch.
+   * same id at another rendition and is timed as a quality switch; an
+   * "angleRestore" puts the previous angle back after a failed switch (it
+   * moves `activeId`, but is not a switch in telemetry). An angle switch and
+   * its restore seek and play at the replace's settle (contract 3.7).
    */
   const swapSource = React.useCallback(
-    (nextId: string, atSeconds: number, target: TargetRendition, kind: "angle" | "quality") => {
+    (nextId: string, atSeconds: number, target: TargetRendition, kind: "angle" | "quality" | "angleRestore") => {
       if (!nextId) return;
       if (kind === "angle" && nextId === activeIdRef.current) return;
       const at = Number.isFinite(atSeconds) && atSeconds > 0 ? atSeconds : 0;
       // An angle switch supersedes a quality swap still in flight.
       dropQualitySwap();
       if (kind === "angle") telemetry.switchStarted();
+      settleSeekRef.current = null;
+      clearSwitchTimer("pausedLand");
+      landAtRef.current = at;
       swapKindRef.current = kind;
       // Hold the outgoing frame only if one is up (else the poster stays).
       const current = sourceRef.current;
@@ -861,7 +1130,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       positionRef.current = at;
       setPositionS(at);
       holdRef.current = null;
-      if (kind === "angle") {
+      if (kind !== "quality") {
         // Another file, another clock. A quality swap keeps the timeline.
         durationRef.current = 0;
         setDurationS(0);
@@ -893,22 +1162,121 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         setPhase("ready");
         return;
       }
-      void sign(true, { switched: true, holdFrame, rendition: target, quality: kind === "quality" });
+      void sign(true, { switched: true, holdFrame, rendition: target, quality: kind === "quality", kind });
     },
-    [player, telemetry, attach, sign, dropQualitySwap],
+    [player, telemetry, attach, sign, dropQualitySwap, clearSwitchTimer],
   );
 
   const switchAngle = React.useCallback(
     // Angle switches keep the session's rendition. A pending quality swap is
     // dropped FIRST, so the new angle signs at the level still served, never
     // at a superseded decision's rendition (review R2-M1).
-    (nextId: string, atSeconds: number, _opts?: { approximate?: boolean }) => {
+    (nextId: string, atSeconds: number, opts?: { approximate?: boolean }) => {
       if (!nextId || nextId === activeIdRef.current) return;
       dropQualitySwap();
+      const prev = switchStateRef.current;
+      // A switch that had not landed yet (a restore included) is superseded:
+      // its still is reused, since the player may already hold the
+      // superseded target's frame 0 (contract 3.6).
+      const superseding = prev.phase === "pending";
+      if (superseding) telemetry.switchSuperseded();
+      const seq = prev.seq + 1;
+      // The outgoing angle's own time at the tap: a failed switch returns here.
+      const fromAt = currentTimeNow();
+      switchFromAtRef.current = fromAt;
+      for (const name of ["gate", "holdCap", "settle", "pausedLand"] as SwitchTimer[]) clearSwitchTimer(name);
+      // An older gate's parked source is superseded by this switch's.
+      gateRef.current = null;
+      const current = sourceRef.current;
+      const frameUp =
+        current != null &&
+        loadedRef.current &&
+        (frameShownGenRef.current === current.generation || frameGenRef.current === current.generation);
+      setSwitch({
+        phase: "pending",
+        seq,
+        fromId: activeIdRef.current ?? null,
+        targetId: nextId,
+        startedAt: Date.now(),
+        approximate: opts?.approximate === true,
+        restoring: false,
+        heldFrame: superseding ? prev.heldFrame : null,
+        landedAt: null,
+        failed: null,
+      });
+      setUpdateInterval(SWITCH_TIME_UPDATE_S);
+      setSwitchTimer("holdCap", SWITCH_HOLD_CAP_MS, () => {
+        const cur = switchStateRef.current;
+        if (cur.seq === seq && cur.phase === "pending" && cur.heldFrame != null) setSwitch({ ...cur, heldFrame: null });
+      });
+      if (!superseding && frameUp) {
+        // The held still: a native thumbnail of the frame on screen, taken
+        // BEFORE the pause and before replaceAsync, which waits for it at
+        // most HELD_FRAME_CAP_MS (contract 3.3).
+        let pending: Promise<VideoThumbnail[]> | null = null;
+        safely(() => {
+          if (typeof player.generateThumbnailsAsync === "function") pending = player.generateThumbnailsAsync([fromAt]);
+        });
+        const thumbs = pending as Promise<VideoThumbnail[]> | null;
+        if (thumbs && typeof thumbs.then === "function") {
+          const gate = { seq, open: false, pending: null as PlaybackSource | null, replaced: false };
+          gateRef.current = gate;
+          setSwitchTimer("gate", HELD_FRAME_CAP_MS, () => openGate(seq));
+          thumbs.then(
+            (list) => {
+              const still = Array.isArray(list) ? (list[0] ?? null) : null;
+              const cur = switchStateRef.current;
+              // A still that comes back after replaceAsync went out may
+              // already describe the new asset: discarded.
+              if (mountedRef.current && still && gateRef.current === gate && !gate.replaced && cur.seq === seq && cur.phase === "pending") {
+                setSwitch({ ...cur, heldFrame: still });
+              }
+              openGate(seq);
+            },
+            () => openGate(seq),
+          );
+        }
+      }
       swapSource(nextId, atSeconds, quality.currentTarget(), "angle");
     },
-    [swapSource, quality, dropQualitySwap],
+    [swapSource, quality, dropQualitySwap, telemetry, currentTimeNow, clearSwitchTimer, setSwitch, setUpdateInterval, setSwitchTimer, player, openGate],
   );
+
+  // A pending angle switch failed (contract 3.5): back to the angle it left,
+  // at that angle's own moment of the tap, play intent and speed kept,
+  // behind the same held still. Never a silent re-sign of the target.
+  failSwitchRef.current = () => {
+    const st = switchStateRef.current;
+    if (st.phase !== "pending" || st.restoring) return;
+    telemetry.switchFailed();
+    const failed: SwitchFailure = { seq: st.seq, targetId: st.targetId ?? "", at: Date.now() };
+    gateRef.current = null;
+    clearSwitchTimer("gate");
+    clearSwitchTimer("pausedLand");
+    switchGenRef.current = null;
+    swapKindRef.current = null;
+    signingRef.current = false;
+    const back = st.fromId;
+    if (!back) {
+      setPhase("failed");
+      switchToIdle({ ...st, failed });
+      return;
+    }
+    setSwitch({ ...st, phase: "pending", restoring: true, targetId: back, fromId: st.targetId, approximate: false, failed });
+    swapSource(back, switchFromAtRef.current, quality.currentTarget(), "angleRestore");
+  };
+
+  // The restore failed too: today's failed phase and retry panel (contract 3.5).
+  restoreFailedRef.current = () => {
+    switchGenRef.current = null;
+    swapKindRef.current = null;
+    signingRef.current = false;
+    settleSeekRef.current = null;
+    loadedRef.current = false;
+    setLoaded(false);
+    setPhase("failed");
+    switchToIdle(switchStateRef.current);
+  };
 
   // A quality decision: the same id, at the exact position right now.
   applyQualityRef.current = (d: QualityDecision) => {
@@ -976,6 +1344,6 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     frameShown: source != null && (frameGen === source.generation || source.holdFrame === true),
     onFirstFrameRender,
     telemetry,
-    switchState: IDLE_SWITCH_STATE,
+    switchState,
   };
 }
