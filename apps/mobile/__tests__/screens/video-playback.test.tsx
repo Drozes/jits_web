@@ -697,25 +697,59 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(mockGetVideoAnalysis).toHaveBeenCalledWith({}, "vid-1");
   });
 
-  it("marks every key moment on the seek bar and jumps from a chip", async () => {
+  it("marks every key moment on the seek bar and steps through them by time (jits-xfvd.18)", async () => {
     const utils = await renderLoadedPlayer();
-    await waitFor(() => expect(utils.getByTestId("moment-chip-0")).toBeTruthy());
+    await waitFor(() => expect(utils.getByTestId("moment-stepper")).toBeTruthy());
     // Engage, takedown, guard pass, and the finish from the analysis's own
     // technique tag at 06:15 video time (never the 06:17 match clock).
     expect(utils.getAllByTestId(/^seek-marker-/, { includeHiddenElements: true })).toHaveLength(4);
     expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy();
-    expect(utils.getByText("06:15 REAR-NAKED CHOKE · FINISH")).toBeTruthy();
-    fireEvent.press(utils.getByLabelText("Jump to 00:27, Takedown"));
+    // Before the first moment: its time, prev disabled, next jumps to it.
+    statusAt(2);
+    expect(utils.getByTestId("moment-step-time")).toHaveTextContent("00:09");
+    expect(utils.getByTestId("moment-step-count")).toHaveTextContent("1/4");
+    expect(utils.getByTestId("moment-step-prev").props.accessibilityState).toMatchObject({ disabled: true });
+    expect(utils.getByTestId("moment-step-prev").props.accessibilityLabel).toBe("Previous key moment");
+    fireEvent.press(utils.getByLabelText("Next key moment, 00:09"));
+    expect(lastPlayer().seeks.at(-1)).toBe(9);
+    // The seek lands, then playback moves on.
+    statusAt(9);
+    // Between moments: prev and next are the neighbours of the one shown.
+    statusAt(30);
+    expect(utils.getByTestId("moment-step-time")).toHaveTextContent("00:27");
+    expect(utils.getByTestId("moment-step-count")).toHaveTextContent("2/4");
+    fireEvent.press(utils.getByLabelText("Next key moment, 03:12"));
+    expect(lastPlayer().seeks.at(-1)).toBe(192);
+    statusAt(192);
+    expect(utils.getByTestId("moment-step-count")).toHaveTextContent("3/4");
+    fireEvent.press(utils.getByLabelText("Previous key moment, 00:27"));
     expect(lastPlayer().seeks.at(-1)).toBe(27);
+    statusAt(27);
+    fireEvent.press(utils.getByTestId("moment-step-current"));
+    expect(lastPlayer().seeks.at(-1)).toBe(27);
+    statusAt(27);
+    // Past the last moment: next is disabled.
+    statusAt(390);
+    expect(utils.getByTestId("moment-step-time")).toHaveTextContent("06:15");
+    expect(utils.getByTestId("moment-step-next").props.accessibilityState).toMatchObject({ disabled: true });
+    expect(utils.getByTestId("moment-step-next").props.accessibilityLabel).toBe("Next key moment");
   });
 
-  it("captions the current moment and lights its chip", async () => {
+  it("lights the current moment and shows no AI move wording or caption (jits-xfvd.18)", async () => {
     const utils = await renderLoadedPlayer();
-    await waitFor(() => expect(utils.getByTestId("moment-chip-1")).toBeTruthy());
+    await waitFor(() => expect(utils.getByTestId("moment-stepper")).toBeTruthy());
     statusAt(30);
-    expect(utils.getByTestId("player-caption")).toHaveTextContent("00:27Takedown: Single leg to the mat");
-    expect(utils.getByTestId("moment-chip-1").props.accessibilityState).toMatchObject({ selected: true });
+    expect(utils.getByTestId("moment-step-current").props.accessibilityState).toMatchObject({ selected: true });
+    expect(utils.getByTestId("moment-step-current").props.accessibilityLabel).toBe("Key moment 2 of 4, 00:27");
+    expect(utils.queryByTestId("player-caption")).toBeNull();
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:30 / 06:40");
+    for (const word of [/takedown/i, /single leg/i, /guard pass/i, /choke/i, /engage/i, /standing/i, /hand fighting/i, /finish/i]) {
+      expect(utils.queryAllByText(word, { includeHiddenElements: true })).toHaveLength(0);
+      expect(utils.queryAllByLabelText(word, { includeHiddenElements: true })).toHaveLength(0);
+    }
+    // More than 10 s on, the moment is no longer lit.
+    statusAt(45);
+    expect(utils.getByTestId("moment-step-current").props.accessibilityState).toMatchObject({ selected: false });
   });
 
   it("skips 10 s either way, clamped to the clip", async () => {
@@ -768,12 +802,15 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(lastPlayer().playing).toBe(true);
   });
 
-  it("gives the seek bar, moment chips and angle segments 44 pt targets", async () => {
+  it("gives the seek bar, moment stepper and angle segments 44 pt targets", async () => {
     const utils = await renderLoadedPlayer();
-    await waitFor(() => expect(utils.getByTestId("moment-chip-0")).toBeTruthy());
-    const h = (el: { props: { style: unknown } }) => Object.assign({}, ...([] as unknown[]).concat(el.props.style).flat(3)).height;
+    await waitFor(() => expect(utils.getByTestId("moment-stepper")).toBeTruthy());
+    const flat = (el: { props: { style: unknown } }) => Object.assign({}, ...([] as unknown[]).concat(el.props.style).flat(3).filter(Boolean));
+    const h = (el: { props: { style: unknown } }) => flat(el).height;
     expect(h(utils.getByTestId("player-seek"))).toBe(44);
-    expect(h(utils.getByTestId("moment-chip-0"))).toBe(44);
+    for (const id of ["moment-step-prev", "moment-step-current", "moment-step-next"]) expect(h(utils.getByTestId(id))).toBe(44);
+    expect(flat(utils.getByTestId("moment-step-prev")).width).toBe(44);
+    expect(flat(utils.getByTestId("moment-step-next")).width).toBe(44);
     expect(h(utils.getByLabelText("YOUR ANGLE"))).toBe(44);
   });
 
@@ -851,7 +888,7 @@ describe("MatchVideoScreen Film Room controls", () => {
     });
     await waitFor(() => expect(utils.getByTestId("player-no-match")).toHaveTextContent("No match detected in this video"));
     statusAt(30);
-    expect(utils.queryByTestId("moment-chip-0")).toBeNull();
+    expect(utils.queryByTestId("moment-stepper")).toBeNull();
     expect(utils.queryAllByTestId(/^seek-marker-/, { includeHiddenElements: true })).toHaveLength(0);
     expect(utils.queryByText(/KEY MOMENT/)).toBeNull();
     expect(utils.queryByTestId("player-caption")).toBeNull();
@@ -870,7 +907,7 @@ describe("MatchVideoScreen Film Room controls", () => {
   it("shows no angle switcher, chips or caption for one angle with no breakdown", async () => {
     const utils = await renderLoadedPlayer({ videos: 1, analysis: { ok: true, data: null } });
     expect(utils.queryByTestId("angle-switcher")).toBeNull();
-    expect(utils.queryByTestId("moment-chip-0")).toBeNull();
+    expect(utils.queryByTestId("moment-stepper")).toBeNull();
     expect(utils.queryByTestId("player-caption")).toBeNull();
     expect(utils.getByTestId("player-seek")).toBeTruthy();
   });
@@ -1104,15 +1141,15 @@ describe("angle switch phase 1 UI (jits-xfvd.16)", () => {
     statusAt(42.6);
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
     setSwitch(utils, pendingTo2());
-    // The clock, the moments and the chips stay on vid-1 at the tap.
+    // The clock, the moments and the stepper stay on vid-1 at the tap.
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
     expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy();
-    expect(utils.getByTestId("moment-chip-0")).toBeTruthy();
+    expect(utils.getByTestId("moment-stepper")).toBeTruthy();
     setSwitch(utils, landedOn2());
     // vid-2's own values: its translated time and no breakdown.
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:40 / 06:40");
     expect(utils.queryByText(/KEY MOMENT/)).toBeNull();
-    expect(utils.queryByTestId("moment-chip-0")).toBeNull();
+    expect(utils.queryByTestId("moment-stepper")).toBeNull();
   });
 
   it("draws the held still while pending, over the video, and nothing at idle", async () => {

@@ -5,12 +5,16 @@ import {
   HIGHLIGHT_COPY,
   metaLine,
   regeneratingBanner,
-  whatChanged,
 } from "@/lib/highlight/highlight-copy";
 import { HighlightNote } from "./highlight-states";
 import { MonoNumbers } from "./mono-numbers";
 
-/** Under the player: regenerating banner, mono meta, what changed, failed-attempt note. */
+/**
+ * Under the player: regenerating banner, mono meta, failed-attempt note.
+ * The server's "what changed" summary is model prose that can name moves
+ * (jr_be highlight-regenerate), and AI move wording is hidden from every
+ * athlete for now (jits-xfvd.18), so it is not shown.
+ */
 export function HighlightReelNotes({ progress }: { progress: HighlightProgress }) {
   const playback = progress.playback;
   return (
@@ -30,9 +34,6 @@ export function HighlightReelNotes({ progress }: { progress: HighlightProgress }
         >
           {metaLine(playback.durationS, playback.version)}
         </Text>
-      ) : null}
-      {progress.lastChangeSummary ? (
-        <HighlightNote testID="highlight-change-summary">{whatChanged(progress.lastChangeSummary)}</HighlightNote>
       ) : null}
       {progress.lastAttemptFailed ? (
         <HighlightNote testID="highlight-last-attempt-failed">{HIGHLIGHT_COPY.lastAttemptFailed}</HighlightNote>

@@ -7,6 +7,10 @@ import {
   translateAngleTime,
   angleSyncExact,
   humanizeAnalysisLabel,
+  canSeeAnalysisLabels,
+  keyMomentDisplayLabel,
+  keyMomentStepAt,
+  type KeyMoment,
 } from "./key-moments";
 
 describe("humanizeAnalysisLabel", () => {
@@ -184,5 +188,61 @@ describe("angleSyncExact", () => {
     expect(angleSyncExact({ sync_offset_ms: 200, sync_source: null })).toBe(false);
     expect(angleSyncExact({ sync_offset_ms: null, sync_source: "audio" })).toBe(false);
     expect(angleSyncExact(null)).toBe(false);
+  });
+});
+
+describe("analysis label gate (jits-xfvd.18)", () => {
+  it("shows labels to admins and founders only; anything else is hidden", () => {
+    expect(canSeeAnalysisLabels("admin")).toBe(true);
+    expect(canSeeAnalysisLabels("founder")).toBe(true);
+    expect(canSeeAnalysisLabels("member")).toBe(false);
+    expect(canSeeAnalysisLabels(null)).toBe(false);
+    expect(canSeeAnalysisLabels(undefined)).toBe(false);
+    expect(canSeeAnalysisLabels("ADMIN")).toBe(false);
+  });
+
+  it("keyMomentDisplayLabel returns the label only when labels are shown", () => {
+    const m: KeyMoment = { t: 27, label: "Single leg takedown", kind: "score", description: null };
+    expect(keyMomentDisplayLabel(m, true)).toBe("Single leg takedown");
+    expect(keyMomentDisplayLabel(m, false)).toBeNull();
+  });
+});
+
+describe("keyMomentStepAt", () => {
+  const ms: KeyMoment[] = [6, 38, 125].map((t) => ({ t, label: `m${t}`, kind: "score", description: null }));
+
+  it("is null with no moments", () => {
+    expect(keyMomentStepAt([], 10)).toBeNull();
+  });
+
+  it("before the first moment shows the first time, no prev, next is the first", () => {
+    const s = keyMomentStepAt(ms, 2)!;
+    expect(s).toMatchObject({ index: 0, reached: false, prev: null });
+    expect(s.shown.t).toBe(6);
+    expect(s.next?.t).toBe(6);
+  });
+
+  it("between moments shows the one at or before the playhead with both neighbours", () => {
+    const s = keyMomentStepAt(ms, 60)!;
+    expect(s).toMatchObject({ index: 1, reached: true });
+    expect(s.shown.t).toBe(38);
+    expect(s.prev?.t).toBe(6);
+    expect(s.next?.t).toBe(125);
+  });
+
+  it("counts a just-seeked moment as reached (quarter second slack)", () => {
+    expect(keyMomentStepAt(ms, 37.8)!.shown.t).toBe(38);
+  });
+
+  it("first moment has no prev; last has no next", () => {
+    expect(keyMomentStepAt(ms, 6)!.prev).toBeNull();
+    const last = keyMomentStepAt(ms, 400)!;
+    expect(last.shown.t).toBe(125);
+    expect(last.next).toBeNull();
+    expect(last.prev?.t).toBe(38);
+  });
+
+  it("treats a non-finite playhead as 0", () => {
+    expect(keyMomentStepAt(ms, Number.NaN)!.reached).toBe(false);
   });
 });

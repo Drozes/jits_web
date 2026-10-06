@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { VideoView } from "expo-video";
-import { NO_MATCH_COPY, angleSyncExact, buildKeyMoments, captionAt, formatClock, isNoMatch, translateAngleTime } from "@jits/shared/utils";
+import { NO_MATCH_COPY, angleSyncExact, buildKeyMoments, formatClock, isNoMatch, translateAngleTime } from "@jits/shared/utils";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
@@ -15,7 +15,8 @@ import { AngleSwitcher, angleText, type AngleOption } from "@/components/film-ro
 import { SwitchOverlay } from "@/components/film-room/switch-overlay";
 import { SyncingPill } from "@/components/film-room/syncing-pill";
 import { SeekBar } from "@/components/film-room/seek-bar";
-import { MomentCaption, MomentChips, Transport, nextSpeed } from "@/components/film-room/player-controls";
+import { Transport, nextSpeed } from "@/components/film-room/player-controls";
+import { MomentStepper } from "@/components/film-room/moment-stepper";
 import { playbackAngleOf } from "@/lib/video/playback-angle";
 import { isMultiAnglePlayerEnabled } from "@/lib/video/multi-angle/flag";
 import { MultiAnglePlayerBody } from "@/components/film-room/multi-angle/multi-angle-player-body";
@@ -33,8 +34,7 @@ const CURRENT_HOLD_S = 10;
 
 /**
  * Full-screen playback of one match video with the Film Room controls: seek
- * bar with a marker per key moment, moment chips, a caption for the current
- * moment, ±10 s, speed, and the angle switcher when both athletes recorded.
+ * bar with a marker per key moment, the key moment stepper (times only), ±10 s, speed, and the angle switcher when both athletes recorded.
  * `?t=<seconds>` starts playback there (key moments link in with it).
  *
  * An angle switch happens in place (multi-angle P0): the screen, the player
@@ -188,7 +188,6 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
     () => (analysis && !noMatch ? buildKeyMoments(analysis, view?.match ?? null, chromeDuration || null) : []),
     [analysis, noMatch, view?.match, chromeDuration],
   );
-  const caption = captionAt(moments, analysis?.positions, chromePositionS);
   const current = [...moments].reverse().find((m) => m.t <= chromePositionS + 0.25 && chromePositionS - m.t < CURRENT_HOLD_S);
 
   const angleOf = (videoId: string | null | undefined) => view?.videos.find((v) => v.id === videoId);
@@ -325,8 +324,6 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                   {NO_MATCH_COPY.short}
                 </Text>
               </View>
-            ) : caption ? (
-              <MomentCaption t={caption.t} text={caption.text} />
             ) : null}
             <View style={{ gap: 6 }}>
               <SeekBar positionS={chromePositionS} durationS={chromeDuration} moments={moments} onSeek={seek} />
@@ -342,7 +339,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
               </View>
             </View>
             <Transport playing={playing} speed={playback.rate} onToggle={toggle} onSkip={(d) => seek(positionS + d)} onSpeed={() => playback.setRate(nextSpeed)} />
-            <MomentChips moments={moments} currentT={current?.t ?? null} onJump={(tt) => { seek(tt); playback.setPlaying(true); }} />
+            <MomentStepper moments={moments} positionS={chromePositionS} currentT={current?.t ?? null} onJump={(tt) => { seek(tt); playback.setPlaying(true); }} />
           </View>
         </>
       ) : phase === "loading" || phase === "ready" ? (

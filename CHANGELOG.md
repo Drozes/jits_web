@@ -11,7 +11,7 @@ JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change:
 - `apps/mobile/components/film-room/switch-overlay.tsx`: the held still over the player while the next angle loads; it crossfades out over 240 ms on an exact landing, dips through black (`moment.angleDip`, 80 ms each way) on an approximate one, and cuts under Reduce Motion.
 - `apps/mobile/components/film-room/syncing-pill.tsx`: "SYNCING ANGLE" / "SWITCHING ANGLE" for a switch not landed after 200 ms, up at least 400 ms, with a 2 px sync bar on the UI thread (static under Reduce Motion, paused in background), hidden from screen readers.
 - `apps/mobile/lib/film-room/use-angle-analyses.ts`: every playable angle's breakdown is read up front, so the player's chrome swaps in one render at landing.
-- `apps/mobile/components/film-room/film-chip.ts`: the outlined chip over film shared by the key moment chips and the player's angle switcher.
+- `apps/mobile/components/film-room/film-chip.ts`: the outlined chip over film shared by the key moment stepper and the player's angle switcher.
 - Copy (`lib/video/video-status-copy.ts`): `Syncing angle`, `Switching angle`, `Could not load {label}. Tap it to try again.`, and the landing announcement. Motion token `moment.angleDip` and five Motion registry rows (DESIGN.md and `design/system/project/Motion.md`).
 - Playback telemetry: `switchHeldStillCount`, `switchPillShownCount`, `switchFailedCount`, `switchSupersededCount`; `switchLatencyMs` now means tap to landing.
 
@@ -22,6 +22,23 @@ JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change:
 **Fixed**
 - No black frame or frame 0 of the next angle on a switch: the outgoing frame is held until the new one is at the target.
 - The Best angle tag on an unselected angle sits on its own `ON_MEDIA.badge` ground and holds 4.5:1 over a bright frame (jits-tn2h; it was about 3.3:1).
+
+### Video: AI move labels hidden; key moment stepper (jits-xfvd.18)
+
+Owner decisions 2026-10-06: AI analysis labels (move, position and technique names) are internal for now. The player and the highlight reels show none to anyone, admins included; the analysis surfaces (match detail AI BREAKDOWN, key moment labels, technique tags, web analysis viewer) show them to platform admins only. Key moments stay as timestamps. JS-only (OTA on runtime 0.5.0).
+
+**Added**
+- `apps/mobile/components/film-room/moment-stepper.tsx`: `MomentStepper`, `[prev] [00:38 | 2/5] [next]` in the film chip style. The middle chip shows the moment at or before the playhead (the first one's time before it), is lit while the playhead is on it, and replays it on tap; prev and next jump to the adjacent moments and are dimmed and disabled at the ends. 44 pt targets; labels "Previous key moment, 00:06", "Next key moment, 02:05", "Key moment 2 of 5, 00:38".
+- The analysis label gate: `canSeeAnalysisLabels(platformRole)` (admin or founder), `keyMomentDisplayLabel` and `keyMomentStepAt` in `packages/shared/src/utils/key-moments.ts` (display-time only; `buildKeyMoments` is unchanged); `useShowAnalysisLabels()` on mobile (`apps/mobile/lib/video/use-show-analysis-labels.ts`, from the auth context) and web (`apps/web/lib/video/use-show-analysis-labels.ts`, reads the athlete via `getCurrentAthlete`, false until it loads and on any failure).
+
+**Changed**
+- Match player (single and multi-angle): the key moment chip row is replaced by `MomentStepper` (times only), and the moment caption is removed for everyone. The seek-bar dots and the "N KEY MOMENTS" counter are unchanged.
+- Match detail for non-admins: key moment rows show the time and the FINISH marker only (the finish exists only for a recorded submission result), technique tags are hidden, and the AI BREAKDOWN reads "Analysis complete." instead of the model summary. Admins see today's labels.
+- Web `VideoAnalysisViewer`: non-admins get "Analysis complete." and the key moment times instead of the Summary, Timeline, Techniques and Tips tabs (the tips name moves too). The no-match state is unchanged.
+- Highlight share caption: a win reads "Took the win against X." and never names the technique, which is the highlight planner's AI guess (jr_be `_highlight_match_facts`), not the recorded submission.
+
+**Removed**
+- `MomentChips` and `MomentCaption` (`components/film-room/player-controls.tsx`); the highlight card's "What changed" note (model prose that can name moves) and `whatChanged` in `lib/highlight/highlight-copy.ts`.
 
 ## OTA "Adaptive playback quality" (runtime 0.5.0), 2026-10-06
 

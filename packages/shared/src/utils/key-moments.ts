@@ -202,6 +202,66 @@ export function captionAt(
   return { t: position.timestamp_s as number, text: label };
 }
 
+/**
+ * AI analysis labels (move, position and technique names from the model) are
+ * internal for now (owner decision 2026-10-06, jits-xfvd.18): only platform
+ * admins (`admin`, and `founder`, which implies admin) see them. Everyone
+ * else gets key moments as timestamps. Unknown or missing role: hidden.
+ */
+export function canSeeAnalysisLabels(platformRole: string | null | undefined): boolean {
+  return platformRole === "admin" || platformRole === "founder";
+}
+
+/**
+ * What a key moment row says for this viewer: its label when labels are
+ * shown, else null (time only). Display-time only, so `buildKeyMoments`'
+ * dedupe and finish logic never depends on who is looking. The finish is
+ * marked separately (`kind === "finish"`), from the recorded result.
+ */
+export function keyMomentDisplayLabel(moment: KeyMoment, showLabels: boolean): string | null {
+  return showLabels ? moment.label : null;
+}
+
+/** Where the playhead sits among the key moments (the player's stepper). */
+export interface KeyMomentStep {
+  /** The moment the stepper shows: the latest at or before the playhead, else the first. */
+  shown: KeyMoment;
+  /** Its index in `moments` (0-based). */
+  index: number;
+  /** True when the playhead has reached `shown` (false before the first moment). */
+  reached: boolean;
+  /** The moment before `shown`, or null at the start. */
+  prev: KeyMoment | null;
+  /** The next moment after the playhead, or null at the end. */
+  next: KeyMoment | null;
+}
+
+/**
+ * The stepper state for playback time `t` over `moments` (oldest first, as
+ * `buildKeyMoments` returns them). A quarter second of slack counts a moment
+ * the player just seeked to as reached. Before the first moment the stepper
+ * shows the first one's time and "next" jumps to it. Null with no moments.
+ */
+export function keyMomentStepAt(moments: KeyMoment[], t: number): KeyMomentStep | null {
+  if (moments.length === 0) return null;
+  const pos = Number.isFinite(t) ? t : 0;
+  let index = -1;
+  for (let i = 0; i < moments.length; i++) {
+    if (moments[i].t <= pos + 0.25) index = i;
+    else break;
+  }
+  if (index < 0) {
+    return { shown: moments[0], index: 0, reached: false, prev: null, next: moments[0] };
+  }
+  return {
+    shown: moments[index],
+    index,
+    reached: true,
+    prev: index > 0 ? moments[index - 1] : null,
+    next: index < moments.length - 1 ? moments[index + 1] : null,
+  };
+}
+
 /** "06:17" style clock (minutes zero-padded, no hours); 0 for bad input. */
 export function formatClock(seconds: number | null | undefined): string {
   const total =
