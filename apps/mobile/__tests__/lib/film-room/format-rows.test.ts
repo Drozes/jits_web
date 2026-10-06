@@ -1,4 +1,4 @@
-import { cardLine, deltaLabel, monthOf, recordStrip, shortDate, shortName, titleDate } from "@/lib/film-room/format";
+import { deltaLabel, monthOf, recordStrip, shortDate, shortName, titleDate } from "@/lib/film-room/format";
 import { applyFilter, buildRows, opponentsOf, recordOf, NO_FILTER } from "@/lib/film-room/rows";
 import { libItem } from "../../support/film-fixtures";
 
@@ -15,15 +15,6 @@ describe("format", () => {
     expect(deltaLabel(-9)).toBe("▼ −9");
     expect(deltaLabel(0)).toBe("± 0");
     expect(deltaLabel(null)).toBeNull();
-  });
-
-  it("builds the card line from delta and finish time (or the clock)", () => {
-    expect(cardLine(libItem())).toBe("▲ +14 · 06:17");
-    expect(cardLine(libItem({ outcome: "draw", elo_delta: 1, finish_time_seconds: null, duration_seconds: 600 }))).toBe("▲ +1 · 10:00");
-    // Every match is ranked: a legacy casual row reads like any match, and a
-    // row with no recorded delta shows only the time (never "CASUAL").
-    expect(cardLine(libItem({ match_type: "casual", elo_delta: 0 }))).toBe("± 0 · 06:17");
-    expect(cardLine(libItem({ match_type: "casual", elo_delta: null }))).toBe("06:17");
   });
 
   it("formats dates without em dashes", () => {
@@ -47,6 +38,18 @@ describe("rows", () => {
       "SEPTEMBER 2026:3",
       "s27+s24",
       "s20",
+      "AUGUST 2026:1",
+      "a30",
+    ]);
+    expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
+  });
+
+  it("puts one match per row for the full-width feed (perRow 1)", () => {
+    const rows = buildRows([sep(27), sep(24), aug(30)], 1);
+    expect(rows.map((r) => (r.type === "month" ? `${r.label}:${r.count}` : r.items.map((i) => i.match_id).join("+")))).toEqual([
+      "SEPTEMBER 2026:2",
+      "s27",
+      "s24",
       "AUGUST 2026:1",
       "a30",
     ]);

@@ -47,6 +47,12 @@ export type ColorTokens = {
   attentionRule: string;   // Amber rule or border (dashed pending edge, draw tile border). Rules only, never text.
   heatOrange: string;      // Arena heat only (tab-icon embers, afterglow edge). Same in both themes.
   heatRed: string;         // Arena heat only (countable embers). Same in both themes; NOT a text red.
+
+  // ---- Semantic aliases (specs/matches-tab, design review 2026-10-06) -----
+  // An alias carries the SAME value as its base token; it exists so a guard can
+  // assert what a mark means. Kit name unseen-ring; CSS var --unseen-ring;
+  // Tailwind border-unseen-ring.
+  unseenRing: string;      // The unwatched-reel ring on a ReelTile. Alias of ink (textPrimary); never Signal Red.
 };
 
 export const lightTokens: ColorTokens = {
@@ -76,6 +82,8 @@ export const lightTokens: ColorTokens = {
   // Heat is fixed in both themes (Arena heat, not a theme color).
   heatOrange: "hsl(25, 95%, 53%)",
   heatRed: "#EC6A74",
+  // Alias of textPrimary (ink).
+  unseenRing: "#0D0F14",
 };
 
 export const darkTokens: ColorTokens = {
@@ -104,6 +112,8 @@ export const darkTokens: ColorTokens = {
   // Heat is fixed in both themes (Arena heat, not a theme color).
   heatOrange: "hsl(25, 95%, 53%)",
   heatRed: "#EC6A74",
+  // Alias of textPrimary (ink).
+  unseenRing: "#E8EDF2",
 };
 
 /**

@@ -32,6 +32,21 @@ describe("resolveSystemPath", () => {
   });
 
   it.each([
+    ...both("film-room"),
+    ...both("film-room/"),
+    "elorated://(app)/film-room",
+    "/film-room",
+    "/(app)/film-room",
+    "exp://192.168.1.2:8081/--/film-room",
+  ])("sends the retired Film Room %s to the Matches tab", (url) => {
+    expect(resolveSystemPath(url)).toBe("/matches");
+  });
+
+  it.each(["elorated://film-room-archive", "/film-room/x", "/athlete/film-room"])("leaves %s (not the Film Room) unchanged", (url) => {
+    expect(resolveSystemPath(url)).toBe(url);
+  });
+
+  it.each([
     ...both("athlete/abc-123"),
     "elorated://login",
     "elorated://",

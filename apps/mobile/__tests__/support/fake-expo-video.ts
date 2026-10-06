@@ -17,6 +17,10 @@
  *   `play()` before it reports readyToPlay.
  * - `setNativeTime(i, t)`: the native clock moves without a seek (a new item
  *   starting at 0, or playback progress without a time update).
+ * - `buffering` (jits-a4fw.5 review B1): while true, `play()` only records
+ *   the intent (`wantsPlay`) and `playing` stays false (as on iOS and Android
+ *   while the item buffers) until `bufferEnd(i)`; a `pause()` before that
+ *   cancels it. A `rateStartsPlayback` rate write records the same intent.
  *
  * Two slot players (jits-xfvd.19): every `useVideoPlayer` call returns its
  * own fake, so the single match player's two slots are `fakePlayers[n]` and
@@ -63,6 +67,10 @@ export interface FakePlayer {
   rateStartsPlayback: boolean;
   /** A readyPlayer that the paused-buffer stall held back (its duration). */
   heldReady: number | null;
+  /** Buffering: play() leaves `playing` false until bufferEnd(). */
+  buffering: boolean;
+  /** play() was called and not paused since (the native intent while buffering). */
+  wantsPlay: boolean;
   play: jest.Mock;
   pause: jest.Mock;
   replaceAsync: jest.Mock;
@@ -149,6 +157,8 @@ function createPlayer(): FakePlayer {
     pausedBufferStall: false,
     rateStartsPlayback: false,
     heldReady: null,
+    buffering: false,
+    wantsPlay: false,
     get timeUpdateEventInterval() {
       return interval;
     },
@@ -162,7 +172,11 @@ function createPlayer(): FakePlayer {
     set playbackRate(v: number) {
       rate = v;
       p.rates.push(v);
-      if (p.rateStartsPlayback && v > 0 && p.source != null) p.playing = true;
+      if (p.rateStartsPlayback && v > 0 && p.source != null) {
+        // AVPlayer.rate > 0 is a play intent; a buffering item still waits for bufferEnd.
+        p.wantsPlay = true;
+        if (!p.buffering) p.playing = true;
+      }
     },
     get currentTime() {
       return time;
@@ -172,6 +186,8 @@ function createPlayer(): FakePlayer {
       p.seeks.push(v);
     },
     play: jest.fn(() => {
+      p.wantsPlay = true;
+      if (p.buffering) return;
       p.playing = true;
       if (p.heldReady != null) {
         const duration = p.heldReady;
@@ -180,6 +196,7 @@ function createPlayer(): FakePlayer {
       }
     }),
     pause: jest.fn(() => {
+      p.wantsPlay = false;
       p.playing = false;
     }),
     replaceAsync: jest.fn((src: { uri: string } | null) => {
@@ -189,6 +206,7 @@ function createPlayer(): FakePlayer {
         p.releases += 1;
         p.status = "idle";
         p.playing = false;
+        p.wantsPlay = false;
         return Promise.resolve();
       }
       p.status = "loading";
@@ -304,6 +322,24 @@ export function setNativeTime(i: number, t: number): void {
 
 export function tick(i: number, t: number): void {
   fakePlayers[i].emit("timeUpdate", { currentTime: t, bufferedPosition: t });
+}
+
+/**
+ * Player `i` finished buffering: it starts playing only if play() (or a
+ * starting rate write) is still wanted; a ready report the paused-buffer
+ * stall held back lands with it.
+ */
+export function bufferEnd(i: number): void {
+  const p = fakePlayers[i];
+  p.buffering = false;
+  if (!p.wantsPlay) return;
+  p.playing = true;
+  if (p.heldReady != null) {
+    const duration = p.heldReady;
+    p.heldReady = null;
+    readyNow(p, duration);
+  }
+  p.emit("playingChange", { isPlaying: true });
 }
 
 /** The next `replaceAsync` on player `i` rejects with `message`. */

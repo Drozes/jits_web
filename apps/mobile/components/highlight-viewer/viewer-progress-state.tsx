@@ -6,6 +6,7 @@ import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 import { VIEWER_COPY } from "./viewer-copy";
 import { ViewerMessage } from "./viewer-states";
 import { ViewerFrame } from "./viewer-frame";
+import type { ReelBinding } from "./reel-binding";
 
 /** The viewer's copy for a reel with NO playable live version, by phase. */
 const PHASE_STATE: Record<Exclude<HighlightPhase, "ready" | "regenerating">, { testID: string; message: string }> = {
@@ -31,8 +32,6 @@ export function ViewerProgressState({ phase }: { phase: HighlightPhase }) {
   return <ViewerMessage testID={state.testID} message={state.message} />;
 }
 
-const NOOP = () => undefined;
-
 /**
  * Everything before a live version is on screen: the poster-frame skeleton
  * while the first progress read runs, "can't play" + Try again when that read
@@ -42,10 +41,12 @@ export function ViewerNoPlayback({
   progress,
   error,
   onRetry,
+  binding,
 }: {
   progress: HighlightProgress | null;
   error: DomainError | null;
   onRetry: () => void;
+  binding?: ReelBinding;
 }) {
   if (progress) return <ViewerProgressState phase={progress.phase} />;
   if (error) {
@@ -57,5 +58,5 @@ export function ViewerNoPlayback({
       />
     );
   }
-  return <ViewerFrame source={null} playbackFailed={false} onPlayerError={NOOP} onRetry={onRetry} />;
+  return <ViewerFrame binding={binding} source={null} playbackFailed={false} onRetry={onRetry} />;
 }

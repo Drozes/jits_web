@@ -56,7 +56,15 @@ describe("motion tokens", () => {
       tapMarkFill: 80,
       tapNudge: 50,
       angleDip: 80,
+      reelRingPulse: 600,
+      milestoneBurstFall: 900,
+      milestoneBurstStagger: 180,
+      milestoneBurstFadeDelay: 600,
+      milestoneBurstFade: 300,
     });
+    // The milestone burst ends within 1.2 s (spec 10.6).
+    expect(moment.milestoneBurstStagger + moment.milestoneBurstFall).toBeLessThan(1200);
+    expect(moment.milestoneBurstFadeDelay + moment.milestoneBurstFade).toBeLessThanOrEqual(moment.milestoneBurstFall);
     // A Moment may run up to about 2000ms (DESIGN.md, the three tiers).
     for (const ms of Object.values(moment)) expect(ms).toBeLessThanOrEqual(2000);
     expect(easing.inQuad).toBeDefined();

@@ -26,8 +26,11 @@ import { InviteHomeCard } from "@/components/invite/invite-home-card";
 import { shouldOfferPracticeMatch } from "@/lib/practice/constants";
 import { useHasEverPlayed } from "@/lib/practice/use-has-ever-played";
 import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
-import { NewHighlightCard } from "@/components/dashboard/new-highlight-card";
-import { useNewHighlight } from "@/lib/highlight/use-new-highlight";
+import { HomeHighlightsCarousel } from "@/components/reels/lane-carousels";
+import { useHomeHighlights } from "@/lib/highlight/use-home-highlights";
+import { logEmptyCta } from "@/lib/matches/telemetry";
+import { useMilestoneCelebration } from "@/lib/milestones/use-milestone-celebration";
+import { MilestoneMoment } from "@/components/milestones/milestone-moment";
 import { requestBellRefresh } from "@/lib/highlight/highlight-store";
 import { markNotificationRouterReady } from "@/lib/notifications/handlers";
 import { formatRecord, recordA11yLabel } from "@/lib/athlete/record";
@@ -72,15 +75,41 @@ export default function DashboardScreen() {
   // SWR keeps stale data on screen while revalidating; the spinner shows only
   // for a pull, never for the silent refetch when the tab regains focus.
   const { match: activeMatch, refresh: refreshActiveMatch } = useMyActiveMatch(athlete?.id);
-  const newHighlight = useNewHighlight(athlete?.id);
-  const refreshNewHighlight = newHighlight.refresh;
+  // The Highlights carousel's empty-state copy needs the completed match
+  // count: a number once the summary lands (no stats = 0), null if it failed,
+  // undefined while it loads.
+  const summaryStats = data?.summary.stats;
+  const matchCount = data
+    ? summaryStats
+      ? summaryStats.wins + summaryStats.losses + summaryStats.draws
+      : 0
+    : isLoading
+      ? undefined
+      : null;
+  const highlights = useHomeHighlights(athlete?.id, matchCount);
+  const refetchHighlights = highlights.refetch;
+  const onHighlightsCta = React.useCallback(
+    (tile: { variant: "first_highlight" | "find_match" }) =>
+      logEmptyCta({ surface: "home", state: tile.variant === "first_highlight" ? "zero" : "no_reels", cta: "arena" }),
+    [],
+  );
+  // The first highlight celebrates on the carousel (spec 10.6), unless the
+  // Matches carousel celebrated it first. Home never celebrates matches.
+  const firstReel = highlights.items[0] ?? null;
+  const { celebration, dismiss: dismissMilestone } = useMilestoneCelebration("home", athlete?.id, {
+    highlights: {
+      count: highlights.items.length,
+      hasMore: highlights.pageSource.cursor !== null,
+      first: firstReel ? { highlightId: firstReel.highlightId, unseen: firstReel.unseen, readyAt: firstReel.readyAt } : null,
+    },
+  });
   const refreshAll = React.useCallback(() => {
     refresh();
     refreshActiveMatch();
-    refreshNewHighlight(true);
+    refetchHighlights(true);
     // The bell sits in this screen's header: a pull refreshes it too.
     requestBellRefresh();
-  }, [refresh, refreshActiveMatch, refreshNewHighlight]);
+  }, [refresh, refreshActiveMatch, refetchHighlights]);
   const { refreshing, onRefresh } = usePullToRefresh(refreshAll, isValidating);
   const matchExits = useMatchExitCount();
   useRefetchOnRefocus(refresh, matchExits);
@@ -161,22 +190,32 @@ export default function DashboardScreen() {
           />
         }
       >
+        {/* A match the app lost (killed mid-match, jits-r9a) comes first and
+            takes Home's one red CTA (spec matches-tab PM7). */}
+        {activeMatch ? <ResumeMatchCard match={activeMatch} /> : null}
+
+        {/* The ONE Highlights carousel (spec matches-tab 7, C-HM3): own reels
+            in phase 1, later friend, nearby and Elo sources in the same row.
+            No red: Home's one red CTA stays Resume or the practice offer.
+            Hidden with clips off or a failed read (Home stays quiet). */}
+        {/* Only with tiles: an empty wrapper would add a gap to the scroll. */}
+        {highlights.tiles.length > 0 ? (
+          <MilestoneMoment celebration={celebration} onDismiss={dismissMilestone}>
+            <HomeHighlightsCarousel
+              tiles={highlights.tiles}
+              pageSource={highlights.pageSource}
+              markSeenLocally={highlights.markSeenLocally}
+              onCtaPress={onHighlightsCta}
+            />
+          </MilestoneMoment>
+        ) : null}
+
         <View>
           <MetaTag>{hasMatches ? "Welcome back" : "Welcome"}</MetaTag>
           <Text className="font-heading text-headline-l text-ink mt-2" numberOfLines={1}>
             {athlete.display_name}
           </Text>
         </View>
-
-        {/* A match the app lost (killed mid-match, jits-r9a) comes first and
-            takes Home's one red CTA. */}
-        {activeMatch ? <ResumeMatchCard match={activeMatch} /> : null}
-
-        {/* A reel the athlete has not watched yet. Secondary only: the one
-            red CTA stays Resume or the practice offer. */}
-        {newHighlight.highlight ? (
-          <NewHighlightCard highlight={newHighlight.highlight} onDismiss={newHighlight.dismiss} />
-        ) : null}
 
         {/* The rating reads only the athlete, so it paints on the first frame;
             the record line under it joins once the summary lands, into a

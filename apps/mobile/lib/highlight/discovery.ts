@@ -2,16 +2,12 @@ import type { HighlightReadyOrigin, HighlightShareSourceTag } from "@jits/shared
 
 /**
  * Discovery-surface copy and routing for Highlight Reels phase 2 (jr_be spec
- * 014 sections 16.6.3 and 16.6.4): the Home card, the bell item, the
+ * 014 sections 16.6.3 and 16.6.4): the bell item, the
  * match-flow summary note and the match-detail "Open reel" link. Kept apart
  * from `highlight-copy.ts` (the phase-1 card and the viewer) so the parallel
  * phase-2 slices do not edit the same file.
  */
 export const DISCOVERY_COPY = {
-  homeMetaTag: "NEW HIGHLIGHT",
-  homeTitle: "Your new highlight",
-  watch: "Watch",
-  dismiss: "Dismiss",
   bellTitle: "Your highlight is ready",
   bellTitleRegen: "Your new version is ready",
   summaryNote: "Your highlight is being made, we'll let you know.",
@@ -30,6 +26,7 @@ const SOURCES: ReadonlySet<string> = new Set<HighlightShareSourceTag>([
   "profile",
   "match_detail",
   "summary",
+  "matches",
 ]);
 
 /** `?source=` as the viewer route reads it: unknown or missing -> `match_detail` (spec 16.6.2). */

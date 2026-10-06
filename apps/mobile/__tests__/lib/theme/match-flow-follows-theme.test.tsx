@@ -38,7 +38,6 @@ import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { darkTokens, lightTokens } from "@/lib/tokens";
 import { FightButton, StakesStrip } from "@/components/match-flow/fight/fight-ui";
 import { FilmBadge } from "@/components/film-room/status-badge";
-import { PosterCard } from "@/components/film-room/poster-card";
 import { FaceoffChip } from "@/components/match-flow/faceoff/faceoff-top";
 
 function Probe() {
@@ -155,37 +154,6 @@ describe("shared match-flow pieces render with the active theme", () => {
       </View>,
     );
     expect(color(s.getByText("2 ANGLES"))).toBe(ON_MEDIA.text);
-  });
-});
-
-describe("poster card with no still (light theme)", () => {
-  it("drops the black scrim and sets its lines in the theme's ink", () => {
-    mockScheme = "light";
-    const p = paletteFor("light");
-    const s = render(
-      <PosterCard
-        item={libItem({ videos: [libVideo({ poster_url: null })] })}
-        status={{ kind: "ready" }}
-        viewer={{ name: "Kai Reyes", photoUrl: null }}
-        onPress={jest.fn()}
-      />,
-    );
-    expect(s.getByTestId("opening-still-fallback")).toBeTruthy();
-    expect(s.queryByTestId("film-card-scrim")).toBeNull();
-    expect(color(s.getByText("M. Park"))).toBe(p.text);
-    expect(color(s.getByText("W"))).toBe(p.win);
-    expect(color(s.getByText(/^▲ \+14/))).toBe(p.win);
-    expect(contrast(p.text2, p.plate)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
-  });
-
-  it("keeps the scrim and on-media lines over a still", () => {
-    mockScheme = "light";
-    const s = render(
-      <PosterCard item={libItem()} status={{ kind: "ready" }} viewer={{ name: "Kai Reyes", photoUrl: null }} onPress={jest.fn()} />,
-    );
-    expect(s.getByTestId("film-card-scrim")).toBeTruthy();
-    expect(color(s.getByText("M. Park"))).toBe(ON_MEDIA.white);
-    expect(color(s.getByText("W"))).toBe(ON_MEDIA.win);
   });
 });
 

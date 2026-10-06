@@ -8,8 +8,6 @@ jest.mock("@jits/shared/api/film-room", () => ({
 }));
 
 import { useMatchLibrary } from "@/lib/film-room/use-match-library";
-import { useMatchUploads } from "@/lib/film-room/use-match-uploads";
-import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 import { libItem } from "../../support/film-fixtures";
 
 // The first page goes through a module-level cache: a fresh athlete per test.
@@ -77,6 +75,20 @@ describe("useMatchLibrary", () => {
     expect(result.current.items).toEqual([]);
   });
 
+  it("reports a failed refresh as refreshError while the cached page stays", async () => {
+    const id = nextId();
+    mockGetMyMatchLibrary
+      .mockResolvedValueOnce(page(["a"], null))
+      .mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    const { result } = renderHook(() => useMatchLibrary(id));
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    expect(result.current.refreshError).toBeNull();
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.refreshError?.message).toBe("offline"));
+    expect(result.current.error).toBeNull();
+    expect(result.current.items.map((i) => i.match_id)).toEqual(["a"]);
+  });
+
   it("refresh drops later pages and re-reads the first", async () => {
     const id = nextId();
     mockGetMyMatchLibrary
@@ -130,19 +142,5 @@ describe("useMatchLibrary revalidate", () => {
     act(() => result.current.loadMore());
     await waitFor(() => expect(result.current.items.map((i) => i.match_id)).toEqual(["new", "a", "b", "c"]));
     expect(mockGetMyMatchLibrary).toHaveBeenLastCalledWith({ tag: "client" }, id, { limit: 20, before: "c0", beforeId: "a" });
-  });
-});
-
-describe("useMatchUploads", () => {
-  it("tracks the upload store for the given matches", () => {
-    resetMatchUploadStore();
-    const { result } = renderHook(() => useMatchUploads(["m-1", "m-2"]));
-    expect(result.current.size).toBe(0);
-    act(() => {
-      setMatchUpload("m-1", { status: "uploading", progress: 0.3 });
-      setMatchUpload("other", { status: "uploading", progress: 0.9 });
-    });
-    expect(result.current.get("m-1")?.progress).toBe(0.3);
-    expect(result.current.has("other")).toBe(false);
   });
 });

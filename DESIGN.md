@@ -56,7 +56,7 @@ Motion carries meaning or does not exist. Every animation is **Reactive** (a res
 ## Consuming this kit
 
 - **Token names** are the kit names in `tokens.json` (`void`, `ink-3`, `signal-red`, `radius-plate`, `space-4`, ...). In a preview or web page they are CSS custom properties of the same name (`var(--void)`, `var(--radius-plate)`, `var(--font-mono)`; dotted steps escape: `var(--space-1\.5)`), and each text style is a class (`.meta-label`).
-- **In the RN code** the same values are NativeWind classes (`bg-surface`, `bg-surface-2/3/4`, `text-ink`, `text-ink-2/3`, `text-ink-on-cta`, `bg-cta`, `text-cta`, `text-positive`, `text-negative`, `text-attention`, `border-attention(-rule)`, `bg-heat-orange`, `bg-heat-red`, `border-hairline(-faint|-strong)`, `rounded-xs/sm/md/lg`, `font-display/heading/body/mono`, `text-<step>` (`text-micro` ... `text-display-240`), `tracking-caps(-l|-xl)`, `tracking-code`); [Color](#color) lists the mapping. JS call sites use `useThemedTokens()`, `usePalette()` or `ON_MEDIA` (= `onMediaTokens`).
+- **In the RN code** the same values are NativeWind classes (`bg-surface`, `bg-surface-2/3/4`, `text-ink`, `text-ink-2/3`, `text-ink-on-cta`, `bg-cta`, `text-cta`, `text-positive`, `text-negative`, `text-attention`, `border-attention(-rule)`, `bg-heat-orange`, `bg-heat-red`, `border-unseen-ring`, `border-hairline(-faint|-strong)`, `rounded-xs/sm/md/lg`, `font-display/heading/body/mono`, `text-<step>` (`text-micro` ... `text-display-240`), `tracking-caps(-l|-xl)`, `tracking-code`); [Color](#color) lists the mapping. JS call sites use `useThemedTokens()`, `usePalette()` or `ON_MEDIA` (= `onMediaTokens`).
 - **Units:** every length is device px at **NativeWind rem = 14px** (one spacing step = 3.5px; `p-4` = 14px). Arbitrary `[Npx]` values stay literal. Web renders the same class at rem 16.
 - **Where the code lives (jits_web):** colors `apps/mobile/lib/tokens.ts` (the source of truth; web `apps/web/app/design-system/tokens.css` mirrors it), classes `apps/mobile/tailwind.config.js`, match-flow palette `apps/mobile/lib/theme/palette.ts`, motion `apps/mobile/lib/motion/`, primitives `apps/mobile/components/ui/elo-system/`, Arena `apps/mobile/components/arena/`, chrome `apps/mobile/components/layout/`.
 - **Screens:** the ELO RATED Native Screens canvas mirrors the shipped app; draw boards from this kit's tokens at 390px wide, dark.
@@ -82,7 +82,7 @@ Twenty cards, each a static HTML twin of the RN component with a README (`compon
 1. **Source of truth:** `apps/mobile/lib/tokens.ts` and `lib/motion/tokens.ts`; web `tokens.css` mirrors them (the old DESIGN.md claimed the reverse; the drift test already treats mobile as the source).
 2. **Units:** device px at rem 14.
 3. **Theme order:** `dark` first, then `light`.
-4. **Color set:** the 17 core tokens plus `attention` (amber, scoped to draws, pressure and pending, processing, paused or disputed states, as the code does), `heat-orange` and `heat-red` (Arena heat only), and the `on-media-*` set (one source, `onMediaTokens` in `lib/tokens.ts`, behind both `ON_MEDIA` and `BROADCAST` since WP7). Legacy shadcn colors are not kit tokens.
+4. **Color set:** the 17 core tokens plus `attention` (amber, scoped to draws, pressure and pending, processing, paused or disputed states, as the code does), `heat-orange` and `heat-red` (Arena heat only), the semantic alias `unseen-ring` (= `ink`, the unwatched-reel ring), and the `on-media-*` set (one source, `onMediaTokens` in `lib/tokens.ts`, behind both `ON_MEDIA` and `BROADCAST` since WP7). Legacy shadcn colors are not kit tokens.
 5. **Display numerals:** Bebas Neue is allowed for numerals 40px and up as brand moments (countdown 240px, GO 116px, the wordmark); every other number is mono. Face-off weights are 36px Bebas today: either raise them to 40px or accept 36px as the floor.
 6. **Radius scale:** 2 tag, 3 button, 4 plate (default), 8 sheets and modals maximum; dots round. Avatars: the code's `Avatar32` is a 2px-radius square, while the old DESIGN.md said avatars stay circular; the kit follows the code (square) until decided.
 7. **Shadows:** none; no shadow family.
@@ -137,7 +137,7 @@ Every value below is exact from `apps/mobile/lib/tokens.ts` (the source of truth
 | `hairline-faint` | `rgba(107, 114, 128, 0.20)` | `rgba(13, 15, 20, 0.11)` | `border-hairline-faint` | `borderHairlineFaint` (`darkTokens` / `lightTokens`) | Faintest divider |
 | `hairline-strong` | `rgba(107, 114, 128, 0.62)` | `rgba(13, 15, 20, 0.34)` | `border-hairline-strong` | `borderHairlineStrong` (`darkTokens` / `lightTokens`) | Chips, actions, avatars, selected edge |
 
-The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange` and `--heat-red`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js` `theme.extend.textColor.cta`).
+The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange`, `--heat-red` and the alias `--unseen-ring`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js` `theme.extend.textColor.cta`).
 
 ### Sub-palettes
 
@@ -158,6 +158,14 @@ Amber marks the draw headline (the verdict DRAW and the draw delta; a D letter i
 | `heat-red` | `#EC6A74` | `lib/tokens.ts` key `heatRed`; Tailwind `bg-heat-red` (`arena-tab-icon.tsx` `HEAT_EMBER_RED` reads it) |
 
 Heat colors draw Arena heat and nothing else: the live embers (two `heat-orange`, one `signal-red`), the countable embers (`heat-red`), the blade clash spark (`signal-red`) and the challenge afterglow edge. Both are fixed across themes and both fall below 3:1 on every light surface (see [Accessibility](#accessibility)).
+
+#### Semantic aliases
+
+| Token | Dark | Light | Source |
+|---|---|---|---|
+| `unseen-ring` | `#E8EDF2` | `#0D0F14` | `lib/tokens.ts` key `unseenRing` (alias of `ink`, same value); Tailwind `border-unseen-ring` |
+
+A semantic alias carries the same value as its base token and exists so a guard can assert what a mark means. `unseen-ring` is the 2px ring on an unwatched reel tile, separated from the poster by a 2px surface gap (design review ruling 2026-10-06, specs/matches-tab). It is never Signal Red: Home keeps its one red CTA.
 
 #### On-media (fixed, over camera, video and photos)
 
@@ -602,7 +610,7 @@ Motion in ELO RATED carries meaning or it does not exist. This section carries o
 | `duration.pulse` | 1400ms | 19 | `--duration-pulse` |
 | `duration.ember` | 2400ms | 21 | (none) |
 | `duration.shimmer` | 1400ms | 23 | (none; web Tailwind `shimmer` is 3s) |
-| `moment.*` (single Moments) | `goFade` 700, `confettiFall` 1800, `confettiFadeDelay` 1200, `confettiFade` 600, `slamIn` 520, `slamInFade` 300, `riseInDelay` 500, `riseIn` 400, `tapMarkFill` 80, `tapNudge` 50, `angleDip` 80ms | 33-54 | (none) |
+| `moment.*` (single Moments) | `goFade` 700, `confettiFall` 1800, `confettiFadeDelay` 1200, `confettiFade` 600, `slamIn` 520, `slamInFade` 300, `riseInDelay` 500, `riseIn` 400, `tapMarkFill` 80, `tapNudge` 50, `angleDip` 80, `reelRingPulse` 600ms | 33-54 | (none) |
 | `tempo.quiet` / `normal` / `busy` | 3000 / 1600 / 800ms | 66-70 | (none) |
 | `BRAND_EASE_OUT_CURVE`, `easing.brandOut` | `cubic-bezier(0.22, 1, 0.36, 1)` | 80, 85 | `--easing-default` |
 | `easing.outCubic` | `Easing.out(Easing.cubic)` | 87 | (none) |
@@ -624,7 +632,7 @@ Mobile tokens live in `apps/mobile/lib/motion/tokens.ts` and are imported from `
 
 - **Durations:** `instant` 100ms (reactive feedback), `fast` 240ms, `base` 480ms (rating tick), `slow` 720ms, `pulse` 1400ms (fixed LIVE pulse cycle), `ember` 2400ms (Arena ember cycle), `shimmer` 1400ms (skeleton sweep).
 - **LIVE pulse tempo:** `tempo.quiet` 3000ms, `tempo.normal` 1600ms, `tempo.busy` 800ms, chosen by how many athletes are live in the lobby. One shared clock drives every live dot so they never beat out of step.
-- **Single Moments:** `moment` names the durations that belong to one registered Moment (`goFade`, `confettiFall`, `confettiFadeDelay`, `confettiFade`, `slamIn`, `slamInFade`, `riseInDelay`, `riseIn`, `tapMarkFill`, `tapNudge`, `angleDip`). Name a new Moment's own timing there instead of writing a literal.
+- **Single Moments:** `moment` names the durations that belong to one registered Moment (`goFade`, `confettiFall`, `confettiFadeDelay`, `confettiFade`, `slamIn`, `slamInFade`, `riseInDelay`, `riseIn`, `tapMarkFill`, `tapNudge`, `angleDip`, `reelRingPulse`). Name a new Moment's own timing there instead of writing a literal.
 - **Easing:** brand ease-out `cubic-bezier(0.22, 1, 0.36, 1)` (`easing.brandOut`, no bounce) by default; `easing.outCubic` for counts; `easing.inQuad` for a fall or a fade off; `easing.linear` for a readout of elapsed time.
 - **Springs:** `spring.press` (damping 18, stiffness 300) for a pressed control returning to rest; `spring.select` (damping 14, stiffness 260) for the tab select bounce.
 - **Press scale:** `PRESS_SCALE` 0.97.
@@ -666,6 +674,8 @@ Mobile haptics use ONE semantic vocabulary, `haptics` from `@/lib/motion` (`apps
 | `matchEnd` | Success notification | End match confirmed. |
 | `resultRecorded` | Success notification | The result is recorded server-side. |
 | `timeWarning` | Medium impact | The clock crosses the low-time threshold. |
+| `reelRevealed` | Success notification | A reel that was building lands as ready while its carousel (Home Highlights, Matches) is on screen; once per landing, never for the first-unseen pulse. Fires under Reduce Motion too. |
+| `milestone` | Success notification | A milestone celebration starts (first match, first win, first highlight; specs/matches-tab 10.6), once per milestone. Never for a first match that was a loss. Fires under Reduce Motion too. Shares a 500 ms guard with `reelRevealed`, so a first reel landing on screen buzzes once. |
 | `error` | Error notification | A mutation or network error. |
 
 - **Never a haptic on a loss.** There is deliberately no loss event, and a draw is silent too; the loser of a submission sees the tap marks still and silent.
@@ -709,6 +719,12 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | Held frame | (no animation) | `SwitchOverlay`, match player | While an in_place angle switch is pending: a native still of the outgoing frame (`expo-image`, `contain`) covers the player, so no black and no frame 0 of the next angle shows; dropped at once if the switch is still pending after 4s. A keep-watching switch holds no still: the outgoing angle stays live on screen | none | Same |
 | Syncing pill | Moment + Ambient | `SyncingPill` (`apps/mobile/components/film-room/syncing-pill.tsx`), match player under the angle switcher | An angle switch not landed 200ms after the tap (keep-watching: the athlete keeps watching the outgoing angle under it): "SYNCING ANGLE" (exact) or "SWITCHING ANGLE" (approximate) fades in over `instant`, stays at least 400ms and until the switch lands, then fades out over `fast` (the approximate note and the failure tag share its slot and never overlap it: the note appears only once the pill is gone, and a failed or abandoned-for-failure switch removes the pill at once, no fade, for the failure tag); while up, a 2px band of `on-media text2` sweeps its bottom edge (`duration.shimmer` 1400ms, linear, `translateX` only), paused in background. Hidden from screen readers (the segment's busy state carries it) | none | Shown and hidden in place, static full-width bar |
 | Angle segment press | Reactive | `AngleSwitcher` (`apps/mobile/components/film-room/angle-switcher.tsx`), match page plate and match player | Press scale 0.97 through `PressableScale`. The lock (jits-xfvd.19): from the tap until the switch settles or is abandoned, the tapped segment is selected and busy (`accessibilityState`), every other one disabled and dimmed to `opacity-disabled` (0.5); locked segments do not move and a tap on one is ignored (counted in telemetry) | `select` on a new angle only while unlocked (none on the active one, on a locked one, at the landing or at an abandon) | 0.85 opacity dip, haptic kept; locked segments do not dip |
+| Reel ring pulse | Moment | `ReelTile` (Home lane, Matches carousel) | The first unseen reel tile appears for the first time in a session, or a building tile lands as ready: the tile scales 1.0 to 1.04 and back over `moment.reelRingPulse` (600ms), once | success on the building-to-ready reveal only | No pulse (the ring alone marks it) |
+| Reel reveal | Moment | `ReelTile` via `ReelCarousel` (`apps/mobile/components/reels/`) | A building tile lands as ready while the carousel's screen is focused: the ready tile fades in over `duration.fast` (240ms), together with the ring pulse | `reelRevealed` once per landing | No fade (the ready tile and its ring appear at once); the haptic still fires |
+| Reel building shimmer | Ambient | Building `ReelTile` (`apps/mobile/components/reels/reel-tile-building.tsx`) | While a reel is being made: a skewed `ON_MEDIA.glass` band sweeps the scrimmed poster every `duration.shimmer` (1400ms), linear, repeating | none | No sweep (static scrim and step plate) |
+| Swipe hint | Moment | `SwipeHint` (`apps/mobile/components/highlight-viewer/swipe-hint.tsx`), the reel swipe viewer | C-V1 appears (once per install, lanes of 2+ reels): the up chevron lifts 4 pt and back twice (`duration.fast` each way, brand ease-out); the hint leaves without animation after the first swipe or 4 s | none | Still chevron, appears and leaves in place |
+| Milestone burst | Moment | `MilestoneBurst` (`apps/mobile/components/milestones/milestone-burst.tsx`) inside `MilestoneMoment`, over the celebrated Matches card or the Home / Matches Highlights carousel | A milestone is claimed (`useMilestoneCelebration`: first match, first win, first highlight; once per athlete per device, within 7 days, never during an active Arena match, under the challenge prompt or the live menu, or while the surface is blurred): 14 sharp rectangles in the verdict confetti colours (Signal Red fill, ink, Signal Red text) fall and turn once, each over `moment.milestoneBurstFall` (900ms) on in-quad, starting up to `moment.milestoneBurstStagger` (180ms) apart and fading over `moment.milestoneBurstFade` (300ms) after `moment.milestoneBurstFadeDelay` (600ms), so the burst ends within 1.2 s; a first match that was a loss uses ink steps only (`ink`, `ink-2`, `ink-3`) | `milestone` when the burst starts; none for a loss | No particles (the banner and the haptic still show) |
+| Milestone banner | Moment | `MilestoneBanner` (`apps/mobile/components/milestones/milestone-banner.tsx`), above the celebrated card or carousel | The same claim: a one-line status plate (C-C1 to C-C3, 3 pt left rule: gain green for a first win, ink otherwise) shows at once and fades out over `duration.fast` (240ms) after 4 s or on tap | none (the burst owns the haptic) | Appears and leaves in place |
 
 ### Other
 

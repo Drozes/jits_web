@@ -95,6 +95,29 @@ it("shows the named limit copy when creation is refused", async () => {
   expect(mockCreate).toHaveBeenCalledTimes(1);
 });
 
+it("a backend that rejects the entry point (no B5 yet) gets one unattributed retry, so the invite still opens", async () => {
+  mockCreate
+    .mockResolvedValueOnce({ ok: false, error: { hint: "invalid_entry_point", message: "" } })
+    .mockResolvedValueOnce({ ok: true, data: INVITE });
+  const { result } = renderHook(() => useChallengeInvite("matches"));
+  await waitFor(() => expect(result.current.phase.kind).toBe("open"));
+  expect(mockCreate).toHaveBeenCalledTimes(2);
+  expect(mockCreate.mock.calls[0][1]).toBe("matches");
+  expect(mockCreate.mock.calls[1][1]).toBeNull();
+});
+
+it("never retries invalid_entry_point without an entry point, nor any other error", async () => {
+  mockCreate.mockResolvedValue({ ok: false, error: { hint: "invalid_entry_point", message: "" } });
+  const none = renderHook(() => useChallengeInvite(null));
+  await waitFor(() => expect(none.result.current.phase.kind).toBe("error"));
+  expect(mockCreate).toHaveBeenCalledTimes(1);
+  // A retry that fails too shows its error (no loop).
+  mockCreate.mockClear();
+  const twice = renderHook(() => useChallengeInvite("matches"));
+  await waitFor(() => expect(twice.result.current.phase.kind).toBe("error"));
+  expect(mockCreate).toHaveBeenCalledTimes(2);
+});
+
 it("opens, reports invite_waiting presence, and goes to the face-off once the claim starts the match", async () => {
   mockCreate.mockResolvedValue({ ok: true, data: INVITE });
   const { result } = renderHook(() => useChallengeInvite("arena"));

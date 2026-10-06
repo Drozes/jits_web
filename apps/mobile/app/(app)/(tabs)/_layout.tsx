@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Tabs } from "expo-router";
-import { Home, Trophy, User } from "lucide-react-native";
+import { Film, Home, Trophy, User } from "lucide-react-native";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { ArenaTabBarIcon, ArenaTabSignalsProvider } from "@/components/layout/arena-tab-icon";
 import { EloTabBar } from "@/components/layout/elo-tab-bar";
@@ -42,12 +42,18 @@ function TabBar(props: BottomTabBarProps) {
  * pages, sessions or gym-manager portal: the Arena tab is the only way to get a
  * match.
  *
- * The bar is the target 4-up: Home, Arena, Rankings, Profile. A Screen and its
- * route file have to land together, because expo-router drops a Screen with no
- * matching route file (console.warn "[Layout children]: No route named ...",
- * then it is filtered out, in 6.0.23 build/useScreens.js:65-68) and the column
- * simply would not render. EloTabBar needs no change for a fourth tab: its
- * columns are flex-1 and it reads the list off the navigator.
+ * The bar is 5-up (owner decision 2026-10-06, spec specs/matches-tab/spec.md
+ * section 4.1, reopening the four-tab decision of jits-tj5n / jits-icei):
+ * Home, Arena, Matches, Rankings, Profile. Matches is the athlete's own match
+ * history (it replaced the pushed Film Room screen) and carries no badge: the
+ * Arena's is the only tab badge (PM9). A Screen and its route directory have
+ * to land together, in the same commit, because expo-router drops a Screen
+ * with no matching route file (console.warn "[Layout children]: No route
+ * named ...", then it is filtered out, in 6.0.23 build/useScreens.js:65-68)
+ * and the column simply would not render. EloTabBar needs no change for a
+ * fifth tab: its columns are flex-1 and it reads the list off the navigator.
+ * At 375 pt each column is 75 pt, and every label fits on one line there
+ * (asserted from the font's real advance widths in elo-tab-bar.test.tsx).
  */
 export default function TabsLayout() {
   return (
@@ -71,6 +77,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size, focused }) => (
             <ArenaTabBarIcon color={color} size={size} focused={focused} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="matches"
+        options={{
+          title: "Matches",
+          tabBarIcon: ({ color, size }) => <Film color={color} size={size} />,
         }}
       />
       <Tabs.Screen

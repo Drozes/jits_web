@@ -1,11 +1,18 @@
-"""Generates the "Proposed (Oct 6 Matches tab)" boards (DRAFT, NOT PUBLISHED).
+"""Generates the "Proposed (Oct 6 Matches tab)" boards (ROUND 2 DRAFT, NOT YET REPUBLISHED).
 
 Static markup only: this script writes .dc.html files; nothing in the boards is script-built.
 Usage:
   python3 generate.py                 # first pass, every auto-height board at 4000 px
   ./measure.sh                        # headless Chrome writes heights.json
   python3 generate.py heights.json    # final pass with measured heights
-Writes project/<board>.dc.html, boards.json and canvas-delta.json next to this file.
+Writes project/<board>.dc.html, boards.json and canvas-delta.json next to this file. The delta is an
+UPDATE of the live page: it compares the layout with src/canvas-matches-tab-live.json (the page's
+entries from a fresh read of project/canvas.json) and lists only the keys that change.
+
+Round 2 (owner, 2026-10-06): Home has ONE mixed carousel titled "Highlights" (own reels in phase 1;
+Friend, Nearby and ELO RATED highlights join the same carousel later, each with a source chip); the
+viewer is full-screen edge-to-edge pages with a right action rail; the Matches zero state's secondary
+action is Challenge a friend (practice link when invites_enabled is off).
 
 Sources of truth:
   Spec:   jits_web specs/matches-tab/spec.md (owner-approved 2026-10-06). Spec copy wins; every
@@ -23,7 +30,8 @@ OUT = os.path.join(HERE, "project")
 SRC = os.environ.get("CANVAS_SRC", os.path.join(HERE, "src"))
 os.makedirs(OUT, exist_ok=True)
 HEIGHTS = json.load(open(sys.argv[1])) if len(sys.argv) > 1 and os.path.exists(sys.argv[1]) else {}
-CANVAS_VERSION = "1791310189-a890"
+CANVAS_VERSION = "1791313840-3c4f"  # fresh read 2026-10-06, round 2
+LIVE = json.load(open(os.path.join(HERE, "src", "canvas-matches-tab-live.json")))
 
 # ---- tokens (dark), apps/mobile/lib/tokens.ts ----
 VOID, PANEL, PLATE, BRIGHT = "#0D0F14", "#13151B", "#1E222B", "#262A34"
@@ -48,10 +56,11 @@ FONTS = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=B
 
 # ---- copy (spec section 11; ids in COPY-DECK.md) ----
 C = {
-    "T1": "Matches", "M1": "Matches", "M2": "Your highlights", "HM1": "Your reels", "HM2": "See all",
+    "T1": "Matches", "M1": "Matches", "M2": "Your highlights", "HM1": "Highlights", "HM2": "See all",  # HM1 holds spec id C-HM3 (C-HM1 "Your reels" retired, R2-1)
     "M13": "DISPUTED", "M14": "Pending",
     "Z1": "Your first match will show up here", "Z2": "Your first highlight lands here", "Z2b": "Your first match lands here",
     "Z3": "0 of 1 matches to your first highlight", "Z4": "Find a match in the Arena", "Z5": "Try a practice match",
+    "Z7": "Challenge a friend",  # C-Z7 (PM13, R2-5)
     "Z6": "Turn on Record from my phone at face-off and we cut your best moments into a highlight.",
     "HZ1": "Get your first highlight",
     "L1": "Your next match goes here", "L2": "Find a match", "L3": "FIRST MATCH", "L4": "FIRST WIN",
@@ -63,6 +72,12 @@ C = {
     "F1t": "NO MATCHES FOR THIS FILTER YET", "F1b": "Older matches have not loaded yet.", "F1a": "Search older matches",
     "F2t": "NO MATCHES FOR THIS FILTER", "F2b": "Try another result or opponent.", "F2a": "Show all",
     "OFF": "You're offline. Some features may not work.",
+    # viewer, full-screen page (round 2): rail labels and bottom meta
+    "V1": "Swipe up for the next one", "V2": "You're all caught up", "V5": "View profile",
+    "VR1": "Share", "VR2": "Save", "VR3": "Improve", "VR9": "Settings",  # C-V6..C-V9 rail labels (coordinator, round 2 review); a11y keeps the full shipped strings
+    "VM1": "Open match",
+    # carousel source chips C-S1..C-S3 (future sources; own reels carry no chip)
+    "SF": "FRIEND", "SN": "NEARBY", "SE": "ELO RATED",
 }
 
 # ---- lucide icons (lucide-react-native 1.16.0 geometry, 24 grid, stroke 2) ----
@@ -84,6 +99,12 @@ I = {
     "wifioff": '<path d="M12 20h.01"></path><path d="M8.5 16.429a5 5 0 0 1 7 0"></path><path d="M5 12.859a10 10 0 0 1 5.17-2.69"></path><path d="M19 12.859a10 10 0 0 0-2.007-1.523"></path><path d="M2 8.82a15 15 0 0 1 4.177-2.643"></path><path d="M22 8.82a15 15 0 0 0-11.288-3.764"></path><path d="m2 2 20 20"></path>',
     "check": '<path d="M20 6 9 17l-5-5"></path>',
     "video": '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect>',
+    "share": '<path d="M12 2v13"></path><path d="m16 6-4-4-4 4"></path><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>',
+    "download": '<path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path>',
+    "scissors": '<circle cx="6" cy="6" r="3"></circle><path d="M8.12 8.12 12 12"></path><path d="M20 4 8.12 15.88"></path><circle cx="6" cy="18" r="3"></circle><path d="M14.8 14.8 20 20"></path>',
+    "volume": '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path><path d="M16 9a5 5 0 0 1 0 6"></path><path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path>',
+    "userplus": '<path d="M2 21a8 8 0 0 1 13.292-6"></path><circle cx="10" cy="8" r="5"></circle><path d="M19 16v6"></path><path d="M22 19h-6"></path>',
+    "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle>',
 }
 
 
@@ -502,6 +523,27 @@ def t_skeleton(size):
             f'<div style="position: absolute; top: 0; bottom: 0; left: 30%; width: 40%; background: rgba(232,237,242,0.08)"></div></div>')
 
 
+def source_chip(t):
+    """Carousel source chip (spec 5, C-S1..C-S3): surface-3 (plate-bright) at 85% with ink-2 text, 2 pt radius, mono caps.
+    Never signal-red, gain or loss. Only non-own tiles carry one."""
+    return (f'<span style="height: 18px; box-sizing: border-box; padding: 0 5px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(38,42,52,0.85); '
+            f'font-family: {MONO}; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.12px; text-transform: uppercase; '
+            f'color: {INK2}; white-space: nowrap">{q(t)}</span>')
+
+
+def t_source(size, src, dur):
+    """A ready tile from another source: the ready tile plus its source chip top left."""
+    tw, th = SIZES[size]
+    return (f'<div style="position: relative; width: {tw}px; height: {th}px">{t_ready(size, dur)}'
+            f'<div style="position: absolute; top: 6px; left: 6px">{source_chip(src)}</div></div>')
+
+
+def future_slot(size, src, dur, under):
+    """A greyed future-source tile in the one carousel (not phase 1): 38% opacity, not pressable.
+    Caption: the subject athlete's short name (spec 5), one line."""
+    return tile_slot(f'<div style="opacity: 0.38">{t_source(size, src, dur)}</div>', size, under)
+
+
 def carousel(slots):
     """Horizontal FlatList: 16 px gutter (slot reserve 4 px, so the strip starts at 12), 8 px visual gap."""
     return (f'<div role="list" style="display: flex; flex-direction: row; gap: 0; margin: 0 -16px; padding: 0 12px; overflow: hidden; flex-shrink: 0">{"".join(slots)}</div>')
@@ -664,7 +706,7 @@ def b04():
     s += caption("Filter with no results, older pages not loaded (C-F1)") + frame(filt1)
     s += caption("Error, nothing cached (C-E1)") + frame(err)
     s += caption("Offline, nothing cached: shipped offline banner plus C-E1") + frame(off)
-    s += note("Offline with a cached page renders the cached feed under the banner; a poster that never downloaded shows the fallback art. Home hides its lane instead of showing an error (spec 10.4).")
+    s += note("Offline with a cached page renders the cached feed under the banner; a poster that never downloaded shows the fallback art. Home hides its Highlights carousel instead of showing an error (spec 10.4).")
     s += caption("Error with cached content: content stays, toast C-E2") + frame(cached)
     s += caption("Load more failed: carried ListFooter (C-E3)") + frame(more)
     return sheet(s)
@@ -731,25 +773,25 @@ HOME_PAD = "24px 16px 66px"
 
 
 # ---------- 05 Home default ----------
-@board("P-MT-05-Home-Default.dc.html", "Proposed: Home, Your reels lane first (phase 1, replaces the NEW HIGHLIGHT card)")
+@board("P-MT-05-Home-Default.dc.html", "Proposed: Home, one Highlights carousel first (phase 1 holds your own reels; replaces the NEW HIGHLIGHT card)")
 def b05():
     m = home_lane_default() + welcome() + elo_tile() + activity(4)
     return screen(tab_header(None, bell_badge=True), m, "home", main_pad=HOME_PAD, gap=20)
 
 
 # ---------- 06 Home with resume ----------
-@board("P-MT-06-Home-Resume.dc.html", "Proposed: Home with a lost live match (Resume above Your reels)")
+@board("P-MT-06-Home-Resume.dc.html", "Proposed: Home with a lost live match (Resume above the Highlights carousel)")
 def b06():
     m = resume_card() + home_lane_default(False) + welcome() + elo_tile() + activity(3)
     return screen(tab_header(None, bell_badge=True), m, "home", main_pad=HOME_PAD, gap=20)
 
 
-# ---------- 07 Home future lanes ----------
-def future_lane(title, gate, tiles_html):
-    return (f'<section style="flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; border: 1px dashed {HLS}; border-radius: 4px; padding: 12px">'
-            f'{row(label_tag(title) + future_chip(), 8, "center", "space-between", "flex-wrap: wrap")}'
-            f'<div style="opacity: 0.38; display: flex; flex-direction: row; gap: 0; overflow: hidden; margin: 0 -12px 0 -4px" aria-hidden="true">{tiles_html}</div>'
-            f'{row(ic("lock", 12, INK3) + mono(gate, 10, INK2, 500, 1.12, False, "white-space: normal"), 6, "flex-start")}</section>')
+# ---------- 07 Home future sources in the one carousel ----------
+SOURCES = [  # (chip, gate note) for the legend on board 07 and the map
+    (C["SF"], "Gate: footage consent decision jr_be-17f (every clip shows two athletes). Epic jr_be-tjx."),
+    (C["SN"], "Gate: jr_be-17f plus location consent (the shipped location permission, boards 57 and 58). Epic jr_be-880."),
+    (C["SE"], "Gate: Terms v2 live (jr_be-dd4.5) and a spec 016 amendment for in-app reads. Epic jr_be-o7c."),
+]
 
 
 def follow_card(init, name, elo):
@@ -759,55 +801,125 @@ def follow_card(init, name, elo):
             f'font-family: {DM}; font-weight: 700; font-size: 11px; letter-spacing: 1.12px; text-transform: uppercase; color: {INK}">Follow</span></div>')
 
 
-@board("P-MT-07-Home-Future-Lanes.dc.html", "Proposed: Home, future lanes (annotated, gated, not in phase 1)")
+def mixed_home_slots():
+    """The one Highlights carousel with the future sources mixed in (greyed, not phase 1)."""
+    return [tile_slot(t_ready("home", "28s"), "home", "vs D. Okafor", ring=True, href=VIEWER_HREF, aria="Watch your highlight vs D. Okafor, unwatched"),
+            future_slot("home", C["SF"], "31s", "S. Whitfield"),
+            future_slot("home", C["SN"], "26s", "K. Ito"),
+            future_slot("home", C["SE"], "40s", "R. Alves"),
+            tile_slot(t_ready("home", "21s"), "home", "vs P. Shah", href=VIEWER_HREF, aria="Watch your highlight vs P. Shah")]
+
+
+def source_legend():
+    rows = "".join(row(f'<div style="width: 84px; flex-shrink: 0">{source_chip(c)}</div>' + mono(g, 10, INK2, 500, 1.12, False, "white-space: normal"), 8, "flex-start")
+                   for c, g in SOURCES)
+    return (f'<section style="flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; border: 1px dashed {HLS}; border-radius: 4px; padding: 12px">'
+            f'{row(mono("Future sources, same carousel", 10, INK, 700, 1.68, True, "white-space: normal") + future_chip(), 8, "center", "space-between", "flex-wrap: wrap")}{rows}</section>')
+
+
+@board("P-MT-07-Home-Future-Lanes.dc.html", "Proposed: Home, future sources in the one Highlights carousel (greyed, gated, not in phase 1)")
 def b07():
-    rt = lambda d, n: tile_slot(t_ready("home", d), "home", n)
-    m = (home_lane_default(False)
-         + f'<div style="flex-shrink: 0; padding: 10px 12px; border-left: 3px solid {HLS}; background: {PANEL}">{mono("Annotation: future lanes stack under Your reels, one ReelCarousel each, when their gates clear. None ships in phase 1.", 10, INK2, 700, 1.12, False, "white-space: normal")}</div>'
-         + future_lane("Elo reels", "Gate: Terms v2 live (jr_be-dd4.5) and a spec 016 amendment for in-app reads. Epic jr_be-o7c.", rt("31s", "vs R. Alves") + rt("26s", "vs K. Ito") + rt("40s", "vs T. Moss"))
-         + future_lane("Friend reels", "Gate: footage consent decision jr_be-17f (every clip shows two athletes). Epic jr_be-tjx.", rt("28s", "Sam W.") + rt("19s", "Leo T.") + rt("33s", "Priya S."))
-         + future_lane("Athletes you might follow", "Gate: a follows table, RLS and a suggestions RPC, after jr_be-17f. Epic jr_be-293.", follow_card("RA", "R. Alves", "1512") + follow_card("KI", "K. Ito", "1478") + follow_card("TM", "T. Moss", "1495"))
+    m = (lane(C["HM1"], mixed_home_slots())
+         + f'<div style="flex-shrink: 0; padding: 10px 12px; border-left: 3px solid {HLS}; background: {PANEL}">{mono("Annotation: one Highlights carousel, never a stack of lanes (spec 7.3). Phase 1 holds only your own reels. Friend, nearby and Elo highlights join this same carousel when their gates clear, each tile with a source chip and the athlete's name; your own reels never carry one. Order: own building, own unseen, then every other ready item newest first. Greyed tiles are not phase 1.", 10, INK2, 700, 1.12, False, "white-space: normal")}</div>'
+         + source_legend()
+         + f'<section style="flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; border: 1px dashed {HLS}; border-radius: 4px; padding: 12px">'
+         + row(label_tag("Athletes you might follow") + future_chip(), 8, "center", "space-between", "flex-wrap: wrap")
+         + f'<div style="opacity: 0.38; display: flex; flex-direction: row; gap: 0; overflow: hidden; margin: 0 -12px 0 -4px" aria-hidden="true">{follow_card("RA", "R. Alves", "1512") + follow_card("KI", "K. Ito", "1478") + follow_card("TM", "T. Moss", "1495")}</div>'
+         + row(ic("lock", 12, INK3) + mono("Not a carousel source (people, not reels); placement decided in jr_be-293. Gate: a follows table, RLS and a suggestions RPC, after jr_be-17f.", 10, INK2, 500, 1.12, False, "white-space: normal"), 6, "flex-start")
+         + '</section>'
          + welcome() + elo_tile() + activity(2))
     return screen(tab_header(None, bell_badge=True), m, "home", main_pad="24px 16px 40px", gap=20)
 
 
-# ---------- 08 reel viewer ----------
-def viewer_page(scale=1.0, hint=True, label="28s · Version 1", playing=True, close_href=HOME_HREF):
-    """Today's ViewerScreen body (board 34) as one full-screen pager page."""
-    fr = ("HIGHLIGHT REEL 9:16, PLAYING" if playing else "POSTER FRAME, PAUSED")
-    h = (f'<div style="display: flex; flex-direction: row; align-items: center; gap: 10.5px; padding: 0 14px; min-height: 44px; flex-shrink: 0">'
-         f'<a href="{close_href}" aria-label="Close" style="width: 44px; height: 44px; margin-left: -11px; display: flex; align-items: center; justify-content: center; color: {INK}">{ic("x", 22, INK)}</a>'
-         f'<h1 style="margin: 0; font-family: {DM}; font-weight: 700; font-size: 14px; line-height: 18px; letter-spacing: 1.12px; text-transform: uppercase; color: {INK}">Your highlight</h1></div>')
-    hint_ = (f'<div style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: 4px">{ic("chev_u", 16, INK3)}'
-             f'{mono("Swipe up for the next one", 10, INK3, 700)}</div>') if hint else ""
-    return (f'<div style="width: 390px; height: 844px; box-sizing: border-box; background: {VOID}; display: flex; flex-direction: column; overflow: hidden; position: relative; padding-top: 47px; padding-bottom: 30px; flex-shrink: 0">'
-            f'{h}<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10.5px">'
-            f'<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center">'
-            f'<button aria-label="Your highlight vs D. Okafor, 28 seconds" style="align-self: center; width: 297px; height: 528px; border: 0; padding: 0; border-radius: 4px; background: {BRIGHT}; cursor: pointer; '
-            f'font-family: {MONO}; font-weight: 500; font-size: 10px; letter-spacing: 2px; color: {PH}">{fr}</button></div>'
-            f'<div style="display: flex; flex-direction: column; gap: 10.5px; padding: 0 14px">'
-            f'<div style="font-family: {MONO}; font-weight: 400; font-size: 12px; line-height: 16px; color: {INK3}; font-variant-numeric: tabular-nums">{label}</div>'
-            f'<div style="display: flex; flex-direction: column; gap: 7px">'
-            f'{btn_primary("Share to Instagram", "35-Highlight-Share.dc.html")}{btn_secondary("Save to Photos")}{btn_secondary("Improve this reel")}</div></div>{hint_}</div></div>')
+# ---------- 08 reel viewer: full-screen pages (round 2, spec 8, Q6 resolved) ----------
+# Scrims (spec 8.2, overlays never on raw video; round 2 review option a): top void 50% to 0 (120 pt),
+# bottom 0 to void 70% (400 pt, so the rail labels sit on it), right edge 0 to void 45% (96 pt) behind the rail.
+SCRIM_TOP = "linear-gradient(to bottom, rgba(13,15,20,0.5) 0%, rgba(13,15,20,0) 100%)"
+SCRIM_BOTTOM = "linear-gradient(to bottom, rgba(13,15,20,0) 0%, rgba(13,15,20,0.7) 100%)"
+SCRIM_RIGHT = "linear-gradient(to right, rgba(13,15,20,0) 0%, rgba(13,15,20,0.45) 100%)"
+
+
+def rail_btn(icon, label, aria, primary=False):
+    """One rail action: a 44 pt target on an on-media plate, its small label under it."""
+    bg, bd, fg = (RED, RED, VOID) if primary else (OM_BADGE, OM_STRONG, OM_WHITE)
+    return (f'<button type="button" aria-label="{q(aria)}" style="margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; width: 56px; display: flex; flex-direction: column; align-items: center; gap: 4px">'
+            f'<span style="width: 44px; height: 44px; box-sizing: border-box; border-radius: 4px; background: {bg}; border: 1px solid {bd}; display: flex; align-items: center; justify-content: center">{ic(icon, 22, fg)}</span>'
+            f'{mono(label, 10, OM_TEXT, 700, 1.12, True)}</button>')
+
+
+def top_btn(icon, aria, href=None, side="left"):
+    pos = "left: 6px" if side == "left" else "right: 6px"
+    tagn, hr = ("a", f' href="{href}"') if href else ("button", ' type="button"')
+    return (f'<{tagn}{hr} aria-label="{q(aria)}" style="position: absolute; top: 47px; {pos}; margin: 0; padding: 0; border: 0; background: transparent; cursor: pointer; width: 44px; height: 44px; '
+            f'display: flex; align-items: center; justify-content: center">{ic(icon, 24, OM_WHITE)}</{tagn}>')
+
+
+def viewer_fs(own=True, hint=True, pct=38, src=None, close_href=HOME_HREF, h=844, caught_up=False):
+    """A full-screen, edge-to-edge 9:16 page (spec 8.2). own=False is a reel that is not yours and whose
+    match you were not in: the rail is not rendered, the meta shows the athlete's name with its source tag
+    and View profile (8.6). h < 844 crops to the bottom of the page (end-of-list frame)."""
+    aria_v = ("Your highlight vs D. Okafor, 28 seconds, playing. Tap to pause" if own else "S. Whitfield, from a friend, 31 seconds, playing. Tap to pause")
+    video = (f'<button type="button" aria-label="{q(aria_v)}" style="position: absolute; left: 0; right: 0; bottom: 0; height: 844px; margin: 0; padding: 0 90px; border: 0; background: {BRIGHT}; cursor: pointer; '
+             f'display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center; font-family: {MONO}; font-weight: 500; font-size: 10px; line-height: 16px; letter-spacing: 2px; color: {PH}">'
+             f'{"HIGHLIGHT REEL 9:16, EDGE TO EDGE, COVER, LOOPING" if own else "FRIEND REEL 9:16, EDGE TO EDGE, COVER, LOOPING"}</button>')
+    scrims = ((f'<div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 120px; background: {SCRIM_TOP}; pointer-events: none"></div>' if h == 844 else "")
+              + f'<div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 400px; background: {SCRIM_BOTTOM}; pointer-events: none"></div>'
+              + (f'<div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; right: 0; width: 96px; background: {SCRIM_RIGHT}; pointer-events: none"></div>' if own else ""))
+    top = (top_btn("x", "Close", close_href, "left") + top_btn("volume", "Mute", side="right")) if h == 844 else ""
+    if own:
+        rail = (f'<div style="position: absolute; right: 12px; bottom: 150px; display: flex; flex-direction: column; gap: 20px; align-items: center">'
+                f'{rail_btn("share", C["VR1"], "Share to Instagram", primary=True)}{rail_btn("download", C["VR2"], "Save to Photos")}{rail_btn("scissors", C["VR3"], "Improve this reel")}</div>')
+    else:
+        rail = ""
+    if own:
+        name = heading("vs D. Okafor", 18, OM_WHITE, extra="white-space: nowrap; overflow: hidden; text-overflow: ellipsis")
+        line, link = "OCT 04 · 0:28", (C["VM1"], "32-Match-Detail.dc.html", "Open match vs D. Okafor")
+    else:
+        name = row(heading("S. Whitfield", 18, OM_WHITE, extra="white-space: nowrap") + mono(src or C["SF"], 10, OM_TEXT2, 700, 1.12, True,
+                   "padding: 2px 5px; border: 1px solid " + OM_STRONG + "; border-radius: 2px"), 8)
+        line, link = "SEP 30 · 0:31", (C["V5"], "36-Athlete.dc.html", "View profile, S. Whitfield")
+    meta = (f'<div style="position: absolute; left: 16px; right: {84 if own else 16}px; bottom: 44px; display: flex; flex-direction: column; gap: 4px">'
+            f'{name}{mono(line, 12, OM_TEXT2, 500, 1.12, True)}'
+            f'<a href="{link[1]}" aria-label="{q(link[2])}" style="align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; gap: 4px">'
+            f'<span style="font-family: {DM}; font-weight: 700; font-size: 12px; line-height: 16px; letter-spacing: 1.12px; text-transform: uppercase; color: {OM_TEXT}">{q(link[0])}</span>{ic("chev_r", 14, OM_TEXT)}</a></div>')
+    prog = (f'<div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 34px; height: 2px; background: rgba(141,146,157,0.4)">'
+            f'<div style="width: {pct}%; height: 2px; background: {INK}"></div></div>')
+    hint_ = (f'<div style="position: absolute; left: 95px; width: 200px; bottom: 166px; display: flex; flex-direction: column; align-items: center; gap: 2px">{ic("chev_u", 16, OM_TEXT)}'
+             f'{mono(C["V1"], 10, OM_TEXT, 700, 1.68, True, "padding: 3px 6px; border-radius: 2px; background: " + OM_BADGE)}</div>') if hint else ""
+    cu = (f'<div role="status" style="position: absolute; left: 0; right: 0; bottom: 46px; display: flex; justify-content: center">'
+          f'{mono(C["V2"], 10, OM_TEXT, 700, 1.68, True, "padding: 3px 6px; border-radius: 2px; background: " + OM_BADGE)}</div>') if caught_up else ""
+    if caught_up:
+        meta = meta.replace("bottom: 44px", "bottom: 70px")
+    return (f'<div style="width: 390px; height: {h}px; position: relative; overflow: hidden; background: #000; flex-shrink: 0">'
+            f'{video}{scrims}{top}{rail}{meta}{prog}{hint_}{cu}</div>')
 
 
 def mini_page(lab, state, on=False):
-    return (f'<div style="width: 120px; height: 213px; box-sizing: border-box; border: 1px solid {INK if on else HL}; border-radius: 4px; background: {BRIGHT if on else PLATE}; '
-            f'display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; opacity: {1 if on else 0.7}">'
-            f'{heading(lab, 12, INK)}{mono(state, 9, INK2 if on else INK3, 700, 1.12, True, "white-space: normal; text-align: center; padding: 0 6px")}</div>')
+    """Pager model thumbnail: a full-bleed page with its rail dots."""
+    rail = "".join(f'<span style="width: 10px; height: 10px; border-radius: 2px; background: {RED if (i == 0 and on) else OM_BADGE}; border: 1px solid {OM_STRONG}"></span>' for i in range(3))
+    return (f'<div style="position: relative; width: 120px; height: 213px; box-sizing: border-box; border: 1px solid {INK if on else HL}; border-radius: 4px; background: {BRIGHT if on else PLATE}; '
+            f'display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; overflow: hidden; opacity: {1 if on else 0.7}">'
+            f'{heading(lab, 12, INK)}{mono(state, 9, INK2 if on else INK3, 700, 1.12, True, "white-space: normal; text-align: center; padding: 0 18px 0 6px")}'
+            f'<div aria-hidden="true" style="position: absolute; right: 5px; bottom: 30px; display: flex; flex-direction: column; gap: 4px">{rail}</div>'
+            f'<div aria-hidden="true" style="position: absolute; left: 6px; right: 6px; bottom: 8px; height: 2px; background: {OM_TRACK}"><div style="width: {40 if on else 0}%; height: 2px; background: {OM_TEXT}"></div></div></div>')
 
 
-@board("P-MT-08-Reel-Viewer.dc.html", "Proposed: Reel viewer, vertical swipe pager (wraps board 34)")
+@board("P-MT-08-Reel-Viewer.dc.html", "Proposed: Reel viewer, full-screen vertical pager (edge-to-edge 9:16 pages, right action rail)")
 def b08():
-    s = sheet_title("Reel viewer: vertical swipe pager",
-                    "A carousel tap opens the viewer at that reel (source home or matches, with a lane token). Each page is today's ViewerScreen (board 34) for one reel; swipe up for the next reel of the lane, down for the previous. Close and the system back gesture return to the surface that opened it; a swipe never closes.")
-    s += caption("Page 2 of the lane, playing (first open shows the swipe hint once)") + viewer_page()
-    s += note("C-V1 swipe hint (spec 8, AC 4.6): one mono ink-3 hint under the actions, shown once per install and only when the lane has 2 or more pages; gone after the first swipe. Pages reuse today's viewer layout (spec 8); a full-bleed shorts page would be a separate decision. Nothing else changes on the page: Share to Instagram keeps the red CTA and the share flow of 35.")
+    s = sheet_title("Reel viewer: full-screen vertical pager",
+                    "Owner decision R2-2 (spec 8, Q6): every page is the reel edge to edge, Shorts style, in pager and single-reel mode alike. The video fills the 390 x 844 frame (cover); close top left, mute top right, the actions on a right rail, the meta bottom left, a 2 pt progress bar at the bottom. Swipe up for the next reel of the carousel, down for the previous. Close and back return to the surface that opened it; a swipe never closes.")
+    s += caption("Your reel, playing (pager mode, first open shows the swipe hint once)") + viewer_fs()
+    s += note("Rail, top to bottom (12 pt from the edge, 20 pt apart, each a 44 pt target with a short label: C-V6 Share, C-V7 Save, C-V8 Improve; the accessible labels stay the full shipped strings; the permission-denied Open Settings fallback reads C-V9 Settings): Share (Share to Instagram, or Share reel when the Reels path is unavailable; the one signal-red control, own reels only), Save (Save to Photos), Improve (Improve this reel). Their show rules (highlight_share_enabled, canSaveToPhotos, the Open Settings fallback, the regenerating banner) are carried from viewer-actions.tsx; only the placement changes. Bottom meta: vs {opp}, shortDate and duration (OCT 04 · 0:28), Open match (32).")
+    s += note("Legibility: overlays sit on scrims, never on raw video: a top scrim (void 50% to 0, 120 pt) under close and mute, a bottom scrim (0 to void 70%, 400 pt) under the meta and the whole rail, a soft right-edge scrim (0 to void 45%, 96 pt) behind the rail, and the rail icons on on-media-badge plates. Progress: ink on an ink-3 40% track, not scrubbable. Tap the video to pause (a centred 64 pt play glyph, ink at 80%, shows while paused); tap again to play. The reel loops; no auto-advance in phase 1 (Q8).")
+    s += caption("Not your reel and not your match (future source): rail hidden, View profile") + viewer_fs(own=False, hint=False, pct=64, src=C["SF"])
+    s += note("Ownership rule (spec 8.6, canManageReel): when the reel is not yours, Share to Instagram, Save to Photos and Improve this reel are hidden with every sheet they open, so the rail is empty and not rendered. Close and mute stay. The meta shows the athlete's short name with the source tag (FRIEND, NEARBY, ELO RATED), and View profile (C-V5) opens their profile (36) because you were not in the match; a participant would see Open match. No red on the page. Not phase 1: phase 1 pages are always your own reels, but the rule ships and is tested now.")
+    s += caption("End of list: swipe past the last reel (C-V2, 2 s), bottom of the page") + viewer_fs(hint=False, pct=91, h=420, caught_up=True)
+    s += note("The last page bounces: no extra page, no wrap to the first reel. C-V2 shows above the progress bar for 2 s when a drag passes the last page by more than 48 pt on a fully loaded list. Never in single-reel mode.")
     s += caption("Pager model")
     s += (f'<div style="padding: 0 16px; display: flex; flex-direction: row; gap: 12px; align-items: center">'
-          f'{col(mini_page("vs P. Shah", "Previous, paused on poster") + mini_page("vs D. Okafor", "Visible, playing", True) + mini_page("vs S. Whitfield", "Next, paused on poster"), 8)}'
-          f'{bullets(["Vertical FlatList, pagingEnabled, windowSize 3: at most the visible page and its neighbours are mounted; one expo-video player plays.", "A page counts as visible at 80% (onViewableItemsChanged).", "Building and ghost tiles are not pages. Nearing the end loads the next page with the B1 cursor.", "Opened from push, the bell, match detail or the summary (no lane token): one reel, no swipe, exactly as today.", "Share sheet, improve sheet and any modal suspend paging while open.", "viewer_opened once per reel per pager session (swiped: true when reached by swipe); viewer_swiped per landing."], 12)}</div>')
-    s += note("Watching marks the reel seen: its ring clears on return and the bell dot clears (notifyHighlightsChanged). Mute rule as today: starts with sound unless the viewer muted last time.")
+          f'{col(mini_page("vs P. Shah", "Previous, loaded, paused at 0 on poster") + mini_page("vs D. Okafor", "Visible, playing, looping", True) + mini_page("vs S. Whitfield", "Next, loaded, paused at 0 on poster"), 8)}'
+          f'{bullets(["Vertical FlatList, pagingEnabled, one page per fling, windowSize 3 (no pager-view dependency, ships OTA).", "Player pool of 3 (previous, current, next by index mod 3): a swipe re-points only the slot leaving the window; only the visible page plays.", "Prefetch on landing: sign i + 1, i + 2 and i - 1, prefetch their posters, load i + 1 and i - 1 into the pool. Nothing beyond i + 2.", "The poster covers each page until its first frame, so a page is never black.", "Pages are the carousel ready items in carousel order; building, ghost, CTA and See all tiles are not pages. Near the end the next page loads with the B1 cursor.", "Single-reel mode (push, the bell, match detail, the summary): the same full-screen page, no paging, no hint, no prefetch.", "Modals suspend paging and pause. Mute is one state for every page, persisted in reels:muted:v1; starts with sound."], 12)}</div>')
+    s += note("C-V1 swipe hint (spec 8.3): above the bottom meta on its own on-media plate, once per install, only with 2 or more pages, gone after the first swipe or 4 s. Watching marks your reel seen when its page becomes current: its ring clears on return and the bell dot clears.")
     return sheet(s)
 
 
@@ -870,14 +982,20 @@ def zero_matches_main(clips=True):
     if clips:
         out += prog
     out += btn_primary(C["Z4"], ARENA_HREF, "Find a match in the Arena. Opens the Arena tab")
-    out += text_btn(C["Z5"], "41-Practice.dc.html", "Try a practice match", INK, center=True)
+    out += (f'<a href="50-Invite-Challenge.dc.html" aria-label="Challenge a friend to a match. Opens an invite with a QR code and link." style="align-self: center; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; color: {INK}; flex-shrink: 0">'
+            f'{ic("userplus", 16, INK)}<span style="font-family: {DM}; font-weight: 700; font-size: 12px; line-height: 16px; letter-spacing: 1.12px; text-transform: uppercase; color: {INK}">{q(C["Z7"])}</span></a>')
     out += helper_line(C["Z6"] if clips else C["L6"])
     return out
 
 
-@board("P-MT-10-Zero-Matches.dc.html", "Proposed: Zero matches, Matches tab (first match hero)")
+def invite_annotation():
+    return (f'<div style="flex-shrink: 0; padding: 10px 12px; border-left: 3px solid {HLS}; background: {PANEL}">'
+            f'{mono("Annotation: C-Z7 Challenge a friend (UserPlus, never red) pushes /invite?from=matches, the shipped challenge invite screen (board 50: QR, short code, Share row; needs B5 jr_be-gpz). invites_enabled off: the slot shows C-Z5 Try a practice match (board 41) while shouldOfferPracticeMatch. Flag not yet known: the slot is empty (no practice-to-invite flash). Never both. The red Find a match in the Arena stays above. Home keeps its practice offer card.", 10, INK2, 700, 1.12, False, "white-space: normal")}</div>')
+
+
+@board("P-MT-10-Zero-Matches.dc.html", "Proposed: Zero matches, Matches tab (first match hero, Challenge a friend)")
 def b10():
-    return screen(tab_header(C["M1"]), zero_matches_main(), "matches", gap=16)
+    return screen(tab_header(C["M1"]), zero_matches_main() + invite_annotation(), "matches", gap=16)
 
 
 # ---------- 11 zero, Home ----------
@@ -939,9 +1057,9 @@ def b14():
     for lab, r in zip(labels, rows_):
         s += caption(lab) + f'<div style="padding: 0 16px">{carousel(r)}</div>'
     s += note("Unseen ring: the unseen-ring alias, a 2 px ink stroke-edge with a 2 px surface gap (spec 5). Never signal-red: Home's one red CTA stays with Resume or the practice offer (AC 3.5). Building tiles show the match poster under a dark scrim with the shared shimmer band; the countdown is server-clock based (Oct 4 deck). Tapping a building tile opens match detail on its Film status plate (32), never the viewer. Ghost tiles are not pressable; CTA tiles switch to the Arena tab.")
-    s += caption("Home lane loading: 3 skeleton tiles while the first read is in flight")
+    s += caption("Home Highlights carousel loading: 3 skeleton tiles while the first read is in flight")
     s += f'<div style="padding: 0 16px">{lane(C["HM1"], [tile_slot(t_skeleton("home"), "home") for _ in range(3)])}</div>'
-    s += note("Never a blank gap that pops (spec 10.4). If the read fails, the lane hides quietly; Home never shows an error for it.")
+    s += note("Never a blank gap that pops (spec 10.4). If the read fails, the carousel hides quietly; Home never shows an error for it. Title: Highlights, the one neutral carousel title on Home (round 2).")
     s += caption("Reveal: the reel lands while Home is on screen")
     seq = [("Building, step 2", tile_slot(t_building("home", 2), "home", "vs D. Okafor", C["B4"])),
            ("Ready: cross-fade, ring, one pulse, success haptic", tile_slot(t_ready("home", "28s"), "home", "vs D. Okafor", ring=True, pulse=True, aria="Watch your highlight vs D. Okafor, unwatched")),
@@ -1002,8 +1120,8 @@ def b15():
           + lane(C["HM1"], [tile_slot(t_ready("home", "28s"), "home", "vs D. Okafor", ring=True, pulse=True, href=VIEWER_HREF, aria="Watch your first highlight vs D. Okafor, unwatched"),
                             tile_slot(t_ghost("home", C["L5"]), "home", aria=C["L5"])])
           + welcome(NEW_NAME), pad="24px 16px"))
-    f3_note = "A lane with 1 to 2 ready reels appends one ghost tile (C-L5) so the shelf reads as filling (owner to confirm)."
-    s += caption("First highlight (C-C3), Home lane (else the Matches carousel, whichever opens first)") + frame(f3 + confetti([(14, 102), (376, 102), (68, 160), (68, 240)], seed=3)) + note(f3_note)
+    f3_note = "A carousel with 1 to 2 ready reels appends one ghost tile (C-L5) so the shelf reads as filling (owner confirmed 2026-10-06, spec Q7)."
+    s += caption("First highlight (C-C3), Home Highlights carousel (else the Matches carousel, whichever opens first)") + frame(f3 + confetti([(14, 102), (376, 102), (68, 160), (68, 240)], seed=3)) + note(f3_note)
     s += caption("Rules")
     s += bullets([
         "Stored in AsyncStorage milestones:v1:<athleteId>, written the moment the celebration starts. A milestone that fires on Home does not fire again on Matches.",
@@ -1022,13 +1140,13 @@ def b16():
     s = sheet_title("Highlights off (clips_enabled false)",
                     "Both carousels are hidden, never shown empty, and no copy promises a highlight (spec 10.7). Everything else stays.")
     home = tab_header(None, inset=False) + frame_body(welcome() + elo_tile() + activity(2), pad="24px 16px")
-    s += caption("Home: no lane, Welcome is first again") + frame(home)
+    s += caption("Home: no Highlights carousel, Welcome is first again") + frame(home)
     mt = tab_header(C["M1"], inset=False) + frame_body(record_strip("21 MATCHES · 14W 6L 1D · 1487") + chips("All") + month_header("OCTOBER 2026", "4 MATCHES") + c_okafor())
     s += caption("Matches with history: no Your highlights row") + frame(mt)
     s += note("The card badge BUILDING HIGHLIGHT should not occur with clips off (no reel is planned), so cards read New, Breakdown ready or No film as usual.")
     zt = tab_header(C["M1"], inset=False) + frame_body(zero_matches_main(clips=False))
     s += caption("Matches, zero matches: C-Z2b, no progress line, film helper") + frame(zt)
-    s += note("C-Z6 mentions a highlight, so with clips off the helper falls back to C-L6 (Turn on Record from my phone at face-off.). Spec 10.7: C-L6 replaces C-Z6 with clips off.")
+    s += note("C-Z6 mentions a highlight, so with clips off the helper falls back to C-L6 (Turn on Record from my phone at face-off.). Spec 10.7: C-L6 replaces C-Z6 with clips off. The secondary action follows board 10: C-Z7 Challenge a friend, C-Z5 when invites_enabled is off, empty while the flag is unknown.")
     return sheet(s)
 
 
@@ -1044,12 +1162,12 @@ MAP_BOARDS = [
     ("P-MT-02-Matches-Default.dc.html", "02", "Matches tab: record strip, Your highlights, chips, feed"),
     ("P-MT-03-Card-States.dc.html", "03", "MatchFeedCard: badge priority, crop rule, tags"),
     ("P-MT-04-Matches-Loading-Errors.dc.html", "04", "Loading, filter empty, offline, errors"),
-    ("P-MT-05-Home-Default.dc.html", "05", "Home: Your reels lane first"),
-    ("P-MT-06-Home-Resume.dc.html", "06", "Home: Resume above Your reels"),
-    ("P-MT-07-Home-Future-Lanes.dc.html", "07", "Home: future lanes and their gates"),
-    ("P-MT-08-Reel-Viewer.dc.html", "08", "Reel viewer: vertical swipe pager"),
+    ("P-MT-05-Home-Default.dc.html", "05", "Home: one Highlights carousel first"),
+    ("P-MT-06-Home-Resume.dc.html", "06", "Home: Resume above Highlights"),
+    ("P-MT-07-Home-Future-Lanes.dc.html", "07", "Home: future sources in the one carousel"),
+    ("P-MT-08-Reel-Viewer.dc.html", "08", "Reel viewer: full-screen pager, right rail"),
     ("P-MT-09-Profile-Clean.dc.html", "09", "Profile: identity, stats, settings"),
-    ("P-MT-10-Zero-Matches.dc.html", "10", "Zero matches: Matches tab"),
+    ("P-MT-10-Zero-Matches.dc.html", "10", "Zero matches: Matches tab, Challenge a friend"),
     ("P-MT-11-Zero-Home.dc.html", "11", "Zero matches: Home"),
     ("P-MT-12-Low-Data-Matches.dc.html", "12", "Low data: Matches tab"),
     ("P-MT-13-Low-Data-Home.dc.html", "13", "Low data: Home"),
@@ -1059,36 +1177,36 @@ MAP_BOARDS = [
 ]
 
 
-@board("P-MT-00-Map.dc.html", "Proposed: Matches tab map (what changed, decisions, lanes and gates, open questions)", w=1440)
+@board("P-MT-00-Map.dc.html", "Proposed: Matches tab map (what changed, decisions, carousel sources and gates, open questions)", w=1440)
 def b00():
     changed = bullets([
         "A fifth tab, Matches (lucide Film): Home · Arena · Matches · Rankings · Profile. No badge on it.",
-        "Matches is the athlete's own history and replaces the pushed Film Room screen (31), which becomes a redirect for two OTAs.",
+        "Matches is the athlete's own history and replaces the pushed Film Room screen (31), which becomes a redirect for two OTAs, then is deleted.",
         "Matches, top to bottom: TabHeader, record strip, Your highlights carousel (9:16 tiles), the shipped filter chips and Opponent picker, month headers, full-width 16:9 match cards. Matches with no film are listed.",
         "Card media tap plays the selected video (33) when playable; the meta row opens match detail (32).",
-        "Home: Resume (only for a lost live match), then the Your reels lane, then Welcome, Elo tile, practice offer, invite card and Recent Activity with its All / Me toggle. The lane absorbs the NEW HIGHLIGHT card (no dismiss).",
-        "Carousel tap opens a vertical swipe pager over today's viewer (34).",
+        "Home: Resume (only for a lost live match), then ONE Highlights carousel, then Welcome, Elo tile, practice offer, invite card and Recent Activity with its All / Me toggle. The carousel absorbs the NEW HIGHLIGHT card (no dismiss). Phase 1 it holds your own reels; Friend, Nearby and ELO RATED highlights join the same carousel later.",
+        "Carousel tap opens a full-screen vertical pager: edge-to-edge 9:16 pages, a right action rail, Shorts style.",
         "Profile loses Recent Matches, the Highlights row and the Film Room preview, and gets no View all matches link.",
-        "Zero, low-data and in-flight states sell the next action; three one-time milestones celebrate firsts.",
+        "Zero, low-data and in-flight states sell the next action (Matches zero: Find a match in the Arena, then Challenge a friend); three one-time milestones celebrate firsts.",
     ], 13)
     decisions = bullets([
-        "Lane titles: Your highlights on Matches (C-M2), Your reels on Home (C-HM1), as the spec copy table.",
-        "Unseen ring: 2 px ink stroke-edge with a 2 px gap. The design system has no highlight accent token; ink is the state edge colour (README).",
+        "Carousel titles: Your highlights on Matches (C-M2); Highlights on Home (C-HM3, R2-1), one neutral title for one mixed carousel. Your reels (C-HM1) is retired.",
+        "Sources, not lanes: future friend, nearby and Elo tiles join the one Home carousel with a source chip (FRIEND, NEARBY, ELO RATED) and the athlete's name; own reels carry no chip. Order: own building, own unseen, then the rest newest first.",
+        "Viewer (spec 8): full-screen pages in pager and single-reel mode. Close and mute on top; own reels: Share (the one red control), Save, Improve on the rail and Open match in the meta. Not yours: no rail; View profile when you were not in the match. Reels loop, no auto-advance (Q8).",
+        "Unseen ring: 2 px ink stroke-edge with a 2 px gap (alias unseen-ring). Never signal-red.",
         "Crop rule: portrait stills pillarboxed (contain over a blurred cover copy, 40% void scrim); landscape and square fill (cover).",
         "One status badge per card, top left, by the deck priority; DISPUTED and Pending live in the meta line.",
-        "Meta row: 24 pt avatar, vs name, outcome letter, delta, short date, plus FIRST MATCH / FIRST WIN tags; a chevron marks it as its own target.",
-        "Red: Matches zero state owns its one red CTA (Find a match in the Arena). Home tiles are never red.",
-        "Clips off hides both carousels and every highlight promise.",
-        "Elo milestones deferred (owner, 2026-10-06).",
+        "Red: Matches zero state owns its one red CTA (Find a match in the Arena); Challenge a friend is the secondary (practice link when invites_enabled is off). Home tiles are never red.",
+        "Clips off hides both carousels and every highlight promise. Elo milestones deferred (owner, 2026-10-06).",
     ], 13)
     future = ("".join(
         f'<div style="display: flex; flex-direction: row; gap: 12px; padding: 10px 0; border-top: 1px solid {HLF}">'
         f'<div style="width: 190px; flex-shrink: 0">{heading(n, 14, INK)}</div><div style="flex: 1">{body(g, 13, INK2)}</div></div>'
-        for n, g in [("Your reels (phase 1)", "Own highlights only, from get_my_highlights. Ships with the tab."),
-                     ("Elo reels", "Gated on Terms v2 (jr_be-dd4.5) and a spec 016 amendment. Epic jr_be-o7c."),
-                     ("Friend reels", "Gated on the footage consent decision jr_be-17f. Epic jr_be-tjx."),
-                     ("Athletes you might follow", "Needs a follows table, RLS and a suggestions RPC; after jr_be-17f. Epic jr_be-293."),
-                     ("Matches visibility filter", "Me / Friends / Gym / World on the Matches tab; same visibility model. Epic jr_be-7t0.")]))
+        for n, g in [("Own reels (phase 1)", "Own highlights from get_my_highlights, no chip. Ships with the tab in the one Highlights carousel."),
+                     ("FRIEND chip (C-S1)", "Gated on the footage consent decision jr_be-17f. Epic jr_be-tjx."),
+                     ("NEARBY chip (C-S2)", "Gated on jr_be-17f plus location consent (the shipped location permission). Epic jr_be-880."),
+                     ("ELO RATED chip (C-S3)", "Gated on Terms v2 (jr_be-dd4.5) and a spec 016 amendment. Epic jr_be-o7c."),
+                     ("Not carousel sources", "Athletes you might follow (people, not reels; placement in jr_be-293) and the Matches visibility filter Me / Friends / Gym / World (jr_be-7t0).")]))
     links = "".join(
         f'<a href="{f}" style="display: flex; flex-direction: row; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid {HLF}; color: {INK}">'
         f'{mono(n, 11, INK, 700, 0.56, False)}{body(t, 13, INK)}<span style="flex: 1"></span>{ic("chev_r", 14, INK3)}</a>' for f, n, t in MAP_BOARDS)
@@ -1099,29 +1217,31 @@ def b00():
         "B4 jr_be-62n: funnel steps matches_reel_tapped and viewer_swiped.",
     ], 12)
     openq = (bullets([
-        "Spec Q5: remove the Film Room redirect after two OTAs.",
-        "Spec Q6: full-bleed shorts pager pages (later; phase 1 reuses today's viewer, spec 8).",
-        "Spec Q7: a lane with 1 to 2 ready reels appends one ghost tile.",
-        "Spec Q3: no Matches tab badge in phase 1.",
+        "Rail labels under the icons (Share, Save, Improve) have no copy id in the spec yet.",
+        "Nearby: a definition of near (radius, the Arena's location model), for epic jr_be-880.",
+        "Spec Q9: Home's practice offer stays for zero-match athletes (recommendation, no invite card swap).",
+    ], 12) + mono("Decided by the owner, round 2 (2026-10-06)", 10, INK3, 700, 1.68, True, "white-space: normal; margin-top: 6px") + bullets([
+        "Q3: no Matches tab badge in phase 1.",
+        "Q5: delete the Film Room redirect after two OTAs.",
+        "Q6: full-screen pages now, pager and single-reel mode (board 08). Q8: no auto-advance, the reel loops.",
+        "Q7: a carousel with 1 to 2 ready reels appends one ghost tile (board 15).",
+        "Home carousel title Highlights; one mixed carousel; future lanes become sources.",
+        "Matches zero secondary: C-Z7 Challenge a friend; C-Z5 when invites are off; empty while the flag is unknown.",
     ], 12) + mono("Decided in design review 2026-10-06 (owner may override)", 10, INK3, 700, 1.68, True, "white-space: normal; margin-top: 6px") + bullets([
-        "Loss haptic: none on a first match that was a loss (spec 10.6).",
-        "First match and first win in one match: only the First win banner (spec 10.6).",
-        "Swipe hint C-V1, once per install, 2+ pages (spec 8, AC 4.6).",
-        "Clips off: C-L6 replaces C-Z6 (spec 10.7).",
-        "Record strip: the shipped recordStrip format (spec 6.1).",
-        "Unseen ring: alias unseen-ring = ink stroke-edge (spec 5).",
-        "Meta-row chevron: decoration inside the meta target (spec 6.2).",
+        "Loss haptic: none on a first match that was a loss; first match and first win in one match: only the First win banner (spec 10.6).",
+        "Swipe hint C-V1, once per install, 2+ pages (spec 8, AC 4.6). Clips off: C-L6 replaces C-Z6 (spec 10.7).",
+        "Record strip: the shipped recordStrip format (spec 6.1). Meta-row chevron: decoration inside the meta target (spec 6.2).",
     ], 12))
-    status = (f'<div style="display: flex; flex-direction: row; gap: 12px; align-items: center">{badge("Proposed, for owner review", "amber")}'
-              f'{mono("Reviewed 2026-10-06 · Spec specs/matches-tab/spec.md · Epic jits-a4fw", 10, INK3, 500)}</div>')
+    status = (f'<div style="display: flex; flex-direction: row; gap: 12px; align-items: center">{badge("Proposed, for owner review · Round 2 reviewed 2026-10-06", "amber")}'
+              f'{mono("Owner decisions 2026-10-06 · Spec specs/matches-tab/spec.md · Epic jits-a4fw", 10, INK3, 500)}</div>')
     top = (f'<div style="padding: 40px 48px 0; display: flex; flex-direction: column; gap: 10px">{status}'
            f'{heading("Matches tab: map", 32, INK, tag="h1")}'
-           f'<p style="margin: 0; max-width: 1000px">{body("Boards for the owner-approved Matches tab and Home reel carousel (phase 1): a fifth tab for your own match history, a leaner Profile, a Home that opens on your reels, a swipeable viewer, and empty states that pull you into your next match.", 15, INK2)}</p></div>')
+           f'<p style="margin: 0; max-width: 1000px">{body("Boards for the owner-approved Matches tab and Home Highlights carousel (phase 1): a fifth tab for your own match history, a leaner Profile, a Home that opens on one Highlights carousel, a full-screen swipeable viewer, and empty states that pull you into your next match.", 15, INK2)}</p></div>')
     grid = (f'<div style="padding: 24px 48px 48px; display: flex; flex-direction: column; gap: 20px">'
             f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{map_card("What changed", changed)}{map_card("Design decisions", decisions)}</div>'
-            f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{map_card("Boards", links, 560)}{map_card("Lanes and their gates", future)}</div>'
+            f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{map_card("Boards", links, 560)}{map_card("Highlights carousel sources and their gates", future)}</div>'
             f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{map_card("Backend (jr_be, applied before the OTA)", asks)}{map_card("Open questions", openq)}'
-            f'{map_card("Retired by this page", bullets(["31 Film Room as a pushed screen (redirect to Matches for two OTAs).", "17 Profile: Recent Matches, Highlights row, Film Room preview.", "11 Home: NEW HIGHLIGHT card and its dismiss."], 12))}</div></div>')
+            f'{map_card("Retired by this page", bullets(["31 Film Room as a pushed screen (redirect to Matches for two OTAs, then deleted).", "17 Profile: Recent Matches, Highlights row, Film Room preview.", "11 Home: NEW HIGHLIGHT card and its dismiss.", "34 viewer layout inside the pager: replaced by full-screen pages.", "Home lane title Your reels and stacked future lanes."], 12))}</div></div>')
     return top + grid
 
 
@@ -1165,7 +1285,8 @@ ROW2 = ["P-MT-10-Zero-Matches.dc.html", "P-MT-11-Zero-Home.dc.html", "P-MT-12-Lo
         "P-MT-14-Reel-Tiles-In-Flight.dc.html", "P-MT-15-Milestones.dc.html", "P-MT-16-Clips-Off.dc.html"]
 
 
-def write_delta(written):
+def layout(written):
+    """Full layout of the page (boards and row-title notes), as published in round 1."""
     info = {f: (t, w, h) for f, t, w, h in written}
     boards, notes = {}, {}
     map_h = info["P-MT-00-Map.dc.html"][2]
@@ -1181,13 +1302,52 @@ def write_delta(written):
     for i, f in enumerate(ROW2):
         t, w, h = info[f]
         boards[f] = {"h": h, "is_interactive": True, "page": PAGE_ID, "title": t, "w": w, "x": 470 * i, "y": y2}
+    return boards, notes
+
+
+def overlaps(boards):
+    out = []
+    items = list(boards.items())
+    for i, (a, A) in enumerate(items):
+        for b, B in items[i + 1:]:
+            if A["x"] < B["x"] + B["w"] and B["x"] < A["x"] + A["w"] and A["y"] < B["y"] + B["h"] and B["y"] < A["y"] + A["h"]:
+                out.append((a, b))
+    return out
+
+
+def diff(new, live):
+    upd, add = {}, {}
+    for k, v in new.items():
+        if k not in live:
+            add[k] = v
+            continue
+        ch = {kk: vv for kk, vv in v.items() if live[k].get(kk) != vv}
+        if ch:
+            upd[k] = ch
+    return upd, add
+
+
+def write_delta(written):
+    boards, notes = layout(written)
+    assert not overlaps(boards), f"board overlap: {overlaps(boards)}"
+    assert all(b.get("page") == PAGE_ID for b in LIVE["boards"].values())
+    b_upd, b_add = diff(boards, LIVE["boards"])
+    n_upd, n_add = diff(notes, LIVE["notes"])
+    gone = sorted(set(LIVE["boards"]) - set(boards))
+    assert not gone, f"live boards missing from this draft: {gone}"
     delta_ = {
-        "pages_append": [{"id": PAGE_ID, "name": PAGE_NAME}],
-        "boards_add": boards,
-        "notes_add": notes,
-        "order_append": ["P-MT-00-Map.dc.html"] + ROW1 + ROW2,
+        "page_id": PAGE_ID,
+        "page_exists": True,
         "based_on_canvas_version": CANVAS_VERSION,
-        "note": "Additive only: no existing board, note, page or key changes. Re-read project/canvas.json right before publishing and merge these keys into the fresh copy.",
+        "boards_update": b_upd,
+        "boards_add": b_add,
+        "notes_update": n_upd,
+        "notes_add": n_add,
+        "order_append": [f for f in boards if f not in LIVE["order"]],
+        "note": ("Round 2 UPDATE of the existing page matches-tab. boards_update / notes_update list only the keys that change on existing "
+                 "P-MT boards and mt-row notes (merge them into those entries, keep every other key). Nothing outside page matches-tab changes: "
+                 "no other board, note, page, order entry or top-level key. Re-read project/canvas.json right before publishing; if the page's "
+                 "entries differ from src/canvas-matches-tab-live.json, rebase first."),
     }
     json.dump(delta_, open(os.path.join(HERE, "canvas-delta.json"), "w"), indent=1, ensure_ascii=False)
 

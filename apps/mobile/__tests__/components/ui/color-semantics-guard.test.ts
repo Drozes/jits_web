@@ -94,9 +94,10 @@ const RED_ALLOWED: Allow = {
   "components/athlete/head-to-head-card.tsx": { lines: 1, reason: "the head-to-head losses count (a negative)" },
   "components/auth/auth-form-field.tsx": { lines: 2, reason: "the error edge and error text (focus is ink-2 since WP2)" },
   "components/error-boundary.tsx": { lines: 1, reason: "the error message (a negative)" },
+  "components/highlight-viewer/reel-rail-button.tsx": { lines: 1, reason: "the reel viewer rail Share CTA fill (the page's one Signal Red CTA, own reels only)" },
   "components/film-room/film-room-states.tsx": { lines: 1, reason: "the state panel's text action" },
   "components/film-room/opening-still.tsx": { lines: 1, reason: "the red VS (brand chrome, Open decision 12)" },
-  "components/film-room/poster-card.tsx": { lines: 4, reason: "the L outcome (a loss)" },
+  "components/matches/match-feed-meta.tsx": { lines: 1, reason: "the Matches feed card's L letter and negative delta (a loss; spec 6.2)" },
   "components/film-room/status-badge.tsx": { lines: 1, reason: "the failed status (a negative)" },
   "components/invite/claim-dob-step.tsx": { lines: 1, reason: "the date-of-birth error (a negative)" },
   "components/layout/arena-tab-icon.tsx": { lines: 2, reason: "the live ember, blade clash spark and the registered Swords icon" },
@@ -161,7 +162,8 @@ const GREEN_ALLOWED: Allow = {
   "components/arena/mat-board.tsx": { lines: 3, reason: "the live Mat Board rows and the live toggle state" },
   "components/arena/on-air-strip.tsx": { lines: 4, reason: "the ON AIR strip (Adding Flare)" },
   "components/athlete/head-to-head-card.tsx": { lines: 1, reason: "the head-to-head wins count" },
-  "components/film-room/poster-card.tsx": { lines: 4, reason: "the W outcome" },
+  "components/matches/match-feed-meta.tsx": { lines: 1, reason: "the Matches feed card's W letter and positive delta (a win, a gain; spec 6.2)" },
+  "components/milestones/milestone-banner.tsx": { lines: 1, reason: "the First win banner's left rule (a win; board P-MT-15, spec 10.6); first match and first highlight use ink" },
   "components/layout/elo-tab-bar.tsx": { lines: 1, reason: "the live dot on the Arena tab" },
   "components/layout/header-live-dot.tsx": { lines: 1, reason: "the header live dot" },
   "components/layout/header-status-chip.tsx": { lines: 3, reason: "the live header status chip" },
@@ -267,6 +269,22 @@ describe("color semantics (WP2)", () => {
       for (const forbidden of [t.accentCta, t.accentCtaText, t.statePositive]) {
         expect([c.trackColor?.true, c.trackColor?.false, c.thumbColor]).not.toContain(forbidden);
       }
+    }
+  });
+
+  it("reel tiles draw no Signal Red and no gain or loss colour; the unseen ring is the unseen-ring token (AC 3.5)", () => {
+    const reels = FILES.filter((f) => f.file.startsWith("components/reels/"));
+    expect(reels.length).toBeGreaterThan(0);
+    const offenders = reels.filter((f) => RED.test(f.text) || GREEN.test(f.text)).map((f) => f.file);
+    expect(offenders).toEqual([]);
+    // Neither the amber attention ink nor a heat colour stands in for the ring.
+    const frame = reels.find((f) => f.file === "components/reels/reel-tile-frame.tsx");
+    expect(frame?.text).toMatch(/ring \? "border-unseen-ring"/);
+    expect(reels.some((f) => /\bunseenRing\b|border-unseen-ring/.test(f.text) && f.file !== "components/reels/reel-tile-frame.tsx")).toBe(false);
+    for (const t of [darkTokens, lightTokens]) {
+      expect(t.unseenRing).toBe(t.textPrimary);
+      expect(t.unseenRing).not.toBe(t.accentCta);
+      expect(t.unseenRing).not.toBe(t.accentCtaText);
     }
   });
 

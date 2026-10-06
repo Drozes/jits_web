@@ -26,6 +26,8 @@ interface OpeningStillProps {
   /** Dim the poster (opacity only) while an upload is in progress. */
   dim?: boolean;
   testID?: string;
+  /** Extra content under the fallback caption (the Matches card's recording helper). */
+  footer?: React.ReactNode;
 }
 
 /**
@@ -42,6 +44,7 @@ export function OpeningStill({
   tileSize,
   dim = false,
   testID = "opening-still",
+  footer = null,
 }: OpeningStillProps) {
   const p = usePalette();
   if (posterUrl) {
@@ -76,6 +79,7 @@ export function OpeningStill({
       >
         {fallbackLabel}
       </Text>
+      {footer}
     </View>
   );
 }

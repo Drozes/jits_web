@@ -39,6 +39,7 @@ export function buildVars(t: typeof lightTokens) {
     "--attention-rule": t.attentionRule,
     "--heat-orange": t.heatOrange,
     "--heat-red": t.heatRed,
+    "--unseen-ring": t.unseenRing,
   });
 }
 

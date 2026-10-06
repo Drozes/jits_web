@@ -4,7 +4,9 @@ import {
   acceptJoinInvite,
   claimChallengeInvite,
   createInvite,
+  INVITE_ENTRY_POINTS,
   listMyOpenChallengeInvites,
+  parseInviteEntryPoint,
   parseClaimResult,
   readInvitesEnabled,
   setMyDateOfBirth,
@@ -72,6 +74,25 @@ describe("claimChallengeInvite", () => {
     const { supabase } = client({ data: null, error: { message: "bad", hint: "invalid_arguments" } });
     const res = await claimChallengeInvite(supabase as never, { gateway: "paste" }, null);
     expect(res).toEqual({ ok: false, error: { hint: "invalid_arguments", message: "bad" } });
+  });
+});
+
+describe("parseInviteEntryPoint (B5: matches)", () => {
+  it("maps every known entry point, including matches", () => {
+    expect(INVITE_ENTRY_POINTS).toEqual(["arena", "profile", "verdict", "home", "friends", "matches"]);
+    for (const e of INVITE_ENTRY_POINTS) expect(parseInviteEntryPoint(e)).toBe(e);
+  });
+  it("reads a missing, unknown or non-string value as no entry point", () => {
+    expect(parseInviteEntryPoint(undefined)).toBeNull();
+    expect(parseInviteEntryPoint("")).toBeNull();
+    expect(parseInviteEntryPoint("film-room")).toBeNull();
+    expect(parseInviteEntryPoint("Matches")).toBeNull();
+    expect(parseInviteEntryPoint(["matches"])).toBeNull();
+  });
+  it("createInvite sends matches as p_entry_point", async () => {
+    const { supabase, rpc } = client({ data: null, error: null });
+    await createInvite(supabase as never, "matches");
+    expect(rpc).toHaveBeenCalledWith("create_invite", { p_entry_point: "matches" });
   });
 });
 

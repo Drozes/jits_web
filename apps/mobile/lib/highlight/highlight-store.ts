@@ -2,6 +2,7 @@ import * as React from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { supabase } from "@/lib/supabase/client";
 import type { Result } from "@jits/shared/api/errors";
+import { runHighlightStoreResets } from "./reset-registry";
 import {
   getMyHighlights,
   type GetMyHighlightsOptions,
@@ -33,8 +34,15 @@ type Read = Promise<Result<MyHighlights>>;
 const inFlight = new Map<string, Read>();
 const lastRead = new Map<string, { at: number; result: Result<MyHighlights> }>();
 
-export function readMyHighlights(opts: GetMyHighlightsOptions, { force = false }: { force?: boolean } = {}): Read {
-  const key = JSON.stringify([opts.limit ?? null, opts.before ?? null, opts.unseenOnly ?? null]);
+/**
+ * `owner` (the signed-in athlete id, when the caller knows it) is part of the
+ * dedupe key, so a read started for one account is never handed to another.
+ */
+export function readMyHighlights(
+  opts: GetMyHighlightsOptions,
+  { force = false, owner = null }: { force?: boolean; owner?: string | null } = {},
+): Read {
+  const key = JSON.stringify([owner, opts.limit ?? null, opts.before ?? null, opts.beforeId ?? null, opts.unseenOnly ?? null]);
   if (!force) {
     const running = inFlight.get(key);
     if (running) return running;
@@ -120,10 +128,18 @@ export function useForegroundEffect(onForeground: () => void): void {
   }, []);
 }
 
-/** Sign-out, and tests: forget cached reads (they belong to the old account). */
+/**
+ * The ONE reset list (`reset-registry.ts`, dependency-free so pure stores can
+ * register without this module's Supabase import): the reel lanes
+ * (`use-reel-lane.ts`), the viewer's signed URLs and lane sessions.
+ */
+export { onHighlightStoreReset } from "./reset-registry";
+
+/** Sign-out, and tests: forget cached reads and every registered cache (they belong to the old account). */
 export function resetHighlightStore(): void {
   inFlight.clear();
   lastRead.clear();
+  runHighlightStoreResets();
 }
 
 /** Test-only: suites that test refresh WIRING (not the dedupe) turn the throttle off. */

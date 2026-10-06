@@ -8,6 +8,7 @@ import { ON_MEDIA, TABULAR, usePalette } from "@/lib/theme/palette";
 import { OpeningStill, type StillAthlete } from "@/components/film-room/opening-still";
 import { FilmScrim } from "@/components/film-room/film-scrim";
 import { FilmBackButton } from "@/components/film-room/film-back-button";
+import { MATCHES_TAB_HREF } from "@/lib/film-room/href";
 
 export const HERO_HEIGHT = 300;
 
@@ -42,7 +43,7 @@ export function MatchHero({ posterUrl, posterKey, me, opponent, fallbackLabel, c
       <FilmScrim color={p.bg} stops={[[0, 0], [1, 0.95]]} style={{ left: 0, right: 0, bottom: 0, height: 110 }} />
 
       <View style={{ position: "absolute", left: 4, top: insets.top + 6 }}>
-        <FilmBackButton label="Go back" fallback="/(app)/film-room" color={ON_MEDIA.white} testID="match-back" />
+        <FilmBackButton label="Go back" fallback={MATCHES_TAB_HREF} color={ON_MEDIA.white} testID="match-back" />
       </View>
 
       {onPlay ? (

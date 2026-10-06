@@ -11,8 +11,11 @@
  *   - `match-video-watch-<videoId>`: each Watch button, label
  *     "Watch your recording" / "Watch <Name>'s recording";
  *   - history rows labelled "Open match vs <name>" (Pressables), and the
- *     Profile Film Room preview posters `past-video-row-<matchId>` ("Open
- *     match video vs <name>"; they replaced the Past Match Videos rows).
+ *     Matches tab's posters `film-card-<matchId>` (the tab replaced the
+ *     Film Room and Profile's Recent Matches and Film Room preview, spec
+ *     specs/matches-tab/spec.md); its header title
+ *     `tab-header-title-matches` proves the tab root is showing (the result
+ *     chips are hidden on a zero-match account).
  * Selectors take the testID OR the label, never a container testID.
  */
 import type { AXElement, Idb, Query } from "./idb";
@@ -24,10 +27,14 @@ export const DETAIL_MARKER_ID = "match-detail-screen";
 export const PLAYER_STATE_ID = "video-player-state";
 const DETAIL_LABEL_RE = /^Match detail vs (.+)$/i;
 const PLAYER_LABEL_RE = /^Video state: (\w+)$/i;
-const TAB_LABELS = ["Home", "Arena", "Rankings", "Profile"];
+const TAB_LABELS = ["Home", "Arena", "Matches", "Rankings", "Profile"];
+type ProvenTab = "Home" | "Matches" | "Profile";
 /** An element only that tab's root renders. */
-const TAB_PROOF: Record<"Home" | "Profile", Query> = {
+const TAB_PROOF: Record<ProvenTab, Query> = {
   Home: { label: "Me", type: "Button" },
+  // The TabHeader title: present in every Matches state (zero, low data,
+  // loading, error), unlike the result chips, which a zero-match account hides.
+  Matches: { id: "tab-header-title-matches" },
   Profile: { label: /^(share profile|view detailed stats)$/i, type: "Button" },
 };
 
@@ -197,7 +204,7 @@ export class MatchDetailPages {
    * (once per 30 s, jits-5tj9.8), so a match finished seconds ago only shows
    * up in a tab's lists after an explicit refresh.
    */
-  async refreshTab(tab: "Home" | "Profile"): Promise<void> {
+  async refreshTab(tab: ProvenTab): Promise<void> {
     await this.openTab(tab);
     await this.scrollToTop();
     await this.idb.pullToRefresh();
@@ -208,7 +215,7 @@ export class MatchDetailPages {
    * Tap the tab by its exact label, then prove the tab root is showing via an
    * element only that tab renders (retry the tap once).
    */
-  async openTab(tab: "Home" | "Profile"): Promise<void> {
+  async openTab(tab: ProvenTab): Promise<void> {
     const proof: Query = TAB_PROOF[tab];
     for (let attempt = 0; attempt < 2; attempt++) {
       await this.backToTabRoot();
@@ -239,12 +246,6 @@ export class MatchDetailPages {
     await this.tapFirstRow(opponent);
   }
 
-  /** Profile (refreshed) -> Recent Matches -> newest row. */
-  async openFromProfile(opponent: string): Promise<void> {
-    await this.refreshTab("Profile");
-    await this.tapFirstRow(opponent);
-  }
-
   /** Profile -> "View Detailed Stats" -> full history -> newest row. */
   async openFromStats(opponent: string): Promise<void> {
     await this.openTab("Profile");
@@ -269,10 +270,10 @@ export class MatchDetailPages {
     await this.tapFirstRow(opponent, 20_000);
   }
 
-  /** Profile -> pull-to-refresh -> Past Match Videos row for `matchId`. */
-  async openFromPastVideos(matchId: string): Promise<void> {
-    await this.refreshTab("Profile");
-    await this.idb.tap(await this.scrollToAny({ id: `past-video-row-${matchId}` }));
+  /** Matches tab -> pull-to-refresh -> the poster for `matchId`. */
+  async openFromMatches(matchId: string): Promise<void> {
+    await this.refreshTab("Matches");
+    await this.idb.tap(await this.scrollToAny({ id: `film-card-${matchId}` }));
   }
 
   // --- player ------------------------------------------------------------------

@@ -15,9 +15,11 @@ jest.mock("expo-haptics", () => ({
 }));
 
 import { haptics } from "@/lib/motion";
+import { __resetHapticGuardForTests, SUCCESS_DEDUPE_MS } from "@/lib/motion/haptics";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 
 beforeEach(() => {
+  __resetHapticGuardForTests();
   mockImpact.mockClear();
   mockNotify.mockClear();
   mockSelect.mockClear();
@@ -47,6 +49,8 @@ describe("haptics vocabulary", () => {
     ["countdownTick", { impact: ["heavy"], notify: [], select: 0 }],
     ["countdownGo", { impact: [], notify: ["success"], select: 0 }],
     ["tapTick", { impact: ["light"], notify: [], select: 0 }],
+    ["reelRevealed", { impact: [], notify: ["success"], select: 0 }],
+    ["milestone", { impact: [], notify: ["success"], select: 0 }],
     ["timeWarning", { impact: ["medium"], notify: [], select: 0 }],
   ] as const)("%s fires exactly one mapped haptic", (event, expected) => {
     expect(callsFor(() => haptics[event]())).toEqual(expected);
@@ -71,6 +75,21 @@ describe("haptics vocabulary", () => {
     await expect(haptics.accept()).resolves.toBeUndefined();
     mockNotify.mockImplementationOnce(() => undefined as unknown as Promise<void>);
     await expect(haptics.ratingGain()).resolves.toBeUndefined();
+  });
+
+  it("a reel reveal and the first-highlight milestone at once buzz once (shared 500 ms guard)", () => {
+    const now = jest.spyOn(Date, "now");
+    now.mockReturnValue(10_000);
+    void haptics.reelRevealed();
+    void haptics.milestone();
+    expect(mockNotify).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(10_000 + SUCCESS_DEDUPE_MS);
+    void haptics.milestone();
+    expect(mockNotify).toHaveBeenCalledTimes(2);
+    // Other success events are not guarded.
+    void haptics.ratingGain();
+    expect(mockNotify).toHaveBeenCalledTimes(3);
+    now.mockRestore();
   });
 
   it("keeps matchHaptics as the same vocabulary under its old name", () => {

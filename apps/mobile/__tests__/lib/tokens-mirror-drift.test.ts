@@ -192,6 +192,8 @@ const MOBILE_ONLY_TOKENS: ReadonlyArray<keyof ColorTokens> = [
   "attentionRule",
   "heatOrange",
   "heatRed",
+  // Semantic alias of ink (specs/matches-tab, the unseen reel ring).
+  "unseenRing",
 ];
 
 const MAPPED_CSS_NAMES: readonly string[] = TOKEN_MAP.map(([, cssName]) => cssName);
@@ -1221,6 +1223,8 @@ const KIT_THEMED_MAP: ReadonlyArray<readonly [string, keyof ColorTokens]> = [
   ["attention-rule", "attentionRule"],
   ["heat-orange", "heatOrange"],
   ["heat-red", "heatRed"],
+  // Semantic alias of ink (specs/matches-tab).
+  ["unseen-ring", "unseenRing"],
 ];
 
 const ON_MEDIA_PREFIX = "on-media-";

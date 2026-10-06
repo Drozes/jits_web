@@ -31,23 +31,55 @@ export function resetInvitesEnabledCache(): void {
 }
 
 /**
- * `invites_enabled` (contract 1). Fail-closed: false until a read succeeds.
- * A failed read is retried on the next mount and on every return to the
- * foreground; every entry point is hidden while false.
+ * The cached flag, or null until a read has succeeded. Subscribes for the
+ * screen's lifetime; a failed read is retried on the next mount and on every
+ * return to the foreground.
  */
-export function useInvitesEnabled(): boolean {
-  const [enabled, setEnabled] = React.useState<boolean>(cached ?? false);
+function useInvitesFlagValue(): boolean | null {
+  const [value, setValue] = React.useState<boolean | null>(cached);
   React.useEffect(() => {
-    listeners.add(setEnabled);
-    if (cached !== null) setEnabled(cached);
+    const listener = (on: boolean) => setValue(on);
+    listeners.add(listener);
+    if (cached !== null) setValue(cached);
     else void load();
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "active" && cached === null) void load();
     });
     return () => {
-      listeners.delete(setEnabled);
+      listeners.delete(listener);
       sub.remove();
     };
   }, []);
-  return enabled;
+  return value;
+}
+
+/**
+ * `invites_enabled` (contract 1). Fail-closed: false until a read succeeds.
+ * A failed read is retried on the next mount and on every return to the
+ * foreground; every entry point is hidden while false.
+ */
+export function useInvitesEnabled(): boolean {
+  return useInvitesFlagValue() ?? false;
+}
+
+export interface InvitesFlagState {
+  /** Same value as `useInvitesEnabled()`: false while unknown (fail-closed). */
+  enabled: boolean;
+  /** False until a read has succeeded: the flag is unknown, not off. */
+  known: boolean;
+  /** The two fields as one tri-state. */
+  state: "on" | "off" | "unknown";
+}
+
+/**
+ * `invites_enabled` with "not read yet" kept apart from "off", over the same
+ * cache as `useInvitesEnabled` (specs/matches-tab 10.2). A surface whose
+ * fallback differs by flag (the Matches zero state: Challenge a friend when
+ * on, the practice link when off) renders neither while `known` is false, so
+ * it never flashes the wrong one.
+ */
+export function useInvitesFlagState(): InvitesFlagState {
+  const value = useInvitesFlagValue();
+  if (value === null) return { enabled: false, known: false, state: "unknown" };
+  return { enabled: value, known: true, state: value ? "on" : "off" };
 }

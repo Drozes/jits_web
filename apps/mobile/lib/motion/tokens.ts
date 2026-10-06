@@ -53,6 +53,24 @@ export const moment = {
   tapNudge: 50,
   /** Angle dip (match player): an approximate angle switch lands; black in, then out, this long each way. */
   angleDip: 80,
+  /**
+   * Reel ring pulse (specs/matches-tab 7.2, 10.5): the first unseen reel tile
+   * of a session, or a building tile landing as ready, scales 1.0 to 1.04 and
+   * back over this long, once. Skipped under Reduce Motion.
+   */
+  reelRingPulse: 600,
+  /**
+   * Milestone burst (specs/matches-tab 10.6): one piece falls and turns over
+   * this long. Pieces start up to `milestoneBurstStagger` apart, so the whole
+   * burst ends within 1.2 s.
+   */
+  milestoneBurstFall: 900,
+  /** Milestone burst: the latest a piece starts after the first. */
+  milestoneBurstStagger: 180,
+  /** Milestone burst: a piece starts fading this long after it starts to fall... */
+  milestoneBurstFadeDelay: 600,
+  /** ...and fades out over this long (ends with its fall). */
+  milestoneBurstFade: 300,
 } as const;
 
 export type MomentToken = keyof typeof moment;

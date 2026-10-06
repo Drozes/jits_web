@@ -7,6 +7,7 @@ import {
   type HighlightProgress,
 } from "@jits/shared/api/highlights";
 import type { DomainError } from "@jits/shared/api/errors";
+import { signPlaybackCached } from "./reel-prefetch";
 
 /** Signed URLs live 1 h; one older than this is renewed on demand. */
 export const HIGHLIGHT_RESIGN_AFTER_MS = 50 * 60_000;
@@ -52,7 +53,16 @@ export interface UseMyHighlightResult {
  * background) also clears a failure. Sign results are dropped when the key
  * moved on or the card unmounted (`cancelled`).
  */
-export function useMyHighlight(matchVideoId: string | null, reloadToken = 0): UseMyHighlightResult {
+export function useMyHighlight(
+  matchVideoId: string | null,
+  reloadToken = 0,
+  /**
+   * The swipe viewer (jits-a4fw.5): the first sign of a render reuses the
+   * pager's prefetched signature (`reel-prefetch.ts`), so the pooled player
+   * keeps the item it already buffered. Re-signs always sign fresh.
+   */
+  { preferCached = false }: { preferCached?: boolean } = {},
+): UseMyHighlightResult {
   const { data, error: progressError, refresh } = useHighlightProgress(supabase, matchVideoId);
   const playback = data?.playback ?? null;
   const key = playback ? `${playback.version}:${playback.storagePath}` : null;
@@ -76,19 +86,24 @@ export function useMyHighlight(matchVideoId: string | null, reloadToken = 0): Us
     }
     let cancelled = false;
     (async () => {
-      const result = await signHighlightPlayback(supabase, current);
+      const result = preferCached
+        ? await signPlaybackCached(current, { force: signTick > 0 })
+        : await signHighlightPlayback(supabase, current);
       if (cancelled) return;
       if (!result.ok) {
         setPlaybackFailed(true);
         return;
       }
-      signedAtRef.current = Date.now();
+      const cachedAt = "signedAt" in result ? result.signedAt : undefined;
+      signedAtRef.current = typeof cachedAt === "number" ? cachedAt : Date.now();
       setSource({ ...result.data, posterPath: current.posterPath, generation: signTick });
       setPlaybackFailed(false);
     })();
     return () => {
       cancelled = true;
     };
+    // preferCached is fixed for a mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, signTick]);
 
   // A new version starts with a clean error budget.

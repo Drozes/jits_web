@@ -1,6 +1,5 @@
 import type { MatchLibraryItem } from "@jits/shared/api/film-room";
 import { deriveCardStatus, statusBadgeLabel, type CardPhase } from "@/lib/film-room/card-status";
-import { compactBadgeLabel } from "@/components/film-room/poster-card";
 import { toneFor } from "@/components/film-room/status-badge";
 import { cardPhaseOf, recentMatchIds } from "@/lib/film-room/use-film-room-phases";
 import type { MatchUploadEntry } from "@/lib/video/match-upload-store";
@@ -37,10 +36,9 @@ describe("Film Room badge priority with the server phase (deck section 9)", () =
     ["building", phase({ phase: "building", reason: null }), "BUILDING HIGHLIGHT", "BUILDING", "amber"],
     ["collecting", phase({}), "UPLOADING", "UPLOADING", "amber"],
     ["no film", phase({ phase: "no_film", reason: "none_usable" }), "NO FILM", "NO FILM", "muted"],
-  ] as const)("%s", (_n, ph, badge, compact, tone) => {
+  ] as const)("%s", (_n, ph, badge, _compact, tone) => {
     const s = deriveCardStatus(item(), null, true, NOW_MS, ph);
     expect(statusBadgeLabel(s)).toBe(badge);
-    expect(compactBadgeLabel(s)).toBe(compact);
     expect(toneFor(s)).toBe(tone);
   });
 

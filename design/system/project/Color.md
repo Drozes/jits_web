@@ -32,7 +32,7 @@ Every value below is exact from `apps/mobile/lib/tokens.ts` (the source of truth
 | `hairline-faint` | `rgba(107, 114, 128, 0.20)` | `rgba(13, 15, 20, 0.11)` | `border-hairline-faint` | `borderHairlineFaint` (`darkTokens` / `lightTokens`) | Faintest divider |
 | `hairline-strong` | `rgba(107, 114, 128, 0.62)` | `rgba(13, 15, 20, 0.34)` | `border-hairline-strong` | `borderHairlineStrong` (`darkTokens` / `lightTokens`) | Chips, actions, avatars, selected edge |
 
-The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange` and `--heat-red`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js` `theme.extend.textColor.cta`).
+The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange`, `--heat-red` and the alias `--unseen-ring`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js` `theme.extend.textColor.cta`).
 
 ## Sub-palettes
 
@@ -53,6 +53,14 @@ Amber marks the draw headline (the verdict DRAW and the draw delta; a D letter i
 | `heat-red` | `#EC6A74` | `lib/tokens.ts` key `heatRed`; Tailwind `bg-heat-red` (`arena-tab-icon.tsx` `HEAT_EMBER_RED` reads it) |
 
 Heat colors draw Arena heat and nothing else: the live embers (two `heat-orange`, one `signal-red`), the countable embers (`heat-red`), the blade clash spark (`signal-red`) and the challenge afterglow edge. Both are fixed across themes and both fall below 3:1 on every light surface (see Accessibility).
+
+### Semantic aliases
+
+| Token | Dark | Light | Source |
+|---|---|---|---|
+| `unseen-ring` | `#E8EDF2` | `#0D0F14` | `lib/tokens.ts` key `unseenRing` (alias of `ink`, same value); Tailwind `border-unseen-ring` |
+
+A semantic alias carries the same value as its base token and exists so a guard can assert what a mark means. `unseen-ring` is the 2px ring on an unwatched reel tile, separated from the poster by a 2px surface gap (design review ruling 2026-10-06, specs/matches-tab). It is never Signal Red: Home keeps its one red CTA.
 
 ### On-media (fixed, over camera, video and photos)
 

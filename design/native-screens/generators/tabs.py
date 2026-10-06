@@ -316,7 +316,9 @@ def resume_card():
 
 
 def new_highlight_card():
-    # dashboard/new-highlight-card.tsx + lib/highlight/discovery.ts DISCOVERY_COPY. Plate flex-row gap-3 (10.5);
+    # STALE: draws the retired Home "Your new highlight" card (deleted in jits-a4fw.6; Home now shows the
+    # Highlights carousel, components/reels/). Kept until the next /canvas-sync redraws the Home boards.
+    # Was: Plate flex-row gap-3 (10.5);
     # poster 54x96 rounded-xs bg-surface-4; right gap-2 (7); dismiss w-6 h-6 (21) X 14 ink-3; Watch py-2 px-4 (7 / 14)
     poster = (f'<a href="34-Highlight-Viewer.dc.html" aria-label="Watch your highlight vs Dana Okafor" style="width: 54px; '
               f'height: 96px; flex-shrink: 0; border-radius: 2px; overflow: hidden; background: {S4}; display: flex; '
@@ -707,7 +709,8 @@ def highlight_tile(opp, secs):
 
 
 def film_poster(opp_short, opp_full, letter, line, date, line_color):
-    # film-room/poster-card.tsx compact (120 wide, 3:4), poster present: still + bottom scrim (0 -> .88 over 58%),
+    # Draws the retired Film Room poster card (was film-room/poster-card.tsx, deleted in jits-a4fw.8; the Matches
+    # feed card replaced it and this board is redrawn by /canvas-sync), compact (120 wide, 3:4), poster present: still + bottom scrim (0 -> .88 over 58%),
     # READY outline badge top/right 8, W tag (h20 rounded 2, border green, tag fill .45 black), name heading 13 caps,
     # data line mono-bold 11 in outcome colour, date mono-medium 10 text2 (all inline: literal)
     return (f'<a href="32-Match-Detail.dc.html" aria-label="Open match video vs {opp_full}" style="position: relative; flex-shrink: 0; width: 120px; '

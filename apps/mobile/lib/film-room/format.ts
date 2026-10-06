@@ -53,21 +53,6 @@ export function deltaLabel(delta: number | null | undefined): string | null {
   return "± 0";
 }
 
-/**
- * The card's data line: rating change then how long it went, e.g.
- * "▲ +14 · 06:17". Every match is ranked; a legacy row with no recorded delta
- * shows only the time. The time is the finish time of a submission, else the
- * configured clock.
- */
-export function cardLine(item: MatchLibraryItem): string {
-  const parts: string[] = [];
-  const delta = deltaLabel(item.elo_delta);
-  if (delta) parts.push(delta);
-  const t = item.finish_time_seconds ?? item.duration_seconds;
-  if (t != null && t > 0) parts.push(formatClock(t));
-  return parts.join(" · ");
-}
-
 /** "SEP 27" */
 export function shortDate(iso: string | null | undefined): string {
   const d = parse(iso);
@@ -109,4 +94,20 @@ export function recordStrip(
   ];
   if (rating != null) parts.push(String(rating));
   return parts.join(" · ");
+}
+
+/**
+ * A video's length for the card's duration chip (specs/matches-tab 6.2):
+ * `m:ss` with unpadded minutes ("4:12", "0:31"), `h:mm:ss` past an hour
+ * ("1:02:05"). Rounded to the nearest second. Not `formatClock`, which
+ * zero-pads minutes ("04:12") for the match clock. Null for a missing,
+ * negative or non-finite length (the chip is then not drawn).
+ */
+export function formatDuration(seconds: number | null | undefined): string | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null;
+  const total = Math.round(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = String(total % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
