@@ -13,8 +13,8 @@ import { useSeenMatches } from "@/lib/film-room/seen-store";
 import { applyFilter, buildRows, NO_FILTER, opponentsOf, recordOf, type LibraryFilter, type LibraryRow } from "@/lib/film-room/rows";
 import { recordStrip } from "@/lib/film-room/format";
 import { usePalette } from "@/lib/theme/palette";
+import { useMatchesRefresh } from "@/lib/matches/use-matches-refresh";
 import { TabHeader } from "@/components/layout/tab-header";
-import { toast } from "@/components/ui/toast";
 import { OpponentPicker } from "@/components/film-room/opponent-picker";
 import { FilmRoomEmpty, FilmRoomError, ListFooter, MonthHeader } from "@/components/film-room/film-room-states";
 import { MatchesListHeader } from "@/components/matches/matches-list-header";
@@ -55,10 +55,10 @@ export default function MatchesScreen() {
   useRefetchOnUploadSettled(ids, library.revalidate);
   useRefetchOnRefocus(library.revalidate, useMatchExitCount());
 
-  // Error with cached content: the content stays, a toast says so (C-E2).
-  React.useEffect(() => {
-    if (library.refreshError) toast.error("Couldn't refresh your matches");
-  }, [library.refreshError]);
+  // Pull to refresh re-reads the library (the phases follow its items); the
+  // reel lane joins here when the carousel lands (spec 6.1, AC 2.3). The
+  // spinner and the C-E2 toast follow the athlete's own pull only.
+  const { refreshing, onRefresh } = useMatchesRefresh(library.refresh, library.isValidating, library.refreshError);
 
   const opponents = React.useMemo(() => opponentsOf(library.items), [library.items]);
   const visible = React.useMemo(() => applyFilter(library.items, filter), [library.items, filter]);
@@ -78,25 +78,23 @@ export default function MatchesScreen() {
       if (row.type === "month") return <MonthHeader label={row.label} count={row.last && hasMore ? null : row.count} />;
       return (
         <View className="flex-row" style={{ gap: 16, marginBottom: 16 }}>
-          {row.items.map((m) =>
-            LAYOUT.renderMatch(m, {
-              viewer,
-              viewerId,
-              seen: !seen.ready || seen.isSeen(m.match_id),
-              phase: phases[m.match_id] ?? null,
-              onOpen: open,
-            }),
-          )}
+          {row.items.map((m) => (
+            <React.Fragment key={m.match_id}>
+              {LAYOUT.renderMatch(m, {
+                viewer,
+                viewerId,
+                seen: !seen.ready || seen.isSeen(m.match_id),
+                phase: phases[m.match_id] ?? null,
+                onOpen: open,
+              })}
+            </React.Fragment>
+          ))}
           {LAYOUT.perRow === 2 && row.items.length === 1 ? <View className="flex-1" /> : null}
         </View>
       );
     },
     [viewer, viewerId, seen, open, hasMore, phases],
   );
-
-  // Pull to refresh re-reads the library (the phases follow its items); the
-  // reel lane joins here when the carousel lands (spec 6.1, AC 2.3).
-  const refreshAll = library.refresh;
 
   const header = (
     <MatchesListHeader
@@ -137,7 +135,7 @@ export default function MatchesScreen() {
         onEndReachedThreshold={0.6}
         contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16 }}
         refreshControl={
-          <RefreshControl refreshing={library.isValidating && !library.isLoading} onRefresh={refreshAll} tintColor={p.text3} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={p.text3} />
         }
       />
       <OpponentPicker

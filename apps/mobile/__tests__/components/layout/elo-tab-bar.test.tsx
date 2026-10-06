@@ -186,8 +186,22 @@ describe("EloTabBar at five tabs (spec specs/matches-tab/spec.md 4.1, AC 1.3)", 
   it("draws every label with the measured style (font-heading, text-micro, caps, tracking-caps-l)", () => {
     const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
     for (const title of CURRENT_LABELS) {
-      expect(u.getByText(title).props.className).toMatch(/\bfont-heading text-micro uppercase tracking-caps-l\b/);
+      const classes = String(u.getByText(title).props.className).split(/\s+/);
+      for (const token of ["font-heading", "text-micro", "uppercase", "tracking-caps-l"]) {
+        expect(classes).toContain(token);
+      }
     }
+  });
+
+  it("caps every label at 1.15x Dynamic Type, and the widest still fits at that size", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    for (const title of CURRENT_LABELS) {
+      expect(u.getByText(title).props.maxFontSizeMultiplier).toBe(1.15);
+    }
+    // Font size and tracking both scale with the multiplier.
+    const column = 375 / CURRENT_TABS.length;
+    const overflow = CURRENT_LABELS.filter((title) => labelWidth(title) * 1.15 > column);
+    expect(overflow).toEqual([]);
   });
 
   it.each([375, 390])("fits every label on one line in a %i pt wide bar, with 4 pt to spare each side", (screenWidth) => {

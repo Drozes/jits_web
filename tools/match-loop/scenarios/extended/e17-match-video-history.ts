@@ -133,21 +133,18 @@ async function runHistory(ctx: ScenarioCtx, matchId: string, seeds: SeededVideo[
   await entry("ui:detail-from-home", "detail from Home (Me scope)", () => pages.openFromHome(redName));
   await pages.backToTabRoot();
 
-  // 2. Profile Recent Matches.
-  await entry("ui:detail-from-profile", "detail from Profile recent matches", () => pages.openFromProfile(redName));
-  await pages.backToTabRoot();
-
-  // 3. Profile > View Detailed Stats > full history.
+  // 2. Profile > View Detailed Stats > full history.
   await entry("ui:detail-from-stats", "detail from Stats history", () => pages.openFromStats(redName));
   await pages.backToTabRoot();
 
-  // 4. Athlete head-to-head, reached on its own (Stats -> detail -> opponent row -> athlete page).
+  // 3. Athlete head-to-head, reached on its own (Stats -> detail -> opponent row -> athlete page).
   await entry("ui:detail-from-athlete", "detail from Demo Red's head-to-head", () => pages.openFromAthlete(redName));
   await pages.backToTabRoot();
 
-  // 5. Profile > Past Match Videos (pull-to-refresh first), then the player.
-  const fromVideos = await entry("ui:detail-from-past-videos", "detail from Past Match Videos", () =>
-    pages.openFromPastVideos(matchId),
+  // 4. The Matches tab (pull-to-refresh first), then the player. Profile's
+  // Recent Matches and Film Room preview moved here (spec matches-tab 9).
+  const fromVideos = await entry("ui:detail-from-matches", "detail from the Matches tab", () =>
+    pages.openFromMatches(matchId),
   );
 
   if (fromVideos) {
@@ -167,8 +164,8 @@ async function runHistory(ctx: ScenarioCtx, matchId: string, seeds: SeededVideo[
     ctx.eq("ui:player-loaded", "loaded", state);
     ctx.eq("ui:no-error-panel", [], await pages.playerErrorPanels());
   } else {
-    ctx.skip("ui:player-loaded", "the detail screen from Past Match Videos did not load, so Watch was not reachable");
-    ctx.skip("ui:no-error-panel", "the detail screen from Past Match Videos did not load, so Watch was not reachable");
+    ctx.skip("ui:player-loaded", "the detail screen from the Matches tab did not load, so Watch was not reachable");
+    ctx.skip("ui:no-error-panel", "the detail screen from the Matches tab did not load, so Watch was not reachable");
   }
 
   await ctx.step("Blue backs out to the Arena", async () => {

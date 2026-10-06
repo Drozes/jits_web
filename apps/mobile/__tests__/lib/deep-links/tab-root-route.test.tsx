@@ -121,7 +121,7 @@ beforeEach(() => {
 });
 
 describe("isTabRootHref", () => {
-  it.each(["/", "/arena", "/arena?challenge=c-1", "/arena/", "/leaderboard", "/profile#x"])(
+  it.each(["/", "/arena", "/arena?challenge=c-1", "/arena/", "/matches", "/matches/", "/leaderboard", "/profile#x"])(
     "%s is a tab root",
     (href) => expect(isTabRootHref(href)).toBe(true),
   );

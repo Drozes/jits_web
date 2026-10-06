@@ -7,12 +7,6 @@
 export const MATCHES_TAB_HREF = "/(app)/(tabs)/matches";
 
 /**
- * @deprecated The Film Room screen retired into the Matches tab. Kept as an
- * alias so an old import still lands on the tab; use `MATCHES_TAB_HREF`.
- */
-export const FILM_ROOM_HREF = MATCHES_TAB_HREF;
-
-/**
  * Route of the player (`app/(app)/video/[id].tsx`), optionally starting at
  * `t` seconds (whole seconds; the player clamps to the clip).
  */

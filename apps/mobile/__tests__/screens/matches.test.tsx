@@ -310,6 +310,28 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(utils.queryByTestId("film-room-error")).toBeNull();
   });
 
+  it("a background revalidate (an upload settling) keeps the spinner off and never toasts, even when it fails", async () => {
+    act(() => {
+      setMatchUpload("m-new", { status: "uploading", progress: 0.5 });
+    });
+    const utils = await renderLoaded();
+    let fail: (v: unknown) => void = () => undefined;
+    mockGetMyMatchLibrary.mockReturnValue(new Promise((r) => (fail = r)));
+    const calls = mockGetMyMatchLibrary.mock.calls.length;
+    act(() => {
+      setMatchUpload("m-new", { status: "uploaded", videoId: "v-9", progress: 1 });
+    });
+    await waitFor(() => expect(mockGetMyMatchLibrary.mock.calls.length).toBeGreaterThan(calls));
+    const control = () => utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0].props.refreshControl;
+    expect(control().props.refreshing).toBe(false);
+    await act(async () => {
+      fail({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    });
+    expect(control().props.refreshing).toBe(false);
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(utils.getByTestId("film-card-m-new")).toBeTruthy();
+  });
+
   it("pull to refresh re-reads the first page", async () => {
     const utils = await renderLoaded();
     const calls = mockGetMyMatchLibrary.mock.calls.length;
@@ -344,6 +366,8 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
   it("shows a retryable error when the first page fails", async () => {
     const utils = await renderLoaded({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
     expect(utils.getByTestId("film-room-error")).toBeTruthy();
+    // A cold load failure is the panel, never the C-E2 toast.
+    expect(mockToastError).not.toHaveBeenCalled();
     mockGetMyMatchLibrary.mockResolvedValue(page(library()));
     await act(async () => {
       fireEvent.press(utils.getByLabelText("Try again"));

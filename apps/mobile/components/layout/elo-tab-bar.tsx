@@ -284,7 +284,10 @@ function TabButton({
         {iconNode}
         {badge ? <TabBadgeMark badge={badge} routeName={route.name} /> : null}
       </TabIcon>
+      {/* Capped at 1.15x so all five labels stay on one line at large Dynamic
+        Type (75 pt columns at 375 pt; owner decision 2026-10-06). */}
       <Text
+        maxFontSizeMultiplier={1.15}
         className={cn(
           "font-heading text-micro uppercase tracking-caps-l",
           isActive ? "text-ink" : "text-ink-3",

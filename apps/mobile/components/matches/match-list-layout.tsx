@@ -18,7 +18,7 @@ export interface MatchRenderContext {
   onOpen: (matchId: string) => void;
 }
 
-/** Renders one match of the feed. Return a memoised component keyed by the caller. */
+/** Renders one match of the feed (a memoised component). The screen keys it by match id. */
 export type RenderMatch = (item: MatchLibraryItem, ctx: MatchRenderContext) => React.ReactElement;
 
 /**
@@ -41,7 +41,6 @@ export const POSTER_GRID_LAYOUT: MatchListLayout = {
   perRow: 2,
   renderMatch: (item, ctx) => (
     <LibraryPoster
-      key={item.match_id}
       item={item}
       viewer={ctx.viewer}
       seen={ctx.seen}
