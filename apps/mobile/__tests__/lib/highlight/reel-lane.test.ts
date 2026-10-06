@@ -130,6 +130,28 @@ describe("ordering", () => {
     expect(ids(out.items).slice(-1)).toEqual(["o19"]);
   });
 
+  it("selects the tail by position: an unparseable readyAt never drops it", () => {
+    const old = Array.from({ length: 15 }, (_, i) => reel(`o${i}`, { readyAt: "not a timestamp" }));
+    const page = [reel("n0", { readyAt: "also junk" }), ...old.slice(0, 9)];
+    const out = mergeFirstPage(old, page, true);
+    expect(out.keptTail).toBe(true);
+    expect(ids(out.items)).toEqual(["n0", ...ids(old)]);
+  });
+
+  it("keptTail is false when nothing past the anchor was kept", () => {
+    const old = [reel("a"), reel("b")];
+    // Anchor b is the last reel on screen: no tail to keep, so the new first cursor applies.
+    expect(mergeFirstPage(old, [reel("n"), reel("a"), reel("b")], true).keptTail).toBe(false);
+    // A short (last) page never keeps a tail.
+    expect(mergeFirstPage(old, [reel("a")], false)).toEqual({ items: [old[0]], keptTail: false });
+  });
+
+  it("reuses objects only when opponent and duration are unchanged too", () => {
+    const a = reel("a");
+    expect(reuseReels([a], [reel("a", { opponentName: "Bo" })])[0]).not.toBe(a);
+    expect(reuseReels([a], [reel("a", { durationS: 30 })])[0]).not.toBe(a);
+  });
+
   it("20 loaded + a full first page of 10 brand-new reels: drops the tail (new first cursor)", () => {
     const old = Array.from({ length: 20 }, (_, i) => reel(`o${i}`, { readyAt: "2026-09-01T00:00:00Z" }));
     const page = Array.from({ length: 10 }, (_, i) => reel(`n${i}`, { readyAt: "2026-10-01T00:00:00Z" }));

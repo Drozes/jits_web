@@ -109,7 +109,14 @@ export function appendReelPage(current: readonly ReelItem[], page: readonly Reel
 
 /** Same reel, same content: the previous object is reused so memoised tiles skip a render. */
 function sameReel(a: ReelItem, b: ReelItem): boolean {
-  return a.highlightId === b.highlightId && a.version === b.version && a.unseen === b.unseen && a.posterUrl === b.posterUrl;
+  return (
+    a.highlightId === b.highlightId &&
+    a.version === b.version &&
+    a.unseen === b.unseen &&
+    a.posterUrl === b.posterUrl &&
+    a.opponentName === b.opponentName &&
+    a.durationS === b.durationS
+  );
 }
 
 /** Returns `next` with every unchanged reel replaced by its previous object (stable identities). */
@@ -151,16 +158,21 @@ export function mergeFirstPage(current: readonly ReelItem[], firstPage: readonly
   const currentIds = new Set(current.map((i) => i.highlightId));
   const fresh = unseenFirst(page.filter((i) => !currentIds.has(i.highlightId)));
   const anchor = page.length > 0 ? page[page.length - 1] : null;
-  const keepTail = firstPageHasMore && anchor !== null && currentIds.has(anchor.highlightId);
-  // Instants, spelling-agnostic (the cursor strings themselves are never rebuilt).
-  const anchorAt = anchor ? Date.parse(anchor.readyAt) : NaN;
+  // The tail is chosen by POSITION: reels after the anchor in the list on
+  // screen (no timestamp parsing, so an odd readyAt spelling cannot drop it).
+  const anchorIndex = firstPageHasMore && anchor ? current.findIndex((i) => i.highlightId === anchor.highlightId) : -1;
   const kept: ReelItem[] = [];
-  for (const old of current) {
+  let tailKept = false;
+  current.forEach((old, index) => {
     const updated = pageById.get(old.highlightId);
     if (updated) kept.push(updated);
-    else if (keepTail && Number.isFinite(anchorAt) && Date.parse(old.readyAt) <= anchorAt) kept.push(old);
-  }
-  return { items: [...fresh, ...kept], keptTail: keepTail };
+    else if (anchorIndex >= 0 && index > anchorIndex) {
+      kept.push(old);
+      tailKept = true;
+    }
+  });
+  // True only when tail reels were actually kept: the caller then keeps the old (deeper) cursor.
+  return { items: [...fresh, ...kept], keptTail: tailKept };
 }
 
 function dedupe(items: readonly ReelItem[]): ReelItem[] {
