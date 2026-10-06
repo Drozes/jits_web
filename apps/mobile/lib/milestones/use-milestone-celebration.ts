@@ -16,6 +16,11 @@ import {
 /** What a surface knows right now (each field null while unknown). */
 export type MilestoneData = Pick<MilestoneInputs, "stats" | "newestMatch" | "newestWin" | "highlights">;
 
+export interface UseMilestoneCelebrationOptions {
+  /** The host's own cover (a sheet or picker over the surface): nothing is decided while true. */
+  blocked?: boolean;
+}
+
 export interface UseMilestoneCelebrationResult {
   /** The celebration on screen, or null. */
   celebration: MilestoneCelebration | null;
@@ -36,17 +41,22 @@ export interface UseMilestoneCelebrationResult {
  * athlete opens first, never both). Nothing is decided while the surface is
  * blurred (a pushed screen or modal route covers it), during an active Arena
  * match, under the incoming challenge prompt or the live menu: it waits for
- * the next time the surface is focused and clear. On a claim: the success
+ * the next time the surface is focused and clear. At most one celebration
+ * per focus: a second due milestone waits for the next focus. On a claim: the success
  * haptic unless the milestone is a loss, and `matches.milestone_shown`.
  */
 export function useMilestoneCelebration(
   surface: MilestoneSurface,
   athleteId: string | null | undefined,
   data: MilestoneData,
+  options: UseMilestoneCelebrationOptions = {},
 ): UseMilestoneCelebrationResult {
   const [focused, setFocused] = React.useState(false);
+  // One celebration per focus (reset on every focus).
+  const firedThisFocus = React.useRef(false);
   useFocusEffect(
     React.useCallback(() => {
+      firedThisFocus.current = false;
       setFocused(true);
       return () => setFocused(false);
     }, []),
@@ -54,7 +64,7 @@ export function useMilestoneCelebration(
   const inActiveMatch = useIsInArenaMatch();
   const arena = useArenaState();
   const menuOpen = useLiveMenuOpen();
-  const overModal = (!!arena.incoming && !arena.incomingTucked) || menuOpen;
+  const overModal = (!!arena.incoming && !arena.incomingTucked) || menuOpen || options.blocked === true;
   const reduceMotion = useReduceMotion();
   const [celebration, setCelebration] = React.useState<MilestoneCelebration | null>(null);
 
@@ -65,7 +75,7 @@ export function useMilestoneCelebration(
   const showing = celebration !== null;
 
   React.useEffect(() => {
-    if (!athleteId || !focused || inActiveMatch || overModal || showing) return;
+    if (!athleteId || !focused || inActiveMatch || overModal || showing || firedThisFocus.current) return;
     let cancelled = false;
     void loadMilestones(athleteId).then((seen) => {
       if (cancelled || milestoneLoadState(athleteId) !== "ok") return;
@@ -73,7 +83,8 @@ export function useMilestoneCelebration(
         { surface, now: Date.now(), inActiveMatch, overModal, reduceMotion, ...latest.current },
         seen,
       );
-      if (!c || !claimMilestone(athleteId, c)) return;
+      if (!c || firedThisFocus.current || !claimMilestone(athleteId, c)) return;
+      firedThisFocus.current = true;
       setCelebration(c);
       if (c.haptic) void haptics.milestone();
       logMilestoneShown(c.milestone);

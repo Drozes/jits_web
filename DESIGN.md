@@ -675,7 +675,7 @@ Mobile haptics use ONE semantic vocabulary, `haptics` from `@/lib/motion` (`apps
 | `resultRecorded` | Success notification | The result is recorded server-side. |
 | `timeWarning` | Medium impact | The clock crosses the low-time threshold. |
 | `reelRevealed` | Success notification | A reel that was building lands as ready while its carousel (Home Highlights, Matches) is on screen; once per landing, never for the first-unseen pulse. Fires under Reduce Motion too. |
-| `milestone` | Success notification | A milestone celebration starts (first match, first win, first highlight; specs/matches-tab 10.6), once per milestone. Never for a first match that was a loss. Fires under Reduce Motion too. |
+| `milestone` | Success notification | A milestone celebration starts (first match, first win, first highlight; specs/matches-tab 10.6), once per milestone. Never for a first match that was a loss. Fires under Reduce Motion too. Shares a 500 ms guard with `reelRevealed`, so a first reel landing on screen buzzes once. |
 | `error` | Error notification | A mutation or network error. |
 
 - **Never a haptic on a loss.** There is deliberately no loss event, and a draw is silent too; the loser of a submission sees the tap marks still and silent.

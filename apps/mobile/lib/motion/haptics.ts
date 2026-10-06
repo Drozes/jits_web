@@ -30,6 +30,27 @@ function safe(fire: () => Promise<void> | void): Promise<void> {
   }
 }
 
+/**
+ * Two discovery moments can land on the same instant: a reel reveal
+ * (`reelRevealed`) and the first-highlight milestone (`milestone`) when the
+ * athlete's first reel lands while its carousel is on screen. They share one
+ * guard, so the second success buzz within this window is dropped.
+ */
+export const SUCCESS_DEDUPE_MS = 500;
+let lastDiscoverySuccessAt = -Infinity;
+
+function discoverySuccess(): Promise<void> {
+  const now = Date.now();
+  if (now - lastDiscoverySuccessAt < SUCCESS_DEDUPE_MS) return Promise.resolve();
+  lastDiscoverySuccessAt = now;
+  return safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
+}
+
+/** Tests only: forget the last discovery success buzz. */
+export function __resetHapticGuardForTests(): void {
+  lastDiscoverySuccessAt = -Infinity;
+}
+
 export const haptics = {
   /** A commit action was tapped (Challenge, Accept, Confirm result, Go live). Light impact. */
   press: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
@@ -72,14 +93,14 @@ export const haptics = {
    * (the reveal, specs/matches-tab 10.5). Success notification, once per
    * landing (never for the once-per-session pulse of an unseen tile).
    */
-  reelRevealed: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
+  reelRevealed: () => discoverySuccess(),
   /**
    * A milestone celebration started (first match, first win, first
    * highlight; specs/matches-tab 10.6). Success notification, once per
    * milestone. Never for a first match that was a loss (the caller withholds
    * it: no haptic on a loss).
    */
-  milestone: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
+  milestone: () => discoverySuccess(),
   /** Timer has crossed the low-time-remaining threshold (e.g. 10s). Medium impact. */
   timeWarning: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)),
 } as const;

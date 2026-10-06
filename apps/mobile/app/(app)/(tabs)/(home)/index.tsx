@@ -88,6 +88,11 @@ export default function DashboardScreen() {
       : null;
   const highlights = useHomeHighlights(athlete?.id, matchCount);
   const refetchHighlights = highlights.refetch;
+  const onHighlightsCta = React.useCallback(
+    (tile: { variant: "first_highlight" | "find_match" }) =>
+      logEmptyCta({ surface: "home", state: tile.variant === "first_highlight" ? "zero" : "no_reels", cta: "arena" }),
+    [],
+  );
   // The first highlight celebrates on the carousel (spec 10.6), unless the
   // Matches carousel celebrated it first. Home never celebrates matches.
   const firstReel = highlights.items[0] ?? null;
@@ -200,9 +205,7 @@ export default function DashboardScreen() {
               tiles={highlights.tiles}
               pageSource={highlights.pageSource}
               markSeenLocally={highlights.markSeenLocally}
-              onCtaPress={(tile) =>
-                logEmptyCta({ surface: "home", state: tile.variant === "first_highlight" ? "zero" : "no_reels", cta: "arena" })
-              }
+              onCtaPress={onHighlightsCta}
             />
           </MilestoneMoment>
         ) : null}

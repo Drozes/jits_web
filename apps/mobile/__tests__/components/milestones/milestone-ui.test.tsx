@@ -5,7 +5,7 @@
  * Motion) and the MilestoneMoment wrapper.
  */
 import * as React from "react";
-import { Text } from "react-native";
+import { AccessibilityInfo, Platform, Text } from "react-native";
 import { act, fireEvent, render } from "@testing-library/react-native";
 
 jest.mock("lucide-react-native", () => {
@@ -83,6 +83,28 @@ describe("MilestoneBanner", () => {
     const inkRule = render(<MilestoneBanner milestone="first_highlight" copy="y" onDismiss={jest.fn()} />).getByTestId("milestone-banner-first_highlight").props.style.borderLeftColor;
     expect(winRule).not.toBe(inkRule);
     expect([p.text, paletteFor("dark").text]).toContain(inkRule);
+  });
+
+  it("VoiceOver: announces its line once on iOS (the status role carries nothing there)", () => {
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
+    // The RN preset's AccessibilityInfo is a shared mock: count this test's calls only.
+    announce.mockClear();
+    const utils = render(<MilestoneBanner milestone="first_win" copy={win.copy} onDismiss={jest.fn()} />);
+    utils.rerender(<MilestoneBanner milestone="first_win" copy={win.copy} onDismiss={jest.fn()} />);
+    expect(Platform.OS).toBe("ios");
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith(win.copy);
+  });
+
+  it("a Reduce Motion flip mid-fade keeps the pending dismiss (the fade's timer survives)", () => {
+    const onDismiss = jest.fn();
+    const { getByTestId } = render(<MilestoneBanner milestone="first_win" copy={win.copy} onDismiss={onDismiss} />);
+    fireEvent.press(getByTestId("milestone-banner-first_win"));
+    act(() => __setReduceMotionForTests(true));
+    act(() => jest.advanceTimersByTime(duration.fast));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    act(() => jest.advanceTimersByTime(MILESTONE_BANNER_MS));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
   it("under Reduce Motion it leaves in place (no fade wait)", () => {

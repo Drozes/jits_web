@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Pressable, Text } from "react-native";
+import { AccessibilityInfo, Platform, Pressable, Text } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Sparkles, Trophy } from "lucide-react-native";
 import type { MilestoneId } from "@/lib/milestones/milestone-store";
@@ -13,7 +13,10 @@ export const MILESTONE_BANNER_MS = 4000;
 /**
  * The one-line milestone banner (board P-MT-15, C-C1 to C-C3): a plate with
  * a 3 pt left rule (gain green for a first win, ink otherwise), an icon and
- * the copy. A status: VoiceOver reads its line once. It fades out over
+ * the copy. A status: screen readers read its line once (iOS through
+ * `announceForAccessibility` on mount, since the status role and live
+ * regions carry nothing to VoiceOver; Android through the polite live
+ * region). It fades out over
  * `duration.fast` after 4 s or on tap, then calls `onDismiss`; under Reduce
  * Motion it appears and leaves in place.
  */
@@ -38,14 +41,25 @@ export function MilestoneBanner({ milestone, copy, onDismiss }: { milestone: Mil
     timers.current.push(setTimeout(() => done.current(), duration.fast));
   }, [reduceMotion, opacity]);
 
+  // VoiceOver: announce once per banner (Android reads the live region).
+  const copyRef = React.useRef(copy);
   React.useEffect(() => {
+    if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(copyRef.current);
+  }, []);
+
+  // The 4 s hold. Re-armed if `leave` changes identity (a Reduce Motion
+  // flip), but never once leaving: a fade already under way keeps its timer.
+  React.useEffect(() => {
+    if (leaving.current) return;
     const t = setTimeout(leave, MILESTONE_BANNER_MS);
-    const pending = timers.current;
-    return () => {
-      clearTimeout(t);
-      pending.forEach(clearTimeout);
-    };
+    return () => clearTimeout(t);
   }, [leave]);
+
+  // The fade's done timer is cleared on unmount only.
+  React.useEffect(() => {
+    const pending = timers.current;
+    return () => pending.forEach(clearTimeout);
+  }, []);
 
   const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
   const win = milestone === "first_win";

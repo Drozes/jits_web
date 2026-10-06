@@ -54,7 +54,10 @@ export default function MatchesScreen() {
   const router = useRouter();
   const p = usePalette();
   const library = useMatchLibrary(athlete?.id);
-  const { history, stats } = useProfileData(athlete?.id, athlete?.primary_gym_id);
+  // Stats drive the record strip and the first match / first win milestones;
+  // refetched with the library (focus, match exit, pull), since this tab
+  // stays mounted through a match.
+  const { history, stats, onRefresh: refetchProfile } = useProfileData(athlete?.id, athlete?.primary_gym_id);
   const seen = useSeenMatches();
   const [filter, setFilter] = React.useState<LibraryFilter>(NO_FILTER);
   const [pickerOpen, setPickerOpen] = React.useState(false);
@@ -65,7 +68,12 @@ export default function MatchesScreen() {
   const phases = useFilmRoomPhases(library.items, library.items, athlete?.id ?? null);
   const ids = React.useMemo(() => library.items.map((i) => i.match_id), [library.items]);
   useRefetchOnUploadSettled(ids, library.revalidate);
-  useRefetchOnRefocus(library.revalidate, useMatchExitCount());
+  const revalidateLibrary = library.revalidate;
+  const revalidateAll = React.useCallback(() => {
+    revalidateLibrary();
+    refetchProfile();
+  }, [revalidateLibrary, refetchProfile]);
+  useRefetchOnRefocus(revalidateAll, useMatchExitCount());
   useMatchesTabOpened();
 
   // The "Your highlights" lane (spec 6.1). Without B2 its building tiles come
@@ -81,7 +89,8 @@ export default function MatchesScreen() {
   const refreshAll = React.useCallback(() => {
     refreshLibrary();
     refetchLane(true);
-  }, [refreshLibrary, refetchLane]);
+    refetchProfile();
+  }, [refreshLibrary, refetchLane, refetchProfile]);
   const { refreshing, onRefresh } = useMatchesRefresh(refreshAll, library.isValidating, library.refreshError);
 
   const opponents = React.useMemo(() => opponentsOf(library.items), [library.items]);
@@ -130,10 +139,13 @@ export default function MatchesScreen() {
   const newest = library.items[0] ?? null;
   const newestWin = library.items.find((i) => i.outcome === "win") ?? null;
   const firstReel = lane.items[0] ?? null;
+  // A card milestone is decided only with no filter applied, so a claimed
+  // celebration is always on a visible card.
   const milestoneData: MilestoneData = {
     stats: stats ? { wins: stats.wins, losses: stats.losses, draws: stats.draws } : null,
-    newestMatch: newest ? { matchId: newest.match_id, completedAt: newest.completed_at, outcome: newest.outcome } : null,
-    newestWin: newestWin ? { matchId: newestWin.match_id, completedAt: newestWin.completed_at } : null,
+    newestMatch:
+      newest && !filtered ? { matchId: newest.match_id, completedAt: newest.completed_at, outcome: newest.outcome } : null,
+    newestWin: newestWin && !filtered ? { matchId: newestWin.match_id, completedAt: newestWin.completed_at } : null,
     highlights:
       lane.loading || !lane.clipsEnabled
         ? null
@@ -143,7 +155,10 @@ export default function MatchesScreen() {
             first: firstReel ? { highlightId: firstReel.highlightId, unseen: firstReel.unseen, readyAt: firstReel.readyAt } : null,
           },
   };
-  const { celebration, dismiss: dismissMilestone } = useMilestoneCelebration("matches", athlete?.id, milestoneData);
+  const { celebration, dismiss: dismissMilestone } = useMilestoneCelebration("matches", athlete?.id, milestoneData, {
+    // The opponent picker sheet covers the feed.
+    blocked: pickerOpen,
+  });
   const cardCelebration = celebration && celebration.milestone !== "first_highlight" ? celebration : null;
   const laneCelebration = celebration && celebration.milestone === "first_highlight" ? celebration : null;
   const onCarouselCta = React.useCallback(
@@ -159,25 +174,27 @@ export default function MatchesScreen() {
       if (row.type === "month") return <MonthHeader label={row.label} count={row.last && hasMore ? null : row.count} />;
       return (
         <View className="flex-row" style={{ gap: 16, marginBottom: 20 }}>
-          {row.items.map((m) => {
-            const card = LAYOUT.renderMatch(m, {
-              viewer,
-              viewerId,
-              seen: !seen.ready || seen.isSeen(m.match_id),
-              phase: phases[m.match_id] ?? null,
-              tags: tagsFor(tags, m.match_id),
-              noFilmHelper: m.match_id === helperId,
-              onOpen: open,
-              onPlay: play,
-              });
-            return cardCelebration?.targetId === m.match_id ? (
-              <MilestoneMoment key={m.match_id} celebration={cardCelebration} onDismiss={dismissMilestone} flex>
-                {card}
-              </MilestoneMoment>
-            ) : (
-              <React.Fragment key={m.match_id}>{card}</React.Fragment>
-            );
-          })}
+          {row.items.map((m) => (
+            // Always the same wrapper, so the card never remounts when a
+            // celebration starts or ends (poster, VoiceOver focus).
+            <MilestoneMoment
+              key={m.match_id}
+              celebration={cardCelebration?.targetId === m.match_id ? cardCelebration : null}
+              onDismiss={dismissMilestone}
+              flex
+            >
+              {LAYOUT.renderMatch(m, {
+                viewer,
+                viewerId,
+                seen: !seen.ready || seen.isSeen(m.match_id),
+                phase: phases[m.match_id] ?? null,
+                tags: tagsFor(tags, m.match_id),
+                noFilmHelper: m.match_id === helperId,
+                onOpen: open,
+                onPlay: play,
+              })}
+            </MilestoneMoment>
+          ))}
           {LAYOUT.perRow === 2 && row.items.length === 1 ? <View className="flex-1" /> : null}
         </View>
       );
@@ -185,25 +202,42 @@ export default function MatchesScreen() {
     [viewer, viewerId, seen, open, play, hasMore, phases, tags, helperId, cardCelebration, dismissMilestone],
   );
 
-  const header = (
-    <MatchesListHeader
-      record={recordStrip(recordOf(history), athlete?.current_elo)}
-      // The "Your highlights" reel carousel (spec 6.1 item 3): hidden with no
-      // tiles (clips off, or a failed read with nothing cached).
-      carousel={
-        laneTiles.length > 0 ? (
-          <MilestoneMoment celebration={laneCelebration} onDismiss={dismissMilestone}>
-            <MatchesReelCarousel lane={lane} viewerId={viewerId} matchCount={matchCount} onCtaPress={onCarouselCta} />
-          </MilestoneMoment>
-        ) : null
-      }
-      filter={filter}
-      opponentName={opponentName}
-      onOutcome={(outcome) => setFilter((f) => ({ ...f, outcome }))}
-      onOpenOpponents={() => setPickerOpen(true)}
-      skeleton={library.isLoading ? <LAYOUT.Skeleton /> : null}
-      zero={zero}
-    />
+  // The lane fields the carousel draws from: a new object only when one changes.
+  const { items: laneItems, inFlight: laneInFlight, loading: laneLoading, error: laneError, hasMore: laneHasMore } = lane;
+  const { loadMoreError: laneMoreError, loadingMore: laneLoadingMore, cursor: laneCursor } = lane;
+  const { loadMore: laneLoadMore, markSeenLocally: laneMarkSeen } = lane;
+  const stableLane = React.useMemo(
+    () => ({ ...lane }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [laneItems, laneInFlight, clipsEnabled, laneLoading, laneError, laneMoreError, laneHasMore, laneLoadingMore, laneCursor, laneLoadMore, refetchLane, laneMarkSeen],
+  );
+  const record = recordStrip(recordOf(history), athlete?.current_elo);
+  const loadingLibrary = library.isLoading;
+  const onOutcome = React.useCallback((outcome: LibraryFilter["outcome"]) => setFilter((f) => ({ ...f, outcome })), []);
+  const onOpenOpponents = React.useCallback(() => setPickerOpen(true), []);
+  const showCarousel = laneTiles.length > 0;
+  const header = React.useMemo(
+    () => (
+      <MatchesListHeader
+        record={record}
+        // The "Your highlights" reel carousel (spec 6.1 item 3): hidden with no
+        // tiles (clips off, or a failed read with nothing cached).
+        carousel={
+          showCarousel ? (
+            <MilestoneMoment celebration={laneCelebration} onDismiss={dismissMilestone}>
+              <MatchesReelCarousel lane={stableLane} viewerId={viewerId} matchCount={matchCount} onCtaPress={onCarouselCta} />
+            </MilestoneMoment>
+          ) : null
+        }
+        filter={filter}
+        opponentName={opponentName}
+        onOutcome={onOutcome}
+        onOpenOpponents={onOpenOpponents}
+        skeleton={loadingLibrary ? <LAYOUT.Skeleton /> : null}
+        zero={zero}
+      />
+    ),
+    [record, showCarousel, laneCelebration, dismissMilestone, stableLane, viewerId, matchCount, onCarouselCta, filter, opponentName, onOutcome, onOpenOpponents, loadingLibrary, zero],
   );
 
   const empty = library.isLoading ? null : library.error ? (

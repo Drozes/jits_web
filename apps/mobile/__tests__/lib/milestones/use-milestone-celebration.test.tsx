@@ -207,6 +207,35 @@ describe("useMilestoneCelebration", () => {
     expect(mockCapture).not.toHaveBeenCalled();
   });
 
+  it("one celebration per focus: a second due milestone waits for the next focus", async () => {
+    const both: MilestoneData = { ...firstWin, highlights: oneReel.highlights };
+    const utils = render(<Probe surface="matches" data={both} />);
+    await waitFor(() => expect(seen.current?.milestone).toBe("first_win"));
+    act(() => seen.dismiss());
+    utils.rerender(<Probe surface="matches" data={both} />);
+    await settle();
+    expect(seen.current).toBeNull();
+    // Blur and focus again: the first highlight now celebrates.
+    act(() => mockFocusCleanups.forEach((c) => c()));
+    act(() => {
+      mockFocusCbs.forEach((cb) => cb());
+    });
+    await waitFor(() => expect(seen.current?.milestone).toBe("first_highlight"));
+  });
+
+  it("the host's own block (a picker open) holds the decision", async () => {
+    function Blocked({ blocked }: { blocked: boolean }) {
+      const r = useMilestoneCelebration("matches", "ath-1", firstWin, { blocked });
+      seen = { current: r.celebration, dismiss: r.dismiss };
+      return null;
+    }
+    const utils = render(<Blocked blocked />);
+    await settle();
+    expect(seen.current).toBeNull();
+    utils.rerender(<Blocked blocked={false} />);
+    await waitFor(() => expect(seen.current?.milestone).toBe("first_win"));
+  });
+
   it("dismiss clears the celebration without re-firing it", async () => {
     const utils = render(<Probe surface="matches" data={firstWin} />);
     await waitFor(() => expect(seen.current).not.toBeNull());

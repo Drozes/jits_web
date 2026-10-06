@@ -63,9 +63,11 @@ jest.mock("@/lib/auth/hooks", () => ({
   }),
 }));
 let mockStats: { wins: number; losses: number; draws: number } | null = null;
+const mockProfileRefetch = jest.fn();
 jest.mock("@/lib/profile/use-profile-data", () => ({
   useProfileData: () => ({
     stats: mockStats,
+    onRefresh: mockProfileRefetch,
     history: [
       ...Array.from({ length: 15 }, () => ({ athlete_outcome: "win" })),
       ...Array.from({ length: 7 }, () => ({ athlete_outcome: "loss" })),
@@ -642,6 +644,79 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
       const utils = await renderLoaded();
       const slot = utils.getByTestId("matches-carousel-slot");
       expect(await within(slot).findByTestId("milestone-banner-first_highlight")).toBeTruthy();
+    });
+
+    it("after the athlete's first match (a match exit), the stats are refetched and First match shows (B1)", async () => {
+      mockStats = { wins: 0, losses: 0, draws: 0 };
+      const utils = await renderLoaded(page([]));
+      expect(utils.getByTestId("matches-zero")).toBeTruthy();
+      const { useArenaMatchScreen } = require("@/lib/arena/arena-store") as { useArenaMatchScreen: (id?: string) => void };
+      function InMatch() {
+        useArenaMatchScreen();
+        return null;
+      }
+      const match = render(<InMatch />);
+      // The match ends: the profile and the library re-read on the exit.
+      mockStats = { wins: 0, losses: 1, draws: 0 };
+      mockGetMyMatchLibrary.mockResolvedValue(page([libItem({ match_id: "first", completed_at: daysAgo(0), outcome: "loss", elo_delta: -9 })]));
+      mockProfileRefetch.mockClear();
+      await act(async () => {
+        match.unmount();
+      });
+      expect(mockProfileRefetch).toHaveBeenCalled();
+      await waitFor(() => expect(utils.getByTestId("film-card-first")).toBeTruthy());
+      const banner = await utils.findByTestId("milestone-banner-first_match");
+      expect(banner.props.accessibilityLabel).toBe("First match in the books");
+    });
+
+    it("pull to refresh re-reads the profile stats too", async () => {
+      const utils = await renderLoaded();
+      mockProfileRefetch.mockClear();
+      const list = utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0];
+      await act(async () => {
+        list.props.refreshControl.props.onRefresh();
+      });
+      expect(mockProfileRefetch).toHaveBeenCalled();
+    });
+
+    it("the celebrated card is not remounted when the celebration starts or ends (M1)", async () => {
+      withReels();
+      const utils = await renderLoaded(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win" })]));
+      const before = utils.getByTestId("match-feed-card-w1");
+      mockStats = { wins: 1, losses: 0, draws: 0 };
+      utils.rerender(<MatchesScreen />);
+      const banner = await utils.findByTestId("milestone-banner-first_win");
+      expect(utils.getByTestId("match-feed-card-w1")).toBe(before);
+      fireEvent.press(banner);
+      await waitFor(() => expect(utils.queryByTestId("milestone-banner-first_win")).toBeNull());
+      expect(utils.getByTestId("match-feed-card-w1")).toBe(before);
+    });
+
+    it("no card milestone is claimed while a filter is applied; it shows once the filter clears", async () => {
+      withReels();
+      const utils = await renderLoaded(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win" })]));
+      fireEvent.press(utils.getByTestId("film-filter-loss"));
+      mockStats = { wins: 1, losses: 0, draws: 0 };
+      utils.rerender(<MatchesScreen />);
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(utils.queryByTestId("milestone-banner-first_win")).toBeNull();
+      fireEvent.press(utils.getByTestId("film-filter-all"));
+      expect(await utils.findByTestId("milestone-banner-first_win")).toBeTruthy();
+    });
+
+    it("waits while the opponent picker is open (host block)", async () => {
+      mockStats = { wins: 1, losses: 0, draws: 0 };
+      withReels();
+      mockGetMyMatchLibrary.mockResolvedValue(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win", opponent: PARK })]));
+      const hook = require("@/lib/milestones/use-milestone-celebration") as typeof import("@/lib/milestones/use-milestone-celebration");
+      const spy = jest.spyOn(hook, "useMilestoneCelebration");
+      const utils = await renderLoaded(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win", opponent: PARK })]));
+      expect(spy.mock.calls.at(-1)?.[3]).toEqual({ blocked: false });
+      fireEvent.press(utils.getByTestId("film-filter-opponent"));
+      expect(spy.mock.calls.at(-1)?.[3]).toEqual({ blocked: true });
+      spy.mockRestore();
     });
 
     it("an old first match (over 7 days) never celebrates", async () => {
