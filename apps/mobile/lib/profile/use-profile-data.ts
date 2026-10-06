@@ -14,7 +14,22 @@ interface ProfilePayload {
 
 const EMPTY: ProfilePayload = { stats: null, gymName: null, eloThisMonth: 0, history: [] };
 
-export function useProfileData(athleteId: string | undefined, primaryGymId: string | null | undefined) {
+export interface UseProfileDataOptions {
+  /**
+   * Skip the "Could not load profile" toast. For a screen that reads the
+   * stats as a side input and refetches them in the background (the Matches
+   * tab: refocus, match exit, pull, which has its own C-E2 toast), where a
+   * failed read must stay quiet. The Profile tab keeps the toast.
+   */
+  quiet?: boolean;
+}
+
+export function useProfileData(
+  athleteId: string | undefined,
+  primaryGymId: string | null | undefined,
+  options: UseProfileDataOptions = {},
+) {
+  const quiet = options.quiet === true;
   const { data, isLoading, isStale, error, refetch } = useCachedResource<ProfilePayload>(
     `profile:${athleteId ?? "anon"}`,
     async (_signal: CancelToken) => {
@@ -48,8 +63,8 @@ export function useProfileData(athleteId: string | undefined, primaryGymId: stri
   );
 
   React.useEffect(() => {
-    if (error) toast.error("Could not load profile");
-  }, [error]);
+    if (error && !quiet) toast.error("Could not load profile");
+  }, [error, quiet]);
 
   return {
     stats: data?.stats ?? null,

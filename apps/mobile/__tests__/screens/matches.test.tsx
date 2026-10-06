@@ -64,8 +64,9 @@ jest.mock("@/lib/auth/hooks", () => ({
 }));
 let mockStats: { wins: number; losses: number; draws: number } | null = null;
 const mockProfileRefetch = jest.fn();
+const mockUseProfileData = jest.fn();
 jest.mock("@/lib/profile/use-profile-data", () => ({
-  useProfileData: () => ({
+  useProfileData: (...a: unknown[]) => (mockUseProfileData(...a), {
     stats: mockStats,
     onRefresh: mockProfileRefetch,
     history: [
@@ -669,8 +670,9 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
       expect(banner.props.accessibilityLabel).toBe("First match in the books");
     });
 
-    it("pull to refresh re-reads the profile stats too", async () => {
+    it("pull to refresh re-reads the profile stats too, read quietly (no profile toast on this tab)", async () => {
       const utils = await renderLoaded();
+      expect(mockUseProfileData).toHaveBeenLastCalledWith(mockAthleteId(), null, { quiet: true });
       mockProfileRefetch.mockClear();
       const list = utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0];
       await act(async () => {

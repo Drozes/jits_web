@@ -56,8 +56,9 @@ export default function MatchesScreen() {
   const library = useMatchLibrary(athlete?.id);
   // Stats drive the record strip and the first match / first win milestones;
   // refetched with the library (focus, match exit, pull), since this tab
-  // stays mounted through a match.
-  const { history, stats, onRefresh: refetchProfile } = useProfileData(athlete?.id, athlete?.primary_gym_id);
+  // stays mounted through a match. Quiet: a failed background read never
+  // toasts here (the pull has its own C-E2 toast).
+  const { history, stats, onRefresh: refetchProfile } = useProfileData(athlete?.id, athlete?.primary_gym_id, { quiet: true });
   const seen = useSeenMatches();
   const [filter, setFilter] = React.useState<LibraryFilter>(NO_FILTER);
   const [pickerOpen, setPickerOpen] = React.useState(false);
