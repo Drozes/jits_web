@@ -76,14 +76,6 @@ function cleanName(name: string | null | undefined): string | null {
   return sanitiseCaptionText(name);
 }
 
-/** Sanitised, lower-cased except for its first letter. */
-function cleanTechnique(technique: string | null | undefined): string | null {
-  const cleaned = sanitiseCaptionText(technique);
-  if (!cleaned) return null;
-  const [first, ...rest] = [...cleaned];
-  return first + rest.join("").toLowerCase();
-}
-
 /** Cut `text` to at most `max` UTF-16 units plus "…", never inside a surrogate pair. */
 function cutWithEllipsis(text: string, max: number): string {
   let out = "";
@@ -99,10 +91,12 @@ function firstLine(ctx: HighlightCaptionContext): string {
   const against = opponent ? `against ${opponent}` : "today";
   const withOpp = opponent ? `with ${opponent}` : "today";
   switch (ctx.outcome) {
-    case "win": {
-      const technique = cleanTechnique(ctx.technique);
-      return technique ? `Got the ${technique} ${against}.` : `Took the win ${against}.`;
-    }
+    case "win":
+      // `ctx.technique` is the highlight planner's AI guess at the finish
+      // (jr_be `_highlight_match_facts`), not the recorded submission. AI
+      // move names are hidden from every athlete for now (owner decision
+      // 2026-10-06, jits-xfvd.18), so the win line never names it.
+      return `Took the win ${against}.`;
     case "draw":
       return `Went the distance ${withOpp}.`;
     case "loss":
@@ -131,8 +125,7 @@ function secondLine(ctx: HighlightCaptionContext): string | null {
 /**
  * Lines joined by `\n`: what happened, the ELO line (see secondLine; left
  * out when no ELO was recorded), "Tracked on ELO RATED.", the hashtags. Never longer than
- * HIGHLIGHT_CAPTION_MAX: an over-long first line (a very long name or
- * technique) is cut with an ellipsis, the other lines are fixed.
+ * HIGHLIGHT_CAPTION_MAX: an over-long first line (a very long name) is cut with an ellipsis, the other lines are fixed.
  */
 export function buildHighlightCaption(ctx: HighlightCaptionContext): string {
   const line2 = secondLine(ctx);

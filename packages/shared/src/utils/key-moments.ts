@@ -202,6 +202,116 @@ export function captionAt(
   return { t: position.timestamp_s as number, text: label };
 }
 
+/**
+ * AI analysis labels (move, position and technique names from the model) are
+ * internal for now (owner decision 2026-10-06, jits-xfvd.18): only platform
+ * admins (`admin`, and `founder`, which implies admin) see them. Everyone
+ * else gets key moments as timestamps. Unknown or missing role: hidden.
+ */
+export function canSeeAnalysisLabels(platformRole: string | null | undefined): boolean {
+  return platformRole === "admin" || platformRole === "founder";
+}
+
+/**
+ * What a key moment row says for this viewer. Admins (`showLabels`) see
+ * every label. Everyone else sees only a finish labelled with the
+ * user-RECORDED submission (`recordedSubmission`, the match's
+ * `submission_name`): `buildKeyMoments` gives the finish that name only when
+ * the analysis named it, so a finish that fell back to an AI scoring moment
+ * keeps its AI label and stays hidden. Else null (time only).
+ * Display-time only, so `buildKeyMoments`' dedupe and finish logic never
+ * depends on who is looking.
+ */
+export function keyMomentDisplayLabel(
+  moment: KeyMoment,
+  showLabels: boolean,
+  recordedSubmission?: string | null,
+): string | null {
+  if (showLabels) return moment.label;
+  const recorded = recordedSubmission?.trim();
+  if (moment.kind === "finish" && recorded && moment.label === recorded) return moment.label;
+  return null;
+}
+
+/**
+ * Whether time `t` belongs to the key moment stop at `stopT`: the same
+ * displayed second (`formatClock` floors) or less than 1 s after it.
+ */
+export function sameKeyMomentStop(stopT: number, t: number): boolean {
+  return Math.floor(t) === Math.floor(stopT) || Math.abs(t - stopT) < 1;
+}
+
+/**
+ * Key moments as distinct stops, for a view that shows times only:
+ * `buildKeyMoments` keeps two moments in the same second when their labels
+ * differ. A moment joins the previous stop when it shows the same clock
+ * second (floored, like `formatClock`) or is less than 1 s after it, so no
+ * two stops read the same time and a seek to one never counts as reaching
+ * another. A stop keeps its earliest time; a finish wins (its kind and
+ * label) when any moment in it is one.
+ */
+export function keyMomentsBySecond(moments: KeyMoment[]): KeyMoment[] {
+  const out: KeyMoment[] = [];
+  for (const m of [...moments].sort((a, b) => a.t - b.t)) {
+    const last = out[out.length - 1];
+    if (!last || !sameKeyMomentStop(last.t, m.t)) {
+      out.push({ ...m });
+      continue;
+    }
+    if (m.kind === "finish" && last.kind !== "finish") {
+      out[out.length - 1] = { ...m, t: last.t };
+    }
+  }
+  return out;
+}
+
+/** Where the playhead sits among the key moments (the player's stepper). */
+export interface KeyMomentStep {
+  /** The moment the stepper shows: the latest at or before the playhead, else the first. */
+  shown: KeyMoment;
+  /** Its index in the per-second list (0-based). */
+  index: number;
+  /** How many distinct seconds there are to step through. */
+  count: number;
+  /** True when the playhead has reached `shown` (false before the first moment). */
+  reached: boolean;
+  /** The moment before `shown`, or null at the start. */
+  prev: KeyMoment | null;
+  /** The next moment after the playhead, or null at the end. */
+  next: KeyMoment | null;
+}
+
+/**
+ * The stepper state for playback time `t`. It steps over DISTINCT seconds
+ * (`keyMomentsBySecond`), so two moments in one second are one stop and
+ * prev never lands on the same time twice. A quarter second of slack counts
+ * a moment the player just seeked to as reached. Before the first moment the
+ * stepper shows the first one's time and "next" jumps to it. Null with no
+ * moments.
+ */
+export function keyMomentStepAt(moments: KeyMoment[], t: number): KeyMomentStep | null {
+  const stops = keyMomentsBySecond(moments);
+  if (stops.length === 0) return null;
+  const pos = Number.isFinite(t) ? t : 0;
+  const count = stops.length;
+  let index = -1;
+  for (let i = 0; i < stops.length; i++) {
+    if (stops[i].t <= pos + 0.25) index = i;
+    else break;
+  }
+  if (index < 0) {
+    return { shown: stops[0], index: 0, count, reached: false, prev: null, next: stops[0] };
+  }
+  return {
+    shown: stops[index],
+    index,
+    count,
+    reached: true,
+    prev: index > 0 ? stops[index - 1] : null,
+    next: index < stops.length - 1 ? stops[index + 1] : null,
+  };
+}
+
 /** "06:17" style clock (minutes zero-padded, no hours); 0 for bad input. */
 export function formatClock(seconds: number | null | undefined): string {
   const total =

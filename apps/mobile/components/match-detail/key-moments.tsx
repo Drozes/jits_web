@@ -2,7 +2,7 @@ import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { TRACKING, typeStep } from "@/lib/typography";
 import { PlayCircle } from "lucide-react-native";
-import { formatClock, type KeyMoment } from "@jits/shared/utils";
+import { formatClock, keyMomentDisplayLabel, keyMomentsBySecond, type KeyMoment } from "@jits/shared/utils";
 import { usePalette, TABULAR } from "@/lib/theme/palette";
 
 /**
@@ -36,12 +36,34 @@ interface KeyMomentsProps {
   moments: KeyMoment[];
   durationS: number | null;
   tags: string[];
+  /** AI move labels and technique tags (admins only, `useShowAnalysisLabels`). */
+  showLabels: boolean;
+  /** The match's user-recorded submission name: a finish carrying it is shown to everyone. */
+  recordedSubmission?: string | null;
   onJump: (t: number) => void;
 }
 
-/** KEY MOMENTS: timeline, one tappable row per moment, technique tags. */
-export function KeyMoments({ moments, durationS, tags, onJump }: KeyMomentsProps) {
+/** "Play from 00:27, Takedown" / "Play from 03:20, Rear-naked choke" / "Play from 06:15, finish" / "Play from 00:09". */
+function rowA11yLabel(m: KeyMoment, label: string | null): string {
+  const parts = [`Play from ${formatClock(m.t)}`];
+  if (label) parts.push(label);
+  else if (m.kind === "finish") parts.push("finish");
+  return parts.join(", ");
+}
+
+/**
+ * KEY MOMENTS: timeline, one tappable row per moment, technique tags. Without
+ * `showLabels` (everyone but admins, jits-xfvd.18) a row is its time and the
+ * FINISH marker only (the finish exists only for a recorded submission
+ * result, and is named only by the recorded submission), one row per
+ * second, and the AI technique tags are left out.
+ */
+export function KeyMoments({ moments: allMoments, durationS, tags: allTags, showLabels, recordedSubmission, onJump }: KeyMomentsProps) {
   const p = usePalette();
+  const tags = showLabels ? allTags : [];
+  // Two moments in one second differ only by their AI labels: one row each
+  // for admins, one time-only row for everyone else.
+  const moments = showLabels ? allMoments : keyMomentsBySecond(allMoments);
   if (moments.length === 0 && tags.length === 0) return null;
   const span = durationS && durationS > 0 ? durationS : Math.max(...moments.map((m) => m.t), 1) * 1.05;
   return (
@@ -58,32 +80,39 @@ export function KeyMoments({ moments, durationS, tags, onJump }: KeyMomentsProps
       </View>
       {moments.length > 0 ? <MomentTimeline moments={moments} durationS={span} /> : null}
       <View style={{ borderTopWidth: moments.length ? 1 : 0, borderTopColor: p.hairline }}>
-        {moments.map((m, i) => (
-          <Pressable
-            key={`${m.t}-${i}`}
-            testID={`key-moment-${i}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Play from ${formatClock(m.t)}, ${m.label}`}
-            onPress={() => onJump(m.t)}
-            className="flex-row items-center active:opacity-70"
-            style={{ height: 52, gap: 14, borderBottomWidth: 1, borderBottomColor: p.hairline }}
-          >
-            <Text className="font-mono-bold" style={[typeStep("body"), { width: 44, color: p.text }, TABULAR]}>
-              {formatClock(m.t)}
-            </Text>
-            <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={[typeStep("callout"), { letterSpacing: TRACKING.loose, color: p.text }]}>
-              {m.label}
-            </Text>
-            {m.kind === "finish" ? (
-              <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.strong, justifyContent: "center" }}>
-                <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text }, TABULAR]}>
-                  FINISH
+        {moments.map((m, i) => {
+          const label = keyMomentDisplayLabel(m, showLabels, recordedSubmission);
+          return (
+            <Pressable
+              key={`${m.t}-${i}`}
+              testID={`key-moment-${i}`}
+              accessibilityRole="button"
+              accessibilityLabel={rowA11yLabel(m, label)}
+              onPress={() => onJump(m.t)}
+              className="flex-row items-center active:opacity-70"
+              style={{ height: 52, gap: 14, borderBottomWidth: 1, borderBottomColor: p.hairline }}
+            >
+              <Text className="font-mono-bold" style={[typeStep("body"), { width: 44, color: p.text }, TABULAR]}>
+                {formatClock(m.t)}
+              </Text>
+              {label ? (
+                <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={[typeStep("callout"), { letterSpacing: TRACKING.loose, color: p.text }]}>
+                  {label}
                 </Text>
-              </View>
-            ) : null}
-            <PlayCircle size={20} color={p.text2} />
-          </Pressable>
-        ))}
+              ) : (
+                <View className="flex-1" />
+              )}
+              {m.kind === "finish" ? (
+                <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.strong, justifyContent: "center" }}>
+                  <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: p.text }, TABULAR]}>
+                    FINISH
+                  </Text>
+                </View>
+              ) : null}
+              <PlayCircle size={20} color={p.text2} />
+            </Pressable>
+          );
+        })}
       </View>
       {tags.length > 0 ? (
         <View testID="technique-tags" className="flex-row flex-wrap" style={{ gap: 6 }}>

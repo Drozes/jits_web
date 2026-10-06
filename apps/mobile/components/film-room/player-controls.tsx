@@ -1,11 +1,8 @@
 import * as React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
-import { StatePressable } from "@/components/ui/state-pressable";
+import { Pressable, Text, View } from "react-native";
 import { Pause, Play, RotateCcw, RotateCw } from "lucide-react-native";
-import { formatClock, type KeyMoment } from "@jits/shared/utils";
 import { ON_MEDIA } from "@/lib/theme/palette";
-import { filmChipLabelStyle, filmChipStyle } from "@/components/film-room/film-chip";
-import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
+import { TABULAR, typeStep } from "@/lib/typography";
 
 /** Playback speeds the speed button cycles through (slow motion for study). */
 export const SPEEDS = [1, 0.5, 0.25, 2] as const;
@@ -80,56 +77,6 @@ export function Transport({ playing, speed, onToggle, onSkip, onSpeed }: Transpo
           {`${speed}x`}
         </Text>
       </Pressable>
-    </View>
-  );
-}
-
-/** Horizontally scrolling "00:27 SINGLE LEG" chips; the current one is lit. */
-export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[]; currentT: number | null; onJump: (t: number) => void }) {
-  if (moments.length === 0) return null;
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      accessibilityLabel="Key moments"
-      contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
-      style={{ marginHorizontal: -16 }}
-    >
-      {moments.map((m, i) => {
-        const on = currentT === m.t;
-        const label = `${formatClock(m.t)} ${m.label.toUpperCase()}${m.kind === "finish" ? " · FINISH" : ""}`;
-        return (
-          <StatePressable
-            dim
-            key={`${m.t}-${i}`}
-            testID={`moment-chip-${i}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Jump to ${formatClock(m.t)}, ${m.label}`}
-            accessibilityState={{ selected: on }}
-            onPress={() => onJump(m.t)}
-            style={filmChipStyle(on)}
-          >
-            <Text className="font-mono-bold" style={[filmChipLabelStyle(on), TABULAR]}>
-              {label}
-            </Text>
-          </StatePressable>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
-/** The light caption chip: "03:12 | Guard pass: knee cut to side control". */
-export function MomentCaption({ t, text }: { t: number; text: string }) {
-  return (
-    <View testID="player-caption" className="flex-row items-center self-start" style={{ gap: 8, paddingVertical: 8, paddingHorizontal: 10, borderRadius: 2, backgroundColor: ON_MEDIA.chip, maxWidth: "100%" }}>
-      <Text className="font-mono-bold" style={[typeStep("caption"), { color: ON_MEDIA.ink }, TABULAR]}>
-        {formatClock(t)}
-      </Text>
-      <View style={{ width: 1, height: 12, backgroundColor: ON_MEDIA.chipBorder }} />
-      <Text numberOfLines={2} className="font-body-medium flex-shrink" style={[typeStep("body"), { lineHeight: 16, color: ON_MEDIA.ink }]}>
-        {text}
-      </Text>
     </View>
   );
 }

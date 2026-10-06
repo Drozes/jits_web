@@ -18,6 +18,10 @@ vi.mock("@jits/shared/api/queries", () => ({
   getMatchVideoSignedUrlResult: (...a: unknown[]) => mockSigned(...a),
 }));
 
+// The existing cases run as an admin (labels shown); the gate block flips it.
+let mockShowLabels = true;
+vi.mock("@/lib/video/use-show-analysis-labels", () => ({ useShowAnalysisLabels: () => mockShowLabels }));
+
 import { VideoAnalysisViewer, recommendationText } from "./video-analysis-viewer";
 
 beforeEach(() => {
@@ -25,6 +29,7 @@ beforeEach(() => {
   fromSpy.mockReset();
   fakeClient.rpc.mockReset();
   mockProgressData = null;
+  mockShowLabels = true;
 });
 
 describe("VideoAnalysisViewer playback URL", () => {
@@ -157,5 +162,52 @@ describe("recommendationText", () => {
     });
     const t = render(<VideoAnalysisViewer videoId="vid-9" />);
     await waitFor(() => expect(t.getByRole("tab", { name: "Tips (1)" })).toBeInTheDocument());
+  });
+});
+
+describe("VideoAnalysisViewer AI label gate (jits-xfvd.18)", () => {
+  function analysedWithLabels() {
+    mockProgressData = { status: "analyzed", chunk_count: 1, chunks: [], chunks_completed: 1, failed_chunk_count: 0, requested_tier: "standard", latest_error_message: null };
+    mockSigned.mockResolvedValue({ ok: true, data: "https://x/v.mp4" });
+    fakeClient.rpc.mockResolvedValue({
+      data: {
+        analysis: {
+          id: "a",
+          video_id: "vid-9",
+          summary: "Blue hit a single leg and finished with an armbar.",
+          positions: [{ position: "closed_guard", timestamp_s: 9, duration_s: 20 }],
+          scoring_moments: [
+            { type: "sweep", description: "Scissor sweep to mount", timestamp_s: 125 },
+            { type: "takedown", description: "Single leg", timestamp_s: 27 },
+          ],
+          recommendations: [{ suggestion: "Chain the single leg into a double." }],
+          match_detected: true,
+        },
+        technique_tags: [{ id: "t1", technique_name: "Armbar", category: "submission", athlete_id: null, timestamp_start: 300, timestamp_end: null, confidence: 0.9, source: "ai" }],
+      },
+      error: null,
+    });
+    return render(<VideoAnalysisViewer videoId="vid-9" />);
+  }
+
+  it("non-admin: a neutral line and the key moment times only, no AI wording", async () => {
+    mockShowLabels = false;
+    const r = analysedWithLabels();
+    await waitFor(() => expect(r.getByTestId("analysis-neutral")).toBeInTheDocument());
+    expect(r.getByText("Analysis complete.")).toBeInTheDocument();
+    expect(r.getByTestId("analysis-moment-times")).toHaveTextContent("0:272:05");
+    expect(r.queryByRole("tab")).toBeNull();
+    const text = r.container.textContent ?? "";
+    for (const word of [/single leg/i, /armbar/i, /sweep/i, /takedown/i, /closed.guard/i, /mount/i]) {
+      expect(text).not.toMatch(word);
+    }
+  });
+
+  it("admin: today's tabs with the summary, moment labels and technique tags", async () => {
+    mockShowLabels = true;
+    const r = analysedWithLabels();
+    await waitFor(() => expect(r.getAllByRole("tab").length).toBe(4));
+    expect(r.getByText("Blue hit a single leg and finished with an armbar.")).toBeInTheDocument();
+    expect(r.queryByTestId("analysis-neutral")).toBeNull();
   });
 });

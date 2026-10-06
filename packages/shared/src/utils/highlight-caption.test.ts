@@ -27,8 +27,9 @@ type Row = [
 
 // outcome x technique x opponent -> first line (match type covered below).
 const FIRST_LINES: Row[] = [
-  ["win", "armbar", "Ana Souza", "Got the armbar against Ana Souza."],
-  ["win", "armbar", null, "Got the armbar today."],
+  // The technique is the planner's AI guess: never named (jits-xfvd.18).
+  ["win", "armbar", "Ana Souza", "Took the win against Ana Souza."],
+  ["win", "armbar", null, "Took the win today."],
   ["win", null, "Ana Souza", "Took the win against Ana Souza."],
   ["win", null, null, "Took the win today."],
   ["draw", null, "Ana Souza", "Went the distance with Ana Souza."],
@@ -76,10 +77,10 @@ describe("buildHighlightCaption", () => {
     expect(caption).not.toMatch(/Every roll counts/);
   });
 
-  it("normalises the technique: trimmed, collapsed, lower-cased after the first letter", () => {
-    expect(buildHighlightCaption(ctx({ technique: "  Rear   NAKED\tChoke " })).split("\n")[0]).toBe(
-      "Got the Rear naked choke against Ana Souza.",
-    );
+  it("never names the AI technique, however it is written (jits-xfvd.18)", () => {
+    const caption = buildHighlightCaption(ctx({ technique: "  Rear   NAKED\tChoke " }));
+    expect(caption.split("\n")[0]).toBe("Took the win against Ana Souza.");
+    expect(caption.toLowerCase()).not.toMatch(/choke/);
   });
 
   it("uses names verbatim but trimmed, and a blank name counts as none", () => {
@@ -161,16 +162,16 @@ describe("sanitiseCaptionText (names and technique)", () => {
     expect(sanitiseCaptionText(input as string | null)).toBe(expected);
   });
 
-  it("keeps normal technique names and names with an initial in the caption", () => {
+  it("keeps names with an initial in the caption", () => {
     const caption = buildHighlightCaption(ctx({ opponentName: "J. Reyes", technique: "Arm triangle" }));
-    expect(caption.split("\n")[0]).toBe("Got the Arm triangle against J. Reyes.");
+    expect(caption.split("\n")[0]).toBe("Took the win against J. Reyes.");
   });
 
-  it("applies to the caption's names, technique and the collab tip", () => {
+  it("applies to the caption's names and the collab tip", () => {
     const caption = buildHighlightCaption(
       ctx({ opponentName: "@ana https://x.co", technique: "#ARM​BAR  from guard" }),
     );
-    expect(caption.split("\n")[0]).toBe("Got the Armbar from guard against ana.");
+    expect(caption.split("\n")[0]).toBe("Took the win against ana.");
     expect(buildCollabTip("#ana‮")).toMatch(/^Tag ana as a collaborator/);
     expect(buildCollabTip("https://x.com")).toMatch(/^Tag your opponent as a collaborator/);
   });

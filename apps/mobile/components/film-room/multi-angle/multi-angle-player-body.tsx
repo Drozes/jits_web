@@ -3,7 +3,7 @@ import { AccessibilityInfo, ActivityIndicator, Image, StyleSheet, Text, View } f
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { NO_MATCH_COPY, buildKeyMoments, captionAt, formatClock, isNoMatch } from "@jits/shared/utils";
+import { NO_MATCH_COPY, buildKeyMoments, formatClock, isNoMatch } from "@jits/shared/utils";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { VideoStatePanel } from "@/components/match-detail/video-state-panel";
 import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
@@ -11,7 +11,8 @@ import { FilmScrim } from "@/components/film-room/film-scrim";
 import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { angleText } from "@/components/film-room/angle-switcher";
 import { SeekBar } from "@/components/film-room/seek-bar";
-import { MomentCaption, MomentChips, Transport, nextSpeed } from "@/components/film-room/player-controls";
+import { Transport, nextSpeed } from "@/components/film-room/player-controls";
+import { MomentStepper } from "@/components/film-room/moment-stepper";
 import { useMatchDetail } from "@/lib/match-detail/use-match-detail";
 import { useVideoAnalysis } from "@/lib/film-room/use-video-analysis";
 import { shortName } from "@/lib/film-room/format";
@@ -46,7 +47,7 @@ function rowOrder(v: AngleVideo): number {
  * The multi-angle match player (dev flag `isMultiAnglePlayerEnabled`):
  * stacked angle players with an opacity-swap switch, the angle control in
  * the thumb zone plus horizontal swipe, frame step while paused, the Angles
- * sheet, and moment chips that open on the clearest angle when the planner
+ * sheet, and a key moment stepper whose jumps open on the clearest angle when the planner
  * provides per-moment clarity. The timeline (seek bar, moments, clock) is
  * the Best angle's clock, so it holds still across a switch.
  */
@@ -105,7 +106,6 @@ export function MultiAnglePlayerBody({ id, start, device }: { id: string | undef
     [analysis, noMatch, view?.match, durationS],
   );
   const momentAngles = React.useMemo(() => readMomentAngles(analysis, view?.match), [analysis, view?.match]);
-  const caption = captionAt(moments, analysis?.positions, positionS);
   const current = [...moments].reverse().find((m) => m.t <= positionS + 0.25 && positionS - m.t < CURRENT_HOLD_S);
 
   const switchableIds = playback.angles.filter((a) => a.switchable).map((a) => a.id);
@@ -165,8 +165,6 @@ export function MultiAnglePlayerBody({ id, start, device }: { id: string | undef
                   {NO_MATCH_COPY.short}
                 </Text>
               </View>
-            ) : caption ? (
-              <MomentCaption t={caption.t} text={caption.text} />
             ) : null}
             <View style={{ gap: 6 }}>
               <SeekBar positionS={positionS} durationS={durationS} moments={moments} onSeek={playback.seek} />
@@ -195,7 +193,7 @@ export function MultiAnglePlayerBody({ id, start, device }: { id: string | undef
                 onOpenSheet={() => setSheetOpen(true)}
               />
             ) : null}
-            <MomentChips moments={moments} currentT={current?.t ?? null} onJump={onJump} />
+            <MomentStepper moments={moments} positionS={positionS} currentT={current?.t ?? null} onJump={onJump} />
           </View>
           {videos && playback.visibleId ? (
             <AnglesSheet
