@@ -1,8 +1,22 @@
 /**
- * A fake expo-video for the multi-angle player tests: every `useVideoPlayer`
- * gets a scripted player that records seeks (currentTime writes), rate and
- * mute writes, play/pause, thumbnails and swaps, and whose events a test
- * emits. `VideoView` renders a Text with the player's URL and counts mounts.
+ * A fake expo-video for the player tests (multi-angle player and the single
+ * match player): every `useVideoPlayer` gets a scripted player that records
+ * seeks (currentTime writes), rate, mute and time-update-interval writes,
+ * play/pause, thumbnails and swaps, and whose events a test emits.
+ * `VideoView` renders a Text with the player's URL and counts mounts.
+ *
+ * Scriptable native behavior (jits-xfvd.16), all opt-in so the defaults stay
+ * as they were (every swap and thumbnail resolves at once):
+ * - `deferReplace(i)`: the next `replaceAsync` settles only when the test
+ *   says, so `readyPlayer` can come before or after the settle.
+ * - `deferThumbnails(i)` / `failThumbnails(i)` / `slowThumbnails(i, ms)`:
+ *   the next `generateThumbnailsAsync` resolves on demand, rejects, or
+ *   resolves after `ms` (a timer, so fake timers drive it).
+ * - `pausedBufferStall`: iOS reports a ready item with an empty buffer as
+ *   "loading" while paused; `readyPlayer` on a paused player then waits for
+ *   `play()` before it reports readyToPlay.
+ * - `setNativeTime(i, t)`: the native clock moves without a seek (a new item
+ *   starting at 0, or playback progress without a time update).
  */
 import * as React from "react";
 import { Text } from "react-native";
@@ -21,7 +35,13 @@ export interface FakePlayer {
   seeks: number[];
   currentTime: number;
   timeUpdateEventInterval: number;
+  /** Every timeUpdateEventInterval write after setup. */
+  intervals: number[];
   preservesPitch: boolean;
+  /** iOS: a paused item stays "loading" until play() (see readyPlayer). */
+  pausedBufferStall: boolean;
+  /** A readyPlayer that the paused-buffer stall held back (its duration). */
+  heldReady: number | null;
   play: jest.Mock;
   pause: jest.Mock;
   replaceAsync: jest.Mock;
@@ -34,15 +54,39 @@ export const fakePlayers: FakePlayer[] = [];
 export const fakeViews: { mounts: number; props: Record<string, any>[] } = { mounts: 0, props: [] };
 
 export function resetFakeVideo(): void {
+  replaceQueue.clear();
+  thumbQueue.clear();
   fakePlayers.length = 0;
   fakeViews.mounts = 0;
   fakeViews.props = [];
+}
+
+export interface Deferred<T = void> {
+  resolve: (value: T) => void;
+  reject: (error: unknown) => void;
+}
+
+/** Per player: scripted outcomes for the next replaceAsync / thumbnail calls. */
+const replaceQueue = new Map<FakePlayer, Array<Deferred & { promise: Promise<void> }>>();
+type ThumbPlan = { kind: "defer"; d: Deferred<unknown[]> & { promise: Promise<unknown[]> } } | { kind: "fail"; error: unknown } | { kind: "slow"; ms: number };
+const thumbQueue = new Map<FakePlayer, ThumbPlan[]>();
+
+function deferred<T>(): Deferred<T> & { promise: Promise<T> } {
+  let resolve!: (v: T) => void;
+  let reject!: (e: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
 }
 
 function createPlayer(): FakePlayer {
   const listeners: Listener[] = [];
   let time = 0;
   let rate = 1;
+  let interval = 0;
+  const thumbsFor = (times: number | number[]) => (Array.isArray(times) ? times : [times]).map((t) => ({ fakeThumbnail: true, t }));
   const p = {
     id: fakePlayers.length,
     source: null,
@@ -50,10 +94,19 @@ function createPlayer(): FakePlayer {
     playing: false,
     duration: 0,
     rates: [] as number[],
+    intervals: [] as number[],
     muted: false,
     seeks: [] as number[],
-    timeUpdateEventInterval: 0,
     preservesPitch: false,
+    pausedBufferStall: false,
+    heldReady: null,
+    get timeUpdateEventInterval() {
+      return interval;
+    },
+    set timeUpdateEventInterval(v: number) {
+      interval = v;
+      p.intervals.push(v);
+    },
     get playbackRate() {
       return rate;
     },
@@ -70,6 +123,11 @@ function createPlayer(): FakePlayer {
     },
     play: jest.fn(() => {
       p.playing = true;
+      if (p.heldReady != null) {
+        const duration = p.heldReady;
+        p.heldReady = null;
+        readyNow(p, duration);
+      }
     }),
     pause: jest.fn(() => {
       p.playing = false;
@@ -77,14 +135,25 @@ function createPlayer(): FakePlayer {
     replaceAsync: jest.fn((src: { uri: string }) => {
       p.source = src;
       p.status = "loading";
-      return Promise.resolve();
+      p.heldReady = null;
+      const next = replaceQueue.get(p)?.shift();
+      return next ? next.promise : Promise.resolve();
     }),
-    generateThumbnailsAsync: jest.fn(async (times: number[]) => times.map((t) => ({ fakeThumbnail: true, t }))),
+    generateThumbnailsAsync: jest.fn((times: number | number[]) => {
+      const plan = thumbQueue.get(p)?.shift();
+      if (!plan) return Promise.resolve(thumbsFor(times));
+      if (plan.kind === "fail") return Promise.reject(plan.error);
+      if (plan.kind === "defer") return plan.d.promise;
+      return new Promise((resolve) => setTimeout(() => resolve(thumbsFor(times)), plan.ms));
+    }),
     addListener: jest.fn((event: string, fn: (payload?: unknown) => void) => {
       const e = { event, fn };
       listeners.push(e);
       return { remove: () => listeners.splice(listeners.indexOf(e), 1) };
     }),
+    __setTime: (t: number) => {
+      time = t;
+    },
     emit: (event: string, payload?: unknown) => {
       if (event === "timeUpdate") time = (payload as { currentTime: number }).currentTime;
       listeners.filter((l) => l.event === event).forEach((l) => l.fn(payload));
@@ -99,8 +168,9 @@ export function useVideoPlayer(_source: unknown, setup?: (p: FakePlayer) => void
     ref.current = createPlayer();
     fakePlayers.push(ref.current);
     setup?.(ref.current);
-    // The setup's own writes are not the app's rate changes.
+    // The setup's own writes are not the app's rate or interval changes.
     ref.current.rates.length = 0;
+    ref.current.intervals.length = 0;
   }
   return ref.current;
 }
@@ -113,12 +183,64 @@ export function VideoView(props: Record<string, any>) {
   return React.createElement(Text, { testID: props.testID, style: props.style }, props.player.source?.uri ?? "");
 }
 
-/** The item on player `i` is ready (duration seconds). */
-export function readyPlayer(i: number, duration = 400): void {
-  const p = fakePlayers[i];
+function readyNow(p: FakePlayer, duration: number): void {
   p.status = "readyToPlay";
   p.duration = duration;
   p.emit("statusChange", { status: "readyToPlay" });
+}
+
+/**
+ * The item on player `i` is ready (duration seconds). With
+ * `pausedBufferStall` on a paused player it stays "loading" until `play()`.
+ */
+export function readyPlayer(i: number, duration = 400): void {
+  const p = fakePlayers[i];
+  if (p.pausedBufferStall && !p.playing) {
+    p.heldReady = duration;
+    return;
+  }
+  readyNow(p, duration);
+}
+
+/** The next `replaceAsync` on player `i` settles only when the test resolves or rejects it. */
+export function deferReplace(i: number): Deferred {
+  const p = fakePlayers[i];
+  const d = deferred<void>();
+  const q = replaceQueue.get(p) ?? [];
+  q.push(d);
+  replaceQueue.set(p, q);
+  return d;
+}
+
+/** The next `generateThumbnailsAsync` on player `i` resolves (with the given thumbnails) or rejects on demand. */
+export function deferThumbnails(i: number): Deferred<unknown[]> {
+  const p = fakePlayers[i];
+  const d = deferred<unknown[]>();
+  const q = thumbQueue.get(p) ?? [];
+  q.push({ kind: "defer", d });
+  thumbQueue.set(p, q);
+  return d;
+}
+
+/** The next `generateThumbnailsAsync` on player `i` rejects. */
+export function failThumbnails(i: number, error: unknown = new Error("thumbnail failed")): void {
+  const p = fakePlayers[i];
+  const q = thumbQueue.get(p) ?? [];
+  q.push({ kind: "fail", error });
+  thumbQueue.set(p, q);
+}
+
+/** The next `generateThumbnailsAsync` on player `i` resolves after `ms` (a timer). */
+export function slowThumbnails(i: number, ms: number): void {
+  const p = fakePlayers[i];
+  const q = thumbQueue.get(p) ?? [];
+  q.push({ kind: "slow", ms });
+  thumbQueue.set(p, q);
+}
+
+/** The native clock of player `i` reads `t` (no seek recorded, no event). */
+export function setNativeTime(i: number, t: number): void {
+  (fakePlayers[i] as unknown as { __setTime: (t: number) => void }).__setTime(t);
 }
 
 export function tick(i: number, t: number): void {
