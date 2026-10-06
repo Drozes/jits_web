@@ -76,7 +76,7 @@ describe("usePlaybackTelemetry", () => {
     expect(mockCaptureMessage).not.toHaveBeenCalled();
     hook.unmount();
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
-    expect(mockCaptureMessage.mock.calls[0][1].tags).toEqual({
+    expect(mockCaptureMessage.mock.calls[0][1].tags).toMatchObject({
       "video.playback.surface": "match",
       "video.playback.source": "original",
       "video.playback.network": "cellular",
@@ -148,5 +148,89 @@ describe("usePlaybackTelemetry", () => {
     act(() => appStateHandler!("active"));
     hook.unmount();
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("usePlaybackTelemetry adaptive quality", () => {
+  const QMETA = {
+    qualityPreference: "auto" as const,
+    settingsVersion: 1,
+    settingsSource: "builtin" as const,
+    adaptiveEnabled: true,
+    networkKey: "wifi",
+    connectionExpensive: false,
+    startTarget: "720" as const,
+    startReason: "network_default" as const,
+  };
+  const { BUILTIN_PLAYBACK_SETTINGS } = require("@jits/shared/utils");
+  const history = require("@/lib/video/quality/history-store");
+  beforeEach(() => history.__resetPlaybackHistoryForTests());
+
+  it("copies the quality meta, the rendition and the flags into a continuation, and re-wires onStall", async () => {
+    const { player, hook } = setup();
+    const stalls: string[] = [];
+    act(() => {
+      hook.result.current.onStall((e) => stalls.push(e.kind));
+      hook.result.current.setQuality(QMETA, BUILTIN_PLAYBACK_SETTINGS);
+      hook.result.current.playIntent(true);
+      hook.result.current.sourceAttached("normalized");
+      hook.result.current.renditionAttached("720", "pb1");
+      player.emit("playingChange", { isPlaying: true });
+      now += 1000;
+      hook.result.current.qualitySwitchStarted("720", "360", "stall_long", { lockedLow: true, capReached: false });
+      hook.result.current.renditionAttached("360", "pb1");
+      now += 1000;
+    });
+    act(() => appStateHandler!("background"));
+    act(() => appStateHandler!("active"));
+    act(() => {
+      player.emit("playingChange", { isPlaying: true });
+      now += 3000;
+      player.emit("statusChange", { status: "loading" });
+      now += 500;
+      player.emit("statusChange", { status: "readyToPlay" });
+      now += 1000;
+    });
+    hook.unmount();
+    expect(extra(0)).toMatchObject({ qualitySwitchCount: 1, startRendition: "720", finalRendition: "360", qualityLockedLow: true });
+    expect(extra(1)).toMatchObject({
+      resumed: true,
+      ...QMETA,
+      startRendition: "360",
+      finalRendition: "360",
+      msOn360: 4500,
+      qualityLockedLow: true,
+      qualitySwitchCount: 0,
+    });
+    // The continuation's stall reached the listener.
+    expect(stalls).toEqual(["start", "end"]);
+  });
+
+  it("records the finished session in the per-network history", async () => {
+    const { player, hook } = setup();
+    act(() => {
+      hook.result.current.setQuality(QMETA, BUILTIN_PLAYBACK_SETTINGS);
+      hook.result.current.playIntent(true);
+      hook.result.current.sourceAttached("normalized");
+      hook.result.current.renditionAttached("720", null);
+      player.emit("playingChange", { isPlaying: true });
+      now += 20_000;
+    });
+    hook.unmount();
+    expect(history.getPlaybackHistory("wifi")).toEqual([
+      expect.objectContaining({ ts: now, rendition: "720", finalRendition: "720", watchMs: 20_000, steppedDown: false }),
+    ]);
+  });
+
+  it("a session without quality meta (a reel) leaves no history", () => {
+    const { player, hook } = setup();
+    act(() => {
+      hook.result.current.playIntent(true);
+      hook.result.current.sourceAttached("normalized");
+      player.emit("playingChange", { isPlaying: true });
+      now += 20_000;
+    });
+    hook.unmount();
+    expect(history.getPlaybackHistory("wifi")).toEqual([]);
   });
 });

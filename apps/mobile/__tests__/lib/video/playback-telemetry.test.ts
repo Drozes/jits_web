@@ -6,8 +6,10 @@ jest.mock("@/lib/error-tracking/sentry", () => ({
 import {
   PlaybackSession,
   outcomeOf,
+  rebufferBucket,
   reportPlaybackSession,
   scrubPlaybackError,
+  startupBucket,
   SEEK_EXEMPT_MS,
   type PlaybackSessionMeta,
 } from "@/lib/video/playback-telemetry";
@@ -329,6 +331,15 @@ describe("reportPlaybackSession", () => {
         "video.playback.network": "wifi",
         "video.playback.outcome": "watched",
         "video.playback.mode": "single",
+        "video.playback.rendition": "unknown",
+        "video.playback.rendition_final": "unknown",
+        "video.playback.start_reason": "none",
+        "video.playback.quality_pref": "none",
+        "video.playback.stepdown": "none",
+        "video.playback.network_key": "none",
+        "video.playback.stalled": "no",
+        "video.playback.startup_bucket": "lt1s",
+        "video.playback.rebuffer_bucket": "0",
       },
       extra: summary,
     });
@@ -445,5 +456,250 @@ describe("PlaybackSession multi-angle fields", () => {
     expect(mockCaptureMessage.mock.calls[0][1].tags["video.playback.mode"]).toBe("multi");
     reportPlaybackSession(matchSession().summary(1, "unmount"));
     expect(mockCaptureMessage.mock.calls[1][1].tags["video.playback.mode"]).toBe("single");
+  });
+
+  it("does not tag a player mode on a reel (#53 review N1)", () => {
+    const s = new PlaybackSession({ ...REEL, playerMode: "multi" }, 0);
+    s.playIntent(true, 0);
+    s.sourceAttached("highlight", 0);
+    reportPlaybackSession(s.summary(10, "unmount"));
+    expect(mockCaptureMessage.mock.calls[0][1].tags).not.toHaveProperty("video.playback.mode");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adaptive quality (jits-xfvd.12, spec 05 section 5.6)
+// ---------------------------------------------------------------------------
+
+const QMETA = {
+  qualityPreference: "auto" as const,
+  settingsVersion: 1,
+  settingsSource: "server" as const,
+  adaptiveEnabled: true,
+  networkKey: "cellular_4g",
+  connectionExpensive: true,
+  startTarget: "720" as const,
+  startReason: "network_default" as const,
+};
+
+/** A match session on 720 from t=0, playing (first frame) at 1000. */
+function qualitySession() {
+  const s = matchSession(400);
+  s.setQuality(QMETA);
+  s.renditionAttached("720", "pb1", 400);
+  s.playing(true, 1000);
+  return s;
+}
+
+describe("PlaybackSession adaptive quality", () => {
+  it("buckets watch time per served rendition; the buckets sum to watchMs", () => {
+    const s = qualitySession();
+    s.qualitySwitchStarted("720", "360", "stall_long", 11_000);
+    s.renditionAttached("360", "pb1", 11_200);
+    s.playing(false, 30_000);
+    s.playing(true, 31_000);
+    s.renditionAttached("original", null, 41_000);
+    const out = s.summary(51_000, "unmount");
+    expect(out.msOn720).toBe(10_200);
+    expect(out.msOn360).toBe(28_800);
+    expect(out.msOnOriginal).toBe(10_000);
+    expect(out.msOn720 + out.msOn360 + out.msOnOriginal).toBe(out.watchMs);
+    expect(out).toMatchObject({
+      startRendition: "720",
+      finalRendition: "original",
+      startFallback: false,
+      playbackProfile: "pb1",
+      ...QMETA,
+    });
+  });
+
+  it("startFallback when the served start differs from the target; playerStartupMs is ttff minus sign", () => {
+    const s = matchSession(400);
+    s.setQuality({ ...QMETA, startTarget: "360" });
+    s.renditionAttached("720", null, 400);
+    s.playing(true, 1500);
+    const out = s.summary(2000, "unmount");
+    expect(out.startFallback).toBe(true);
+    expect(out.playerStartupMs).toBe(1100);
+  });
+
+  it("a quality switch is not an angle switch: no switchCount, no switch latency", () => {
+    const s = qualitySession();
+    s.qualitySwitchStarted("720", "360", "stall_repeat", 5000);
+    s.qualitySwitchLanded(5600);
+    const out = s.summary(10_000, "unmount");
+    expect(out).toMatchObject({
+      switchCount: 0,
+      switchLatencyMs: null,
+      qualitySwitchCount: 1,
+      qualityStepDownCount: 1,
+      qualityStepUpCount: 0,
+      qualitySwitchLatencyMs: 600,
+      qualitySwitchLatencyMaxMs: 600,
+      qualitySwitches: [{ atMs: 5000, from: "720", to: "360", reason: "stall_repeat" }],
+      qualitySwitchesTruncated: false,
+    });
+  });
+
+  it("the quality swap's reload is exempt from stalls, like an angle swap", () => {
+    const s = qualitySession();
+    s.qualitySwitchStarted("720", "360", "stall_long", 5000);
+    s.status("loading", 5050);
+    s.status("readyToPlay", 5600);
+    expect(s.summary(6000, "unmount").stallCount).toBe(0);
+  });
+
+  it("freezes stalls before the first step-down (an open stall up to now) and counts the rest after", () => {
+    const s = qualitySession();
+    s.status("loading", 2000);
+    s.status("readyToPlay", 2500);
+    s.status("loading", 4000);
+    // The step-down fires while the second stall is open.
+    s.qualitySwitchStarted("720", "360", "stall_long", 5200);
+    s.status("readyToPlay", 5600);
+    s.playing(true, 5600);
+    s.status("loading", 9000);
+    s.status("readyToPlay", 9300);
+    const out = s.summary(12_000, "unmount");
+    expect(out).toMatchObject({
+      stallsBeforeStepDown: 2,
+      stallMsBeforeStepDown: 1700,
+      stallsAfterStepDown: 1,
+      stallMsAfterStepDown: 300,
+    });
+  });
+
+  it("before/after figures stay null without a stall-driven step-down (a step-up only)", () => {
+    const s = qualitySession();
+    s.qualitySwitchStarted("360", "720", "smooth", 40_000);
+    const out = s.summary(50_000, "unmount");
+    expect(out).toMatchObject({ qualityStepUpCount: 1, stallsBeforeStepDown: null, stallsAfterStepDown: null });
+  });
+
+  it("keeps the first 8 quality switches and flags the rest as truncated", () => {
+    const s = qualitySession();
+    for (let i = 0; i < 10; i += 1) s.qualitySwitchStarted(i % 2 ? "360" : "720", i % 2 ? "720" : "360", i % 2 ? "smooth" : "stall_long", 2000 + i * 1000);
+    const out = s.summary(20_000, "unmount");
+    expect(out.qualitySwitchCount).toBe(10);
+    expect(out.qualitySwitches).toHaveLength(8);
+    expect(out.qualitySwitchesTruncated).toBe(true);
+    expect(out.qualitySwitches[0]).toEqual({ atMs: 2000, from: "720", to: "360", reason: "stall_long" });
+  });
+
+  it("carries the controller's lock and cap flags", () => {
+    const s = qualitySession();
+    s.qualityFlags({ lockedLow: true, capReached: false });
+    s.qualityFlags({ lockedLow: false, capReached: true });
+    expect(s.summary(2000, "unmount")).toMatchObject({ qualityLockedLow: true, qualityCapReached: true });
+  });
+
+  it("onStall fires exactly when stallCount increments and when an open stall closes", () => {
+    const events: Array<[string, number]> = [];
+    const s = new PlaybackSession(MATCH, 0, { onStall: (e) => events.push([e.kind, e.at]) });
+    s.playIntent(true, 0);
+    s.sourceAttached("normalized", 400);
+    s.playing(true, 1000);
+    s.status("loading", 2000);
+    s.status("loading", 2100); // still the same stall
+    s.status("readyToPlay", 2600);
+    s.seekRequested(3000);
+    s.status("loading", 3100); // a seek's wait: not a stall
+    s.status("readyToPlay", 3300);
+    s.status("loading", 5000);
+    s.playIntent(false, 5400); // paused: the stall closes
+    expect(events).toEqual([
+      ["start", 2000],
+      ["end", 2600],
+      ["start", 5000],
+      ["end", 5400],
+    ]);
+    expect(s.summary(6000, "unmount").stallCount).toBe(2);
+  });
+
+  it("a reel has null, 0 or false quality fields and `none` quality tags", () => {
+    const s = new PlaybackSession(REEL, 0);
+    s.playIntent(true, 0);
+    s.sourceAttached("highlight", 0);
+    s.playing(true, 500);
+    const out = s.summary(5000, "unmount");
+    expect(out).toMatchObject({
+      qualityPreference: null,
+      networkKey: null,
+      startRendition: null,
+      finalRendition: null,
+      startFallback: false,
+      qualitySwitchCount: 0,
+      msOn720: 0,
+      msOn360: 0,
+      msOnOriginal: 0,
+      stallsBeforeStepDown: null,
+      qualityLockedLow: false,
+      playerStartupMs: null,
+    });
+    reportPlaybackSession(out);
+    const tags = mockCaptureMessage.mock.calls[0][1].tags;
+    expect(tags).toMatchObject({
+      "video.playback.rendition": "none",
+      "video.playback.rendition_final": "none",
+      "video.playback.start_reason": "none",
+      "video.playback.quality_pref": "none",
+      "video.playback.stepdown": "none",
+      "video.playback.network_key": "none",
+      "video.playback.startup_bucket": "none",
+    });
+  });
+
+  it("tags a match session's quality dimensions", () => {
+    const s = qualitySession();
+    s.status("loading", 2000);
+    s.qualitySwitchStarted("720", "360", "stall_long", 3000);
+    s.renditionAttached("360", "pb1", 3100);
+    s.playing(true, 3500);
+    reportPlaybackSession(s.summary(60_000, "unmount"));
+    expect(mockCaptureMessage.mock.calls[0][1].tags).toMatchObject({
+      "video.playback.mode": "single",
+      "video.playback.rendition": "720",
+      "video.playback.rendition_final": "360",
+      "video.playback.start_reason": "network_default",
+      "video.playback.quality_pref": "auto",
+      "video.playback.stepdown": "stall",
+      "video.playback.network_key": "cellular_4g",
+      "video.playback.stalled": "yes",
+      "video.playback.startup_bucket": "lt1s",
+    });
+  });
+
+  it("a match session with no file reached reads rendition unknown", () => {
+    const s = new PlaybackSession(MATCH, 0);
+    s.playIntent(true, 0);
+    reportPlaybackSession(s.summary(100, "unmount"));
+    expect(mockCaptureMessage.mock.calls[0][1].tags["video.playback.rendition"]).toBe("unknown");
+  });
+});
+
+describe("quality tag buckets", () => {
+  it.each([
+    [null, "none"],
+    [0, "lt1s"],
+    [999, "lt1s"],
+    [1000, "1to2s"],
+    [2499, "2to2.5s"],
+    [2500, "2.5to3s"],
+    [3000, "3to5s"],
+    [5000, "gte5s"],
+  ])("startup %p -> %s", (ms, bucket) => {
+    expect(startupBucket(ms)).toBe(bucket);
+  });
+
+  it.each([
+    [null, "none"],
+    [0, "0"],
+    [0.005, "lt1pct"],
+    [0.01, "1to2pct"],
+    [0.02, "2to5pct"],
+    [0.05, "gte5pct"],
+    [0.4, "gte5pct"],
+  ])("rebuffer %p -> %s", (ratio, bucket) => {
+    expect(rebufferBucket(ratio)).toBe(bucket);
   });
 });
