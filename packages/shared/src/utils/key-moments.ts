@@ -234,25 +234,32 @@ export function keyMomentDisplayLabel(
 }
 
 /**
- * Key moments with one entry per second (by rounded time), for a view that
- * shows times only: `buildKeyMoments` keeps two moments in the same second
- * when their labels differ. Each entry takes the earliest time in its
- * second; a finish wins (its kind and label) when any moment there is one.
+ * Whether time `t` belongs to the key moment stop at `stopT`: the same
+ * displayed second (`formatClock` floors) or less than 1 s after it.
+ */
+export function sameKeyMomentStop(stopT: number, t: number): boolean {
+  return Math.floor(t) === Math.floor(stopT) || Math.abs(t - stopT) < 1;
+}
+
+/**
+ * Key moments as distinct stops, for a view that shows times only:
+ * `buildKeyMoments` keeps two moments in the same second when their labels
+ * differ. A moment joins the previous stop when it shows the same clock
+ * second (floored, like `formatClock`) or is less than 1 s after it, so no
+ * two stops read the same time and a seek to one never counts as reaching
+ * another. A stop keeps its earliest time; a finish wins (its kind and
+ * label) when any moment in it is one.
  */
 export function keyMomentsBySecond(moments: KeyMoment[]): KeyMoment[] {
   const out: KeyMoment[] = [];
-  const at = new Map<number, number>();
   for (const m of [...moments].sort((a, b) => a.t - b.t)) {
-    const key = Math.round(m.t);
-    const i = at.get(key);
-    if (i == null) {
-      at.set(key, out.length);
+    const last = out[out.length - 1];
+    if (!last || !sameKeyMomentStop(last.t, m.t)) {
       out.push({ ...m });
       continue;
     }
-    const kept = out[i];
-    if (m.kind === "finish" && kept.kind !== "finish") {
-      out[i] = { ...m, t: kept.t };
+    if (m.kind === "finish" && last.kind !== "finish") {
+      out[out.length - 1] = { ...m, t: last.t };
     }
   }
   return out;

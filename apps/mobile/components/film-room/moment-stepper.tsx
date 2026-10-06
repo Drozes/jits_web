@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
-import { formatClock, keyMomentStepAt, type KeyMoment } from "@jits/shared/utils";
+import { formatClock, keyMomentStepAt, sameKeyMomentStop, type KeyMoment } from "@jits/shared/utils";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 import { filmChipLabelStyle, filmChipStyle } from "@/components/film-room/film-chip";
@@ -47,9 +47,9 @@ function StepArrow({ dir, target, onJump }: { dir: "prev" | "next"; target: KeyM
 export function MomentStepper({ moments, positionS, currentT, onJump }: MomentStepperProps) {
   const step = keyMomentStepAt(moments, positionS);
   if (!step) return null;
-  // The stepper's stops are per second, so the lit moment may be another
-  // one in the same second (keyMomentsBySecond).
-  const on = step.reached && currentT != null && Math.round(currentT) === Math.round(step.shown.t);
+  // A stop can hold several moments (keyMomentsBySecond), so the lit moment
+  // may be another one in the same stop.
+  const on = step.reached && currentT != null && currentT >= step.shown.t && sameKeyMomentStop(step.shown.t, currentT);
   const clock = formatClock(step.shown.t);
   const count = `${step.index + 1}/${step.count}`;
   return (

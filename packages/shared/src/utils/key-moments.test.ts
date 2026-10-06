@@ -11,6 +11,7 @@ import {
   keyMomentDisplayLabel,
   keyMomentStepAt,
   keyMomentsBySecond,
+  sameKeyMomentStop,
   type KeyMoment,
 } from "./key-moments";
 
@@ -290,5 +291,40 @@ describe("same-second moments (review M1)", () => {
     const at6 = keyMomentStepAt(same, at40.prev!.t)!;
     expect(at6).toMatchObject({ index: 0, count: 2, prev: null });
     expect(at6.next?.t).toBe(40);
+  });
+});
+
+describe("stops never share a displayed time (re-review Low)", () => {
+  const at = (...ts: number[]): KeyMoment[] => ts.map((t) => ({ t, label: `m${t}`, kind: "score", description: null }));
+
+  it("5.4 and 5.6 (same floored second, both 00:05) are one stop", () => {
+    expect(keyMomentsBySecond(at(5.4, 5.6, 20)).map((m) => m.t)).toEqual([5.4, 20]);
+    const s = keyMomentStepAt(at(5.4, 5.6, 20), 20)!;
+    expect(s.prev?.t).toBe(5.4);
+    expect(keyMomentStepAt(at(5.4, 5.6, 20), 5.6)).toMatchObject({ index: 0, count: 2, prev: null });
+  });
+
+  it("5.9 and 6.1 (different seconds, under 1 s apart) are one stop", () => {
+    expect(keyMomentsBySecond(at(5.9, 6.1, 20)).map((m) => m.t)).toEqual([5.9, 20]);
+    expect(keyMomentStepAt(at(5.9, 6.1, 20), 6.1)).toMatchObject({ index: 0, count: 2, prev: null });
+  });
+
+  it("a finish wins the stop and keeps the earliest time", () => {
+    const ms: KeyMoment[] = [
+      { t: 5.9, label: "Sweep", kind: "score", description: null },
+      { t: 6.1, label: "Armbar", kind: "finish", description: null },
+    ];
+    expect(keyMomentsBySecond(ms)).toEqual([{ t: 5.9, label: "Armbar", kind: "finish", description: null }]);
+  });
+
+  it("moments a full second or more apart in different seconds stay separate", () => {
+    expect(keyMomentsBySecond(at(5.0, 6.0, 7.5)).map((m) => m.t)).toEqual([5.0, 6.0, 7.5]);
+  });
+
+  it("sameKeyMomentStop: same floored second or under 1 s apart", () => {
+    expect(sameKeyMomentStop(5.4, 5.6)).toBe(true);
+    expect(sameKeyMomentStop(5.9, 6.1)).toBe(true);
+    expect(sameKeyMomentStop(5.0, 6.0)).toBe(false);
+    expect(sameKeyMomentStop(5.0, 6.9)).toBe(false);
   });
 });

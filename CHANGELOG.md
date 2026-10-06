@@ -34,7 +34,7 @@ Owner decisions 2026-10-06: AI analysis labels (move, position and technique nam
 **Changed**
 - Match player (single and multi-angle): the key moment chip row is replaced by `MomentStepper` (times only), and the moment caption is removed for everyone. The seek-bar dots and the "N KEY MOMENTS" counter are unchanged.
 - Match detail for non-admins: key moment rows show the time and the FINISH marker only (the finish exists only for a recorded submission result), one row per second, technique tags are hidden, and the AI BREAKDOWN reads "Analysis complete." instead of the model summary. A finish named by the user-recorded submission keeps that name for everyone ("Play from 03:57, Rear-naked choke"); a finish that fell back to an AI scoring moment stays time only. Admins see today's labels.
-- The stepper steps over distinct seconds (`keyMomentsBySecond`): two moments in one second are one stop, so prev never sticks on a repeated time and the n/N count covers every stop (review M1).
+- The stepper steps over distinct stops (`keyMomentsBySecond`): moments in the same displayed second, or less than 1 s apart, are one stop (earliest time, a finish wins), so prev never sticks on a repeated time and the n/N count covers every stop (review M1 and re-review).
 - Web `VideoAnalysisViewer`: non-admins get "Analysis complete." and the key moment times instead of the Summary, Timeline, Techniques and Tips tabs (the tips name moves too). The no-match state is unchanged.
 - Highlight share caption: a win reads "Took the win against X." and never names the technique, which is the highlight planner's AI guess (jr_be `_highlight_match_facts`), not the recorded submission.
 
