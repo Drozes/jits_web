@@ -1,0 +1,69 @@
+/**
+ * The angle switcher's press feedback (jits-xfvd.16, contract 4.3): the
+ * press scale, one `select` haptic on a new angle only, and the busy state
+ * while the player is still switching. Labels and testIDs stay as the
+ * match-loop harness knows them.
+ */
+import * as React from "react";
+import { fireEvent, render } from "@testing-library/react-native";
+import { AngleSwitcher } from "@/components/film-room/angle-switcher";
+import { haptics, __setReduceMotionForTests } from "@/lib/motion";
+import { REDUCED_PRESS_OPACITY } from "@/components/ui/pressable-scale";
+
+const mine = { id: "a", is_mine: true, uploaded_by_name: "Kai Reyes", playability: "playable" };
+const theirs = { id: "b", is_mine: false, uploaded_by_name: "Dee Okafor", playability: "playable" };
+
+let select: jest.SpyInstance;
+beforeEach(() => {
+  select = jest.spyOn(haptics, "select").mockResolvedValue(undefined);
+});
+afterEach(() => {
+  select.mockRestore();
+  __setReduceMotionForTests(false);
+});
+
+describe("AngleSwitcher press feedback", () => {
+  it.each(["film", "plate"] as const)("%s: a new angle buzzes once, then selects", (variant) => {
+    const onSelect = jest.fn();
+    const s = render(<AngleSwitcher variant={variant} angles={[mine, theirs]} activeId="a" onSelect={onSelect} />);
+    fireEvent.press(s.getByLabelText("D. OKAFOR'S ANGLE"));
+    expect(select).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith("b");
+    expect(select.mock.invocationCallOrder[0]).toBeLessThan(onSelect.mock.invocationCallOrder[0]);
+  });
+
+  it("the active angle does nothing: no haptic, no call", () => {
+    const onSelect = jest.fn();
+    const s = render(<AngleSwitcher variant="film" angles={[mine, theirs]} activeId="a" onSelect={onSelect} />);
+    fireEvent.press(s.getByLabelText("YOUR ANGLE"));
+    expect(select).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("marks the busy angle selected and busy, and nothing else", () => {
+    const s = render(<AngleSwitcher variant="film" angles={[mine, theirs]} activeId="b" busyId="b" onSelect={jest.fn()} />);
+    expect(s.getByTestId("angle-b").props.accessibilityState).toEqual({ selected: true, busy: true });
+    expect(s.getByTestId("angle-a").props.accessibilityState).toEqual({ selected: false });
+    s.rerender(<AngleSwitcher variant="film" angles={[mine, theirs]} activeId="b" busyId={null} onSelect={jest.fn()} />);
+    expect(s.getByTestId("angle-b").props.accessibilityState).toEqual({ selected: true });
+  });
+
+  it("keeps the tab roles, labels and testIDs", () => {
+    const s = render(<AngleSwitcher variant="film" angles={[mine, theirs]} activeId="a" onSelect={jest.fn()} />);
+    expect(s.getByTestId("angle-switcher").props.accessibilityRole).toBe("tablist");
+    expect(s.getByTestId("angle-a").props.accessibilityRole).toBe("tab");
+    expect(s.getByTestId("angle-a").props.accessibilityLabel).toBe("YOUR ANGLE");
+    expect(s.getByTestId("angle-b").props.accessibilityLabel).toBe("D. OKAFOR'S ANGLE");
+  });
+
+  it("under Reduce Motion a press dips the opacity and keeps the haptic", () => {
+    __setReduceMotionForTests(true);
+    const s = render(<AngleSwitcher variant="film" angles={[mine, theirs]} activeId="a" onSelect={jest.fn()} />);
+    const seg = s.getByTestId("angle-b");
+    fireEvent(seg, "pressIn");
+    expect(s.getByTestId("angle-b")).toHaveStyle({ opacity: REDUCED_PRESS_OPACITY });
+    fireEvent(seg, "pressOut");
+    fireEvent.press(seg);
+    expect(select).toHaveBeenCalledTimes(1);
+  });
+});

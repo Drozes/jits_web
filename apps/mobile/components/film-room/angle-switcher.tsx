@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Text, View } from "react-native";
-import { StatePressable } from "@/components/ui/state-pressable";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { haptics } from "@/lib/motion";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { shortName } from "@/lib/film-room/format";
@@ -81,13 +82,25 @@ interface AngleSwitcherProps {
    * switcher always agree; computed from the angles when absent (player).
    */
   bestId?: string | null;
+  /**
+   * The angle that is selected and still switching (the player passes
+   * `switchState.targetId` while a switch is pending and not restoring). It
+   * keeps the selected surface and adds `busy` to its accessibility state;
+   * the Syncing pill carries the progress, so nothing else is drawn.
+   */
+  busyId?: string | null;
 }
 
 /**
  * Two-segment switch between the athletes' recordings of one match. Renders
  * nothing with fewer than two angles.
+ *
+ * Each segment is a `PressableScale` (press-in 0.97, the Reduce Motion
+ * opacity dip). Pressing an angle that is not active fires the `select`
+ * haptic once, then `onSelect`; pressing the active one does nothing (no
+ * haptic, no call), as the tab vocabulary says.
  */
-export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate", bestId }: AngleSwitcherProps) {
+export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate", bestId, busyId }: AngleSwitcherProps) {
   const p = usePalette();
   const angles = switchableAngles(all, activeId);
   if (angles.length < 2) return null;
@@ -112,14 +125,17 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
         const isBest = a.id === best;
         const a11y = isBest ? `${angleA11yLabel(a, opponentName)}, ${BEST_ANGLE}` : angleA11yLabel(a, opponentName);
         return (
-          <StatePressable
-            dim
+          <PressableScale
             key={a.id}
             testID={`angle-${a.id}`}
             accessibilityRole="tab"
             accessibilityLabel={a11y}
-            accessibilityState={{ selected: on }}
-            onPress={() => onSelect(a.id)}
+            accessibilityState={on && a.id === busyId ? { selected: true, busy: true } : { selected: on }}
+            onPress={() => {
+              if (on) return;
+              void haptics.select();
+              onSelect(a.id);
+            }}
             className="flex-1 items-center justify-center"
             style={{
               height: 44,
@@ -138,7 +154,7 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
                 {BEST_ANGLE.toUpperCase()}
               </Text>
             ) : null}
-          </StatePressable>
+          </PressableScale>
         );
       })}
     </View>
