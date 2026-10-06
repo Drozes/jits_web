@@ -2,6 +2,55 @@
 
 ## [Unreleased]
 
+### Match player: keep-watching angle switch, phase 1.5 (jits-xfvd.19)
+
+Owner feedback after phase 1: "When I switch, the video still stalls for a second." Now angle 1 keeps playing, with its audio, until angle 2 is ready and in step; then a crossfade. JS-only on mobile (OTA on runtime 0.5.0: a second `useVideoPlayer`, `VideoView` `surfaceType` at mount, `muted`, `volume`, `bufferOptions`, `replaceAsync(null)` and `expo-device` are all in build 25). Contract: `research/2026-10-multi-angle-playback/07-keep-watching-contract.md`. No video bytes before the tap (no preload on cellular). Rollback: `KEEP_WATCHING_ENABLED = false` in `apps/mobile/lib/match-detail/keep-watching.ts` restores phase 1 exactly.
+
+**Added**
+- `apps/mobile/lib/match-detail/keep-watching.ts`: the pure planner (constants, network class, the incoming target t0 with coverage, start decision, chase step, equal-power ramp gains, the retry re-sign rule, the Android decoder check). `apps/mobile/lib/match-detail/switch-lead-store.ts`: per network class EWMAs of ready and start latency (the adaptive lead) and the decoder latch. Neither imports the single player, so the multi-angle player (jits-xfvd.3) can reuse them.
+- `useVideoPlayback` (`apps/mobile/lib/match-detail/use-video-playback.ts`): two slot players for the screen's life (`players`, `frontSlot`, `onSlotFirstFrame`). A tap on a ready front loads the target muted in the other slot while the front keeps playing, chases it into step hidden (within 2 frames for 2 samples, or lands by a cap with the leftover offset), and lands with an equal-power 240 ms audio ramp: the front, activeId, source and clock move to the new slot in one update; the old slot is released 300 ms later. Paused switches land on the post-seek frame. Pause, play, speed, seek and the front ending retarget the incoming player. Abandons (sign failure, a load error after one silent retry, an Android decoder error with a latch, an 8 s / 12 s timeout, background, navigation, unmount, a front error) leave angle 1 playing and always unlock; failures show the phase-1 tag. An angle pair with no sync offsets keeps watching as an approximate switch (it lands once the new angle starts at the carried time, with the 80 ms dip). The rest (no offsets passed, warm-only Android tier, kill switch, latch, front not ready, a quality swap) runs the shipped in-place switch.
+- `apps/mobile/components/film-room/angle-view-stack.tsx`: `AngleViewStack`, one `VideoView` per slot (Android TextureViews on both), each an opaque black box. The outgoing angle's view stays on top at the landing and fades out over `duration.fast` on the brand ease-out (Angle crossfade), dips for an approximate angle (Angle dip) or cuts under Reduce Motion; the poster never shows during a keep-watching switch.
+- Telemetry (`apps/mobile/lib/video/playback-telemetry.ts`, `use-playback-telemetry.ts`): switch mode `keep_watching`; keep-watching count, median lead and landed-late, p95 sync error at landing, retargets, fallbacks and abandons (first 4 reasons each), lock-ignored taps, silent load retries. The telemetry follows the front player across the role swap.
+
+**Changed**
+- The angle LOCK (owner, 2026-10-06), both modes: from the tap until the switch settles or is abandoned, the tapped chip is busy + selected and every other chip is disabled and dimmed to `opacity-disabled` 0.5; their taps only count in telemetry (no haptic, no switch). The engine also ignores `switchAngle` while a switch is in flight. No haptic at the landing or at an abandon.
+- `AngleSwitcher` (`apps/mobile/components/film-room/angle-switcher.tsx`): `locked` and `onIgnoredTap`; locked chips hold still on the same element (`PressableScale` gains `still`: no press scale or Reduce Motion dip, the press still fires), so screen-reader focus is kept.
+- Match player screen (`apps/mobile/app/(app)/video/[id].tsx`): renders `AngleViewStack`; always passes both angles' offsets to `switchAngle` (null when unsynced: no prod video has an offset yet, so an unsynced pair keeps watching as an approximate switch); in keep-watching the clock, seek bar, key moments and route flip at the crossfade (the route with the landed time), and the phase-1 chrome snapshot applies to in-place switches only. `SwitchOverlay` holds its still for in-place switches only.
+- DESIGN.md Motion registry and its mirror `design/system/project/Motion.md`: Angle crossfade, Angle dip, new Audio crossfade, Held frame, Syncing pill, Angle segment press and Press scale rows.
+
+### Video: film chip contrast over bright frames (jits-3liz)
+
+**Fixed**
+- `apps/mobile/components/film-room/film-chip.ts`: the unselected film chip (key moment stepper chip and arrows, the player's angle switcher over film) now sits on `ON_MEDIA.badge` (0.88 black) instead of `ON_MEDIA.tag` (0.45 black), so its `ON_MEDIA.white` label holds WCAG AA over a pure white frame (about 16.5:1, was about 3.4:1). Owner approved 2026-10-06. The selected (inverted) chip and the `ON_MEDIA.strong` edge are unchanged. No new token: `badge` is already the on-media text ground in the contrast rule.
+- `apps/mobile/components/film-room/angle-switcher.tsx`: the unselected Best angle tag is outlined in `ON_MEDIA.strong` (1 px, on its own `ON_MEDIA.badge` ground) so it stays distinct on the now-badge chip; selected, it keeps the chip's ink outline (`bdebf7fa`).
+- Tests: new `apps/mobile/__tests__/components/film-room/film-chip-contrast.test.tsx` asserts 4.5:1 over a white frame for the rendered stepper and switcher chips; `angle-switcher.test.tsx` updated for the new ground.
+
+## OTA "AI move labels hidden" (runtime 0.5.0), 2026-10-06
+
+Production OTA group `7e1d3be8-905e-47f4-bb13-9b05fa41ce51` from jits_web `main` `a054b5a5` (release PR #66: #65). JS-only, non-critical. Rollback target: `ff7e974d-d271-4eca-a76a-1cb594723d91`. Server-side reel labels remain until jr_be-du1.10.
+
+### Video: AI move labels hidden; key moment stepper (jits-xfvd.18)
+
+Owner decisions 2026-10-06: AI analysis labels (move, position and technique names) are internal for now. The player and the highlight reels show none to anyone, admins included; the analysis surfaces (match detail AI BREAKDOWN, key moment labels, technique tags, web analysis viewer) show them to platform admins only. Key moments stay as timestamps. JS-only (OTA on runtime 0.5.0).
+
+**Added**
+- `apps/mobile/components/film-room/moment-stepper.tsx`: `MomentStepper`, `[prev] [00:38 | 2/5] [next]` in the film chip style. The middle chip shows the moment at or before the playhead (the first one's time before it), is lit while the playhead is on it, and replays it on tap; prev and next jump to the adjacent moments and are dimmed and disabled at the ends. 44 pt targets; labels "Previous key moment, 00:06", "Next key moment, 02:05", "Key moment 2 of 5, 00:38".
+- The analysis label gate: `canSeeAnalysisLabels(platformRole)` (admin or founder), `keyMomentDisplayLabel` and `keyMomentStepAt` in `packages/shared/src/utils/key-moments.ts` (display-time only; `buildKeyMoments` is unchanged); `useShowAnalysisLabels()` on mobile (`apps/mobile/lib/video/use-show-analysis-labels.ts`, from the auth context) and web (`apps/web/lib/video/use-show-analysis-labels.ts`, reads the athlete via `getCurrentAthlete`, false until it loads and on any failure).
+
+**Changed**
+- Match player (single and multi-angle): the key moment chip row is replaced by `MomentStepper` (times only), and the moment caption is removed for everyone. The seek-bar dots and the "N KEY MOMENTS" counter are unchanged.
+- Match detail for non-admins: key moment rows show the time and the FINISH marker only (the finish exists only for a recorded submission result), one row per second, technique tags are hidden, and the AI BREAKDOWN reads "Analysis complete." instead of the model summary. A finish named by the user-recorded submission keeps that name for everyone ("Play from 03:57, Rear-naked choke"); a finish that fell back to an AI scoring moment stays time only. Admins see today's labels.
+- The stepper steps over distinct stops (`keyMomentsBySecond`): moments in the same displayed second, or less than 1 s apart, are one stop (earliest time, a finish wins), so prev never sticks on a repeated time and the n/N count covers every stop (review M1 and re-review).
+- Web `VideoAnalysisViewer`: non-admins get "Analysis complete." and the key moment times instead of the Summary, Timeline, Techniques and Tips tabs (the tips name moves too). The no-match state is unchanged.
+- Highlight share caption: a win reads "Took the win against X." and never names the technique, which is the highlight planner's AI guess (jr_be `_highlight_match_facts`), not the recorded submission.
+
+**Removed**
+- `MomentChips` and `MomentCaption` (`components/film-room/player-controls.tsx`); the highlight card's "What changed" note (model prose that can name moves) and `whatChanged` in `lib/highlight/highlight-copy.ts`.
+
+## OTA "Angle switch phase 1" (runtime 0.5.0), 2026-10-06
+
+Production OTA group `ff7e974d-d271-4eca-a76a-1cb594723d91` from jits_web `main` `bed21406` (release PR #64: #63, #62). JS-only, non-critical. Rollback target: `aaa9bb67-bdee-4269-ae29-d26eb024ba29`. Known follow-ups: device capture (jits-xfvd.14), film chip contrast (jits-3liz), multi-angle test flake (jits-eimg).
+
 ### Match player: angle switch phase 1 (jits-xfvd.16, jits-tn2h)
 
 JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change: `expo-image`, Reanimated and `expo-haptics` are already linked). Contract: `research/2026-10-multi-angle-playback/06-angle-switch-phase1-contract.md`; design: canvas page "Proposed (Oct 6 angle switch)". No video bytes are preloaded (pre-sign only, as before).
@@ -22,24 +71,6 @@ JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change:
 **Fixed**
 - No black frame or frame 0 of the next angle on a switch: the outgoing frame is held until the new one is at the target.
 - The Best angle tag on an unselected angle sits on its own `ON_MEDIA.badge` ground and holds 4.5:1 over a bright frame (jits-tn2h; it was about 3.3:1).
-
-### Video: AI move labels hidden; key moment stepper (jits-xfvd.18)
-
-Owner decisions 2026-10-06: AI analysis labels (move, position and technique names) are internal for now. The player and the highlight reels show none to anyone, admins included; the analysis surfaces (match detail AI BREAKDOWN, key moment labels, technique tags, web analysis viewer) show them to platform admins only. Key moments stay as timestamps. JS-only (OTA on runtime 0.5.0).
-
-**Added**
-- `apps/mobile/components/film-room/moment-stepper.tsx`: `MomentStepper`, `[prev] [00:38 | 2/5] [next]` in the film chip style. The middle chip shows the moment at or before the playhead (the first one's time before it), is lit while the playhead is on it, and replays it on tap; prev and next jump to the adjacent moments and are dimmed and disabled at the ends. 44 pt targets; labels "Previous key moment, 00:06", "Next key moment, 02:05", "Key moment 2 of 5, 00:38".
-- The analysis label gate: `canSeeAnalysisLabels(platformRole)` (admin or founder), `keyMomentDisplayLabel` and `keyMomentStepAt` in `packages/shared/src/utils/key-moments.ts` (display-time only; `buildKeyMoments` is unchanged); `useShowAnalysisLabels()` on mobile (`apps/mobile/lib/video/use-show-analysis-labels.ts`, from the auth context) and web (`apps/web/lib/video/use-show-analysis-labels.ts`, reads the athlete via `getCurrentAthlete`, false until it loads and on any failure).
-
-**Changed**
-- Match player (single and multi-angle): the key moment chip row is replaced by `MomentStepper` (times only), and the moment caption is removed for everyone. The seek-bar dots and the "N KEY MOMENTS" counter are unchanged.
-- Match detail for non-admins: key moment rows show the time and the FINISH marker only (the finish exists only for a recorded submission result), one row per second, technique tags are hidden, and the AI BREAKDOWN reads "Analysis complete." instead of the model summary. A finish named by the user-recorded submission keeps that name for everyone ("Play from 03:57, Rear-naked choke"); a finish that fell back to an AI scoring moment stays time only. Admins see today's labels.
-- The stepper steps over distinct stops (`keyMomentsBySecond`): moments in the same displayed second, or less than 1 s apart, are one stop (earliest time, a finish wins), so prev never sticks on a repeated time and the n/N count covers every stop (review M1 and re-review).
-- Web `VideoAnalysisViewer`: non-admins get "Analysis complete." and the key moment times instead of the Summary, Timeline, Techniques and Tips tabs (the tips name moves too). The no-match state is unchanged.
-- Highlight share caption: a win reads "Took the win against X." and never names the technique, which is the highlight planner's AI guess (jr_be `_highlight_match_facts`), not the recorded submission.
-
-**Removed**
-- `MomentChips` and `MomentCaption` (`components/film-room/player-controls.tsx`); the highlight card's "What changed" note (model prose that can name moves) and `whatChanged` in `lib/highlight/highlight-copy.ts`.
 
 ## OTA "Adaptive playback quality" (runtime 0.5.0), 2026-10-06
 

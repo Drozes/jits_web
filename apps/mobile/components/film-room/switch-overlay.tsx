@@ -7,7 +7,8 @@ import { duration, easing, moment } from "@/lib/motion";
 import { ON_MEDIA } from "@/lib/theme/palette";
 
 export interface SwitchOverlayProps {
-  switchState: Pick<SwitchState, "phase" | "seq" | "heldFrame" | "approximate" | "restoring">;
+  /** `mode` is optional for older callers: only an in_place switch (or none given) holds a still. */
+  switchState: Pick<SwitchState, "phase" | "seq" | "heldFrame" | "approximate" | "restoring"> & Partial<Pick<SwitchState, "mode">>;
   /** From useReduceMotion() at the screen (a prop for testability). */
   reduceMotion: boolean;
   testID?: string;
@@ -33,10 +34,14 @@ export type SwitchOverlayMode = "hold" | "crossfade" | "dip";
  * hook returns to idle and clears the still. Not touchable, hidden from
  * screen readers (the switcher's busy state and the landing announcement
  * carry the meaning).
+ *
+ * In_place switches only (jits-xfvd.19): a keep-watching switch never holds
+ * a still, the outgoing angle stays live on screen and `AngleViewStack`
+ * crossfades it, so this draws nothing for `mode` "keep_watching".
  */
 export function SwitchOverlay({ switchState, reduceMotion, testID = "switch-overlay" }: SwitchOverlayProps) {
   const { phase, seq, heldFrame, approximate, restoring } = switchState;
-  if (heldFrame == null || phase === "idle") return null;
+  if (heldFrame == null || phase === "idle" || switchState.mode === "keep_watching") return null;
   if (phase === "landing" && reduceMotion) return null;
   const mode: SwitchOverlayMode = phase === "pending" ? "hold" : approximate && !restoring ? "dip" : "crossfade";
   return <HeldStill key={seq} still={heldFrame} mode={mode} testID={testID} />;

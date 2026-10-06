@@ -1,6 +1,7 @@
 import * as React from "react";
 import { ScrollView, Text, View } from "react-native";
 import { PressableScale } from "@/components/ui/pressable-scale";
+import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 import { filmChipLabelStyle, filmChipStyle } from "@/components/film-room/film-chip";
 import { haptics } from "@/lib/motion";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
@@ -90,6 +91,16 @@ interface AngleSwitcherProps {
    * the Syncing pill carries the progress, so nothing else is drawn.
    */
   busyId?: string | null;
+  /**
+   * The angle lock (jits-xfvd.19, contract 07 section 11.1): true from the
+   * tap until the switch lands and settles, or is abandoned. While locked
+   * the selected chip is `busyId` (pending) or `activeId` (landing); every
+   * other chip is disabled and dimmed to `DISABLED_OPACITY` (0.5). No chip
+   * moves, buzzes or selects. Default false (the match page never locks).
+   */
+  locked?: boolean;
+  /** A tap on a chip the lock disabled (the player counts it in telemetry). */
+  onIgnoredTap?: () => void;
 }
 
 /**
@@ -104,8 +115,17 @@ interface AngleSwitcherProps {
  * opacity dip). Pressing an angle that is not active fires the `select`
  * haptic once, then `onSelect`; pressing the active one does nothing (no
  * haptic, no call), as the tab vocabulary says.
+ *
+ * Locked (an angle switch in flight, `locked`): the selected chip (the
+ * tapped angle while pending, then the landed one) does nothing; every other
+ * chip is disabled (`accessibilityState`
+ * disabled, dimmed to 0.5), does not move and has no haptic, and a tap on it
+ * only calls `onIgnoredTap`. Nothing buzzes at the landing or when the lock
+ * releases. Every chip stays the same `PressableScale` element (held
+ * `still` while locked), so locking and unlocking never remount a chip and
+ * screen-reader focus stays where it was.
  */
-export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate", bestId, busyId }: AngleSwitcherProps) {
+export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate", bestId, busyId, locked = false, onIgnoredTap }: AngleSwitcherProps) {
   const p = usePalette();
   const angles = switchableAngles(all, activeId);
   if (angles.length < 2) return null;
@@ -113,8 +133,13 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
   const film = variant === "film";
   // On the page the segments follow the theme; the active one inverts.
   const c = { on: p.text, onLabel: p.bg, border: p.strong, fill: p.secondaryBg, label: p.text, sub: p.text2 };
+  // While locked the selection is the switch's: the tapped angle while it is
+  // pending (a keep-watching switch leaves activeId on the outgoing angle
+  // until the landing), then the landed one.
+  const selectedId = locked ? (busyId ?? activeId) : activeId;
   const chips = angles.map((a) => {
-    const on = a.id === activeId;
+    const on = a.id === selectedId;
+    const disabled = locked && !on;
     const label = angleName(a, opponentName);
     const isBest = a.id === best;
     const a11y = isBest ? `${angleA11yLabel(a, opponentName)}, ${BEST_ANGLE}` : angleA11yLabel(a, opponentName);
@@ -122,28 +147,42 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
       testID: `angle-${a.id}`,
       accessibilityRole: "tab" as const,
       accessibilityLabel: a11y,
-      accessibilityState: on && a.id === busyId ? { selected: true, busy: true } : { selected: on },
+      still: locked,
+      accessibilityState: disabled
+        ? { disabled: true, selected: false }
+        : on && a.id === busyId
+          ? { selected: true, busy: true }
+          : { selected: on },
       onPress: () => {
+        if (locked) {
+          // The lock: no haptic, no switch. Only a disabled chip's tap counts.
+          if (disabled) onIgnoredTap?.();
+          return;
+        }
         if (on) return;
         void haptics.select();
         onSelect(a.id);
       },
     };
+    // Locked chips hold still (`still`: no press scale, no Reduce Motion dip)
+    // on the same PressableScale element; dimmed when disabled.
+    const dim = disabled ? { opacity: DISABLED_OPACITY } : null;
     if (film) {
       // Over video: the key moment chip (film-chip.ts), sized to its label,
       // with the Best angle tag inset beside the label.
       return (
-        <PressableScale key={a.id} {...common} style={[filmChipStyle(on), { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+        <PressableScale key={a.id} {...common} style={[filmChipStyle(on), { flexDirection: "row", alignItems: "center", gap: 8 }, dim]}>
           <Text numberOfLines={1} className="font-mono-bold" style={[filmChipLabelStyle(on), TABULAR]}>
             {label}
           </Text>
           {isBest ? (
             // Unselected, the tag sits on its own ON_MEDIA.badge ground so it
-            // holds 4.5:1 over a bright frame (jits-tn2h); selected, it is
-            // outlined in the chip's own ink.
+            // holds 4.5:1 over a bright frame (jits-tn2h), outlined in
+            // ON_MEDIA.strong so it stays distinct on the badge chip
+            // (jits-3liz); selected, it is outlined in the chip's own ink.
             <View
               testID={`angle-best-tag-${a.id}`}
-              style={{ paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, borderWidth: 1, borderColor: on ? ON_MEDIA.ink : ON_MEDIA.badge, backgroundColor: on ? "transparent" : ON_MEDIA.badge }}
+              style={{ paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, borderWidth: 1, borderColor: on ? ON_MEDIA.ink : ON_MEDIA.strong, backgroundColor: on ? "transparent" : ON_MEDIA.badge }}
             >
               <Text testID={`angle-best-${a.id}`} numberOfLines={1} className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: on ? ON_MEDIA.ink : ON_MEDIA.text }, TABULAR]}>
                 {BEST_ANGLE.toUpperCase()}
@@ -158,7 +197,7 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
         key={a.id}
         {...common}
         className="flex-1 items-center justify-center"
-        style={{ height: 44, borderRadius: 2, borderWidth: 1, borderColor: on ? c.on : c.border, backgroundColor: on ? c.on : c.fill }}
+        style={[{ height: 44, borderRadius: 2, borderWidth: 1, borderColor: on ? c.on : c.border, backgroundColor: on ? c.on : c.fill }, dim]}
       >
         <Text numberOfLines={1} className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING.caps, color: on ? c.onLabel : c.label }, TABULAR]}>
           {label}

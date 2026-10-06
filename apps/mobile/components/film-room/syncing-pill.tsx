@@ -38,6 +38,9 @@ export interface SyncingPillProps {
  * (a superseding switch keeps it up and only changes the label). A restore
  * after a failure is not a switch: the pill goes at once (no minimum, no
  * fade) so the failure tag can take its slot at the moment of failure.
+ * A keep-watching switch (jits-xfvd.19) uses it unchanged: the athlete keeps
+ * watching the outgoing angle under it until the crossfade, and an abandoned
+ * switch is a failure (pill gone at once, tag) or a silent end (normal fade).
  *
  * Moment + Ambient: it fades in over `instant` and out over `fast`; while up,
  * a 2 px band sweeps its bottom edge (linear, `duration.shimmer`, UI thread,

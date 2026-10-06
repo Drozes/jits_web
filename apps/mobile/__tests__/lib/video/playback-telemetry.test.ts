@@ -773,3 +773,71 @@ describe("quality tag buckets", () => {
     expect(rebufferBucket(ratio)).toBe(bucket);
   });
 });
+
+describe("PlaybackSession keep-watching switch (jits-xfvd.19)", () => {
+  it("reports empty keep-watching fields without a switch", () => {
+    expect(matchSession().summary(1000, "unmount")).toMatchObject({
+      switchKeepWatchingCount: 0,
+      switchLeadMs: null,
+      switchLandedLateMs: null,
+      switchSyncErrorP95Ms: null,
+      switchRetargetCount: 0,
+      switchFallbackCount: 0,
+      switchFallbackReasons: [],
+      switchAbandonedCount: 0,
+      switchAbandonReasons: [],
+      switchIgnoredTapCount: 0,
+      switchLoadRetryCount: 0,
+      switchLoadRetryLandedCount: 0,
+    });
+  });
+
+  it("counts modes, medians the lead and landed-late, p95s the exact sync error, and keeps 4 reasons", () => {
+    const s = matchSession();
+    s.playing(true, 1000);
+    s.switchStarted(2000, "keep_watching");
+    s.switchRetarget();
+    s.switchLoadRetried();
+    s.switchLanded(3000);
+    s.switchKeepWatchingLanded({ leadMs: 1000, landedLateMs: 1500, syncErrorMs: 20, exact: true, afterRetry: true });
+    s.switchStarted(5000, "keep_watching");
+    s.switchLanded(7000);
+    // [cap] a landing with a leftover 100 ms offset.
+    s.switchKeepWatchingLanded({ leadMs: 2000, landedLateMs: 2500, syncErrorMs: 100, exact: true, afterRetry: false });
+    s.switchStarted(9000, "keep_watching");
+    s.switchKeepWatchingLanded({ leadMs: 3000, landedLateMs: 4000, syncErrorMs: 900, exact: false, afterRetry: false });
+    s.switchStarted(11_000, "keep_watching");
+    s.switchAbandoned("timeout");
+    s.switchStarted(12_000, "seek");
+    for (const r of ["no_offsets", "warm_only", "no_offsets", "disabled", "unsupported"] as const) s.switchFallback(r);
+    for (const r of ["timeout", "background", "navigation", "unmount", "load_error"] as const) s.switchAbandoned(r);
+    s.switchTapIgnored();
+    s.switchTapIgnored();
+    const out = s.summary(20_000, "unmount");
+    expect(out).toMatchObject({
+      switchCount: 5,
+      switchKeepWatchingCount: 4,
+      switchSeekCount: 1,
+      switchLeadMs: 2000,
+      switchLandedLateMs: 2500,
+      switchSyncErrorP95Ms: 100,
+      switchRetargetCount: 1,
+      switchFallbackCount: 5,
+      switchFallbackReasons: ["no_offsets", "warm_only", "no_offsets", "disabled"],
+      switchAbandonedCount: 6,
+      switchAbandonReasons: ["timeout", "timeout", "background", "navigation"],
+      switchIgnoredTapCount: 2,
+      switchLoadRetryCount: 1,
+      switchLoadRetryLandedCount: 1,
+      switchLatencyMs: 1500,
+    });
+  });
+
+  it("an abandoned switch has no latency (a stray landing after it is ignored)", () => {
+    const s = matchSession();
+    s.switchStarted(2000, "keep_watching");
+    s.switchAbandoned("background");
+    s.switchLanded(3000);
+    expect(s.summary(4000, "unmount").switchLatencyMs).toBeNull();
+  });
+});

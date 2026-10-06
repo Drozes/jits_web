@@ -1,9 +1,8 @@
 import * as React from "react";
-import { AccessibilityInfo, ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { VideoView } from "expo-video";
 import { NO_MATCH_COPY, angleSyncExact, buildKeyMoments, formatClock, isNoMatch, translateAngleTime } from "@jits/shared/utils";
 import { HarnessMarker } from "@/components/match-detail/harness-marker";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
@@ -13,6 +12,7 @@ import { FilmScrim } from "@/components/film-room/film-scrim";
 import { FilmBackButton } from "@/components/film-room/film-back-button";
 import { AngleSwitcher, angleText, type AngleOption } from "@/components/film-room/angle-switcher";
 import { SwitchOverlay } from "@/components/film-room/switch-overlay";
+import { AngleViewStack } from "@/components/film-room/angle-view-stack";
 import { SyncingPill } from "@/components/film-room/syncing-pill";
 import { SeekBar } from "@/components/film-room/seek-bar";
 import { Transport, nextSpeed } from "@/components/film-room/player-controls";
@@ -37,18 +37,26 @@ const CURRENT_HOLD_S = 10;
  * bar with a marker per key moment, the key moment stepper (times only), ±10 s, speed, and the angle switcher when both athletes recorded.
  * `?t=<seconds>` starts playback there (key moments link in with it).
  *
- * An angle switch happens in place (multi-angle P0): the screen, the player
- * and the telemetry session stay; the other angle's (pre-signed) URL is
- * swapped in at the exact translated position, keeping play/pause and speed.
- * The route params follow along (`setParams`) only so the URL names what is
- * on screen; nothing is keyed on them.
+ * An angle switch keeps the screen and the telemetry session; the route
+ * params follow along (`setParams`) only so the URL names what is on screen;
+ * nothing is keyed on them. The engine (`playback.switchState.mode`) runs it
+ * one of two ways:
  *
- * While a switch is in flight (jits-xfvd.16, `playback.switchState`): the
- * tapped segment is selected and busy, a still of the outgoing frame covers
- * the player (`SwitchOverlay`), "Syncing angle" shows after 200 ms
- * (`SyncingPill`), and the bottom cluster stays on the outgoing angle until
- * the switch lands, then swaps in one render. A failed switch returns to
- * the previous angle with a "Could not load" tag.
+ * - keep_watching (jits-xfvd.19): the outgoing angle keeps playing, with its
+ *   audio, while the new one loads in the second player underneath and gets
+ *   in step; then `AngleViewStack` crossfades (dips, for an approximate
+ *   angle). The bottom cluster (clock, seek bar, key moments) is live and
+ *   flips at the crossfade, with the route. An abandoned switch leaves the
+ *   outgoing angle playing and, for a failure, shows the "Could not load" tag.
+ * - in_place (jits-xfvd.16, the fallback): a still of the outgoing frame
+ *   covers the player (`SwitchOverlay`) while the one player loads the new
+ *   angle, the bottom cluster holds the outgoing angle as it was at the tap,
+ *   and a failed switch returns to the previous angle with the tag.
+ *
+ * Either way every angle chip is LOCKED from the tap until the switch lands
+ * and settles or is abandoned: the tapped chip is selected and busy, the
+ * others disabled and dimmed, and their taps are only counted in telemetry.
+ * "Syncing angle" shows after 200 ms (`SyncingPill`).
  *
  * `useVideoPlayback` signs a 1-hour URL (normalized MP4 preferred), re-signs
  * silently once when the player errors and resumes where it was. The player is
@@ -104,7 +112,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const playback = useVideoPlayback(id, start);
-  const { phase, source, stateLabel, player, retry, positionS, durationS, playing, seek, toggle, telemetry } = playback;
+  const { phase, source, stateLabel, retry, positionS, durationS, playing, seek, toggle, telemetry } = playback;
   const sw = playback.switchState;
   const activeId = playback.activeId;
   const details = useMatchDetail(source?.matchId ?? undefined);
@@ -169,14 +177,47 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   );
   const analyses = useAngleAnalyses(analysisIds);
 
-  // While a switch is pending, the bottom cluster stays on the outgoing angle
-  // as it was at the tap (contract 4.5); it swaps to the new angle's live
-  // values in one render at landing. The transport stays live.
+  // While an in_place switch is pending, the bottom cluster stays on the
+  // outgoing angle as it was at the tap (contract 06 4.5); it swaps to the
+  // new angle's live values in one render at landing. A keep-watching switch
+  // needs no snapshot: activeId and the front player stay on the outgoing
+  // angle until the crossfade, so the live chrome flips there (contract 07
+  // D1). The transport stays live.
   const [snapshot, setSnapshot] = React.useState<ChromeSnapshot | null>(null);
   // The route's `approx` for each angle this screen switched to, so a restore
   // to a superseded switch's angle puts back what the route said for it.
   const approxByIdRef = React.useRef<Record<string, "0" | "1">>({});
-  const frozen = sw.phase === "pending" ? snapshot : null;
+  const frozen = sw.phase === "pending" && sw.mode !== "keep_watching" ? snapshot : null;
+  // The lock (owner 2026-10-06): no chip switches from the tap until idle.
+  const locked = sw.phase !== "idle";
+  // The route follows activeId: at the tap for in_place (activeId moves
+  // there, with the tap's time), at the crossfade for keep_watching (with the
+  // landed time). An abandoned switch never moves it. The pending move is
+  // keyed by the seq the tap's switch gets (the engine's seq + 1) and the
+  // screen's entry, so it can never apply to another switch or recording.
+  const routeRef = React.useRef<{ id: string; t: number; approx: "0" | "1"; seq: number; entryId: string | undefined } | null>(null);
+  const { currentTimeNow } = playback;
+  const failedSeq = sw.failed?.seq ?? null;
+  React.useEffect(() => {
+    const next = routeRef.current;
+    if (!next) return;
+    // Another recording opened, or a later switch began: this move is stale.
+    if (entryId !== next.entryId || sw.seq > next.seq) {
+      routeRef.current = null;
+      return;
+    }
+    // The tap's switch has not reached the state yet (or was rejected).
+    if (sw.seq < next.seq) return;
+    if (activeId === next.id) {
+      routeRef.current = null;
+      const at = sw.mode === "keep_watching" ? currentTimeNow() : next.t;
+      router.setParams({ id: next.id, t: at.toFixed(3), approx: next.approx });
+      return;
+    }
+    // Ended without activeId reaching the target (abandoned or failed, even
+    // pending to idle in one batch): the route stays.
+    if (sw.phase === "idle" || failedSeq === next.seq) routeRef.current = null;
+  }, [activeId, sw.seq, sw.phase, sw.mode, failedSeq, entryId, currentTimeNow, router]);
   const chromeId = frozen ? frozen.id : activeId;
   const chromePositionS = frozen ? frozen.positionS : positionS;
   const chromeDuration = frozen ? frozen.durationS : duration;
@@ -236,25 +277,16 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
           {/* The row read and the sign both succeeded, so the recording
               exists: a player error is an expired URL or the network
               (useVideoPlayback re-signs). */}
-          <VideoView
-            testID="video-player"
-            player={player}
-            style={StyleSheet.absoluteFill}
-            contentFit="contain"
-            nativeControls={false}
-            allowsPictureInPicture={false}
-            onFirstFrameRender={playback.onFirstFrameRender}
+          <AngleViewStack
+            players={playback.players}
+            frontSlot={playback.frontSlot}
+            switchState={sw}
+            onSlotFirstFrame={playback.onSlotFirstFrame}
+            posterUrl={source.posterUrl ?? null}
+            frameShown={playback.frameShown}
+            reduceMotion={reduceMotion}
           />
-          {source.posterUrl && !playback.frameShown ? (
-            <Image
-              testID="video-poster"
-              source={{ uri: source.posterUrl }}
-              resizeMode="contain"
-              style={StyleSheet.absoluteFill}
-              accessibilityIgnoresInvertColors
-            />
-          ) : null}
-          {/* The outgoing frame, held while the next angle loads (jits-xfvd.16). */}
+          {/* In_place only: the outgoing frame, held while the next angle loads (jits-xfvd.16). */}
           <SwitchOverlay switchState={sw} reduceMotion={reduceMotion} />
           <FilmScrim stops={[[0, 0.75], [1, 0]]} style={{ left: 0, right: 0, top: 0, height: insets.top + 150 }} />
           <FilmScrim stops={[[0, 0], [1, 0.9]]} style={{ left: 0, right: 0, bottom: 0, height: "45%" }} />
@@ -266,9 +298,19 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                 angles={view.videos}
                 activeId={activeId}
                 opponentName={opponentName}
-                busyId={sw.phase === "pending" && !sw.restoring ? sw.targetId : null}
+                // The tapped angle while pending (an in_place restore: the
+                // angle coming back); during the landing the landed one is
+                // selected and the rest stay locked until idle (D4).
+                busyId={sw.phase === "pending" ? sw.targetId : null}
+                locked={locked}
+                onIgnoredTap={telemetry.switchTapIgnored}
                 onSelect={(other) => {
                   if (other === activeId) return;
+                  // Defensive: the switcher never selects while locked.
+                  if (locked) {
+                    telemetry.switchTapIgnored();
+                    return;
+                  }
                   // Offsets come with the match (get_match_details, jr_be
                   // 20261005100400; primary = 0). The position is the
                   // player's own, carried in fractional seconds: flooring it
@@ -280,17 +322,23 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                   const fromT = playback.currentTimeNow();
                   const moved = translateAngleTime(fromT, from?.sync_offset_ms, to?.sync_offset_ms);
                   const exact = moved.synced && angleSyncExact(from) && angleSyncExact(to);
-                  // A switch superseding a pending one keeps the first
-                  // snapshot: the outgoing angle is still what is on screen.
-                  if (sw.phase !== "pending") {
-                    setSnapshot({ id: activeId, positionS, durationS: duration, fromT, approx: approximate ? "1" : "0" });
-                  }
+                  // The frozen chrome if the engine runs this switch in_place.
+                  setSnapshot({ id: activeId, positionS, durationS: duration, fromT, approx: approximate ? "1" : "0" });
                   approxByIdRef.current[other] = exact ? "0" : "1";
-                  playback.switchAngle(other, moved.t, { approximate: !exact });
+                  // The route moves when activeId does (the effect above).
+                  routeRef.current = { id: other, t: moved.t, approx: exact ? "0" : "1", seq: sw.seq + 1, entryId };
+                  // The offsets let the engine map the two angles' times
+                  // continuously (keep_watching). Always passed: an unsynced
+                  // pair (null offsets) keeps watching as an approximate
+                  // switch (coordinator 2026-10-06: no prod video has an
+                  // offset yet, so withholding them would keep the stall).
+                  playback.switchAngle(other, moved.t, {
+                    approximate: !exact,
+                    offsets: { fromMs: from?.sync_offset_ms ?? null, toMs: to?.sync_offset_ms ?? null },
+                  });
                   // The note shows when an approximate switch lands, not at the tap.
                   setApproxAt(null);
                   setNoteQueued(false);
-                  router.setParams({ id: other, t: moved.t.toFixed(3), approx: exact ? "0" : "1" });
                 }}
               />
             </View>

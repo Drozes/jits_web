@@ -58,6 +58,13 @@ export interface PressableScaleProps extends Omit<PressableProps, "style"> {
   haptic?: PressHaptic;
   /** NativeWind classes, applied to the Pressable as usual. */
   className?: string;
+  /**
+   * Hold still: no press scale and no Reduce Motion dip, but `onPress` (and
+   * `haptic`) still fire. For a control that is locked for a moment yet must
+   * keep its element (and screen-reader focus), such as the locked angle
+   * chips (jits-xfvd.19). Default false.
+   */
+  still?: boolean;
 }
 
 function fireHaptic(haptic: PressHaptic | undefined): void {
@@ -66,26 +73,28 @@ function fireHaptic(haptic: PressHaptic | undefined): void {
 }
 
 export const PressableScale = React.forwardRef<View, PressableScaleProps>(function PressableScale(
-  { haptic, style, disabled, onPress, onPressIn, onPressOut, ...rest },
+  { haptic, style, disabled, still = false, onPress, onPressIn, onPressOut, ...rest },
   ref,
 ) {
   const reduceMotion = useReduceMotion();
   const scale = useSharedValue(1);
   const [pressed, setPressed] = React.useState(false);
   const inert = !!disabled;
+  // No motion: disabled, or held still.
+  const motionless = inert || still;
 
-  // A control disabled mid-press never gets its press-out: put it back at rest.
+  // A control disabled (or stilled) mid-press never gets its press-out: put it back at rest.
   React.useEffect(() => {
-    if (!inert) return;
+    if (!motionless) return;
     cancelAnimation(scale);
     scale.value = 1;
-  }, [inert, scale]);
+  }, [motionless, scale]);
 
   const handlePressIn = React.useCallback(
     (e: GestureResponderEvent) => {
       setPressed(true);
       // Under Reduce Motion the dip is the pressed-only opacity below.
-      if (!inert && !reduceMotion) {
+      if (!motionless && !reduceMotion) {
         scale.value = withTiming(PRESS_SCALE, {
           duration: duration.instant,
           easing: easing.brandOut,
@@ -93,7 +102,7 @@ export const PressableScale = React.forwardRef<View, PressableScaleProps>(functi
       }
       onPressIn?.(e);
     },
-    [inert, reduceMotion, scale, onPressIn],
+    [motionless, reduceMotion, scale, onPressIn],
   );
 
   const handlePressOut = React.useCallback(
@@ -126,7 +135,7 @@ export const PressableScale = React.forwardRef<View, PressableScaleProps>(functi
   // Flattened: a function style may return a nested array with `false`
   // entries (FightButton), which the jest style reader cannot walk either.
   if (resolved) composed.push(StyleSheet.flatten(resolved));
-  if (shownPressed && reduceMotion) composed.push(REDUCED_DIP_STYLE);
+  if (shownPressed && reduceMotion && !still) composed.push(REDUCED_DIP_STYLE);
 
   return (
     <AnimatedPressable
