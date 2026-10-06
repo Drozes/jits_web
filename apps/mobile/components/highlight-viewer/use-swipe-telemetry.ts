@@ -3,8 +3,8 @@ import type { HighlightShareSourceTag, HighlightShareStep } from "@jits/shared/a
 import { track } from "@/lib/highlight-share";
 import type { ReelPoolController } from "@/lib/highlight/reel-player-pool";
 
-/** B4 step (jr_be-62n, allowlisted by jr_be 20261008200200); joins HIGHLIGHT_SHARE_STEPS with jits-a4fw.1. */
-export const VIEWER_SWIPED = "viewer_swiped" as HighlightShareStep;
+/** B4 step (jr_be-62n, allowlisted by jr_be 20261008200200; in HIGHLIGHT_SHARE_STEPS). */
+export const VIEWER_SWIPED: HighlightShareStep = "viewer_swiped";
 
 interface Pending {
   highlightId: string;

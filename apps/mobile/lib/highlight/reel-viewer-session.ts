@@ -76,12 +76,9 @@ export function parseReelLane(raw: string | string[] | undefined): ReelLaneKey |
   return value === "home" || value === "matches" ? value : null;
 }
 
-/**
- * The funnel `source` of a lane. `matches` joins `HIGHLIGHT_SHARE_SOURCES`
- * with jits-a4fw.1; the server stores `detail` as free JSON either way.
- */
+/** The funnel `source` of a lane (`home` and `matches` are both `HIGHLIGHT_SHARE_SOURCES`). */
 export function laneSource(lane: ReelLaneKey): HighlightShareSourceTag {
-  return lane as HighlightShareSourceTag;
+  return lane;
 }
 
 /** Sign-out (lanes belong to the old account) and tests. */
