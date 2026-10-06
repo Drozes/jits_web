@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## OTA "Adaptive playback quality" (runtime 0.5.0), 2026-10-06
+
+Production OTA group `aaa9bb67-bdee-4269-ae29-d26eb024ba29` from jits_web `main` `335a2335` (release PR #59: #58, #57, #53). JS-only, non-critical. Rollback target: `cc8974cd-0d94-450c-ad70-a53817cda20d`. Needs jr_be `20261008100400_playback_client_settings.sql`, applied to prod 2026-10-06 (the client falls back to built-in defaults if the RPC is unavailable). The multi-angle player ships inert behind a dev-only flag. Known follow-ups: on-device check of adaptive switching (spec 8.2 item 11), jits-xfvd.13 (multi-angle held frame on device), jits-p08f (db:types regen), jits-qcuw (recorder test flake).
+
 ### Match player: adaptive playback quality (jits-xfvd.12)
 
 JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change, no `app.json` change: NetInfo and AsyncStorage are already linked). Needs the jr_be `20261008100400` migration (`get_playback_settings`, applied to prod) for server-tuned settings; without it the client uses its compiled-in defaults. Spec: `research/2026-10-multi-angle-playback/05-adaptive-quality-spec.md`.
@@ -48,6 +52,8 @@ JS-only on mobile (OTA-safe on runtime 0.5.0, build 25): expo-video 3.0.16 APIs 
 - `apps/mobile/components/film-room/multi-angle/`: `angle-stack.tsx` (stacked views, TextureView on Android, held frame, dip, horizontal swipe with accessibility actions), `angle-bar.tsx` (angle control in the thumb zone, angle-count chip, Approx. sync tag), `angles-sheet.tsx` (every angle including pending and failed, COPY-DECK v2.2 row strings), `frame-step.tsx`, `multi-angle-player-body.tsx`.
 - Playback telemetry: `switchSwapCount` / `switchSeekCount` / `switchDipCount`, `syncResidualP50Ms` / `syncResidualP95Ms` / `syncSamples`, `decoderCapEvents` / `decoderCapReasons`, `playerMode`, `deviceTier`, and the `video.playback.mode` tag.
 - Sync trust reads `sync_offset_ms`, `sync_source` and `sync_confidence` from the match rows (mapped by `getMatchDetailView` since the angle-switch fix); there is no separate offsets read.
+
+## Earlier 0.5.0 OTAs: "Video status + angle switch" `cc8974cd` (2026-10-05), "Video wave 2" `5df069d4`, "Video upload UX" `31f5007e`
 
 ### Match player: angle switch in place (multi-angle P0)
 
