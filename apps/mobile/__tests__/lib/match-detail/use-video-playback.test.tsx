@@ -862,15 +862,56 @@ describe("useVideoPlayback adaptive quality", () => {
     longStall(10.25);
     expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledTimes(1);
     act(() => result.current.switchAngle("vid-2", 12));
-    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-2.360.mp4" }));
+    // Round 2 (R2-M1): the dropped step-down is lost; vid-2 signs at the served 720.
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-2.720.mp4" }));
     ready();
     time(12.05);
     expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
-    for (let t = 0; t < 800 && mockTelemetry.qualitySwitchStarted.mock.calls.length < 2; t += 1) {
-      clock += 250;
-      time(12.3 + t * 0.25);
-    }
-    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenLastCalledWith("360", "720", "smooth", expect.anything());
+    // Not stuck: after the cooldown a new long stall decides again.
+    clock += 5000;
+    time(12.3);
+    longStall(12.5);
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledTimes(2);
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenLastCalledWith("720", "360", expect.stringMatching(/^stall_/), expect.anything());
+  });
+
+  it("review R2-M1: a step-down superseded by an angle switch: B and C sign the served 720, no unrequested step-up", async () => {
+    signCopies({ "vid-1": BOTH, "vid-2": BOTH, "vid-3": BOTH });
+    const base = mockSign.getMockImplementation()!;
+    mockSign.mockImplementation((c: unknown, vid: string, o: { rendition: string }) =>
+      vid === "vid-1" && o.rendition === "360" ? new Promise(() => undefined) : base(c, vid, o),
+    );
+    const { result } = await open();
+    longStall(10.25);
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledTimes(1);
+    act(() => result.current.switchAngle("vid-2", 12));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-2.720.mp4" }));
+    expect(mockSign).toHaveBeenCalledWith({}, "vid-2", { rendition: "720" });
+    ready();
+    time(12.05);
+    act(() => result.current.switchAngle("vid-3", 13));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-3.720.mp4" }));
+    expect(mockSign).toHaveBeenCalledWith({}, "vid-3", { rendition: "720" });
+    expect(mockSign).not.toHaveBeenCalledWith({}, "vid-2", { rendition: "360" });
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it("review R2-L1: a restore whose URL expired re-signs behind the held frame (no poster flash)", async () => {
+    signCopies({ "vid-1": BOTH });
+    const base = mockSign.getMockImplementation()!;
+    mockSign.mockImplementation((c: unknown, vid: string, o: { rendition: string }) =>
+      o.rendition === "360" ? Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "down" } }) : base(c, vid, o),
+    );
+    const { result } = await open();
+    // The restore's swap of the old (expired) URL is rejected by the player.
+    player().replaceAsync.mockImplementationOnce(() => Promise.reject(new Error("403 expired")));
+    longStall(10.25);
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(3));
+    expect(result.current.phase).toBe("ready");
+    expect(result.current.source?.holdFrame).toBe(true);
+    expect(result.current.frameShown).toBe(true);
+    ready();
+    expect(player().seeks.at(-1)).toBe(10.25);
   });
 
   it("review M3: pausing during a long stall never steps down (telemetry closes the stall on pause)", async () => {

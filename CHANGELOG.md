@@ -28,6 +28,7 @@ JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change,
   - Pausing or seeking during a long stall can no longer trigger a step-down: both players refresh the controller's conditions before telemetry closes the stall (M3).
   - Multi-angle (dev flag): a failed quality re-sign keeps each slot on its old file instead of marking it dead (M2).
   - Telemetry: a continuation reports `startFallback: null`, carries `qualitySteppedDown` from earlier in the screen session (the `stepdown` tag follows it), and every event has the `video.playback.resumed` tag.
+  - Review round 2: an angle switch drops a pending quality swap before reading the rendition, so the new angle signs at the level still served, and a superseded decision leaves the controller's target equal to what the new angle serves (no later silent step-up); a quality restore whose URL expired re-signs behind the held frame; a new start selection resets the telemetry flags carried into continuations.
   - Stores: history lists are cut to 20 on read; the settings read times out after 5 s and a failed read retries after 60 s; a hung AsyncStorage costs only the first start the 300 ms wait; the signer's `available` treats an empty path as absent, like the path choice.
 
 ### Arena live switch: a stale declined web session (jits-smgb)

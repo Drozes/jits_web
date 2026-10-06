@@ -214,6 +214,30 @@ describe("usePlaybackTelemetry adaptive quality", () => {
     expect(stalls).toEqual(["start", "end"]);
   });
 
+  it("review: a new start selection (a new video on this screen) resets the carried flags", async () => {
+    const { player, hook } = setup();
+    act(() => {
+      hook.result.current.setQuality(QMETA, BUILTIN_PLAYBACK_SETTINGS);
+      hook.result.current.playIntent(true);
+      hook.result.current.sourceAttached("normalized");
+      hook.result.current.renditionAttached("720", null);
+      player.emit("playingChange", { isPlaying: true });
+      hook.result.current.qualitySwitchStarted("720", "360", "stall_long", { lockedLow: true, capReached: true });
+      // An outside navigation: a new video, a new start selection.
+      hook.result.current.setQuality({ ...QMETA, startTarget: "360" }, BUILTIN_PLAYBACK_SETTINGS);
+      now += 1000;
+    });
+    act(() => appStateHandler!("background"));
+    act(() => appStateHandler!("active"));
+    act(() => {
+      player.emit("playingChange", { isPlaying: true });
+      now += 2000;
+    });
+    hook.unmount();
+    expect(extra(1)).toMatchObject({ resumed: true, qualitySteppedDown: false, qualityLockedLow: false, qualityCapReached: false });
+    expect(mockCaptureMessage.mock.calls[1][1].tags["video.playback.stepdown"]).toBe("none");
+  });
+
   it("records the finished session in the per-network history", async () => {
     const { player, hook } = setup();
     act(() => {

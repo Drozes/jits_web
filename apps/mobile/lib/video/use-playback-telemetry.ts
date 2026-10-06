@@ -220,6 +220,8 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
       switchLanded: () => sessionRef.current?.switchLanded(Date.now()),
       error: (message) => sessionRef.current?.error(message),
       setQuality: (meta, settings) => {
+        // A new start selection (a new video on this screen): no flags carry over from the last one.
+        flagsRef.current = { lockedLow: false, capReached: false, steppedDown: false };
         qualityRef.current = { meta, settings };
         sessionRef.current?.setQuality(meta);
       },

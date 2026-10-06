@@ -445,11 +445,16 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       streakRef.current = true;
       silentCountRef.current += 1;
       telemetry.resigned();
+      // A quality swap (or its restore) that errored keeps its held frame
+      // through the re-sign: no poster flash (review R2-L1).
+      const kind = swapKindRef.current;
+      const holdFrame = (kind === "restore" || kind === "quality") && sourceRef.current?.holdFrame === true;
+      if (kind === "restore") swapKindRef.current = null;
       // A quality swap that errored does not land; the re-sign uses its level.
       dropQualitySwap();
       // The re-sign is a new generation: the old swap can never land now.
       switchGenRef.current = null;
-      void sign(true);
+      void sign(true, holdFrame ? { holdFrame } : {});
     },
     [sign, telemetry, dropQualitySwap],
   );
@@ -827,9 +832,15 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   );
 
   const switchAngle = React.useCallback(
-    // Angle switches keep the session's rendition.
-    (nextId: string, atSeconds: number) => swapSource(nextId, atSeconds, quality.currentTarget(), "angle"),
-    [swapSource, quality],
+    // Angle switches keep the session's rendition. A pending quality swap is
+    // dropped FIRST, so the new angle signs at the level still served, never
+    // at a superseded decision's rendition (review R2-M1).
+    (nextId: string, atSeconds: number) => {
+      if (!nextId || nextId === activeIdRef.current) return;
+      dropQualitySwap();
+      swapSource(nextId, atSeconds, quality.currentTarget(), "angle");
+    },
+    [swapSource, quality, dropQualitySwap],
   );
 
   // A quality decision: the same id, at the exact position right now.
