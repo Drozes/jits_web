@@ -43,6 +43,7 @@ import { ARENA_CHALLENGE_FRESH_MS, MATCH_RESUME_WINDOW_MS } from "../constants";
 import { isUuid } from "../utils/shared";
 import { recordedEloDelta } from "../utils/recorded-delta";
 import { buildWeeklyActivity } from "../utils/stats-window";
+import { pickPlaybackPath, type ServedRendition, type TargetRendition } from "../utils/playback-quality";
 import {
   videoPlayability,
   videoAngleLabel,
@@ -3143,7 +3144,7 @@ export async function getMatchDetailView(
 }
 
 export interface MatchVideoPlayback {
-  /** Signed URL of normalized_path ?? storage_path. */
+  /** Signed URL of the file `pickPlaybackPath` chose for `target`. */
   url: string;
   /** Signed thumbnail key, best effort. */
   posterUrl: string | null;
@@ -3155,10 +3156,26 @@ export interface MatchVideoPlayback {
   /** Recorded length in seconds, when known. */
   durationSeconds: number | null;
   /**
-   * Which file `url` points at: the slicer's normalized H.264/AAC MP4, or the
-   * uploaded original (playback telemetry splits startup and stalls by it).
+   * The file family `url` points at: a slicer-made copy (`normalized`: the
+   * 720p-class `normalized_path` or the 360p `playback_360_path`), or the
+   * uploaded original. Playback telemetry splits startup and stalls by it;
+   * the rendition itself is `servedRendition`.
    */
   sourceKind: "normalized" | "original";
+  /** The rendition asked for (adaptive quality, jits-xfvd.12). */
+  target: TargetRendition;
+  /** The rendition actually signed after the fallback chain. */
+  servedRendition: ServedRendition;
+  /** Which slicer copies the row has (non-null `normalized_path` / `playback_360_path`). */
+  available: { "720": boolean; "360": boolean };
+  /** `match_videos.playback_profile` (null: a legacy rendition, or none yet). */
+  playbackProfile: string | null;
+}
+
+export interface MatchVideoPlaybackOptions {
+  /** Default "720", which reproduces the pre-quality choice (`normalized_path ?? storage_path`). */
+  rendition?: TargetRendition;
+  expiresInSeconds?: number;
 }
 
 /**
@@ -3174,14 +3191,18 @@ export interface MatchVideoPlayback {
 export async function getMatchVideoPlaybackResult(
   supabase: Client,
   videoId: string,
-  expiresInSeconds = 3600,
+  opts: number | MatchVideoPlaybackOptions = {},
 ): Promise<Result<MatchVideoPlayback | null>> {
+  // A number is the old third argument (expiresInSeconds).
+  const { rendition: target = "720", expiresInSeconds = 3600 } = typeof opts === "number" ? { expiresInSeconds: opts } : opts;
   // A malformed id can match no row; skip the round trip (and its 22P02).
   if (!isUuid(videoId)) return { ok: true, data: null };
   try {
     const { data, error } = await supabase
       .from("match_videos")
-      .select("storage_path, normalized_path, thumbnail_url, status, match_id, duration_seconds")
+      .select(
+        "storage_path, normalized_path, playback_360_path, playback_profile, thumbnail_url, status, match_id, duration_seconds",
+      )
       .eq("id", videoId)
       .maybeSingle();
     if (error) {
@@ -3191,13 +3212,25 @@ export async function getMatchVideoPlaybackResult(
         error: mapPostgrestError(error, "match_video_playback"),
       };
     }
-    // Same single-source rule as loadMatchVideoSignedUrl (jits-8t0m): prefer
-    // the normalized H.264/AAC MP4 when the slicer wrote one, else the original.
-    const playbackPath = data?.normalized_path ?? data?.storage_path;
+    // The contract's fallback chain per target (jr_be INTEGRATION.md 13):
+    // 720 is today's rule (normalized, else the original); 360 prefers the
+    // 360p copy, then the 720p one, then the original. Un-backfilled rows
+    // have NULL rendition columns and simply fall through.
+    const picked = data
+      ? pickPlaybackPath(
+          {
+            storage_path: data.storage_path ?? null,
+            normalized_path: data.normalized_path ?? null,
+            playback_360_path: data.playback_360_path ?? null,
+          },
+          target,
+        )
+      : null;
     // A deleted row is absence, even though RLS still returns it.
-    if (!data || !playbackPath || data.status === "deleted") {
+    if (!data || !picked || data.status === "deleted") {
       return { ok: true, data: null };
     }
+    const playbackPath = picked.path;
 
     const [{ data: signed, error: signError }, posterUrl] = await Promise.all([
       supabase.storage
@@ -3235,7 +3268,11 @@ export async function getMatchVideoPlaybackResult(
         playability: videoPlayability(data.status),
         matchId: data.match_id ?? null,
         durationSeconds: data.duration_seconds ?? null,
-        sourceKind: data.normalized_path ? "normalized" : "original",
+        sourceKind: picked.served === "original" ? "original" : "normalized",
+        target,
+        servedRendition: picked.served,
+        available: { "720": data.normalized_path != null, "360": data.playback_360_path != null },
+        playbackProfile: data.playback_profile ?? null,
       },
     };
   } catch (err) {

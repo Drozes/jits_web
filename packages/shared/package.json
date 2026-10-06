@@ -25,6 +25,7 @@
     "./api/friends": "./src/api/friends.ts",
     "./api/location": "./src/api/location.ts",
     "./api/invite-rpc": "./src/api/invite-rpc.ts",
+    "./api/playback-settings": "./src/api/playback-settings.ts",
     "./constants": "./src/constants.ts",
     "./constants/highlights": "./src/constants/highlights.ts",
     "./constants/go-live": "./src/constants/go-live.ts",

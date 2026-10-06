@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "adaptive": true,
+  "start": {
+    "wifi": "720",
+    "ethernet": "720",
+    "cellular_5g": "720",
+    "cellular_4g": "720",
+    "cellular_3g": "360",
+    "cellular_2g": "360",
+    "cellular_unknown": "360",
+    "other": "360",
+    "unknown": "360",
+    "none": "360"
+  },
+  "expensive": {
+    "cellular": "default",
+    "wifi": "default"
+  },
+  "stepDown": {
+    "stallMs": 1000,
+    "stallCount": 2,
+    "windowMs": 30000,
+    "cooldownMs": 2000
+  },
+  "stepUp": {
+    "smoothMs": 30000,
+    "smoothMsAfterStepDown": 90000,
+    "cooldownMs": 15000,
+    "networks": ["wifi", "ethernet", "cellular_5g", "cellular_4g"],
+    "onExpensive": true
+  },
+  "relapse": {
+    "windowMs": 60000
+  },
+  "maxSwitchesPerSession": 4,
+  "history": {
+    "maxEntries": 8,
+    "lookbackMs": 86400000,
+    "lookbackCount": 3,
+    "minWatchMs": 10000,
+    "badStallCount": 2,
+    "badStallMs": 3000,
+    "badStartupMs": 5000,
+    "downgradeIfNewestBad": true,
+    "downgradeBadCount": 2,
+    "upgradeGoodCount": 3
+  }
+}

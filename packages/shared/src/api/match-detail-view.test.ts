@@ -439,7 +439,7 @@ describe("getMatchVideoPlaybackResult", () => {
     await getMatchVideoPlaybackResult(m.client, VID);
     expect(m.from).toHaveBeenCalledWith("match_videos");
     expect(m.select).toHaveBeenCalledWith(
-      "storage_path, normalized_path, thumbnail_url, status, match_id, duration_seconds",
+      "storage_path, normalized_path, playback_360_path, playback_profile, thumbnail_url, status, match_id, duration_seconds",
     );
     expect(m.eq).toHaveBeenCalledWith("id", VID);
   });
@@ -473,7 +473,19 @@ describe("getMatchVideoPlaybackResult", () => {
     expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.norm.mp4", 600);
     expect(r).toEqual({
       ok: true,
-      data: { url: "https://signed/m/a/1.norm.mp4", posterUrl: null, status: "analyzed", playability: "playable", matchId: null, durationSeconds: null, sourceKind: "normalized" },
+      data: {
+        url: "https://signed/m/a/1.norm.mp4",
+        posterUrl: null,
+        status: "analyzed",
+        playability: "playable",
+        matchId: null,
+        durationSeconds: null,
+        sourceKind: "normalized",
+        target: "720",
+        servedRendition: "720",
+        available: { "720": true, "360": false },
+        playbackProfile: null,
+      },
     });
   });
 
@@ -644,7 +656,114 @@ describe("getMatchVideoPlaybackResult", () => {
     const r3 = await getMatchVideoPlaybackResult(failing.client, VID);
     expect(r3).toEqual({
       ok: true,
-      data: { url: "https://signed/m/a/1.mp4", posterUrl: null, status: "ready", playability: "playable", matchId: null, durationSeconds: null, sourceKind: "original" },
+      data: {
+        url: "https://signed/m/a/1.mp4",
+        posterUrl: null,
+        status: "ready",
+        playability: "playable",
+        matchId: null,
+        durationSeconds: null,
+        sourceKind: "original",
+        target: "720",
+        servedRendition: "original",
+        available: { "720": false, "360": false },
+        playbackProfile: null,
+      },
+    });
+  });
+
+  describe("renditions (adaptive quality, jits-xfvd.12)", () => {
+    const rowWith = (paths: { normalized_path: string | null; storage_path: string | null; playback_360_path: string | null }, profile: string | null = "pb1-h264-cfr30-g30-720-360") =>
+      mockClient({
+        maybeSingle: {
+          data: { ...paths, playback_profile: profile, thumbnail_url: null, status: "analyzed", match_id: MATCH_ID, duration_seconds: 300 },
+          error: null,
+        },
+      });
+    const ALL = { normalized_path: "m/a/1.720.mp4", storage_path: "m/a/1.mov", playback_360_path: "m/a/1.360.mp4" };
+
+    it("a number third argument still sets the expiry (old signature)", async () => {
+      const m = rowWith(ALL);
+      await getMatchVideoPlaybackResult(m.client, VID, 120);
+      expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.720.mp4", 120);
+    });
+
+    it("an options object sets the expiry and the target; the default is 720 for 1 h", async () => {
+      const m = rowWith(ALL);
+      const r = await getMatchVideoPlaybackResult(m.client, VID, { expiresInSeconds: 90 });
+      expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.720.mp4", 90);
+      expect(r.ok && r.data?.target).toBe("720");
+      const d = rowWith(ALL);
+      await getMatchVideoPlaybackResult(d.client, VID, {});
+      expect(d.createSignedUrl).toHaveBeenCalledWith("m/a/1.720.mp4", 3600);
+    });
+
+    it("target 360 signs the 360 copy and returns every new field", async () => {
+      const m = rowWith(ALL);
+      const r = await getMatchVideoPlaybackResult(m.client, VID, { rendition: "360" });
+      expect(m.createSignedUrl).toHaveBeenCalledWith("m/a/1.360.mp4", 3600);
+      expect(r).toEqual({
+        ok: true,
+        data: {
+          url: "https://signed/m/a/1.360.mp4",
+          posterUrl: null,
+          status: "analyzed",
+          playability: "playable",
+          matchId: MATCH_ID,
+          durationSeconds: 300,
+          sourceKind: "normalized",
+          target: "360",
+          servedRendition: "360",
+          available: { "720": true, "360": true },
+          playbackProfile: "pb1-h264-cfr30-g30-720-360",
+        },
+      });
+    });
+
+    it("target 360 falls back to the 720 copy, then the original (un-backfilled NULLs)", async () => {
+      const no360 = rowWith({ ...ALL, playback_360_path: null }, null);
+      const r1 = await getMatchVideoPlaybackResult(no360.client, VID, { rendition: "360" });
+      expect(no360.createSignedUrl).toHaveBeenCalledWith("m/a/1.720.mp4", 3600);
+      expect(r1.ok && r1.data).toMatchObject({ target: "360", servedRendition: "720", sourceKind: "normalized", available: { "720": true, "360": false }, playbackProfile: null });
+
+      const onlyOriginal = rowWith({ normalized_path: null, storage_path: "m/a/1.mov", playback_360_path: null }, null);
+      const r2 = await getMatchVideoPlaybackResult(onlyOriginal.client, VID, { rendition: "360" });
+      expect(onlyOriginal.createSignedUrl).toHaveBeenCalledWith("m/a/1.mov", 3600);
+      expect(r2.ok && r2.data).toMatchObject({ servedRendition: "original", sourceKind: "original", available: { "720": false, "360": false } });
+    });
+
+    it("target 720 picks normalized, then the original, then the 360 copy", async () => {
+      const all = rowWith(ALL);
+      const r1 = await getMatchVideoPlaybackResult(all.client, VID, { rendition: "720" });
+      expect(r1.ok && r1.data).toMatchObject({ servedRendition: "720", sourceKind: "normalized" });
+
+      const noNorm = rowWith({ ...ALL, normalized_path: null });
+      const r2 = await getMatchVideoPlaybackResult(noNorm.client, VID, { rendition: "720" });
+      expect(noNorm.createSignedUrl).toHaveBeenCalledWith("m/a/1.mov", 3600);
+      expect(r2.ok && r2.data).toMatchObject({ servedRendition: "original", sourceKind: "original", available: { "720": false, "360": true } });
+
+      const only360 = rowWith({ normalized_path: null, storage_path: null, playback_360_path: "m/a/1.360.mp4" });
+      const r3 = await getMatchVideoPlaybackResult(only360.client, VID, { rendition: "720" });
+      expect(only360.createSignedUrl).toHaveBeenCalledWith("m/a/1.360.mp4", 3600);
+      expect(r3.ok && r3.data).toMatchObject({ servedRendition: "360", sourceKind: "normalized" });
+    });
+
+    it("no path at all is still absence for either target", async () => {
+      for (const rendition of ["720", "360"] as const) {
+        const m = rowWith({ normalized_path: null, storage_path: null, playback_360_path: null });
+        expect(await getMatchVideoPlaybackResult(m.client, VID, { rendition })).toEqual({ ok: true, data: null });
+        expect(m.createSignedUrl).not.toHaveBeenCalled();
+      }
+    });
+
+    it("a missing chosen object is VIDEO_FILE_MISSING (no retry down the chain)", async () => {
+      const m = mockClient({
+        maybeSingle: { data: { ...ALL, playback_profile: null, thumbnail_url: null, status: "analyzed" }, error: null },
+        sign: () => ({ data: null, error: { message: "Object not found" } }),
+      });
+      const r = await getMatchVideoPlaybackResult(m.client, VID, { rendition: "360" });
+      expect(r).toEqual({ ok: false, error: { code: "VIDEO_FILE_MISSING", message: "The video file was not found." } });
+      expect(m.createSignedUrl).toHaveBeenCalledTimes(1);
     });
   });
 
