@@ -368,7 +368,7 @@ In `use-multi-angle-playback.ts`, no forked policy:
 - A stall listener: `PlaybackSession` takes an optional `onStall(event: { kind: "start" | "end"; at: number })` invoked exactly where `stallCount` increments and where an open stall closes. `use-playback-telemetry.ts` exposes `onStall(cb): () => void` on `PlaybackTelemetry` and re-wires the listener into every new session (continuations included).
 - New `PlaybackTelemetry` methods: `setQuality`, `renditionAttached`, `qualitySwitchStarted`, `qualitySwitchLanded`, `onStall`.
 
-New summary fields (all on `extra`; for `surface: "highlight"` they are null, 0 or false and the tags below read `none`):
+New summary fields (all on `extra`; for `surface: "highlight"` they are null, 0 or false, and the quality tags below (`rendition`, `rendition_final`, `start_reason`, `quality_pref`, `stepdown`, `network_key`, and `startup_bucket`, whose `playerStartupMs` is null) read `none`. `stalled`, `rebuffer_bucket` and `resumed` describe the session itself and are computed for reels too (implementation, review round 1):
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -381,7 +381,7 @@ New summary fields (all on `extra`; for `surface: "highlight"` they are null, 0 
 | `startTarget` | `"720" \| "360" \| null` | Start selection target. |
 | `startReason` | StartReason \| null | Section 3.1 enum. |
 | `startRendition` | `"720" \| "360" \| "original" \| null` | Served at start. |
-| `startFallback` | boolean | Served differs from target. |
+| `startFallback` | boolean \| null | Served differs from target. Null on a continuation (`resumed: true`), which has no start of its own. |
 | `playbackProfile` | string \| null | Start file's `playback_profile` (null = legacy or none). |
 | `finalRendition` | ServedRendition \| null | Served at session end. |
 | `qualitySwitchCount` | number | Quality switches issued in this telemetry session. |
@@ -394,6 +394,7 @@ New summary fields (all on `extra`; for `surface: "highlight"` they are null, 0 
 | `stallsAfterStepDown` / `stallMsAfterStepDown` | number \| null | Counted stalls after it; null if none happened. |
 | `qualityLockedLow` | boolean | Relapse lock hit. |
 | `qualityCapReached` | boolean | `maxSwitchesPerSession` reached. |
+| `qualitySteppedDown` | boolean | A stall-driven step-down happened in this screen session (this event or an earlier one, so a continuation after a step-down still shows it). |
 | `playerStartupMs` | number \| null | `timeToFirstFrameMs - signMs` when both are non-null (pure player startup, precomputed). |
 
 New tags (string values, for Discover filtering; see section 10 on why buckets):
@@ -404,7 +405,8 @@ New tags (string values, for Discover filtering; see section 10 on why buckets):
 | `video.playback.rendition_final` | same values, at session end |
 | `video.playback.start_reason` | StartReason values, or `none` |
 | `video.playback.quality_pref` | `auto`, `high`, `data_saver`, `none` |
-| `video.playback.stepdown` | `stall` (at least one stall-driven step-down this session), `none` |
+| `video.playback.stepdown` | `stall` (at least one stall-driven step-down in this screen session, `qualitySteppedDown`), `none` |
+| `video.playback.resumed` | `true` (a continuation after the background), `false` |
 | `video.playback.network_key` | the ten keys, or `none` |
 | `video.playback.stalled` | `yes` (`stallCount > 0`), `no` |
 | `video.playback.startup_bucket` | from `playerStartupMs`: `lt1s`, `1to2s`, `2to2.5s`, `2.5to3s`, `3to5s`, `gte5s`, `none` |
@@ -564,7 +566,7 @@ supabase test db             # full pgTAP suite, including 138
 
 ## 11. Reading the new fields in Sentry (draft, input to jits-xfvd.4 and jr_be-1qz.19)
 
-Base filter for every question: `message:"Video playback session" video.playback.surface:match`, and `resumed:false` where startup matters. Require at least 100 sessions in a bucket before acting on it (report 02 section 5).
+Base filter for every question: `message:"Video playback session" video.playback.surface:match`, and the tag `video.playback.resumed:false` where startup matters (Discover filters tags, not `extra`). Require at least 100 sessions in a bucket before acting on it (report 02 section 5).
 
 Caveat to verify first: Sentry Discover indexes tags, not `extra`. Numeric `extra` fields (`playerStartupMs`, `stallMs`, `watchMs`, `msOn360`) cannot be aggregated (no p75, no sums) in Discover. That is why 5.6 adds bucket tags. Exact p75 and aggregate ratios need an event export (Sentry events API with full payload) and a small script; jits-xfvd.4 owns that tooling. If Discover in this Sentry plan does aggregate custom fields, prefer it and drop the export.
 

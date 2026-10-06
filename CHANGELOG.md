@@ -4,7 +4,7 @@
 
 ### Match player: adaptive playback quality (jits-xfvd.12)
 
-JS-only on mobile (OTA on runtime 0.5.0; no native module, no `package.json` or `app.json` change: NetInfo and AsyncStorage are already linked). Needs the jr_be `20261008100400` migration (`get_playback_settings`, applied to prod) for server-tuned settings; without it the client uses its compiled-in defaults. Spec: `research/2026-10-multi-angle-playback/05-adaptive-quality-spec.md`.
+JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change, no `app.json` change: NetInfo and AsyncStorage are already linked). Needs the jr_be `20261008100400` migration (`get_playback_settings`, applied to prod) for server-tuned settings; without it the client uses its compiled-in defaults. Spec: `research/2026-10-multi-angle-playback/05-adaptive-quality-spec.md`.
 
 **Added**
 - Video settings: a PLAYBACK QUALITY choice, Auto (adaptive), High (always the 720p copy) or Data saver (always the 360p copy), saved per phone on tap (`apps/mobile/app/(app)/settings/video.tsx`, store `apps/mobile/lib/video/quality/preference.ts`, key `video-playback:quality`). Radio rows use the design-system selection surface and check; no Signal Red.
@@ -22,6 +22,13 @@ JS-only on mobile (OTA on runtime 0.5.0; no native module, no `package.json` or 
 
 **Fixed**
 - The `video.playback.mode` tag is sent only for the match player, not for highlight reels (#53 review N1); a test pins the multi-angle dev flag OFF when `EXPO_PUBLIC_MULTI_ANGLE_PLAYER` is unset (N2).
+- Review round 1:
+  - A quality swap whose sign fails no longer fails playback: the previous file goes back in at the exact position behind the held frame (play intent and speed kept), and the controller is told the swap failed so later decisions still happen (H1). An angle switch while a quality sign is pending also releases it (H2); `QualityController.angleChanged` clears an outstanding decision defensively.
+  - `switchFailed` restores the level (and the next sign's target) to the rendition still served (M1); `switchIssued` closes the controller's open stall; a landed quality swap clears the stall log.
+  - Pausing or seeking during a long stall can no longer trigger a step-down: both players refresh the controller's conditions before telemetry closes the stall (M3).
+  - Multi-angle (dev flag): a failed quality re-sign keeps each slot on its old file instead of marking it dead (M2).
+  - Telemetry: a continuation reports `startFallback: null`, carries `qualitySteppedDown` from earlier in the screen session (the `stepdown` tag follows it), and every event has the `video.playback.resumed` tag.
+  - Stores: history lists are cut to 20 on read; the settings read times out after 5 s and a failed read retries after 60 s; a hung AsyncStorage costs only the first start the 300 ms wait; the signer's `available` treats an empty path as absent, like the path choice.
 
 ### Arena live switch: a stale declined web session (jits-smgb)
 
