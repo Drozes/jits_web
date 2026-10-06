@@ -957,10 +957,13 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
             seeksAtSettle(swapKindRef.current) &&
             seekIssuedGenRef.current === gen &&
             playingRef.current &&
-            Math.abs(currentTime - landAtRef.current) <= LAND_TOLERANCE_S
+            currentTime >= landAtRef.current - LAND_TOLERANCE_S
           ) {
             // An angle switch lands on a time within LAND_TOLERANCE_S of its
-            // target (contract 3.3), never on the looser seek hold.
+            // target (contract 3.3), never on the looser seek hold. A time
+            // already past the target also lands (review H1): playback has
+            // moved on from it, and a stale time (frame 0, the old spot) is
+            // always before it.
             switchSeekLandedRef.current = true;
             frameLanded(gen);
           }
@@ -1004,7 +1007,17 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     // The controller sees the pause BEFORE telemetry closes an open stall (review M3).
     feed();
     telemetry.playIntent(playing);
-    if (!loadedRef.current) return;
+    if (!loadedRef.current) {
+      // Settled but not ready: iOS keeps a paused item "loading" until it is
+      // asked to play, so Play kicks it (review H2) and Pause stops a
+      // settle-time play() (review L1), like the autoplay backstop.
+      const current = sourceRef.current;
+      if (current && settledGenRef.current === current.generation) {
+        if (playing) startPlayback();
+        else safely(() => player.pause());
+      }
+      return;
+    }
     if (playing) startPlayback();
     else {
       safely(() => player.pause());
@@ -1048,6 +1061,12 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         // seek must survive into its resume seek, not land on a dying item.
         resumeAtRef.current = clamped > 0 ? clamped : null;
         progressBaseRef.current = clamped;
+      }
+      // A seek during a pending angle switch: it lands at the new spot
+      // (review H1); a paused one is landed by its first frame or fallback.
+      const gen = sourceRef.current?.generation;
+      if (gen != null && gen === switchGenRef.current && seeksAtSettle(swapKindRef.current) && !switchSeekLandedRef.current) {
+        landAtRef.current = clamped;
       }
       // The controller sees the seek BEFORE telemetry closes an open stall (review M3).
       feed();
@@ -1184,9 +1203,21 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       // The outgoing angle's own time at the tap: a failed switch returns here.
       const fromAt = currentTimeNow();
       switchFromAtRef.current = fromAt;
-      for (const name of ["gate", "holdCap", "settle", "pausedLand"] as SwitchTimer[]) clearSwitchTimer(name);
-      // An older gate's parked source is superseded by this switch's.
-      gateRef.current = null;
+      clearSwitchTimer("settle");
+      clearSwitchTimer("pausedLand");
+      // A superseded switch whose still is still being taken of the frame on
+      // screen (no replaceAsync yet) hands that capture to this one (review
+      // L2); otherwise an older gate's parked source is superseded here.
+      const prevGate = gateRef.current;
+      const inheritGate = superseding && prevGate != null && !prevGate.open && !prevGate.replaced;
+      if (inheritGate) {
+        prevGate.seq = seq;
+      } else {
+        gateRef.current = null;
+        clearSwitchTimer("gate");
+      }
+      // A reused still keeps its own 4 s cap, timed from its capture (review L5).
+      if (!superseding) clearSwitchTimer("holdCap");
       const current = sourceRef.current;
       const frameUp =
         current != null &&
@@ -1205,10 +1236,6 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         failed: null,
       });
       setUpdateInterval(SWITCH_TIME_UPDATE_S);
-      setSwitchTimer("holdCap", SWITCH_HOLD_CAP_MS, () => {
-        const cur = switchStateRef.current;
-        if (cur.seq === seq && cur.phase === "pending" && cur.heldFrame != null) setSwitch({ ...cur, heldFrame: null });
-      });
       if (!superseding && frameUp) {
         // The held still: a native thumbnail of the frame on screen, taken
         // BEFORE the pause and before replaceAsync, which waits for it at
@@ -1221,19 +1248,26 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         if (thumbs && typeof thumbs.then === "function") {
           const gate = { seq, open: false, pending: null as PlaybackSource | null, replaced: false };
           gateRef.current = gate;
-          setSwitchTimer("gate", HELD_FRAME_CAP_MS, () => openGate(seq));
+          // The gate may be handed to a superseding switch (or a restore):
+          // always read its current seq.
+          setSwitchTimer("gate", HELD_FRAME_CAP_MS, () => openGate(gate.seq));
           thumbs.then(
             (list) => {
               const still = Array.isArray(list) ? (list[0] ?? null) : null;
               const cur = switchStateRef.current;
               // A still that comes back after replaceAsync went out may
               // already describe the new asset: discarded.
-              if (mountedRef.current && still && gateRef.current === gate && !gate.replaced && cur.seq === seq && cur.phase === "pending") {
+              if (mountedRef.current && still && gateRef.current === gate && !gate.replaced && cur.seq === gate.seq && cur.phase === "pending") {
                 setSwitch({ ...cur, heldFrame: still });
+                // The still drops SWITCH_HOLD_CAP_MS after its capture.
+                setSwitchTimer("holdCap", SWITCH_HOLD_CAP_MS, () => {
+                  const now = switchStateRef.current;
+                  if (now.phase === "pending" && now.heldFrame === still) setSwitch({ ...now, heldFrame: null });
+                });
               }
-              openGate(seq);
+              openGate(gate.seq);
             },
-            () => openGate(seq),
+            () => openGate(gate.seq),
           );
         }
       }
@@ -1250,8 +1284,13 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     if (st.phase !== "pending" || st.restoring) return;
     telemetry.switchFailed();
     const failed: SwitchFailure = { seq: st.seq, targetId: st.targetId ?? "", at: Date.now() };
-    gateRef.current = null;
-    clearSwitchTimer("gate");
+    // A still still being taken (no replaceAsync yet) is of fromId, the
+    // angle coming back: keep it for the restore (review L4).
+    const gate = gateRef.current;
+    if (!gate || gate.open || gate.replaced) {
+      gateRef.current = null;
+      clearSwitchTimer("gate");
+    }
     clearSwitchTimer("pausedLand");
     switchGenRef.current = null;
     swapKindRef.current = null;

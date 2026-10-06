@@ -1561,4 +1561,122 @@ describe("useVideoPlayback angle switch phase 1 (jits-xfvd.16)", () => {
       expect(player().intervals).toEqual([]);
     });
   });
+
+  describe("review round 1 (B1)", () => {
+    it("H1: a seek after the post-seek ready moves the landing target; the switch lands at the new spot", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      ready();
+      act(() => result.current.seek(100));
+      for (let t = 100; t <= 110; t += 1) time(t);
+      expect(state(result).phase).toBe("landing");
+      expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+    });
+
+    it("H1: a first post-ready time already past the target + 0.25 s still lands", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      ready();
+      time(20.8);
+      time(21);
+      time(22);
+      expect(state(result).phase).toBe("landing");
+      expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+    });
+
+    it("H1: a stale time before the target still never lands", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      ready();
+      time(0);
+      time(19.6);
+      expect(state(result).phase).toBe("pending");
+    });
+
+    it("L1: pausing between the settle's play() and readyToPlay pauses the player", async () => {
+      signAll();
+      const { result } = await open();
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+      await flush();
+      expect(player().playing).toBe(true);
+      player().pause.mockClear();
+      act(() => result.current.toggle());
+      expect(player().pause).toHaveBeenCalled();
+      expect(player().playing).toBe(false);
+    });
+
+    it("L4: a fast sign failure keeps the pending still of the outgoing angle for the restore", async () => {
+      signAll({ "vid-9": () => Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "down" } }) });
+      const { result } = await open();
+      const thumbs = deferThumbnails(idx());
+      act(() => result.current.switchAngle("vid-9", 20.5));
+      await waitFor(() => expect(mockTelemetry.switchFailed).toHaveBeenCalledTimes(1));
+      expect(state(result).restoring).toBe(true);
+      await act(async () => thumbs.resolve([{ still: 10 }]));
+      expect(state(result)).toMatchObject({ phase: "pending", restoring: true, heldFrame: { still: 10 } });
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/a.mp4" }));
+    });
+
+    describe("with fake timers", () => {
+      beforeEach(() => jest.useFakeTimers());
+      afterEach(() => jest.useRealTimers());
+
+      it("H2: paused-buffer stall, Play after the 3 s backstop already passed still plays", async () => {
+        signAll();
+        const { result } = await open({ paused: true });
+        player().pausedBufferStall = true;
+        act(() => result.current.switchAngle("vid-2", 12.5));
+        await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+        await flush();
+        act(() => readyPlayer(idx()));
+        act(() => result.current.onFirstFrameRender());
+        expect(state(result).phase).toBe("landing");
+        act(() => jest.advanceTimersByTime(5000));
+        expect(player().play).not.toHaveBeenCalled();
+        act(() => result.current.toggle());
+        expect(player().play).toHaveBeenCalled();
+        expect(result.current.stateLabel).toBe("loaded");
+      });
+
+      it("L2: A to B to C inside the 150 ms gate keeps the still being taken of A", async () => {
+        signAll();
+        const { result } = await open();
+        const thumbs = deferThumbnails(idx());
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await flush();
+        act(() => jest.advanceTimersByTime(50));
+        act(() => result.current.switchAngle("vid-3", 21));
+        await flush();
+        expect(player().replaceAsync).toHaveBeenCalledTimes(1);
+        await act(async () => thumbs.resolve([{ still: "A" }]));
+        expect(state(result)).toMatchObject({ phase: "pending", seq: 2, targetId: "vid-3", heldFrame: { still: "A" } });
+        expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/c.mp4" });
+        expect(player().generateThumbnailsAsync).toHaveBeenCalledTimes(1);
+      });
+
+      it("L5: the 4 s still cap runs from the still's capture, not the newest tap", async () => {
+        signAll();
+        const { result } = await open();
+        deferReplace(idx()); // B never settles
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await flush();
+        expect(state(result).heldFrame).not.toBeNull();
+        act(() => jest.advanceTimersByTime(3000));
+        act(() => result.current.switchAngle("vid-3", 21));
+        expect(state(result).heldFrame).not.toBeNull();
+        act(() => jest.advanceTimersByTime(SWITCH_HOLD_CAP_MS - 3000));
+        expect(state(result)).toMatchObject({ phase: "pending", seq: 2, heldFrame: null });
+      });
+    });
+  });
 });
