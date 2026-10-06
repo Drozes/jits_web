@@ -11,7 +11,7 @@ import { ON_MEDIA } from "@/lib/theme/palette";
 import { AA_NORMAL_TEXT, composite, contrast } from "../../support/token-contrast";
 import { AngleSwitcher } from "@/components/film-room/angle-switcher";
 import { haptics, __setReduceMotionForTests } from "@/lib/motion";
-import { REDUCED_PRESS_OPACITY } from "@/components/ui/pressable-scale";
+import { PressableScale, REDUCED_PRESS_OPACITY } from "@/components/ui/pressable-scale";
 import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 
 const mine = { id: "a", is_mine: true, uploaded_by_name: "Kai Reyes", playability: "playable" };
@@ -137,6 +137,26 @@ describe("AngleSwitcher lock (jits-xfvd.19, contract 07 11.1)", () => {
     expect(s.getByTestId("angle-a")).toHaveStyle({ opacity: DISABLED_OPACITY });
     fireEvent(s.getByTestId("angle-b"), "pressIn");
     expect(s.getByTestId("angle-b")).not.toHaveStyle({ opacity: REDUCED_PRESS_OPACITY });
+  });
+
+  it.each(["film", "plate"] as const)("%s: locking and unlocking never remount a chip (same element, screen-reader focus kept)", (variant) => {
+    const el = (locked: boolean) => (
+      <AngleSwitcher variant={variant} angles={[mine, theirs]} activeId="a" busyId={locked ? "b" : null} locked={locked} onSelect={jest.fn()} />
+    );
+    const s = render(el(false));
+    const a = s.getByTestId("angle-a");
+    const b = s.getByTestId("angle-b");
+    const scales = s.UNSAFE_getAllByType(PressableScale);
+    expect(scales).toHaveLength(2);
+    s.rerender(el(true));
+    expect(s.getByTestId("angle-a")).toBe(a);
+    expect(s.getByTestId("angle-b")).toBe(b);
+    expect(s.UNSAFE_getAllByType(PressableScale)).toEqual(scales);
+    expect(s.UNSAFE_getAllByType(PressableScale).every((x, i) => x === scales[i])).toBe(true);
+    s.rerender(el(false));
+    expect(s.getByTestId("angle-a")).toBe(a);
+    expect(s.getByTestId("angle-b")).toBe(b);
+    expect(s.UNSAFE_getAllByType(PressableScale).every((x, i) => x === scales[i])).toBe(true);
   });
 
   it("landing (still locked, no busy chip): the landed chip is selected, not dimmed; the rest stay disabled", () => {

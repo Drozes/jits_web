@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { DISABLED_OPACITY } from "@/components/ui/elo-system/button";
 import { filmChipLabelStyle, filmChipStyle } from "@/components/film-room/film-chip";
@@ -117,11 +117,13 @@ interface AngleSwitcherProps {
  * haptic, no call), as the tab vocabulary says.
  *
  * Locked (an angle switch in flight, `locked`): the selected chip (the
- * tapped angle while pending, then the landed one) is a plain `Pressable`
- * that does nothing; every other chip is disabled (`accessibilityState`
+ * tapped angle while pending, then the landed one) does nothing; every other
+ * chip is disabled (`accessibilityState`
  * disabled, dimmed to 0.5), does not move and has no haptic, and a tap on it
  * only calls `onIgnoredTap`. Nothing buzzes at the landing or when the lock
- * releases.
+ * releases. Every chip stays the same `PressableScale` element (held
+ * `still` while locked), so locking and unlocking never remount a chip and
+ * screen-reader focus stays where it was.
  */
 export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate", bestId, busyId, locked = false, onIgnoredTap }: AngleSwitcherProps) {
   const p = usePalette();
@@ -145,6 +147,7 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
       testID: `angle-${a.id}`,
       accessibilityRole: "tab" as const,
       accessibilityLabel: a11y,
+      still: locked,
       accessibilityState: disabled
         ? { disabled: true, selected: false }
         : on && a.id === busyId
@@ -161,15 +164,14 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
         onSelect(a.id);
       },
     };
-    // Locked chips do not move (no press scale): a plain Pressable, dimmed
-    // when disabled. Unlocked: the PressableScale of the tab vocabulary.
-    const Chip = locked ? Pressable : PressableScale;
+    // Locked chips hold still (`still`: no press scale, no Reduce Motion dip)
+    // on the same PressableScale element; dimmed when disabled.
     const dim = disabled ? { opacity: DISABLED_OPACITY } : null;
     if (film) {
       // Over video: the key moment chip (film-chip.ts), sized to its label,
       // with the Best angle tag inset beside the label.
       return (
-        <Chip key={a.id} {...common} style={[filmChipStyle(on), { flexDirection: "row", alignItems: "center", gap: 8 }, dim]}>
+        <PressableScale key={a.id} {...common} style={[filmChipStyle(on), { flexDirection: "row", alignItems: "center", gap: 8 }, dim]}>
           <Text numberOfLines={1} className="font-mono-bold" style={[filmChipLabelStyle(on), TABULAR]}>
             {label}
           </Text>
@@ -187,11 +189,11 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
               </Text>
             </View>
           ) : null}
-        </Chip>
+        </PressableScale>
       );
     }
     return (
-      <Chip
+      <PressableScale
         key={a.id}
         {...common}
         className="flex-1 items-center justify-center"
@@ -206,7 +208,7 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
             {BEST_ANGLE.toUpperCase()}
           </Text>
         ) : null}
-      </Chip>
+      </PressableScale>
     );
   });
   if (film) {

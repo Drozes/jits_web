@@ -183,6 +183,49 @@ describe("PressableScale", () => {
     expect(mockAccept).toHaveBeenCalledTimes(1);
     expect(mockPress).not.toHaveBeenCalled();
   });
+
+  it("still: no scale and no Reduce Motion dip, but the press (and haptic) still fire", () => {
+    const onPress = jest.fn();
+    const screen = render(
+      <PressableScale testID="p" still haptic onPress={onPress}>
+        <Text>Go</Text>
+      </PressableScale>,
+    );
+    const node = screen.getByTestId("p");
+    fireEvent(node, "pressIn", {});
+    act(() => jest.advanceTimersByTime(500));
+    expect(scaleOf(node)).toBe(1);
+    fireEvent(node, "pressOut", {});
+    fireEvent.press(node);
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(mockPress).toHaveBeenCalledTimes(1);
+    act(() => __setReduceMotionForTests(true));
+    screen.rerender(
+      <PressableScale testID="p" still style={{ height: 40 }} onPress={onPress}>
+        <Text>Go</Text>
+      </PressableScale>,
+    );
+    fireEvent(screen.getByTestId("p"), "pressIn", {});
+    expect(StyleSheet.flatten(screen.getByTestId("p").props.style).opacity).toBeUndefined();
+  });
+
+  it("returns to rest when stilled mid-press", () => {
+    const screen = render(
+      <PressableScale testID="p" onPress={jest.fn()}>
+        <Text>Go</Text>
+      </PressableScale>,
+    );
+    fireEvent(screen.getByTestId("p"), "pressIn", {});
+    act(() => jest.advanceTimersByTime(500));
+    expect(scaleOf(screen.getByTestId("p"))).toBeCloseTo(PRESS_SCALE, 3);
+    screen.rerender(
+      <PressableScale testID="p" still onPress={jest.fn()}>
+        <Text>Go</Text>
+      </PressableScale>,
+    );
+    act(() => jest.advanceTimersByTime(16));
+    expect(scaleOf(screen.getByTestId("p"))).toBe(1);
+  });
 });
 
 describe("Button press scale, haptic and sheen", () => {
