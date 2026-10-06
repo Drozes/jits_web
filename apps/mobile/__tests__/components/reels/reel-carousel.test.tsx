@@ -108,6 +108,19 @@ describe("ReelCarousel", () => {
     expect(tilesFor("matches", { items: [...items, reelItem("c")] }).some((t) => t.kind === "ghost")).toBe(false);
   });
 
+  it("a mixed own and friend list (with building and ghost tiles) keeps onOpenReel indexes among ready tiles", () => {
+    const items: ReelItem[] = [
+      reelItem("own1", { unseen: true }),
+      reelItem("fr1", { source: "friend", isOwn: false, opponentName: "S. Whitfield" }),
+    ];
+    const tiles = tilesFor("home", { items, building: [buildingReel("m-z")] });
+    expect(tiles.map((t) => t.kind)).toEqual(["building", "ready", "ready", "ghost"]);
+    const { getByTestId, getByText, onOpenReel } = renderCarousel(tiles);
+    expect(getByText("FRIEND")).toBeTruthy();
+    fireEvent.press(getByTestId("reel-tile-ready:fr1"));
+    expect(onOpenReel).toHaveBeenCalledWith(items, 1, "home");
+  });
+
   it("a building tile opens match detail (Film status), never the viewer", () => {
     const { getByTestId, onOpenReel } = renderCarousel(tilesFor("home", { items: [reelItem("a")], building: [buildingReel("m-9")] }));
     fireEvent.press(getByTestId("reel-tile-building:m-9"));
@@ -139,7 +152,7 @@ describe("ReelCarousel", () => {
     expect(tiles[tiles.length - 1].kind).toBe("see_all");
     const { getByLabelText } = renderCarousel(tiles);
     fireEvent.press(getByLabelText("See all, open Matches"));
-    expect(mockNavigate).toHaveBeenCalledWith("/(app)/(tabs)/matches");
+    expect(mockNavigate).toHaveBeenCalledWith("/(app)/(tabs)/matches?entry=see_all");
   });
 
   it("loading shows the lane's skeleton count (3 on Home)", () => {
@@ -159,6 +172,15 @@ describe("moments", () => {
     renderCarousel(tiles);
     expect(mockRunPulse).toHaveBeenCalledTimes(1);
     expect(mockRevealHaptic).not.toHaveBeenCalled();
+  });
+
+  it("Home: the first-unseen pulse fires once per session in total, not once per reel", () => {
+    const first = renderCarousel(tilesFor("home", { items: [reelItem("a", { unseen: true })] }));
+    expect(mockRunPulse).toHaveBeenCalledTimes(1);
+    first.unmount();
+    // A different unseen reel later in the session does not pulse.
+    renderCarousel(tilesFor("home", { items: [reelItem("b", { unseen: true }), reelItem("a")] }));
+    expect(mockRunPulse).toHaveBeenCalledTimes(1);
   });
 
   it("Matches: no first-unseen pulse", () => {

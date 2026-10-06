@@ -12,6 +12,8 @@ const mockNavigate = jest.fn();
 const mockFocusCallbacks: (() => void)[] = [];
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace, navigate: mockNavigate }),
+  // The swipe viewer's entry (`openReelViewer`) pushes through the global router.
+  router: { push: (...a: unknown[]) => mockPush(...a) },
   useFocusEffect: (cb: () => void) => {
     const R = require("react");
     R.useEffect(() => {
@@ -752,11 +754,17 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
     expect(redCtas(utils)).toHaveLength(1);
   });
 
-  it("opens the tapped reel through the lane seam with source=home and logs home_card_tapped", async () => {
+  it("opens the tapped reel in the swipe viewer (lane session, source=home) and logs home_card_tapped", async () => {
     mockGetMyHighlights.mockResolvedValue(highlightsPage([reel("h1", { unseen: true }), reel("h2")]));
     const utils = render(React.createElement(DashboardScreen));
     fireEvent.press(await utils.findByTestId("reel-tile-ready:h2"));
-    expect(mockPush).toHaveBeenCalledWith("/highlight/h2?source=home");
+    expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/highlight\/h2\?source=home&lane=home&session=.+/));
+    const token = new URLSearchParams(String(mockPush.mock.calls[0][0]).split("?")[1]).get("session");
+    const { getReelSession } = require("@/lib/highlight/reel-viewer-session") as typeof import("@/lib/highlight/reel-viewer-session");
+    const session = getReelSession(token ?? undefined);
+    // Ready items only, in tile order, opened at the tapped one.
+    expect(session?.items.map((i) => i.highlightId)).toEqual(["h1", "h2"]);
+    expect(session?.startIndex).toBe(1);
     expect(mockLogEvent).toHaveBeenCalledWith(
       {},
       "h2",
@@ -815,6 +823,18 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
     expect(await utils.findByTestId("reel-tile-skeleton:2", hidden)).toBeTruthy();
     expect(utils.queryByTestId("reel-tile-skeleton:3", hidden)).toBeNull();
     await settleActiveMatchRead();
+  });
+
+  it("holds the skeletons while the match count is unknown (no wrong empty-state copy flashes)", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getDashboardSummary.mockReturnValue(new Promise(() => {}));
+    const utils = render(React.createElement(DashboardScreen));
+    await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalled());
+    await act(async () => {
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+    });
+    expect(utils.getByTestId("reel-tile-skeleton:0", { includeHiddenElements: true })).toBeTruthy();
+    expect(utils.queryByLabelText(/Opens the Arena tab/)).toBeNull();
   });
 
   it("pull to refresh re-reads the lane", async () => {

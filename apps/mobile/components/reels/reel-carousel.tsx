@@ -34,6 +34,9 @@ export interface ReelCarouselProps {
   testID?: string;
 }
 
+/** Vertical room for the ring pulse (1.04 of a 193 pt frame grows about 4 pt each way). */
+const PULSE_ROOM = 4;
+
 /** The row's side gutter is 16 pt to the first poster; the frame's ring and gap take 4 of it. */
 const GUTTER = 16 - RING_WIDTH - RING_GAP;
 
@@ -48,7 +51,8 @@ const GUTTER = 16 - RING_WIDTH - RING_GAP;
  */
 export function ReelCarousel({ title, laneKey, tiles, onOpenReel, onEndReached, onCtaPress, testID }: ReelCarouselProps) {
   const router = useRouter();
-  const { pulseIds, revealIds } = useReelMoments(tiles, laneKey);
+  const moments = useReelMoments(tiles, laneKey);
+  const { pulseIds, revealIds, focused } = moments;
   const column = tileColumnWidth(laneKey);
 
   // Handlers read the latest props through a ref, so the press callback the
@@ -72,7 +76,8 @@ export function ReelCarousel({ title, laneKey, tiles, onOpenReel, onEndReached, 
         cta?.(tile);
         return;
       case "see_all":
-        r.navigate(MATCHES_TAB_HREF as never);
+        // The entry marker lets the Matches tab attribute the open (`matches.tab_opened` entry see_all).
+        r.navigate(`${MATCHES_TAB_HREF}?entry=see_all` as never);
         return;
       default:
         return;
@@ -89,11 +94,12 @@ export function ReelCarousel({ title, laneKey, tiles, onOpenReel, onEndReached, 
           onTilePress={onPress}
           pulse={id ? pulseIds.has(id) : false}
           reveal={id ? revealIds.has(id) : false}
+          animate={focused}
           testID={`reel-tile-${tile.key}`}
         />
       );
     },
-    [laneKey, onPress, pulseIds, revealIds],
+    [laneKey, onPress, pulseIds, revealIds, focused],
   );
 
   if (tiles.length === 0) return null;
@@ -105,14 +111,18 @@ export function ReelCarousel({ title, laneKey, tiles, onOpenReel, onEndReached, 
       data={tiles}
       keyExtractor={(t) => t.key}
       renderItem={renderItem}
-      extraData={pulseIds}
+      extraData={moments}
       accessibilityRole="list"
       accessibilityLabel={title}
       showsHorizontalScrollIndicator={false}
       snapToInterval={column}
       decelerationRate="fast"
       getItemLayout={(_d, index) => ({ length: column, offset: GUTTER + column * index, index })}
-      contentContainerStyle={{ paddingHorizontal: GUTTER }}
+      // PULSE_ROOM above and below so the 1.04 ring pulse is never clipped by the
+      // row's bounds (Android clips a ScrollView's children); cells never clip.
+      contentContainerStyle={{ paddingHorizontal: GUTTER, paddingVertical: PULSE_ROOM }}
+      style={{ overflow: "visible" }}
+      removeClippedSubviews={false}
       onEndReached={onEndReached}
       onEndReachedThreshold={0.5}
       // Home holds at most 10 reels plus building and See all tiles: draw them all.
@@ -123,7 +133,7 @@ export function ReelCarousel({ title, laneKey, tiles, onOpenReel, onEndReached, 
   );
 
   return (
-    <View testID={testID ?? `reel-carousel-${laneKey}`} style={{ gap: 10, marginHorizontal: -16 }}>
+    <View testID={testID ?? `reel-carousel-${laneKey}`} style={{ gap: 10 - PULSE_ROOM, marginHorizontal: -16 }}>
       <View style={{ paddingHorizontal: 16 }}>
         <MetaTag>{title}</MetaTag>
       </View>

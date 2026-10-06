@@ -131,6 +131,11 @@ describe("building tile", () => {
     expect(mockRunShimmer).toHaveBeenCalledTimes(1);
   });
 
+  it("no shimmer while the host screen is blurred (animate false)", () => {
+    const { queryByTestId } = renderTile({ kind: "building", key: "b", reel: buildingReel("m1") }, { animate: false });
+    expect(queryByTestId("reel-building-shimmer", hidden)).toBeNull();
+  });
+
   it("no shimmer under Reduce Motion", () => {
     act(() => __setReduceMotionForTests(true));
     const { queryByTestId } = renderTile({ kind: "building", key: "b", reel: buildingReel("m1") });
@@ -154,18 +159,36 @@ describe("building tile", () => {
       });
       const { getByTestId, getByLabelText, queryByText } = renderTile({ kind: "building", key: "b", reel });
       expect(getByTestId("reel-building-countdown").props.children).toBe("Waiting 8:12");
-      expect(getByLabelText("Your highlight vs L. Tanaka is being made. Waiting 8:12. Opens the match.")).toBeTruthy();
+      // The label is static while the visible countdown ticks (no re-announcement every second).
+      const label = "Your highlight vs L. Tanaka is being made. Waiting for another angle. Opens the match.";
+      expect(getByLabelText(label)).toBeTruthy();
       expect(queryByText("Step 1 of 2")).toBeNull();
 
       act(() => {
         jest.advanceTimersByTime(2000);
       });
       expect(getByTestId("reel-building-countdown").props.children).toBe("Waiting 8:10");
+      expect(getByLabelText(label)).toBeTruthy();
 
       act(() => {
         jest.advanceTimersByTime(8 * 60_000 + 10_000);
       });
       expect(getByTestId("reel-building-countdown").props.children).toBe("Any second now");
+    });
+
+    it("uses the read's receivedAt as the baseline when the lane stamped one", () => {
+      // The read landed 30 s ago (device time); the server said 10:00:00 then.
+      const now = Date.parse("2026-10-06T10:10:30Z");
+      jest.setSystemTime(now);
+      const reel = buildingReel("m1", {
+        reelState: "waiting",
+        step: 1,
+        serverNow: "2026-10-06T10:00:00Z",
+        waitDeadlineAt: "2026-10-06T10:08:12Z",
+        receivedAt: now - 30_000,
+      });
+      const { getByTestId } = renderTile({ kind: "building", key: "b", reel });
+      expect(getByTestId("reel-building-countdown").props.children).toBe("Waiting 7:42");
     });
 
     it("a waiting reel without a deadline shows step 1", () => {

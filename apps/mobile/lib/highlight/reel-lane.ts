@@ -20,6 +20,12 @@ export const LANE_SKELETON_COUNT: Record<ReelLaneKey, number> = { home: 3, match
 /** A building tile: an in-flight reel with its signed poster. */
 export interface BuildingReel extends InFlightReel {
   posterUrl: string | null;
+  /**
+   * Device time (ms) the read carrying `serverNow` resolved: the baseline of
+   * the C-B3 server-clock countdown. Absent for the Matches fallback (whose
+   * `serverNow` is the device clock already).
+   */
+  receivedAt?: number;
 }
 
 /**

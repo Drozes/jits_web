@@ -5,14 +5,19 @@ import { buildLaneTiles, REEL_LANE_COPY, type ReelTileModel } from "@/lib/highli
 import type { UseReelLaneResult } from "@/lib/highlight/use-reel-lane";
 import { logHighlightEvent } from "@/lib/highlight/highlight-event";
 import { ReelCarousel } from "./reel-carousel";
-import { openReelFromLane } from "./open-reel";
+import { laneLoadMore, openReelFromLane, type LanePageSource } from "./open-reel";
 
 /**
- * Opens a tapped reel through the one viewer seam (`openReelFromLane`),
- * clears its ring at once, and logs the surface's funnel step (spec 13).
+ * Opens a tapped reel through the one viewer seam (`openReelFromLane`, the
+ * swipe viewer with the lane's `loadMore`), clears its ring at once, and logs
+ * the surface's funnel step (spec 13). `position` is the reel's index among
+ * the READY tiles (the pager index), not its tile position: building, ghost,
+ * CTA and See all tiles are not counted.
  */
-function useOpenFromLane(markSeenLocally: (id: string) => void) {
+function useOpenFromLane(markSeenLocally: (id: string) => void, source: LanePageSource) {
   const router = useRouter();
+  const latest = React.useRef(source);
+  latest.current = source;
   return React.useCallback(
     (items: ReelItem[], startIndex: number, lane: ReelLaneKey) => {
       const item = items[startIndex];
@@ -28,7 +33,8 @@ function useOpenFromLane(markSeenLocally: (id: string) => void) {
       } else {
         logHighlightEvent(item.highlightId, "matches_reel_tapped", { source: "matches", position: startIndex, unseen: item.unseen });
       }
-      if (openReelFromLane(router, { items, startIndex, lane })) markSeenLocally(item.highlightId);
+      const loadMore = laneLoadMore(items, latest.current);
+      if (openReelFromLane(router, { items, startIndex, lane, loadMore })) markSeenLocally(item.highlightId);
     },
     [router, markSeenLocally],
   );
@@ -42,14 +48,17 @@ function useOpenFromLane(markSeenLocally: (id: string) => void) {
  */
 export function HomeHighlightsCarousel({
   tiles,
+  pageSource,
   markSeenLocally,
   onCtaPress,
 }: {
   tiles: ReelTileModel[];
+  /** The lane's loaded items and cursor, so the swipe viewer can page past the tiles. */
+  pageSource: LanePageSource;
   markSeenLocally: (highlightId: string) => void;
   onCtaPress?: (tile: Extract<ReelTileModel, { kind: "cta" }>) => void;
 }) {
-  const open = useOpenFromLane(markSeenLocally);
+  const open = useOpenFromLane(markSeenLocally, pageSource);
   return <ReelCarousel title={REEL_LANE_COPY.title.home} laneKey="home" tiles={tiles} onOpenReel={open} onCtaPress={onCtaPress} />;
 }
 
@@ -63,15 +72,18 @@ export function HomeHighlightsCarousel({
  */
 export function MatchesReelCarousel({
   lane,
+  viewerId = null,
   matchCount,
   testID,
 }: {
   lane: UseReelLaneResult;
+  /** The signed-in athlete, for the swipe viewer's further pages. */
+  viewerId?: string | null;
   /** Completed match count when known (0 picks the first-highlight ghosts); null or omitted reads as "has matches". */
   matchCount?: number | null;
   testID?: string;
 }) {
-  const { items, inFlight, clipsEnabled, loading, error, hasMore, loadMore, loadMoreError, loadingMore, markSeenLocally } = lane;
+  const { items, inFlight, clipsEnabled, loading, error, hasMore, loadMore, loadingMore, markSeenLocally, cursor } = lane;
   const tiles = React.useMemo(
     () =>
       buildLaneTiles({
@@ -86,8 +98,9 @@ export function MatchesReelCarousel({
       }),
     [items, inFlight, clipsEnabled, loading, error, hasMore, matchCount],
   );
-  const open = useOpenFromLane(markSeenLocally);
-  const onEndReached = hasMore && !loadingMore && !loadMoreError ? loadMore : undefined;
+  const open = useOpenFromLane(markSeenLocally, { loaded: items, cursor, viewerId });
+  // A failed page may be retried by scrolling on (`loadMore` guards a running load itself).
+  const onEndReached = hasMore && !loadingMore ? loadMore : undefined;
   return (
     <ReelCarousel
       title={REEL_LANE_COPY.title.matches}

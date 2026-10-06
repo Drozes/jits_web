@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { ReelItem } from "./reel-types";
-import { buildLaneTiles, type ReelTileModel } from "./reel-lane";
+import { buildLaneTiles, type ReelCursor, type ReelTileModel } from "./reel-lane";
 import { useReelLane } from "./use-reel-lane";
 
 export interface UseHomeHighlightsResult {
@@ -8,6 +8,8 @@ export interface UseHomeHighlightsResult {
   tiles: ReelTileModel[];
   /** Ready items in lane order (phase 1: own reels only). */
   items: ReelItem[];
+  /** What the swipe viewer pages through past the tiles: every loaded item, the cursor after them, the viewer. */
+  pageSource: { loaded: ReelItem[]; cursor: ReelCursor | null; viewerId: string | null };
   loadMore: () => void;
   /** Re-read every source (`force` skips the shared read throttle; pull to refresh passes true). */
   refetch: (force?: boolean) => void;
@@ -51,5 +53,9 @@ export function useHomeHighlights(athleteId: string | undefined, matchCount: num
     });
   }, [items, inFlight, clipsEnabled, loading, error, hasMore, matchCount]);
 
-  return { tiles, items, loadMore: own.loadMore, refetch: own.refetch, markSeenLocally: own.markSeenLocally };
+  const pageSource = React.useMemo(
+    () => ({ loaded: items, cursor: own.cursor, viewerId: athleteId ?? null }),
+    [items, own.cursor, athleteId],
+  );
+  return { tiles, items, pageSource, loadMore: own.loadMore, refetch: own.refetch, markSeenLocally: own.markSeenLocally };
 }

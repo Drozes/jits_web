@@ -30,6 +30,8 @@ export const BUILDING_COPY = {
   anySecond: "Any second now",
   /** C-B4 */
   helper: "Usually 1 to 3 minutes",
+  /** The C-B6 step line while C-B3 counts down: static, so VoiceOver does not re-announce every second. */
+  waitingA11y: "Waiting for another angle",
 } as const;
 
 /** C-B5 */

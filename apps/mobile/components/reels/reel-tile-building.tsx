@@ -51,16 +51,19 @@ export function BuildingTile({
   reel,
   size,
   onPress,
+  animate = true,
   testID,
 }: {
   reel: BuildingReel;
   size: ReelTileSize;
   onPress: () => void;
+  /** False while the host screen is blurred: the shimmer pauses. */
+  animate?: boolean;
   testID?: string;
 }) {
   const reduceMotion = useReduceMotion();
   const { width, height } = REEL_TILE_SIZE[size];
-  const remaining = useServerCountdown(reel.reelState === "waiting" ? reel.waitDeadlineAt : null, reel.serverNow);
+  const remaining = useServerCountdown(reel.reelState === "waiting" ? reel.waitDeadlineAt : null, reel.serverNow, reel.receivedAt);
   const line = buildingStepLine(reel, remaining);
   const waiting = reel.reelState === "waiting" && remaining != null;
   const step: 1 | 2 = line === BUILDING_COPY.step2 ? 2 : 1;
@@ -70,16 +73,17 @@ export function BuildingTile({
       testID={testID}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={buildingA11yLabel(reel.opponentName, line)}
+      // Static while counting down: VoiceOver must not re-announce every second.
+      accessibilityLabel={buildingA11yLabel(reel.opponentName, waiting ? BUILDING_COPY.waitingA11y : line)}
       style={{ gap: 6 }}
     >
       <TileFrame size={size}>
         <View className="bg-surface-4" style={{ width, height }}>
           {reel.posterUrl ? (
-            <Image source={{ uri: reel.posterUrl }} style={{ position: "absolute", top: 0, left: 0, width, height }} contentFit="cover" />
+            <Image source={{ uri: reel.posterUrl, cacheKey: reel.posterPath ?? undefined }} style={{ position: "absolute", top: 0, left: 0, width, height }} contentFit="cover" />
           ) : null}
           <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: ON_MEDIA.scrim }} />
-          {reduceMotion ? null : <ShimmerSweep width={width} />}
+          {reduceMotion || !animate ? null : <ShimmerSweep width={width} />}
           <View style={{ position: "absolute", left: 6, right: 6, bottom: 6, padding: 7, borderRadius: 2, gap: 6, backgroundColor: ON_MEDIA.badge }}>
             <Sparkles size={14} color={ON_MEDIA.amber} />
             {waiting ? (

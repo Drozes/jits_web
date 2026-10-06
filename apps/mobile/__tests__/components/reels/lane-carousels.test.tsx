@@ -1,8 +1,10 @@
 /**
  * The lane hosts (specs/matches-tab 6.1, 7, 13): MatchesReelCarousel builds
  * its tiles from a lane result (title C-M2, paging, hidden with clips off or a
- * failed read), both hosts open through the one `openReelFromLane` seam,
- * clear the ring at once, and log `home_card_tapped` / `matches_reel_tapped`.
+ * failed read), both hosts open the swipe viewer through the one
+ * `openReelFromLane` seam (ready items only, the right index, the lane's
+ * `loadMore`), clear the ring at once, and log `home_card_tapped` /
+ * `matches_reel_tapped`. `laneLoadMore` pages past the tiles.
  */
 import * as React from "react";
 import { fireEvent, render } from "@testing-library/react-native";
@@ -27,11 +29,15 @@ jest.mock("expo-image", () => {
 });
 jest.mock("@/components/reels/reel-motion", () => ({ runRingPulse: jest.fn(), runReveal: jest.fn(), runShimmer: jest.fn() }));
 jest.mock("@/lib/motion/haptics", () => ({ haptics: { reelRevealed: jest.fn(() => Promise.resolve()) } }));
+const mockOpenViewer = jest.fn();
+jest.mock("@/lib/highlight/reel-viewer-session", () => ({ openReelViewer: (...a: unknown[]) => mockOpenViewer(...a) }));
+const mockFetchPage = jest.fn();
+jest.mock("@/lib/highlight/use-reel-lane", () => ({ fetchReelPage: (...a: unknown[]) => mockFetchPage(...a) }));
 const mockLog = jest.fn();
 jest.mock("@/lib/highlight/highlight-event", () => ({ logHighlightEvent: (...a: unknown[]) => mockLog(...a) }));
 
 import { HomeHighlightsCarousel, MatchesReelCarousel } from "@/components/reels/lane-carousels";
-import { openReelFromLane } from "@/components/reels/open-reel";
+import { laneLoadMore, openReelFromLane } from "@/components/reels/open-reel";
 import { buildLaneTiles } from "@/lib/highlight/reel-lane";
 import type { UseReelLaneResult } from "@/lib/highlight/use-reel-lane";
 import { reelItem } from "../../support/reel-tile-fixtures";
@@ -54,26 +60,70 @@ function lane(over: Partial<UseReelLaneResult> = {}): UseReelLaneResult {
   };
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockOpenViewer.mockReturnValue("tok");
+});
 
 describe("openReelFromLane (the viewer seam)", () => {
-  it("opens the reel at startIndex on the single-reel route with the lane as source", () => {
+  it("opens the swipe viewer at startIndex with the lane and its loadMore", () => {
     const router = { push: jest.fn() };
     const items = [reelItem("a"), reelItem("b")];
-    expect(openReelFromLane(router, { items, startIndex: 1, lane: "matches" })).toBe(true);
-    expect(router.push).toHaveBeenCalledWith("/highlight/b?source=matches");
+    const loadMore = jest.fn();
+    expect(openReelFromLane(router, { items, startIndex: 1, lane: "matches", loadMore })).toBe(true);
+    expect(mockOpenViewer).toHaveBeenCalledWith({ items, startIndex: 1, lane: "matches", loadMore });
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the single-reel route only when the viewer declines", () => {
+    mockOpenViewer.mockReturnValue(null);
+    const router = { push: jest.fn() };
+    const items = [reelItem("a"), reelItem("b")];
+    expect(openReelFromLane(router, { items, startIndex: 1, lane: "home" })).toBe(true);
+    expect(router.push).toHaveBeenCalledWith("/highlight/b?source=home");
     expect(openReelFromLane(router, { items, startIndex: 5, lane: "home" })).toBe(false);
-    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("laneLoadMore", () => {
+  const cursor = { before: "2026-10-06T10:00:00.123456+00:00", beforeId: "x" };
+
+  it("is undefined when the lane holds nothing more", () => {
+    expect(laneLoadMore([reelItem("a")], { loaded: [reelItem("a")], cursor: null, viewerId: "me" })).toBeUndefined();
+  });
+
+  it("first hands over loaded reels past the tiles, then pages from the cursor, then reports exhaustion", async () => {
+    const shown = [reelItem("a"), reelItem("b")];
+    const loaded = [...shown, reelItem("c")];
+    mockFetchPage
+      .mockResolvedValueOnce({ items: [reelItem("c")], cursor: { before: "t2", beforeId: "c" } }) // all known: skipped
+      .mockResolvedValueOnce({ items: [reelItem("d"), reelItem("e")], cursor: null });
+    const more = laneLoadMore(shown, { loaded, cursor, viewerId: "me" })!;
+    expect((await more()).map((i) => i.highlightId)).toEqual(["c"]);
+    expect(mockFetchPage).not.toHaveBeenCalled();
+    expect((await more()).map((i) => i.highlightId)).toEqual(["d", "e"]);
+    expect(mockFetchPage).toHaveBeenNthCalledWith(1, cursor, undefined, "me");
+    expect(mockFetchPage).toHaveBeenNthCalledWith(2, { before: "t2", beforeId: "c" }, undefined, "me");
+    expect(await more()).toEqual([]);
+  });
+
+  it("rejects on a failed read and retries from the same cursor", async () => {
+    mockFetchPage.mockResolvedValueOnce(null).mockResolvedValueOnce({ items: [reelItem("z")], cursor: null });
+    const more = laneLoadMore([reelItem("a")], { loaded: [reelItem("a")], cursor, viewerId: null })!;
+    await expect(more()).rejects.toThrow();
+    expect((await more()).map((i) => i.highlightId)).toEqual(["z"]);
+    expect(mockFetchPage).toHaveBeenLastCalledWith(cursor, undefined, null);
   });
 });
 
 describe("MatchesReelCarousel", () => {
   it("titles itself Your highlights and opens a reel with matches_reel_tapped", () => {
     const l = lane({ items: [reelItem("a", { unseen: true }), reelItem("b"), reelItem("c")] });
-    const { getByText, getByTestId } = render(<MatchesReelCarousel lane={l} />);
+    const { getByText, getByTestId } = render(<MatchesReelCarousel lane={l} viewerId="me" />);
     expect(getByText("Your highlights")).toBeTruthy();
     fireEvent.press(getByTestId("reel-tile-ready:a"));
-    expect(mockPush).toHaveBeenCalledWith("/highlight/a?source=matches");
+    expect(mockOpenViewer).toHaveBeenCalledWith(expect.objectContaining({ items: l.items, startIndex: 0, lane: "matches" }));
+    expect(mockPush).not.toHaveBeenCalled();
     expect(mockLog).toHaveBeenCalledWith("a", "matches_reel_tapped", { source: "matches", position: 0, unseen: true });
     expect(l.markSeenLocally).toHaveBeenCalledWith("a");
   });
@@ -96,7 +146,12 @@ describe("MatchesReelCarousel", () => {
     const list = render(<MatchesReelCarousel lane={more} />).getByLabelText("Your highlights");
     expect(list.props.onEndReached).toBeDefined();
     const busy = render(<MatchesReelCarousel lane={lane({ items, hasMore: true, loadingMore: true })} />).getAllByLabelText("Your highlights");
-    expect(busy[0].props.onEndReached).toBeUndefined();
+    expect(busy[busy.length - 1].props.onEndReached).toBeUndefined();
+    // After a failed page, scrolling on retries (the hook guards a running load).
+    const failed = render(
+      <MatchesReelCarousel lane={lane({ items, hasMore: true, loadMoreError: { code: "UNKNOWN", message: "x" } })} />,
+    ).getAllByLabelText("Your highlights");
+    expect(failed[failed.length - 1].props.onEndReached).toBeDefined();
   });
 });
 
@@ -105,10 +160,11 @@ describe("HomeHighlightsCarousel", () => {
     const items = [reelItem("a"), reelItem("b", { unseen: true })];
     const tiles = buildLaneTiles({ laneKey: "home", items, building: [], clipsEnabled: true, loading: false, hasMore: false });
     const markSeen = jest.fn();
-    const { getByText, getByTestId } = render(<HomeHighlightsCarousel tiles={tiles} markSeenLocally={markSeen} />);
+    const pageSource = { loaded: items, cursor: { before: "t", beforeId: "b" }, viewerId: "me" };
+    const { getByText, getByTestId } = render(<HomeHighlightsCarousel tiles={tiles} pageSource={pageSource} markSeenLocally={markSeen} />);
     expect(getByText("Highlights")).toBeTruthy();
     fireEvent.press(getByTestId("reel-tile-ready:b"));
-    expect(mockPush).toHaveBeenCalledWith("/highlight/b?source=home");
+    expect(mockOpenViewer).toHaveBeenCalledWith({ items, startIndex: 1, lane: "home", loadMore: expect.any(Function) });
     expect(mockLog).toHaveBeenCalledWith("b", "home_card_tapped", {
       source: "home",
       surface: "carousel",
@@ -120,6 +176,7 @@ describe("HomeHighlightsCarousel", () => {
   });
 
   it("renders nothing with no tiles", () => {
-    expect(render(<HomeHighlightsCarousel tiles={[]} markSeenLocally={jest.fn()} />).toJSON()).toBeNull();
+    const pageSource = { loaded: [], cursor: null, viewerId: null };
+    expect(render(<HomeHighlightsCarousel tiles={[]} pageSource={pageSource} markSeenLocally={jest.fn()} />).toJSON()).toBeNull();
   });
 });

@@ -17,7 +17,16 @@ export interface ReelMoments {
   pulseIds: ReadonlySet<string>;
   /** Ready tiles that just landed from a building tile and fade in. */
   revealIds: ReadonlySet<string>;
+  /** The host screen is focused (ambient motion such as the building shimmer runs only then). */
+  focused: boolean;
 }
+
+/**
+ * The session key of Home's first-unseen pulse. Coordinator decision
+ * 2026-10-06: it fires ONCE PER SESSION IN TOTAL (not once per reel), so it
+ * claims one fixed key; `__resetSessionPulses` resets it for tests.
+ */
+export const HOME_FIRST_UNSEEN_PULSE_KEY = "home:first-unseen";
 
 function buildingOf(tiles: readonly ReelTileModel[]): BuildingReel[] {
   return tiles.flatMap((t) => (t.kind === "building" ? [t.reel] : []));
@@ -30,8 +39,12 @@ function buildingOf(tiles: readonly ReelTileModel[]): BuildingReel[] {
  * - The reveal: a match that showed a building tile and now has a ready reel
  *   (`landedReels`) cross-fades in with one ring pulse and ONE success haptic
  *   per landing batch, only while the carousel's screen is focused.
- * - Home only: the first unseen tile pulses once per JS session
- *   (`claimSessionPulse`), the first time it is on a focused screen.
+ * - Home only: the first unseen tile pulses, once per JS session in total
+ *   (`claimSessionPulse(HOME_FIRST_UNSEEN_PULSE_KEY)`), the first time an
+ *   unseen tile is on a focused screen.
+ *
+ * Decided in a layout effect, so a revealed tile renders hidden and fades in
+ * before the first paint that shows it (no blink).
  *
  * Under Reduce Motion nothing moves (no pulse, no fade; the pulse is not
  * claimed, so it is not spent) but the reveal haptic still fires (haptics
@@ -42,20 +55,26 @@ export function useReelMoments(tiles: readonly ReelTileModel[], laneKey: ReelLan
   const reduceMotion = useReduceMotion();
   const focused = React.useRef(false);
   const [focusTick, setFocusTick] = React.useState(0);
+  const [isFocused, setIsFocused] = React.useState(false);
   useFocusEffect(
     React.useCallback(() => {
       focused.current = true;
+      setIsFocused(true);
       setFocusTick((n) => n + 1);
       return () => {
         focused.current = false;
+        setIsFocused(false);
       };
     }, []),
   );
 
   const prev = React.useRef<{ building: BuildingReel[]; items: ReturnType<typeof pagerItems> } | null>(null);
-  const [moments, setMoments] = React.useState<ReelMoments>({ pulseIds: EMPTY, revealIds: EMPTY });
+  const [moments, setMoments] = React.useState<{ pulseIds: ReadonlySet<string>; revealIds: ReadonlySet<string> }>({
+    pulseIds: EMPTY,
+    revealIds: EMPTY,
+  });
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     // Skeletons (a first read in flight) are not a state to compare against.
     if (tiles.length > 0 && tiles.every((t) => t.kind === "skeleton")) return;
     const items = pagerItems(tiles);
@@ -72,7 +91,7 @@ export function useReelMoments(tiles: readonly ReelTileModel[], laneKey: ReelLan
     const pulse = new Set(reveal);
     if (laneKey === "home") {
       const firstUnseen = items.find((i) => i.unseen);
-      if (firstUnseen && claimSessionPulse(firstUnseen.highlightId)) pulse.add(firstUnseen.highlightId);
+      if (firstUnseen && claimSessionPulse(HOME_FIRST_UNSEEN_PULSE_KEY)) pulse.add(firstUnseen.highlightId);
     }
     if (pulse.size === 0) return;
     setMoments({ pulseIds: pulse, revealIds: reveal });
@@ -85,5 +104,5 @@ export function useReelMoments(tiles: readonly ReelTileModel[], laneKey: ReelLan
     return () => clearTimeout(id);
   }, [moments]);
 
-  return moments;
+  return React.useMemo(() => ({ ...moments, focused: isFocused }), [moments, isFocused]);
 }

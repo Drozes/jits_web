@@ -184,6 +184,32 @@ describe("useReelLane", () => {
     expect(result.current.hasMore).toBe(true);
   });
 
+  it("a good first read clears a failed load-more, so paging can resume", async () => {
+    mockGetMy.mockResolvedValueOnce(page([item("1")], { nextBefore: "t", nextBeforeId: "1" }));
+    const { result } = renderHook(() => useReelLane("ath-1", "matches"));
+    await settle();
+    mockGetMy.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    act(() => result.current.loadMore());
+    await settle();
+    expect(result.current.loadMoreError).not.toBeNull();
+
+    mockGetMy.mockResolvedValueOnce(page([item("1")], { nextBefore: "t", nextBeforeId: "1" }));
+    act(() => result.current.refetch(true));
+    await settle();
+    expect(result.current.loadMoreError).toBeNull();
+    expect(result.current.hasMore).toBe(true);
+  });
+
+  it("stamps building reels with the device time their read landed (the countdown baseline)", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1_234_000);
+    const inFlight = [{ matchId: "m-w", matchVideoId: null, highlightId: null, reelState: "waiting", step: 1, waitDeadlineAt: "2026-10-06T10:08:12Z", serverNow: "2026-10-06T10:00:00Z", opponentName: null, playedAt: null, posterPath: null }];
+    mockGetMy.mockResolvedValue(page([], { inFlight }));
+    const { result } = renderHook(() => useReelLane("ath-1", "home"));
+    await settle();
+    expect(result.current.inFlight).toEqual([expect.objectContaining({ matchId: "m-w", receivedAt: 1_234_000 })]);
+    now.mockRestore();
+  });
+
   it("a load-more that finds clips switched off is an empty last page, not an error", async () => {
     mockGetMy.mockResolvedValueOnce(page([item("1")], { nextBefore: "t", nextBeforeId: "1" }));
     const { result } = renderHook(() => useReelLane("ath-1", "matches"));

@@ -44,14 +44,16 @@ export function ReadyTile({
   const tokens = useThemedTokens();
   const reduceMotion = useReduceMotion();
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
+  // A tile mounted to be revealed starts hidden, so it never blinks in before the fade.
+  const opacity = useSharedValue(reveal && !reduceMotion ? 0 : 1);
   const chip = sourceChip(item);
   const { width, height } = REEL_TILE_SIZE[size];
 
-  React.useEffect(() => {
+  // Layout effects: the animation starts before the frame that shows the tile is painted.
+  React.useLayoutEffect(() => {
     if (pulse && !reduceMotion) runRingPulse(scale);
   }, [pulse, reduceMotion, scale]);
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (reveal && !reduceMotion) runReveal(opacity);
   }, [reveal, reduceMotion, opacity]);
 
@@ -70,7 +72,8 @@ export function ReadyTile({
           <View className="bg-surface-4 items-center justify-center" style={{ width, height }}>
             {item.posterUrl ? (
               <Image
-                source={{ uri: item.posterUrl }}
+                // Keyed by the storage path: a re-signed URL reuses the cached image.
+                source={{ uri: item.posterUrl, cacheKey: item.posterPath ?? undefined }}
                 style={{ position: "absolute", top: 0, left: 0, width, height }}
                 contentFit="cover"
                 contentPosition="center"

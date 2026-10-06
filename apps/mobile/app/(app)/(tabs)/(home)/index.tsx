@@ -180,7 +180,11 @@ export default function DashboardScreen() {
             in phase 1, later friend, nearby and Elo sources in the same row.
             No red: Home's one red CTA stays Resume or the practice offer.
             Hidden with clips off or a failed read (Home stays quiet). */}
-        <HomeHighlightsCarousel tiles={highlights.tiles} markSeenLocally={highlights.markSeenLocally} />
+        <HomeHighlightsCarousel
+          tiles={highlights.tiles}
+          pageSource={highlights.pageSource}
+          markSeenLocally={highlights.markSeenLocally}
+        />
 
         <View>
           <MetaTag>{hasMatches ? "Welcome back" : "Welcome"}</MetaTag>
