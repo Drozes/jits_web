@@ -1691,6 +1691,36 @@ describe("keep-watching angle switch UI (jits-xfvd.19)", () => {
     expect(mockSetParams).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ["an abandon that goes pending to idle in one batch", { ...pendingTo2(KW), phase: "idle" }],
+    ["a failure abandon in one batch", { ...pendingTo2(KW), phase: "idle", failed: { seq: 1, targetId: "vid-2", at: Date.now() } }],
+  ])("the route never moves after %s, even if activeId reaches the target later", async (_label, ended) => {
+    const { utils } = await renderKeepWatching();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    // No pending render: the engine's state goes straight to idle.
+    setSwitch(utils, ended as Record<string, unknown>);
+    mockPlaybackPatch = { ...mockPlaybackPatch, activeId: "vid-2" };
+    setSwitch(utils, { ...pendingTo2(KW), phase: "idle" });
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
+  it("the route move belongs to the tap's switch only: a later seq or another entry drops it", async () => {
+    const { utils } = await renderKeepWatching();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    // A later switch (seq 2) lands on the same angle: not the tap's switch.
+    mockPlaybackPatch = { ...mockPlaybackPatch, activeId: "vid-2", frontSlot: 1 };
+    setSwitch(utils, landedOn2({ ...KW, seq: 2 }));
+    expect(mockSetParams).not.toHaveBeenCalled();
+    // Another recording opened (new entry) mid-switch.
+    mockPlaybackPatch = { ...mockPlaybackPatch, activeId: "vid-1", frontSlot: 0 };
+    setSwitch(utils, { ...IDLE_SWITCH_STATE, seq: 2 });
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ ...KW, seq: 3 }));
+    mockPlaybackPatch = { ...mockPlaybackPatch, entryId: "vid-9", activeId: "vid-2", frontSlot: 1 };
+    setSwitch(utils, landedOn2({ ...KW, seq: 3 }));
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
   it("the outgoing view stays on top through the landing, then the new front is on top", async () => {
     const { utils, players } = await renderKeepWatching();
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));

@@ -61,7 +61,9 @@ export function angleTransitionOf(s: AngleViewStackProps["switchState"], reduceM
  * throttled on iOS). At idle the new front is on top at full opacity again.
  * An in_place switch draws only the front (`SwitchOverlay` holds its still).
  *
- * The poster covers the front slot until its item draws a frame. With one
+ * Each slot is an opaque `ON_MEDIA.black` box, so nothing behind it shows
+ * through the letterbox bars. The poster covers the front slot until its
+ * item draws a frame, never during a keep-watching switch. With one
  * player for both slots (no second player), only the front view is drawn.
  * Not touchable; screen readers skip the picture as before.
  */
@@ -71,6 +73,7 @@ export function AngleViewStack({ players, frontSlot, switchState, onSlotFirstFra
   const transition = angleTransitionOf(switchState, reduceMotion);
   const from = landingFrom(switchState);
   const shared = players[0] === players[1];
+  const keepWatchingInFlight = switchState.mode === "keep_watching" && switchState.phase !== "idle";
 
   const opacity0 = useSharedValue(1);
   const opacity1 = useSharedValue(1);
@@ -107,6 +110,19 @@ export function AngleViewStack({ players, frontSlot, switchState, onSlotFirstFra
     }
   }, [transition, from, seq, opacity0, opacity1, black]);
 
+  // Unmount mid-transition: stop every running animation.
+  const valuesRef = React.useRef({ opacity0, opacity1, black });
+  valuesRef.current = { opacity0, opacity1, black };
+  React.useEffect(
+    () => () => {
+      const v = valuesRef.current;
+      cancelAnimation(v.opacity0);
+      cancelAnimation(v.opacity1);
+      cancelAnimation(v.black);
+    },
+    [],
+  );
+
   const style0 = useAnimatedStyle(() => ({ opacity: opacity0.value }));
   const style1 = useAnimatedStyle(() => ({ opacity: opacity1.value }));
   const blackStyle = useAnimatedStyle(() => ({ opacity: black.value }));
@@ -121,7 +137,9 @@ export function AngleViewStack({ players, frontSlot, switchState, onSlotFirstFra
         <Animated.View
           key={slot}
           testID={`angle-view-slot-${slot}`}
-          style={[StyleSheet.absoluteFill, { zIndex: slot === top ? 1 : 0 }, slot === 0 ? style0 : style1]}
+          // Each slot is an opaque box: a hidden incoming angle or a stale
+          // TextureView frame never shows through the letterbox bars.
+          style={[StyleSheet.absoluteFill, { zIndex: slot === top ? 1 : 0, backgroundColor: ON_MEDIA.black }, slot === 0 ? style0 : style1]}
         >
           <VideoView
             // The front view keeps the id the player has always had.
@@ -139,7 +157,9 @@ export function AngleViewStack({ players, frontSlot, switchState, onSlotFirstFra
       {transition === "dip" ? (
         <Animated.View testID="angle-view-dip" style={[StyleSheet.absoluteFill, { zIndex: 2, backgroundColor: ON_MEDIA.black }, blackStyle]} />
       ) : null}
-      {posterUrl && !frameShown ? (
+      {/* Never over a keep-watching switch: angle 1 is live on screen until
+          the crossfade, and frameShown may briefly describe the new front. */}
+      {posterUrl && !frameShown && !keepWatchingInFlight ? (
         <Image
           testID="video-poster"
           source={{ uri: posterUrl }}

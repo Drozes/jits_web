@@ -10,8 +10,13 @@ import { render } from "@testing-library/react-native";
 
 jest.mock("react-native-reanimated", () => {
   const mock = require("react-native-reanimated/mock");
+  const R = require("react");
   return {
     ...mock,
+    // Stable per component (as on device), so a test can read the value a
+    // transition targets (the mock's withTiming returns its target at once).
+    useSharedValue: (init: unknown) => R.useRef(mock.useSharedValue(init)).current,
+    cancelAnimation: jest.fn(),
     withTiming: jest.fn(mock.withTiming),
     withSequence: jest.fn(mock.withSequence),
     withDelay: jest.fn(mock.withDelay),
@@ -27,7 +32,8 @@ jest.mock("expo-video", () => {
   };
 });
 
-import { withDelay, withSequence, withTiming } from "react-native-reanimated";
+import { cancelAnimation, withDelay, withSequence, withTiming } from "react-native-reanimated";
+import { ON_MEDIA } from "@/lib/theme/palette";
 import type { VideoPlayer } from "expo-video";
 import { AngleViewStack, angleTransitionOf, topSlotOf, type AngleViewStackProps } from "@/components/film-room/angle-view-stack";
 import { duration, easing, moment } from "@/lib/motion";
@@ -209,6 +215,75 @@ describe("AngleViewStack", () => {
     s.rerender(stack({ switchState: inPlace }));
     expect(mockWithTiming).not.toHaveBeenCalled();
     expect(s.queryByTestId("angle-view-dip", HIDDEN)).toBeNull();
+  });
+
+  /** Render `el`, let its effects run, render again and read both slots' opacity. */
+  function opacitiesAfter(s: ReturnType<typeof render>, el: React.ReactElement<AngleViewStackProps>): [unknown, unknown] {
+    s.rerender(<AngleViewStack {...el.props} />);
+    s.rerender(<AngleViewStack {...el.props} />);
+    return [styleValue(s.getByTestId("angle-view-slot-0", HIDDEN), "opacity"), styleValue(s.getByTestId("angle-view-slot-1", HIDDEN), "opacity")];
+  }
+
+  it("each slot is an opaque black box (nothing shows through the letterbox bars)", () => {
+    const s = render(stack({ switchState: PENDING }));
+    for (const slot of [0, 1]) {
+      expect(styleValue(s.getByTestId(`angle-view-slot-${slot}`, HIDDEN), "backgroundColor")).toBe(ON_MEDIA.black);
+    }
+  });
+
+  it("a crossfade targets the outgoing fromSlot, not the front slot", () => {
+    const s = render(stack({ switchState: PENDING }));
+    expect(opacitiesAfter(s, stack({ switchState: LANDING, frontSlot: 1 }))).toEqual([0, 1]);
+  });
+
+  it("a cut sets the outgoing view's opacity to 0 at once", () => {
+    const s = render(stack({ switchState: PENDING, reduceMotion: true }));
+    expect(opacitiesAfter(s, stack({ switchState: LANDING, frontSlot: 1, reduceMotion: true }))).toEqual([0, 1]);
+    expect(mockWithTiming).not.toHaveBeenCalled();
+  });
+
+  it("idle resets both views to opacity 1", () => {
+    const s = render(stack({ switchState: PENDING }));
+    expect(opacitiesAfter(s, stack({ switchState: LANDING, frontSlot: 1 }))).toEqual([0, 1]);
+    expect(opacitiesAfter(s, stack({ switchState: { ...LANDING, phase: "idle" }, frontSlot: 1 }))).toEqual([1, 1]);
+  });
+
+  it("a second switch right after idle (slot 1 to 0) fades slot 1", () => {
+    const s = render(stack({ switchState: PENDING }));
+    opacitiesAfter(s, stack({ switchState: LANDING, frontSlot: 1 }));
+    opacitiesAfter(s, stack({ switchState: { ...LANDING, phase: "idle" }, frontSlot: 1 }));
+    const second: S = { phase: "pending", seq: 2, mode: "keep_watching", fromSlot: 1, incomingSlot: 0, approximate: false };
+    expect(opacitiesAfter(s, stack({ switchState: second, frontSlot: 1 }))).toEqual([1, 1]);
+    expect(opacitiesAfter(s, stack({ switchState: { ...second, phase: "landing" }, frontSlot: 0 }))).toEqual([1, 0]);
+    expect(styleValue(s.getByTestId("angle-view-slot-1", HIDDEN), "zIndex")).toBe(1);
+    expect(s.getByTestId("video-player", HIDDEN).props.player).toBe(A);
+  });
+
+  it("idle straight to landing (no pending render in between) still crossfades the outgoing slot", () => {
+    const s = render(stack());
+    expect(opacitiesAfter(s, stack({ switchState: LANDING, frontSlot: 1 }))).toEqual([0, 1]);
+    expect(mockWithTiming).toHaveBeenCalledWith(0, { duration: duration.fast, easing: easing.brandOut });
+  });
+
+  it("unmounting mid-fade stops every animation", () => {
+    const s = render(stack({ switchState: PENDING }));
+    s.rerender(stack({ switchState: LANDING, frontSlot: 1 }));
+    (cancelAnimation as jest.Mock).mockClear();
+    s.unmount();
+    expect(cancelAnimation).toHaveBeenCalledTimes(3);
+  });
+
+  it("no poster while a keep-watching switch is pending or landing", () => {
+    const poster = { posterUrl: "https://signed.example/p.jpg", frameShown: false };
+    const s = render(stack({ ...poster, switchState: PENDING }));
+    expect(s.queryByTestId("video-poster", HIDDEN)).toBeNull();
+    s.rerender(stack({ ...poster, switchState: LANDING, frontSlot: 1 }));
+    expect(s.queryByTestId("video-poster", HIDDEN)).toBeNull();
+    s.rerender(stack({ ...poster, switchState: { ...LANDING, phase: "idle" }, frontSlot: 1 }));
+    expect(s.getByTestId("video-poster", HIDDEN)).toBeTruthy();
+    // An in_place switch keeps the phase-1 rule (the poster follows frameShown).
+    s.rerender(stack({ ...poster, switchState: { ...PENDING, mode: "in_place", fromSlot: null, incomingSlot: null } }));
+    expect(s.getByTestId("video-poster", HIDDEN)).toBeTruthy();
   });
 
   it("covers the front with the poster until it has drawn a frame", () => {

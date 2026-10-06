@@ -192,22 +192,32 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   const locked = sw.phase !== "idle";
   // The route follows activeId: at the tap for in_place (activeId moves
   // there, with the tap's time), at the crossfade for keep_watching (with the
-  // landed time). An abandoned switch never moves it.
-  const routeRef = React.useRef<{ id: string; t: number; approx: "0" | "1" } | null>(null);
+  // landed time). An abandoned switch never moves it. The pending move is
+  // keyed by the seq the tap's switch gets (the engine's seq + 1) and the
+  // screen's entry, so it can never apply to another switch or recording.
+  const routeRef = React.useRef<{ id: string; t: number; approx: "0" | "1"; seq: number; entryId: string | undefined } | null>(null);
   const { currentTimeNow } = playback;
+  const failedSeq = sw.failed?.seq ?? null;
   React.useEffect(() => {
     const next = routeRef.current;
-    if (!next || activeId !== next.id) return;
-    routeRef.current = null;
-    const at = sw.mode === "keep_watching" ? currentTimeNow() : next.t;
-    router.setParams({ id: next.id, t: at.toFixed(3), approx: next.approx });
-  }, [activeId, sw.mode, currentTimeNow, router]);
-  const prevPhaseRef = React.useRef(sw.phase);
-  React.useEffect(() => {
-    // Back to idle without activeId reaching the target: abandoned.
-    if (prevPhaseRef.current !== "idle" && sw.phase === "idle") routeRef.current = null;
-    prevPhaseRef.current = sw.phase;
-  }, [sw.phase]);
+    if (!next) return;
+    // Another recording opened, or a later switch began: this move is stale.
+    if (entryId !== next.entryId || sw.seq > next.seq) {
+      routeRef.current = null;
+      return;
+    }
+    // The tap's switch has not reached the state yet (or was rejected).
+    if (sw.seq < next.seq) return;
+    if (activeId === next.id) {
+      routeRef.current = null;
+      const at = sw.mode === "keep_watching" ? currentTimeNow() : next.t;
+      router.setParams({ id: next.id, t: at.toFixed(3), approx: next.approx });
+      return;
+    }
+    // Ended without activeId reaching the target (abandoned or failed, even
+    // pending to idle in one batch): the route stays.
+    if (sw.phase === "idle" || failedSeq === next.seq) routeRef.current = null;
+  }, [activeId, sw.seq, sw.phase, sw.mode, failedSeq, entryId, currentTimeNow, router]);
   const chromeId = frozen ? frozen.id : activeId;
   const chromePositionS = frozen ? frozen.positionS : positionS;
   const chromeDuration = frozen ? frozen.durationS : duration;
@@ -316,7 +326,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                   setSnapshot({ id: activeId, positionS, durationS: duration, fromT, approx: approximate ? "1" : "0" });
                   approxByIdRef.current[other] = exact ? "0" : "1";
                   // The route moves when activeId does (the effect above).
-                  routeRef.current = { id: other, t: moved.t, approx: exact ? "0" : "1" };
+                  routeRef.current = { id: other, t: moved.t, approx: exact ? "0" : "1", seq: sw.seq + 1, entryId };
                   // The offsets let the engine map the two angles' times
                   // continuously (keep_watching); without them it runs in_place.
                   playback.switchAngle(other, moved.t, {
