@@ -105,17 +105,32 @@ const OFFSETS = { fromMs: 0, toMs: 0 };
 const flush = async () => {
   for (let i = 0; i < 4; i++) await act(async () => undefined);
 };
-const advance = async (ms: number) => {
-  act(() => {
-    jest.advanceTimersByTime(ms);
-  });
-  await flush();
-};
 const state = (r: Result) => r.current.switchState;
 
 let tapAt = 0;
-/** A's time now, extrapolated from 10 s at the tap (playing at `rate`). */
-const aNow = (rate = 1) => 10 + ((Date.now() - tapAt) / 1000) * rate;
+/**
+ * The modelled A clock: `base` at `at`, moving at `rate` while `playing`.
+ * After a tap, `advance` sends A a time update every 100 ms (as the pending
+ * 0.1 s interval does), so the engine never extrapolates A far (review L1).
+ */
+const aClock = { base: 10, at: 0, rate: 1, playing: true, ticking: true };
+const aNow = (rate = aClock.rate) => (aClock.playing ? aClock.base + ((Date.now() - aClock.at) / 1000) * rate : aClock.base);
+/** A's clock jumps (a user seek) or stops (pause, end), from now. */
+const setAClock = (patch: Partial<typeof aClock>) => {
+  Object.assign(aClock, { base: aNow(), at: Date.now() }, patch);
+};
+const advance = async (ms: number) => {
+  let left = ms;
+  do {
+    const step = Math.min(100, left);
+    act(() => {
+      jest.advanceTimersByTime(step);
+    });
+    if (tapAt > 0 && aClock.playing && aClock.ticking) act(() => tick(idx(0), aNow()));
+    left -= step;
+  } while (left > 0);
+  await flush();
+};
 
 /** Open vid-1, ready, a frame on screen, playing at 10 s; vid-2 and vid-3 pre-signed. */
 async function open(opts: { paused?: boolean; rate?: number } = {}) {
@@ -128,7 +143,11 @@ async function open(opts: { paused?: boolean; rate?: number } = {}) {
   act(() => hook.result.current.presign(["vid-2", "vid-3"]));
   await waitFor(() => expect(mockSign).toHaveBeenCalledWith({}, "vid-3", expect.anything()));
   await flush();
-  if (opts.rate) act(() => hook.result.current.setRate(opts.rate!));
+  if (opts.rate) {
+    act(() => hook.result.current.setRate(opts.rate!));
+    aClock.rate = opts.rate;
+  }
+  if (opts.paused) aClock.playing = false;
   if (opts.paused) act(() => hook.result.current.toggle());
   for (const p of [slot(0), slot(1)]) {
     p.play.mockClear();
@@ -145,6 +164,7 @@ async function open(opts: { paused?: boolean; rate?: number } = {}) {
 function tap(result: Result, target = "vid-2", opts: { approximate?: boolean; offsets?: { fromMs: number | null; toMs: number | null } } = {}) {
   act(() => tick(idx(0), 10));
   tapAt = Date.now();
+  Object.assign(aClock, { base: 10, at: tapAt });
   act(() => result.current.switchAngle(target, 10, { offsets: OFFSETS, ...opts }));
 }
 
@@ -170,8 +190,12 @@ async function chaseInStep(result: Result, opts: { errorS?: number; samples?: nu
   }
 }
 
-let appStateHandler: ((s: string) => void) | null = null;
+let appStateHandlers: Array<(s: string) => void> = [];
+/** Every AppState listener, in subscription order (the engine's layout-effect one first). */
+const appStateHandler = (s: string) => appStateHandlers.forEach((h) => h(s));
 beforeEach(() => {
+  tapAt = 0;
+  Object.assign(aClock, { base: 10, at: 0, rate: 1, playing: true, ticking: true });
   jest.useFakeTimers();
   jest.clearAllMocks();
   resetFakeVideo();
@@ -181,9 +205,9 @@ beforeEach(() => {
   mockFlags.enabled = true;
   mockDevice.info = { os: "ios", apiLevel: null, totalMemory: null, yearClass: null };
   signAll();
-  appStateHandler = null;
+  appStateHandlers = [];
   jest.spyOn(AppState, "addEventListener").mockImplementation((_e, fn) => {
-    appStateHandler = fn as (s: string) => void;
+    appStateHandlers.push(fn as (s: string) => void);
     return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>;
   });
 });
@@ -441,7 +465,7 @@ describe("keep-watching switch: playing", () => {
     expect(mockTelemetry.switchAbandoned).toHaveBeenCalledWith("timeout");
   });
 
-  it("late ready: retargets ahead by what the load took (counted); the fallback after it starts B", async () => {
+  it("late ready: retargets ahead by what the load took (counted); the ready item's start is still planned (M2)", async () => {
     const { result } = await open();
     tap(result);
     await flush();
@@ -451,11 +475,46 @@ describe("keep-watching switch: playing", () => {
     expect(mockTelemetry.switchRetarget).toHaveBeenCalledTimes(1);
     const t1 = slot(1).seeks.at(-1)!;
     expect(t1).toBeCloseTo(aNow() + 1.3 * 0.9 + 0.2);
+    // The re-seeked item is already ready: play is scheduled a start latency before A reaches t1.
+    const startMs = Math.round((t1 - aNow()) * 1000 - 120);
+    await advance(startMs - 10);
     expect(slot(1).play).not.toHaveBeenCalled();
-    // No ready event after the re-seek: the fallback plays B and it is chased.
-    await advance(READY_FALLBACK_MS);
+    await advance(20);
     expect(slot(1).play).toHaveBeenCalledTimes(1);
+    expect(t1 - aNow()).toBeCloseTo(0.12, 1);
     expect(mockTelemetry.switchRetarget).toHaveBeenCalledTimes(1);
+  });
+
+  it("M2: a re-seek of a ready B with no new ready event: the fallback plans the start, never plays at once", async () => {
+    const { result } = await open();
+    tap(result);
+    await bReady();
+    // B drops back to loading (it does not report ready again), then a user seek.
+    act(() => emitStatus(idx(1), "loading"));
+    act(() => result.current.seek(100));
+    setAClock({ base: 100 });
+    expect(slot(1).seeks.at(-1)).toBe(101);
+    await advance(READY_FALLBACK_MS - 10);
+    expect(slot(1).play).not.toHaveBeenCalled();
+    await advance(10);
+    // At the fallback A is at the old target: a planned retarget ahead, not play() 1 s off.
+    expect(slot(1).play).not.toHaveBeenCalled();
+    expect(mockTelemetry.switchRetarget).toHaveBeenCalledTimes(1);
+    expect(slot(1).seeks.at(-1)! - aNow()).toBeGreaterThanOrEqual(1 - 1e-9);
+  });
+
+  it("M2: a user seek on a ready B starts it on plan and lands in step at the new moment", async () => {
+    const { result } = await open();
+    tap(result);
+    await bReady();
+    act(() => result.current.seek(100));
+    tapAt = Date.now();
+    setAClock({ base: 100, at: tapAt });
+    expect(slot(1).seeks.at(-1)).toBe(101);
+    await chaseInStep(result);
+    expect(state(result).phase).toBe("landing");
+    expect(result.current.positionS).toBeCloseTo(aNow());
+    expect(mockTelemetry.switchRetarget).not.toHaveBeenCalled();
   });
 
   it("the ready fallback plays B muted at once when no ready event comes (iOS paused buffer)", async () => {
@@ -553,13 +612,16 @@ describe("keep-watching switch: paused, rate, seek, end (3.4, 3.5)", () => {
     await bReady();
     await advance(300);
     act(() => tick(idx(0), 10.3));
+    setAClock({ base: 10.3, playing: false });
     act(() => result.current.toggle());
     expect(slot(1).pause).toHaveBeenCalled();
     expect(slot(1).seeks.at(-1)).toBeCloseTo(10.3);
     await advance(2000);
-    // The scheduled play never fires; the paused fallback lands it.
+    // The scheduled play never fires; the ready item lands paused on its post-seek fallback.
     expect(slot(1).play).not.toHaveBeenCalled();
-    expect(state(result).phase).toBe("landing");
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+    expect(result.current.activeId).toBe("vid-2");
+    expect(result.current.positionS).toBeCloseTo(10.3);
     expect(slot(0).pause).toHaveBeenCalled();
   });
 
@@ -571,6 +633,7 @@ describe("keep-watching switch: paused, rate, seek, end (3.4, 3.5)", () => {
     expect(slot(1).replaceAsync).toHaveBeenCalledTimes(1);
     expect(slot(1).seeks.at(-1)).toBe(11);
     tapAt = Date.now();
+    setAClock({ base: 10, at: tapAt, playing: true });
     act(() => readyPlayer(idx(1)));
     await chaseInStep(result);
     expect(state(result).phase).toBe("landing");
@@ -620,12 +683,14 @@ describe("keep-watching switch: paused, rate, seek, end (3.4, 3.5)", () => {
     tap(result);
     await bReady();
     act(() => tick(idx(0), 399.9));
+    setAClock({ base: 399.9, playing: false });
     act(() => slot(0).emit("playToEnd"));
     expect(result.current.playing).toBe(false);
     expect(slot(1).seeks.at(-1)).toBeCloseTo(399.5);
-    // No ready event and no frame: the fallback, then one more wait for a frame.
+    // Ready already: the paused fallback, then one more wait for a frame.
     await advance(2 * READY_FALLBACK_MS);
-    expect(state(result).phase).toBe("landing");
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+    expect(result.current.positionS).toBeCloseTo(399.5);
   });
 });
 
@@ -715,7 +780,7 @@ describe("keep-watching switch: abandon (section 7)", () => {
     const { result } = await open();
     tap(result);
     await flush();
-    act(() => appStateHandler!("background"));
+    act(() => appStateHandler("background"));
     expectAbandoned(result, "background", false);
     expect(result.current.playing).toBe(false);
   });
@@ -725,7 +790,7 @@ describe("keep-watching switch: abandon (section 7)", () => {
     tap(result);
     await bReady();
     await chaseInStep(result);
-    act(() => appStateHandler!("background"));
+    act(() => appStateHandler("background"));
     expect(state(result).phase).toBe("idle");
     expect(result.current.frontSlot).toBe(1);
     expect(slot(0).releases).toBe(1);
@@ -971,5 +1036,209 @@ describe("keep-watching switch: in_place fallbacks (section 9)", () => {
     act(() => hook.result.current.switchAngle("vid-2", 0, { offsets: OFFSETS }));
     expect(mockTelemetry.switchFallback).toHaveBeenCalledWith("phase_not_ready");
     expect(slot(1).replaceAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe("keep-watching switch: review round 1 (jits-xfvd.19)", () => {
+  const SHORT = () => signAll({ "vid-4": () => Promise.resolve(playable("https://s/d.mp4", { durationSeconds: 12.5 })) });
+
+  it("M1: a late retarget past a shorter angle's end lands at its edge once ready there", async () => {
+    SHORT();
+    const { result } = await open();
+    tap(result, "vid-4");
+    await flush();
+    expect(slot(1).seeks).toEqual([11]);
+    await advance(900);
+    act(() => readyPlayer(idx(1), 12.5));
+    // max(1, 1.3 * 0.9 + 0.2) ahead of 10.9 is past 12.0 (12.5 - 0.5): clamped, not covered.
+    expect(mockTelemetry.switchRetarget).toHaveBeenCalledTimes(1);
+    expect(slot(1).seeks.at(-1)).toBe(12);
+    expect(state(result)).toMatchObject({ phase: "landing", approximate: false });
+    expect(result.current.activeId).toBe("vid-4");
+    expect(mockTelemetry.switchKeepWatchingLanded).toHaveBeenCalledWith(expect.objectContaining({ exact: false }));
+  });
+
+  it("M1: a hidden re-seek past B's end is clamped and lands at the edge", async () => {
+    SHORT();
+    const { result } = await open();
+    tap(result, "vid-4");
+    await flush();
+    act(() => readyPlayer(idx(1), 12.5));
+    await chaseInStep(result, { errorS: -0.5, samples: 1 });
+    for (let i = 0; i < 40 && state(result).phase === "pending"; i++) {
+      await advance(100);
+      act(() => tick(idx(1), aNow() - 0.5));
+    }
+    expect(state(result).phase).toBe("landing");
+    expect(slot(1).seeks.at(-1)).toBe(12);
+    expect(slot(1).seeks.every((t) => t <= 12)).toBe(true);
+    expect(mockTelemetry.switchRetarget).toHaveBeenCalled();
+    expect(mockTelemetry.switchAbandoned).not.toHaveBeenCalled();
+  });
+
+  it("M1: B reaching its end while pending lands at the edge (crossfade, not approximate) and stops", async () => {
+    const { result } = await open();
+    tap(result);
+    await bReady();
+    await chaseInStep(result, { errorS: 0.09, samples: 1 });
+    expect(state(result).phase).toBe("pending");
+    act(() => slot(1).emit("playToEnd"));
+    expect(state(result)).toMatchObject({ phase: "landing", approximate: false });
+    expect(result.current.activeId).toBe("vid-2");
+    expect(result.current.playing).toBe(false);
+    // Stopped at the end: the outgoing angle is silenced at once (no ramp over a stopped film).
+    expect(slot(0).muted).toBe(true);
+    expect(slot(1).muted).toBe(false);
+  });
+
+  it("L1: a stalled A (no time updates) is not extrapolated past 250 ms: no false late retarget", async () => {
+    const { result } = await open();
+    tap(result);
+    aClock.ticking = false;
+    await flush();
+    await advance(900);
+    act(() => readyPlayer(idx(1)));
+    // A's last update is the tap at 10 s: at most 10.25 now, so t0 = 11 is still ahead.
+    expect(mockTelemetry.switchRetarget).not.toHaveBeenCalled();
+    await advance(620);
+    expect(slot(1).play).not.toHaveBeenCalled();
+    await advance(20);
+    expect(slot(1).play).toHaveBeenCalledTimes(1);
+  });
+
+  it("L4: a pause during the landing pauses and silences the outgoing angle at once", async () => {
+    const { result } = await open();
+    tap(result);
+    await bReady();
+    await chaseInStep(result);
+    expect(state(result).phase).toBe("landing");
+    await advance(40);
+    const writes = slot(0).volumes.length;
+    act(() => result.current.toggle());
+    expect(slot(0).pause).toHaveBeenCalled();
+    expect(slot(0).muted).toBe(true);
+    expect(slot(1).pause).toHaveBeenCalled();
+    expect(slot(1).muted).toBe(false);
+    expect(slot(1).volume).toBe(1);
+    await advance(200);
+    // The ramp stopped: no more volume writes to the old front.
+    expect(slot(0).volumes.length).toBe(writes + 1);
+  });
+
+  it("L4: a seek during the landing silences the outgoing angle; the seek acts on B", async () => {
+    const { result } = await open();
+    tap(result);
+    await bReady();
+    await chaseInStep(result);
+    act(() => result.current.seek(50));
+    expect(slot(1).seeks.at(-1)).toBe(50);
+    expect(slot(0).seeks).not.toContain(50);
+    expect(slot(0).muted).toBe(true);
+    expect(slot(0).pause).toHaveBeenCalled();
+  });
+
+  it("L5: a median in step does not land while the latest raw sample is out of step", async () => {
+    const { result } = await open();
+    tap(result);
+    await bReady();
+    await chaseInStep(result, { errorS: 0.06, samples: 1 });
+    expect(state(result).phase).toBe("pending");
+    await advance(100);
+    act(() => tick(idx(1), aNow() - 0.3));
+    expect(state(result).phase).toBe("pending");
+    await advance(100);
+    act(() => tick(idx(1), aNow()));
+    await advance(100);
+    act(() => tick(idx(1), aNow()));
+    expect(state(result).phase).toBe("landing");
+  });
+
+  it("m4: distinct durations: at LAND the clock, duration, source and id are B's in the same commit", async () => {
+    signAll({ "vid-2": () => Promise.resolve(playable(URLS["vid-2"], { durationSeconds: 300 })) });
+    const { result } = await open();
+    expect(result.current.durationS).toBe(400);
+    tap(result);
+    await flush();
+    act(() => readyPlayer(idx(1), 300));
+    await chaseInStep(result);
+    expect(state(result).phase).toBe("landing");
+    expect(result.current.activeId).toBe("vid-2");
+    expect(result.current.durationS).toBe(300);
+    expect(result.current.currentTimeNow()).toBe(slot(1).currentTime);
+    expect(result.current.positionS).toBe(slot(1).currentTime);
+    expect(result.current.source).toMatchObject({ url: "https://s/b.mp4", durationSeconds: 300 });
+  });
+
+  it("a rate change before B starts lands in step at the new rate", async () => {
+    const { result } = await open();
+    tap(result);
+    await flush();
+    act(() => result.current.setRate(2));
+    setAClock({ rate: 2 });
+    act(() => readyPlayer(idx(1)));
+    await chaseInStep(result, { rate: 2 });
+    expect(state(result).phase).toBe("landing");
+    expect(slot(1).playbackRate).toBe(2);
+  });
+
+  it("iOS: no rate write starts B before its planned play, and the released A stays stopped", async () => {
+    const { result } = await open();
+    slot(0).rateStartsPlayback = true;
+    slot(1).rateStartsPlayback = true;
+    tap(result);
+    await bReady();
+    expect(slot(1).playing).toBe(false);
+    await advance(700);
+    expect(slot(1).playing).toBe(false);
+    await chaseInStep(result);
+    expect(state(result).phase).toBe("landing");
+    await advance(SWITCH_SETTLE_MS);
+    expect(slot(0).releases).toBe(1);
+    expect(slot(0).playing).toBe(false);
+  });
+});
+
+describe("keep-watching switch: unsynced angles (null offsets, coordinator 2026-10-06)", () => {
+  const NULLS = { fromMs: null, toMs: null };
+
+  it("mid-play: keeps A playing and lands approximate (no sync check, dip audio cut)", async () => {
+    const { result } = await open();
+    tap(result, "vid-2", { offsets: NULLS });
+    expect(state(result)).toMatchObject({ phase: "pending", mode: "keep_watching", approximate: true });
+    expect(mockTelemetry.switchFallback).not.toHaveBeenCalled();
+    await bReady();
+    await chaseInStep(result, { errorS: 0.4, samples: 1 });
+    expect(state(result)).toMatchObject({ phase: "landing", approximate: true });
+    expect(slot(0).pause).not.toHaveBeenCalled();
+    expect(slot(0).mutes).toEqual([]);
+    expect(mockTelemetry.switchKeepWatchingLanded).toHaveBeenCalledWith(expect.objectContaining({ exact: false }));
+    await advance(DIP_MS);
+    expect(slot(0).muted).toBe(true);
+    expect(slot(1).muted).toBe(false);
+  });
+
+  it("paused: lands approximate on B's first frame at A's own time", async () => {
+    const { result } = await open({ paused: true });
+    tap(result, "vid-2", { offsets: { fromMs: 1200, toMs: null } });
+    expect(state(result).approximate).toBe(true);
+    await flush();
+    expect(slot(1).seeks).toEqual([10]);
+    act(() => result.current.onSlotFirstFrame(1));
+    expect(state(result)).toMatchObject({ phase: "landing", approximate: true });
+    expect(slot(1).play).not.toHaveBeenCalled();
+  });
+
+  it("an unsynced switch past a shorter angle's end lands at the edge; a load error still retries once", async () => {
+    signAll({ "vid-4": () => Promise.resolve(playable("https://s/d.mp4", { durationSeconds: 10.6 })) });
+    const { result } = await open();
+    failReplace(idx(1), "network lost");
+    tap(result, "vid-4", { offsets: NULLS });
+    await flush();
+    await flush();
+    expect(mockTelemetry.switchLoadRetried).toHaveBeenCalledTimes(1);
+    // 10 + 1 s lead is past 10.1 (10.6 - 0.5): the edge.
+    expect(slot(1).seeks.at(-1)).toBeCloseTo(10.1);
+    act(() => readyPlayer(idx(1), 10.6));
+    expect(state(result)).toMatchObject({ phase: "landing", approximate: true });
   });
 });

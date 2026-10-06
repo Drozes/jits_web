@@ -79,13 +79,13 @@ describe("keep-watching planner", () => {
     it("late: retargets ahead by at least what the load took, at most MAX_RETARGETS times, then chases", () => {
       const late = decideStart({ ...base, waitS: 0.05, readyMs: 2000 });
       // max(lead 1, 1.3 * 2 + 0.2 = 2.8) ahead of A.
-      expect(late).toEqual({ kind: "retarget", t0S: expect.closeTo(10 + LEAD_SAFETY * 2 + 0.2, 6) });
-      expect(decideStart({ ...base, waitS: 0.05, readyMs: 100 })).toEqual({ kind: "retarget", t0S: 11 });
+      expect(late).toEqual({ kind: "retarget", t0S: expect.closeTo(10 + LEAD_SAFETY * 2 + 0.2, 6), covered: true });
+      expect(decideStart({ ...base, waitS: 0.05, readyMs: 100 })).toEqual({ kind: "retarget", t0S: 11, covered: true });
       expect(decideStart({ ...base, waitS: -1, retargets: MAX_RETARGETS })).toEqual({ kind: "chase" });
     });
 
-    it("a retarget never aims past B's end", () => {
-      expect(decideStart({ ...base, waitS: -1, mappedANowS: 399.8, durationBS: 400 })).toEqual({ kind: "retarget", t0S: 399.5 });
+    it("a retarget never aims past B's end, and says B does not cover it (review M1)", () => {
+      expect(decideStart({ ...base, waitS: -1, mappedANowS: 399.8, durationBS: 400 })).toEqual({ kind: "retarget", t0S: 399.5, covered: false });
     });
   });
 

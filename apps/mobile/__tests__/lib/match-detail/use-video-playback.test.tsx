@@ -781,6 +781,35 @@ describe("useVideoPlayback adaptive quality", () => {
     expect(mockTelemetry.qualitySwitchStarted).not.toHaveBeenCalled();
   });
 
+  it("keep_watching (jits-xfvd.19): the controller decides again on the new front once the switch is idle", async () => {
+    signCopies({ "vid-1": BOTH, "vid-2": BOTH });
+    const { result } = await open();
+    act(() => result.current.presign(["vid-2"]));
+    await waitFor(() => expect(mockSign).toHaveBeenCalledWith({}, "vid-2", { rendition: "720" }));
+    await act(async () => undefined);
+    const A = player();
+    const B = mockPlayers[mockPlayers.length - 1];
+    act(() => A.emit("timeUpdate", { currentTime: 10 }));
+    // Paused keep-watching switch: exact, lands on B's first frame after its seek.
+    act(() => result.current.setPlaying(false));
+    act(() => result.current.switchAngle("vid-2", 10, { offsets: { fromMs: 0, toMs: 0 } }));
+    await act(async () => undefined);
+    await act(async () => undefined);
+    act(() => result.current.onSlotFirstFrame(1));
+    expect(result.current.switchState).toMatchObject({ phase: "landing", mode: "keep_watching" });
+    expect(result.current.player).toBe(B);
+    await waitSettle();
+    act(() => result.current.setPlaying(true));
+    clock += 5000;
+    // A long stall on the NEW front steps it down: the controller follows slot 1.
+    stall("start");
+    clock += 1000;
+    act(() => B.emit("timeUpdate", { currentTime: 10.5 }));
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledWith("720", "360", "stall_long", expect.anything());
+    await waitFor(() => expect(B.replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-2.360.mp4" }));
+    expect(A.replaceAsync).not.toHaveBeenCalledWith({ uri: "https://s/vid-2.360.mp4" });
+  });
+
   it("keep_watching (jits-xfvd.19): a tap while a quality swap is in flight runs in_place (quality_swap)", async () => {
     signCopies({ "vid-1": BOTH, "vid-2": BOTH });
     const base = mockSign.getMockImplementation()!;

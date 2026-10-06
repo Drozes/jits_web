@@ -135,7 +135,11 @@ export function waitUntilTarget(t0S: number, mappedANowS: number, rate: number):
 }
 
 /** 3.3 step 3: start B at the right moment, or retarget, or chase. */
-export type StartDecision = { kind: "schedule"; inMs: number } | { kind: "retarget"; t0S: number } | { kind: "chase" };
+export type StartDecision =
+  | { kind: "schedule"; inMs: number }
+  /** covered=false: the new target was clamped to B's edge (B does not cover it, 3.5). */
+  | { kind: "retarget"; t0S: number; covered: boolean }
+  | { kind: "chase" };
 
 export function decideStart(input: {
   waitS: number;
@@ -154,7 +158,8 @@ export function decideStart(input: {
     // The lead was too short for this load: aim further ahead, by at least
     // what this load actually took.
     const leadS = Math.max(input.leadS, LEAD_SAFETY * (input.readyMs / 1000) + 0.2);
-    return { kind: "retarget", t0S: clampIncoming(input.mappedANowS + leadS * input.rate, input.durationBS).t };
+    const { t, covered } = clampIncoming(input.mappedANowS + leadS * input.rate, input.durationBS);
+    return { kind: "retarget", t0S: t, covered };
   }
   return { kind: "chase" };
 }

@@ -12,7 +12,7 @@ import { usePlaybackTelemetry, type PlaybackTelemetry } from "@/lib/video/use-pl
 import { servedOf, useQualitySession } from "@/lib/video/quality/use-quality-session";
 import { currentNetworkSnapshot } from "@/lib/video/quality/network-store";
 import { deviceTier, readDeviceInfo } from "@/lib/video/multi-angle/device-tier";
-import { DriftFilter, extrapolate } from "@/lib/video/multi-angle/sync-controller";
+import { DriftFilter, SWAP_MAX_ERROR_S, extrapolate } from "@/lib/video/multi-angle/sync-controller";
 import {
   ABANDON_TIMEOUT_MS,
   AUDIO_RAMP,
@@ -26,6 +26,7 @@ import {
   LOAD_RETRY_MAX,
   READY_FALLBACK_MS,
   START_AT_TARGET_SLACK_S,
+  clampIncoming,
   decideChase,
   decideStart,
   incomingTarget,
@@ -151,6 +152,11 @@ export const HELD_FRAME_CAP_MS = 150;
 export const SWITCH_HOLD_CAP_MS = 4000;
 /** "landing" lasts this long, then the state returns to "idle" and heldFrame clears. */
 export const SWITCH_SETTLE_MS = 300;
+/**
+ * The keep-watching engine extrapolates A from its last time update at most
+ * this far (2.5 pending update intervals): a stalled A sends none (review L1).
+ */
+const A_EXTRAPOLATE_MAX_MS = 250;
 /** Paused, no frame event after the post-seek readyToPlay: land after this. */
 export const PAUSED_LAND_FALLBACK_MS = 350;
 
@@ -286,6 +292,7 @@ interface KeepWatchingFns {
   incomingTime: (p: VideoPlayer, t: number) => void;
   incomingDuration: (p: VideoPlayer, duration: number) => void;
   incomingFrame: () => void;
+  incomingEnded: (p: VideoPlayer) => void;
 }
 
 const INERT_KEEP_WATCHING: KeepWatchingFns = {
@@ -301,6 +308,7 @@ const INERT_KEEP_WATCHING: KeepWatchingFns = {
   incomingTime: () => undefined,
   incomingDuration: () => undefined,
   incomingFrame: () => undefined,
+  incomingEnded: () => undefined,
 };
 
 /**
@@ -363,6 +371,8 @@ interface KeepWatchingRun {
   hiddenReseeks: number;
   loadRetries: number;
   landing: boolean;
+  /** B reached its end while pending (a shorter angle). */
+  ended: boolean;
   timers: Partial<Record<KeepWatchingTimer, ReturnType<typeof setTimeout>>>;
   rampTimers: Array<ReturnType<typeof setTimeout>>;
 }
@@ -1247,11 +1257,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   // button over a stopped film.
   React.useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
-      if (next === "background") {
-        // A landing finishes first; a pending keep-watching switch is abandoned (contract 07 section 3.6).
-        kwFnsRef.current.onLeave("background");
-        setPlaying(false);
-      }
+      // (A keep-watching switch was already finished or abandoned by the layout-effect listener below.)
+      if (next === "background") setPlaying(false);
     });
     return () => sub?.remove?.();
   }, []);
@@ -1668,9 +1675,17 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         if (mountedRef.current && kwRef.current === run) fn();
       }, Math.max(0, ms));
     };
-    /** A's time now, extrapolated from its last time update (a seek in flight answers with its target). */
-    const aNow = (now = Date.now()): number =>
-      extrapolate(aSampleRef.current, now, playingRef.current && holdRef.current == null, rateRef.current) ?? currentTimeNow();
+    /**
+     * A's time now, extrapolated from its last time update (a seek in flight
+     * answers with its target). Never more than A_EXTRAPOLATE_MAX_MS past
+     * that update: a stalled A sends none, and must not be assumed to run on.
+     */
+    const aNow = (now = Date.now()): number => {
+      const s = aSampleRef.current;
+      if (!s) return currentTimeNow();
+      const until = Math.min(now, s.at + A_EXTRAPOLATE_MAX_MS);
+      return extrapolate(s, until, playingRef.current && holdRef.current == null, rateRef.current) ?? currentTimeNow();
+    };
     const mapA = (run: KeepWatchingRun, tA: number) => mapToIncoming(tA, run.fromMs, run.toMs);
     const setRateOn = (p: VideoPlayer, r: number) =>
       safely(() => {
@@ -1711,6 +1726,14 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         run.B.currentTime = to;
       });
       kwTimer(run, "ready", READY_FALLBACK_MS, () => onReady(run, "fallback"));
+      // A re-seek of an item that was already ready (retarget, user seek,
+      // pause or play, rate): iOS sends no new status and the view draws its
+      // first frame once per item, so it is ready at its new target now.
+      let alreadyReady = false;
+      safely(() => {
+        alreadyReady = run.B.status === "readyToPlay";
+      });
+      if (run.readyMs != null && alreadyReady) onReady(run, "status");
     };
 
     /** B stops (a user action or a retry): no scheduled play, no chase. */
@@ -1851,7 +1874,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       }
       run.ready = true;
       kwClear(run, "ready");
-      if (run.readyMs == null) run.readyMs = Date.now() - run.loadIssuedAt;
+      const firstReady = run.readyMs == null;
+      if (firstReady) run.readyMs = Date.now() - run.loadIssuedAt;
       if (!run.playMode) {
         if (via === "status") kwTimer(run, "pausedLand", PAUSED_LAND_FALLBACK_MS, () => landPaused(run));
         else if (via === "frame") land(run, 0);
@@ -1864,8 +1888,10 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         land(run, 0);
         return;
       }
-      if (via === "fallback") {
-        // iOS may not fill a paused item's buffer: play it muted now and chase.
+      if (via === "fallback" && firstReady) {
+        // The first readiness after a load: iOS may not fill a paused item's
+        // buffer, so play it muted now and chase. After a re-seek of a ready
+        // item the start is still planned (review M2).
         startIncoming(run);
         return;
       }
@@ -1901,6 +1927,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         run.retargets += 1;
         telemetry.switchRetarget();
         run.t0S = d.t0S;
+        // Past B's end: B lands at its edge once ready there (review M1).
+        run.covered = d.covered;
         seekIncoming(run);
       } else startIncoming(run);
     };
@@ -1944,7 +1972,11 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         capMs: KEEP_WATCHING_CAP_MS[run.cls],
         approximate: false,
       });
-      if (d.kind === "land") land(run, d.errorS);
+      if (d.kind === "land" && !d.byCap && Math.abs(errorS) > SWAP_MAX_ERROR_S) {
+        // The median is in step but this sample is not: not yet (review L5).
+        run.inStep = 0;
+        setRateOn(run.B, run.rate);
+      } else if (d.kind === "land") land(run, d.errorS);
       else if (d.kind === "hold") {
         run.inStep = d.inStep;
         setRateOn(run.B, run.rate);
@@ -1954,15 +1986,23 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       } else {
         run.hiddenReseeks += 1;
         telemetry.switchRetarget();
-        run.inStep = 0;
-        run.bSample = null;
-        run.advanced = false;
-        run.baseT = d.toS;
-        run.filter.seeked(now);
-        const to = d.toS;
+        const target = clampIncoming(d.toS, run.durationBS);
+        const to = target.t;
         safely(() => {
           run.B.currentTime = to;
         });
+        if (!target.covered) {
+          // A has run past B's end: land at B's edge (review M1).
+          run.t0S = to;
+          run.covered = false;
+          land(run, 0);
+          return;
+        }
+        run.inStep = 0;
+        run.bSample = null;
+        run.advanced = false;
+        run.baseT = to;
+        run.filter.seeked(now);
       }
     };
 
@@ -2023,15 +2063,23 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     /** LAND (5.2): one state update moves the front to B; idle SWITCH_SETTLE_MS later. */
     const land = (run: KeepWatchingRun, errorS: number) => {
       if (run.landing || kwRef.current !== run) return;
+      const data = run.data;
+      const gen = run.gen;
+      if (!data || gen == null) {
+        // Defensive (review L3): nothing loaded to land on; the lock must still open.
+        abandon(run, "load_error");
+        return;
+      }
       run.landing = true;
       kwClear(run, "play", "ready", "pausedLand", "cap", "abandon");
       const now = Date.now();
       const { B } = run;
-      const data = run.data;
-      const gen = run.gen;
-      if (!data || gen == null) return; // unreachable: B was loaded before it can land
-      // B to the session's exact rate and play intent.
-      if (playingRef.current && rateRef.current > 0) {
+      // B to the session's exact rate and play intent. A B that already
+      // ended lands at its edge stopped, like a front reaching its end.
+      if (run.ended) {
+        playingRef.current = false;
+        setPlaying(false);
+      } else if (playingRef.current && rateRef.current > 0) {
         setRateOn(B, rateRef.current);
         if (!run.bPlaying) safely(() => B.play());
       } else safely(() => B.pause());
@@ -2234,6 +2282,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         hiddenReseeks: 0,
         loadRetries: 0,
         landing: false,
+        ended: false,
         timers: {},
         rampTimers: [],
       };
@@ -2244,7 +2293,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         fromId: activeIdRef.current ?? null,
         targetId: nextId,
         startedAt: now,
-        approximate: opts.approximate === true,
+        // Unsynced (a null offset) is approximate too, so picture and audio agree (coordinator 2026-10-06).
+        approximate: run.approximate,
         restoring: false,
         heldFrame: null,
         landedAt: null,
@@ -2270,10 +2320,36 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       return run;
     };
 
+    /**
+     * During the 300 ms landing the old front is still audible: a pause or a
+     * seek there silences and stops it at once (review L4); B is the front
+     * and takes the action itself.
+     */
+    const quietOutgoing = (run: KeepWatchingRun, pause: boolean) => {
+      for (const t of run.rampTimers) clearTimeout(t);
+      run.rampTimers = [];
+      safely(() => {
+        run.A.muted = true;
+        run.A.volume = 1;
+        run.B.muted = false;
+        run.B.volume = 1;
+      });
+      if (pause) safely(() => run.A.pause());
+    };
+    const landingRun = () => {
+      const run = kwRef.current;
+      return run && run.landing ? run : null;
+    };
+
     kwFnsRef.current = {
       blocker,
       start,
       onPlayIntent: (want) => {
+        const landingNow = landingRun();
+        if (landingNow) {
+          if (!want) quietOutgoing(landingNow, true);
+          return;
+        }
         const run = live();
         if (!run) return;
         const playMode = want && rateRef.current > 0;
@@ -2300,6 +2376,11 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         seekIncoming(run);
       },
       onUserSeek: (targetS) => {
+        const landingNow = landingRun();
+        if (landingNow) {
+          quietOutgoing(landingNow, true);
+          return;
+        }
         const run = live();
         if (!run) return;
         holdIncoming(run);
@@ -2351,6 +2432,20 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         if (run.gen != null) run.bFrameDrawn = true;
         if (run.settled && run.seekIssued) onReady(run, "frame");
       },
+      incomingEnded: (p) => {
+        const run = live(p);
+        if (!run || !run.settled) return;
+        // B ran out while pending (a shorter angle): land at its edge, the
+        // normal crossfade, not approximate (review M1, coordinator).
+        run.ended = true;
+        run.covered = false;
+        let end = run.t0S;
+        safely(() => {
+          if (Number.isFinite(p.currentTime)) end = p.currentTime;
+        });
+        run.t0S = end;
+        land(run, 0);
+      },
     };
   }
 
@@ -2366,6 +2461,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
           ),
           p.addListener("timeUpdate", ({ currentTime }) => kwFnsRef.current.incomingTime(p, currentTime)),
           p.addListener("sourceLoad", ({ duration }) => kwFnsRef.current.incomingDuration(p, duration)),
+          p.addListener("playToEnd", () => kwFnsRef.current.incomingEnded(p)),
         );
       });
     }
@@ -2374,8 +2470,24 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     };
   }, [players]);
 
-  // Unmount: a pending switch is abandoned silently (no state updates).
-  React.useEffect(() => () => kwFnsRef.current.onUnmount(), []);
+  // Background and unmount (contract 07 section 3.6) are handled in LAYOUT
+  // effects (review L2): their AppState listener is added before the
+  // telemetry hook's passive one, and their cleanup runs before its unmount
+  // flush, so the abandon is in the session event that flush sends.
+  React.useLayoutEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "background") kwFnsRef.current.onLeave("background");
+    });
+    return () => sub?.remove?.();
+  }, []);
+  React.useLayoutEffect(
+    () => () => {
+      // No state update from here on (the screen is unmounting).
+      mountedRef.current = false;
+      kwFnsRef.current.onUnmount();
+    },
+    [],
+  );
 
   /** Each slot's VideoView onFirstFrameRender: the incoming angle's, or the front's. */
   const onSlotFirstFrame = React.useCallback(

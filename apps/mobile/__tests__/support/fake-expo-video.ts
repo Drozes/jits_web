@@ -24,7 +24,8 @@
  * `bufferOptions` writes (`mutes`, `volumes`, `rates`, `bufferWrites`) and
  * counts `replaceAsync(null)` releases; `failReplace(i, message)` rejects
  * the next swap, and `emitStatus(i, status, message)` / `emitPlaying(i, on)`
- * drive its status and playing events.
+ * drive its status and playing events. `rateStartsPlayback` (opt-in) makes a
+ * rate write start a player that holds an item, as AVPlayer.rate does.
  */
 import * as React from "react";
 import { Text } from "react-native";
@@ -58,6 +59,8 @@ export interface FakePlayer {
   preservesPitch: boolean;
   /** iOS: a paused item stays "loading" until play() (see readyPlayer). */
   pausedBufferStall: boolean;
+  /** iOS: a playbackRate write to a paused player with an item starts it (AVPlayer.rate). Opt-in. */
+  rateStartsPlayback: boolean;
   /** A readyPlayer that the paused-buffer stall held back (its duration). */
   heldReady: number | null;
   play: jest.Mock;
@@ -144,6 +147,7 @@ function createPlayer(): FakePlayer {
     seeks: [] as number[],
     preservesPitch: false,
     pausedBufferStall: false,
+    rateStartsPlayback: false,
     heldReady: null,
     get timeUpdateEventInterval() {
       return interval;
@@ -158,6 +162,7 @@ function createPlayer(): FakePlayer {
     set playbackRate(v: number) {
       rate = v;
       p.rates.push(v);
+      if (p.rateStartsPlayback && v > 0 && p.source != null) p.playing = true;
     },
     get currentTime() {
       return time;
