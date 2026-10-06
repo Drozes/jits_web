@@ -4,11 +4,15 @@ import {
   ALL_STATIC_COPY,
   BEST_ANGLE,
   countdownA11y,
+  couldNotLoadAngle,
   formatCountdown,
   PHASE_COPY,
   ROW_HELPER,
   ROW_TAG,
   rowAnnouncement,
+  SWITCHING_ANGLE,
+  switchAnnouncement,
+  SYNCING_ANGLE,
   TERM,
 } from "@/lib/video/video-status-copy";
 
@@ -29,6 +33,8 @@ describe("video-status-copy", () => {
       PHASE_COPY.waitExtendedLine("your angle"),
       ROW_HELPER.addUntil("9:42 PM"),
       ROW_HELPER.quiet("D. Okafor"),
+      couldNotLoadAngle("M. Park's angle"),
+      switchAnnouncement("Your angle", true),
     ];
     for (const s of [...ALL_STATIC_COPY, ...dynamic]) {
       expect(s).not.toMatch(FORBIDDEN);
@@ -59,6 +65,19 @@ describe("video-status-copy", () => {
   it("announces a row's new state in words (deck 10.1)", () => {
     expect(rowAnnouncement("D. Okafor's angle", ROW_TAG.ready)).toBe("D. Okafor's angle is ready to watch.");
     expect(rowAnnouncement("Your angle", ROW_TAG.didntUpload)).toBe("Your angle didn't upload.");
+  });
+
+  it("says the owner-approved angle switch copy, with no ellipsis (jits-xfvd.16)", () => {
+    expect(SYNCING_ANGLE).toBe("Syncing angle");
+    expect(SWITCHING_ANGLE).toBe("Switching angle");
+    expect(couldNotLoadAngle("M. Park's angle")).toBe("Could not load M. Park's angle. Tap it to try again.");
+    expect(couldNotLoadAngle("your angle")).toBe("Could not load your angle. Tap it to try again.");
+    expect(switchAnnouncement("M. Park's angle", false)).toBe("M. Park's angle.");
+    expect(switchAnnouncement("Your angle", true)).toBe("Your angle. Approximate sync.");
+    const ellipsis = String.fromCharCode(0x2026);
+    for (const s of [SYNCING_ANGLE, SWITCHING_ANGLE, couldNotLoadAngle("x")]) {
+      expect(s.includes(ellipsis) || s.includes("...")).toBe(false);
+    }
   });
 
   it("the status surfaces read their strings from the copy module, never their own literals", () => {
