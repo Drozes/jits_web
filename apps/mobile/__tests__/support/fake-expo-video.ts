@@ -17,6 +17,14 @@
  *   `play()` before it reports readyToPlay.
  * - `setNativeTime(i, t)`: the native clock moves without a seek (a new item
  *   starting at 0, or playback progress without a time update).
+ *
+ * Two slot players (jits-xfvd.19): every `useVideoPlayer` call returns its
+ * own fake, so the single match player's two slots are `fakePlayers[n]` and
+ * `fakePlayers[n + 1]`. Each records `muted`, `volume`, `playbackRate` and
+ * `bufferOptions` writes (`mutes`, `volumes`, `rates`, `bufferWrites`) and
+ * counts `replaceAsync(null)` releases; `failReplace(i, message)` rejects
+ * the next swap, and `emitStatus(i, status, message)` / `emitPlaying(i, on)`
+ * drive its status and playing events.
  */
 import * as React from "react";
 import { Text } from "react-native";
@@ -32,6 +40,16 @@ export interface FakePlayer {
   playbackRate: number;
   rates: number[];
   muted: boolean;
+  /** Every muted write. */
+  mutes: boolean[];
+  volume: number;
+  /** Every volume write. */
+  volumes: number[];
+  bufferOptions: { preferredForwardBufferDuration?: number; [k: string]: unknown };
+  /** Every bufferOptions write. */
+  bufferWrites: Array<{ preferredForwardBufferDuration?: number }>;
+  /** replaceAsync(null) calls (the item cleared, its decoder freed). */
+  releases: number;
   seeks: number[];
   currentTime: number;
   timeUpdateEventInterval: number;
@@ -86,6 +104,9 @@ function createPlayer(): FakePlayer {
   let time = 0;
   let rate = 1;
   let interval = 0;
+  let muted = false;
+  let volume = 1;
+  let bufferOptions: Record<string, unknown> = { preferredForwardBufferDuration: 0 };
   const thumbsFor = (times: number | number[]) => (Array.isArray(times) ? times : [times]).map((t) => ({ fakeThumbnail: true, t }));
   const p = {
     id: fakePlayers.length,
@@ -95,7 +116,31 @@ function createPlayer(): FakePlayer {
     duration: 0,
     rates: [] as number[],
     intervals: [] as number[],
-    muted: false,
+    mutes: [] as boolean[],
+    volumes: [] as number[],
+    bufferWrites: [] as Array<Record<string, unknown>>,
+    releases: 0,
+    get muted() {
+      return muted;
+    },
+    set muted(v: boolean) {
+      muted = v;
+      p.mutes.push(v);
+    },
+    get volume() {
+      return volume;
+    },
+    set volume(v: number) {
+      volume = v;
+      p.volumes.push(v);
+    },
+    get bufferOptions() {
+      return bufferOptions;
+    },
+    set bufferOptions(v: Record<string, unknown>) {
+      bufferOptions = { ...v };
+      p.bufferWrites.push({ ...v });
+    },
     seeks: [] as number[],
     preservesPitch: false,
     pausedBufferStall: false,
@@ -132,10 +177,16 @@ function createPlayer(): FakePlayer {
     pause: jest.fn(() => {
       p.playing = false;
     }),
-    replaceAsync: jest.fn((src: { uri: string }) => {
+    replaceAsync: jest.fn((src: { uri: string } | null) => {
       p.source = src;
-      p.status = "loading";
       p.heldReady = null;
+      if (src == null) {
+        p.releases += 1;
+        p.status = "idle";
+        p.playing = false;
+        return Promise.resolve();
+      }
+      p.status = "loading";
       const next = replaceQueue.get(p)?.shift();
       return next ? next.promise : Promise.resolve();
     }),
@@ -171,6 +222,9 @@ export function useVideoPlayer(_source: unknown, setup?: (p: FakePlayer) => void
     // The setup's own writes are not the app's rate or interval changes.
     ref.current.rates.length = 0;
     ref.current.intervals.length = 0;
+    ref.current.mutes.length = 0;
+    ref.current.volumes.length = 0;
+    ref.current.bufferWrites.length = 0;
   }
   return ref.current;
 }
@@ -245,4 +299,23 @@ export function setNativeTime(i: number, t: number): void {
 
 export function tick(i: number, t: number): void {
   fakePlayers[i].emit("timeUpdate", { currentTime: t, bufferedPosition: t });
+}
+
+/** The next `replaceAsync` on player `i` rejects with `message`. */
+export function failReplace(i: number, message = "load failed"): void {
+  deferReplace(i).reject(new Error(message));
+}
+
+/** Player `i` reports a status (and an error message for "error"). */
+export function emitStatus(i: number, status: string, message?: string): void {
+  const p = fakePlayers[i];
+  p.status = status;
+  p.emit("statusChange", status === "error" ? { status, error: { message: message ?? "error" } } : { status });
+}
+
+/** Player `i` reports it started or stopped playing. */
+export function emitPlaying(i: number, isPlaying: boolean): void {
+  const p = fakePlayers[i];
+  p.playing = isPlaying;
+  p.emit("playingChange", { isPlaying });
 }
