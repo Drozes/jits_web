@@ -11,6 +11,15 @@ export const REEL_POOL_SIZE = 3;
 export const REEL_PREFETCH_AHEAD = 2;
 /** Load the lane's next page once the visible page is this close to the end. */
 export const REEL_LOAD_MORE_THRESHOLD = 3;
+/**
+ * A cached playback signature is reused while younger than this. Signed URLs
+ * live 1 h and `useMyHighlight` re-signs on demand past 50 min; 45 leaves a
+ * prefetched URL at least 15 min of life on screen before that renewal.
+ */
+export const REEL_SIGN_REUSE_MS = 45 * 60_000;
+/** Prefetched progress (to find a page's live render) is reused this long. */
+export const REEL_PROGRESS_TTL_MS = 90_000;
+
 /** A page counts as visible (it plays, it is "landed on") at 80% coverage. */
 export const REEL_VISIBLE_PERCENT = 80;
 
@@ -25,10 +34,13 @@ export function pageLayout(pageHeight: number, index: number): { length: number;
   return { length: pageHeight, offset: pageHeight * index, index };
 }
 
-/** The page a scroll offset rests on (nearest page, clamped). */
-export function pageIndexFromOffset(offsetY: number, pageHeight: number, count: number): number {
+/**
+ * The page a scroll offset rests on (nearest page, clamped). With `footer`,
+ * index `count` (the loading page after the last reel) is a valid rest too.
+ */
+export function pageIndexFromOffset(offsetY: number, pageHeight: number, count: number, footer = false): number {
   if (pageHeight <= 0) return 0;
-  return clampIndex(Math.round(offsetY / pageHeight), count);
+  return clampIndex(Math.round(offsetY / pageHeight), footer ? count + 1 : count);
 }
 
 /**
@@ -55,11 +67,13 @@ export function slotForIndex(index: number, active: number, count: number, size 
   return slot === -1 ? null : slot;
 }
 
-/** Pages whose signed URL is prefetched: the next `ahead`, then the previous one. */
+/**
+ * Pages whose signed URL is prefetched: the next `ahead`. The previous page
+ * was just watched, so its slot already holds it (review M4).
+ */
 export function prefetchTargets(active: number, count: number, ahead = REEL_PREFETCH_AHEAD): number[] {
   const out: number[] = [];
   for (let k = 1; k <= ahead; k++) if (active + k < count) out.push(active + k);
-  if (active - 1 >= 0) out.push(active - 1);
   return out;
 }
 
@@ -84,4 +98,30 @@ export function mergeReelItems(existing: readonly ReelItem[], more: readonly Ree
     out.push(item);
   }
   return out;
+}
+
+/** A drag past the last page by more than this shows C-V2 (spec 8.3). */
+export const CAUGHT_UP_OVERSCROLL_PT = 48;
+
+export interface CaughtUpInput {
+  platform: "ios" | "android" | string;
+  /** The page the athlete rests on, and the last loaded page. */
+  active: number;
+  lastIndex: number;
+  pageHeight: number;
+  /** iOS: the content offset when the drag ended (it overscrolls into the bounce). */
+  endOffsetY?: number;
+  /** Android: finger travel up the screen in pt (start pageY minus end pageY); the offset clamps there. */
+  touchDeltaY?: number;
+}
+
+/**
+ * Whether a drag was an attempt to go past the last reel (C-V2). iOS reports
+ * the bounce in the content offset; Android clamps the offset at the end, so
+ * the finger's travel decides there.
+ */
+export function isCaughtUpAttempt(i: CaughtUpInput): boolean {
+  if (i.lastIndex < 0 || i.active !== i.lastIndex) return false;
+  if (i.platform === "android") return (i.touchDeltaY ?? 0) > CAUGHT_UP_OVERSCROLL_PT;
+  return (i.endOffsetY ?? 0) - i.lastIndex * i.pageHeight > CAUGHT_UP_OVERSCROLL_PT;
 }

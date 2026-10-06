@@ -1,6 +1,7 @@
 /** The swipe viewer's entry API (jits-a4fw.5, spec 8.1). */
 const mockPush = jest.fn();
 jest.mock("expo-router", () => ({ router: { push: (...a: unknown[]) => mockPush(...a) } }));
+jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
 import {
   __resetReelSessionsForTests,
@@ -11,6 +12,7 @@ import {
   parseReelLane,
   reelViewerHref,
 } from "@/lib/highlight/reel-viewer-session";
+import { resetHighlightStore } from "@/lib/highlight/highlight-store";
 import { reel } from "../../support/reel-fixtures";
 
 beforeEach(() => {
@@ -59,5 +61,11 @@ describe("openReelViewer", () => {
     expect(parseReelLane("push")).toBeNull();
     expect(parseReelLane(undefined)).toBeNull();
     expect(laneSource("matches")).toBe("matches");
+  });
+
+  it("sign-out (resetHighlightStore) forgets every lane session", () => {
+    const s = createReelSession({ items: [reel(1)], startIndex: 0, lane: "home" })!;
+    resetHighlightStore();
+    expect(getReelSession(s.token)).toBeNull();
   });
 });

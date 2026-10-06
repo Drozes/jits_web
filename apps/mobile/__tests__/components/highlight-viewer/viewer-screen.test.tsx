@@ -267,11 +267,12 @@ describe("viewer theme", () => {
 });
 
 describe("viewer states", () => {
-  it("loading: the empty poster frame, no actions, header + close", async () => {
+  it("loading: the empty poster frame, no actions, close and mute only on top (spec 8.2)", async () => {
     mockGetDetail.mockReturnValue(new Promise(() => undefined));
     const utils = await renderViewer();
     expect(utils.getByTestId("viewer-skeleton")).toBeTruthy();
-    expect(utils.getByRole("header")).toHaveTextContent("Your highlight");
+    expect(utils.queryByText("Your highlight")).toBeNull();
+    expect(utils.getByLabelText("Mute")).toBeTruthy();
     expect(utils.getByLabelText("Close")).toBeTruthy();
     expect(utils.queryByTestId("viewer-share")).toBeNull();
     expect(redCtas(utils)).toHaveLength(0);
@@ -625,7 +626,7 @@ describe("actions", () => {
     await flush();
     expect(mockToast.error).toHaveBeenCalledWith(copy);
     expect(mockToast.success).not.toHaveBeenCalled();
-    expect(utils.queryByTestId("viewer-save-permission")).toBeNull();
+    expect(utils.queryByTestId("viewer-open-settings")).toBeNull();
   });
 
   it("save outcome unavailable: silent", async () => {
@@ -637,18 +638,17 @@ describe("actions", () => {
     expect(mockToast.success).not.toHaveBeenCalled();
   });
 
-  it("save permission denied: inline Settings copy + Open Settings", async () => {
+  it("save permission denied: Settings (C-V9) on the rail opens the system settings", async () => {
     const spy = jest.spyOn(Linking, "openSettings").mockResolvedValue(undefined);
     mockShare = makeShare({ saveToPhotos: jest.fn(() => Promise.resolve({ ok: false, kind: "permission" })) });
     const utils = await renderViewer();
-    expect(utils.queryByTestId("viewer-save-permission")).toBeNull();
+    expect(utils.queryByTestId("viewer-open-settings")).toBeNull();
     fireEvent.press(utils.getByTestId("viewer-save"));
     await flush();
     expect(mockToast.error).not.toHaveBeenCalled();
-    expect(utils.getByTestId("viewer-save-permission")).toHaveTextContent(
-      "Allow ELO RATED to add to Photos in Settings to save your reel.Settings",
-    );
-    fireEvent.press(utils.getByLabelText("Open Settings"));
+    const settings = utils.getByLabelText("Open Settings");
+    expect(settings.props.accessibilityHint).toBe("Allow ELO RATED to add to Photos in Settings to save your reel.");
+    fireEvent.press(settings);
     expect(spy).toHaveBeenCalledTimes(1);
     expect(redCtas(utils)).toHaveLength(1);
   });

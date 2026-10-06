@@ -20,16 +20,18 @@ interface BandProps {
 }
 
 function Band({ id, style, horizontal = false, from, to }: BandProps) {
+  // Gradient ids are unique per page: several pages are mounted at once.
+  const gradientId = `${id}-${React.useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
   return (
     <View testID={id} pointerEvents="none" style={[{ position: "absolute" }, style]}>
       <Svg width="100%" height="100%">
         <Defs>
-          <LinearGradient id={id} x1="0" y1="0" x2={horizontal ? "1" : "0"} y2={horizontal ? "0" : "1"}>
+          <LinearGradient id={gradientId} x1="0" y1="0" x2={horizontal ? "1" : "0"} y2={horizontal ? "0" : "1"}>
             <Stop offset="0" stopColor={darkTokens.bgPrimary} stopOpacity={from} />
             <Stop offset="1" stopColor={darkTokens.bgPrimary} stopOpacity={to} />
           </LinearGradient>
         </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradientId})`} />
       </Svg>
     </View>
   );

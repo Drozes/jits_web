@@ -13,10 +13,11 @@ export interface ReelPoster {
   path: string | null;
 }
 
-/** The signed 9:16 cover (`cover`), cached by the render-unique storage key; `blur` for the legacy pillarbox. */
+/** The signed 9:16 cover (`cover`); `blur` for the legacy pillarbox. */
 export function ReelPosterImage({ poster, blur = false }: { poster: ReelPoster; blur?: boolean }) {
   if (!poster.url) return null;
-  const source = { uri: poster.url, cacheKey: poster.path ? `highlight-poster:${poster.path}` : undefined };
+  // No custom cache key: the pager prefetches posters by URL (`Image.prefetch`), so render the same key.
+  const source = { uri: poster.url };
   return (
     <Image
       testID={blur ? "highlight-poster-blur" : "highlight-poster"}

@@ -1,8 +1,9 @@
 import * as React from "react";
-import type { NativeScrollEvent, NativeSyntheticEvent, ViewToken } from "react-native";
+import { Platform, type GestureResponderEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ViewToken } from "react-native";
 import type { ReelItem } from "@/lib/highlight/reel-types";
 import { laneSource, type ReelViewerSession } from "@/lib/highlight/reel-viewer-session";
 import {
+  isCaughtUpAttempt,
   mergeReelItems,
   pageIndexFromOffset,
   prefetchTargets,
@@ -15,17 +16,47 @@ import { useSwipeHint } from "@/lib/highlight/use-swipe-hint";
 import { useSwipeTelemetry } from "./use-swipe-telemetry";
 
 export const REEL_VIEWABILITY = { itemVisiblePercentThreshold: REEL_VISIBLE_PERCENT };
-/** A drag past the last page by more than this shows C-V2 (spec 8.3). */
-export const CAUGHT_UP_OVERSCROLL_PT = 48;
+
+/** The pager's fixed FlatList props (spec 8.3): native paging, one page per fling, a 3-page window. */
+export const REEL_LIST_PROPS = {
+  pagingEnabled: true,
+  decelerationRate: "fast",
+  snapToAlignment: "start",
+  disableIntervalMomentum: true,
+  showsVerticalScrollIndicator: false,
+  initialNumToRender: 1,
+  maxToRenderPerBatch: 2,
+  windowSize: 3,
+  removeClippedSubviews: Platform.OS === "android",
+} as const;
+
+/** Rotation, split view or a status-bar change: keep the visible reel in place (not the first layout). */
+export function useKeepPageOnResize(listRef: React.RefObject<{ scrollToOffset: (p: { offset: number; animated: boolean }) => void } | null>, height: number, active: number): void {
+  const first = React.useRef(true);
+  const activeRef = React.useRef(active);
+  activeRef.current = active;
+  React.useEffect(() => {
+    if (height <= 0) return;
+    if (first.current) {
+      first.current = false; // initialScrollIndex placed the first layout
+      return;
+    }
+    listRef.current?.scrollToOffset({ offset: activeRef.current * height, animated: false });
+  }, [height, listRef]);
+}
 export const CAUGHT_UP_MS = 2_000;
+/** A drag that ends without momentum (rare with paging) lands from its offset after this. */
+export const NO_MOMENTUM_FALLBACK_MS = 300;
 
 /**
  * The swipe pager's state (spec 8.3): the lane (grown by `loadMore` near the
- * end, no duplicates), the visible page (momentum end, with 80% visibility
- * as the backup), the player pool following it, prefetch of `i + 1`, `i + 2`
- * and `i - 1` (signed and preloaded into their slots), `viewer_swiped` per
- * landing, the once-per-session `viewer_opened` guard, the swipe hint, the
- * end-of-list caption, and the sheet state that suspends paging.
+ * end, no duplicates, no retry loop after a failure), the visible page
+ * (momentum end; viewability only outside a gesture), the player pool
+ * following it (the loading page after the last reel plays nothing),
+ * prefetch of `i + 1` and `i + 2` (skipped when already loaded or freshly
+ * offered), `viewer_swiped` once per landing, the once-per-session
+ * `viewer_opened` guard, the swipe hint, C-V2 at the end of a fully loaded
+ * lane on both platforms, and the sheet state that suspends paging.
  */
 export function useReelPager(session: ReelViewerSession, pageHeight: number) {
   const source = laneSource(session.lane);
@@ -37,39 +68,89 @@ export function useReelPager(session: ReelViewerSession, pageHeight: number) {
   const [caughtUp, setCaughtUp] = React.useState(false);
   const hint = useSwipeHint(items.length);
   const swipe = useSwipeTelemetry(pool, source);
-  const s = React.useRef({ active: session.startIndex, items, swiped: new Set<number>(), opened: new Set<string>(), exhausted: !session.loadMore, height: pageHeight }).current;
+  const s = React.useRef({
+    active: session.startIndex,
+    items,
+    loadingMore: false,
+    swiped: new Set<number>(),
+    opened: new Set<string>(),
+    exhausted: !session.loadMore,
+    failedAt: null as number | null,
+    height: pageHeight,
+    gesture: false,
+    touchY: null as number | null,
+    fallback: null as ReturnType<typeof setTimeout> | null,
+  }).current;
   s.items = items;
   s.height = pageHeight;
+  s.loadingMore = loadingMore;
 
   React.useEffect(() => pool.setActive(active, items.length), [pool, active, items.length]);
 
   const land = (index: number) => {
-    const item = s.items[index];
-    if (index === s.active || !item) return;
+    if (index === s.active) return;
     const from = s.active;
     s.active = index;
     s.swiped.add(index);
-    swipe.landed({ highlightId: item.highlightId, index, direction: index > from ? "next" : "previous" });
     hint.dismiss();
+    const item = s.items[index];
+    // The loading page after the last reel: nothing plays, nothing to log.
+    if (item) swipe.landed({ highlightId: item.highlightId, index, direction: index > from ? "next" : "previous" });
     setActive(index);
   };
   const handlers = React.useRef({ land }).current;
   handlers.land = land;
 
   // FlatList needs stable handlers; they only pick the active index.
-  const [stable] = React.useState(() => ({
-    onViewableItemsChanged: ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      const hit = viewableItems.find((v) => v.isViewable && typeof v.index === "number");
-      if (hit && typeof hit.index === "number") handlers.land(hit.index);
-    },
-    onMomentumScrollEnd: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      handlers.land(pageIndexFromOffset(e.nativeEvent.contentOffset.y, s.height, s.items.length));
-    },
-    onScrollEndDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const lastOffset = (s.items.length - 1) * s.height;
-      if (s.exhausted && e.nativeEvent.contentOffset.y - lastOffset > CAUGHT_UP_OVERSCROLL_PT) setCaughtUp(true);
-    },
-  }));
+  const [stable] = React.useState(() => {
+    const landAt = (y: number) => handlers.land(pageIndexFromOffset(y, s.height, s.items.length, s.loadingMore));
+    const clearFallback = () => {
+      if (s.fallback) clearTimeout(s.fallback);
+      s.fallback = null;
+    };
+    return {
+      onViewableItemsChanged: ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+        if (s.gesture) return; // momentum end decides during a swipe
+        const hit = viewableItems.find((v) => v.isViewable && typeof v.index === "number");
+        if (hit && typeof hit.index === "number") handlers.land(hit.index);
+      },
+      onScrollBeginDrag: () => {
+        clearFallback();
+        s.gesture = true;
+      },
+      onScrollEndDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const y = e.nativeEvent.contentOffset.y;
+        if (s.exhausted && Platform.OS !== "android") {
+          const hitEnd = isCaughtUpAttempt({ platform: Platform.OS, active: s.active, lastIndex: s.items.length - 1, pageHeight: s.height, endOffsetY: y });
+          if (hitEnd) setCaughtUp(true);
+        }
+        clearFallback();
+        s.fallback = setTimeout(() => {
+          s.gesture = false;
+          landAt(y);
+        }, NO_MOMENTUM_FALLBACK_MS);
+      },
+      onMomentumScrollBegin: clearFallback,
+      onMomentumScrollEnd: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        clearFallback();
+        s.gesture = false;
+        landAt(e.nativeEvent.contentOffset.y);
+      },
+      onTouchStart: (e: GestureResponderEvent) => {
+        s.touchY = e.nativeEvent.pageY;
+      },
+      onTouchEnd: (e: GestureResponderEvent) => {
+        const start = s.touchY;
+        s.touchY = null;
+        if (Platform.OS !== "android" || start == null || !s.exhausted) return;
+        const hitEnd = isCaughtUpAttempt({ platform: "android", active: s.active, lastIndex: s.items.length - 1, pageHeight: s.height, touchDeltaY: start - e.nativeEvent.pageY });
+        if (hitEnd) setCaughtUp(true);
+      },
+    };
+  });
+  React.useEffect(() => () => {
+    if (s.fallback) clearTimeout(s.fallback);
+  }, [s]);
 
   React.useEffect(() => {
     if (!caughtUp) return;
@@ -77,23 +158,30 @@ export function useReelPager(session: ReelViewerSession, pageHeight: number) {
     return () => clearTimeout(t);
   }, [caughtUp]);
 
+  // Re-runs only when the target reels change (not when the lane merely grows).
+  const targets = prefetchTargets(active, items.length);
+  const targetKey = targets.map((i) => items[i].highlightId).join(",");
   React.useEffect(() => {
-    const targets = prefetchTargets(active, items.length);
-    for (const i of targets) {
-      const item = items[i];
-      void prefetchReel(item).then((src) => {
+    for (const i of prefetchTargets(s.active, s.items.length)) {
+      if (pool.isLoaded(i) || pool.hasFreshOffer(i)) continue;
+      const item = s.items[i];
+      void prefetchReel(item).then((hit) => {
         // Dropped when the athlete has moved on.
-        if (src && prefetchTargets(s.active, s.items.length).includes(i)) pool.offer(i, `${item.highlightId}:${src.version}`, src);
+        if (hit && s.items[i] === item && prefetchTargets(s.active, s.items.length).includes(i)) {
+          pool.offer(i, `${item.highlightId}:${hit.source.version}`, hit.source, hit.signedAt);
+        }
       });
     }
-  }, [active, items, pool, s]);
+  }, [targetKey, pool, s]);
 
   React.useEffect(() => {
-    if (!session.loadMore || loadingMore || s.exhausted || !shouldLoadMore(active, items.length)) return;
+    // A failed read is not retried until the athlete lands somewhere else.
+    if (!session.loadMore || loadingMore || s.exhausted || s.failedAt === active || !shouldLoadMore(active, items.length)) return;
     setLoadingMore(true);
     session
       .loadMore()
       .then((more) => {
+        s.failedAt = null;
         const merged = mergeReelItems(s.items, more);
         if (merged.length === s.items.length) s.exhausted = true;
         else {
@@ -101,7 +189,9 @@ export function useReelPager(session: ReelViewerSession, pageHeight: number) {
           setItems(merged);
         }
       })
-      .catch(() => undefined)
+      .catch(() => {
+        s.failedAt = s.active;
+      })
       .finally(() => setLoadingMore(false));
   }, [active, items.length, loadingMore, session, s]);
 

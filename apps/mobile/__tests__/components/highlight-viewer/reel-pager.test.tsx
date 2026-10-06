@@ -15,6 +15,7 @@ jest.mock("expo-video", () => require("../../support/fake-expo-video"));
 const mockRouter = { back: jest.fn(), replace: jest.fn(), push: jest.fn(), canGoBack: jest.fn(() => true) };
 let mockParams: Record<string, string | undefined> = {};
 jest.mock("expo-router", () => ({
+  Stack: { Screen: () => null },
   router: { push: jest.fn() },
   useRouter: () => mockRouter,
   useLocalSearchParams: () => mockParams,
@@ -127,7 +128,8 @@ jest.mock("@/lib/highlight-share", () => ({
   track: (...a: unknown[]) => mockTrack(...a),
 }));
 
-import { fakePlayers, resetFakeVideo } from "../../support/fake-expo-video";
+import { bufferEnd, fakePlayers, resetFakeVideo } from "../../support/fake-expo-video";
+import { Platform } from "react-native";
 import { ReelPager } from "@/components/highlight-viewer/reel-pager";
 import HighlightViewerRoute from "@/app/(app)/highlight/[id]";
 import { __resetReelSessionsForTests, createReelSession, type ReelViewerSession } from "@/lib/highlight/reel-viewer-session";
@@ -215,20 +217,24 @@ describe("ReelPager", () => {
     expect(pool()[2].playing).toBe(false);
   });
 
-  it("prefetches i + 1, i + 2 and i - 1 (signed, posters), nothing further, and preloads the neighbours", async () => {
+  it("prefetches i + 1 and i + 2 (signed, posters), nothing further, and preloads the next reel paused", async () => {
     await open(session([reel(1), reel(2), reel(3), reel(4), reel(5)], 1));
     const mvs = mockGetProgress.mock.calls.map((c) => c[1]).sort();
-    expect(mvs).toEqual(["v1", "v3", "v4"]);
-    expect(mockImagePrefetch.mock.calls.map((c) => (c as unknown[])[0]).sort()).toEqual([
-      "https://signed/p1.jpg",
-      "https://signed/p3.jpg",
-      "https://signed/p4.jpg",
-    ]);
-    // Neighbours preloaded into their slots, paused.
-    expect(pool()[0].replaceAsync).toHaveBeenCalledWith("https://signed/v1.mp4");
+    expect(mvs).toEqual(["v3", "v4"]);
+    expect(mockImagePrefetch.mock.calls.map((c) => (c as unknown[])[0]).sort()).toEqual(["https://signed/p3.jpg", "https://signed/p4.jpg"]);
     expect(pool()[2].replaceAsync).toHaveBeenCalledWith("https://signed/v3.mp4");
-    expect(pool()[0].playing).toBe(false);
     expect(pool()[2].playing).toBe(false);
+  });
+
+  it("swiping back and forth costs no new progress read or sign (cached, already loaded)", async () => {
+    const utils = await open(session([reel(1), reel(2), reel(3), reel(4)], 0));
+    await swipeTo(utils, 1);
+    const reads = mockGetProgress.mock.calls.length;
+    const signs = mockSign.mock.calls.length;
+    await swipeTo(utils, 0);
+    await swipeTo(utils, 1);
+    expect(mockGetProgress.mock.calls.length).toBe(reads);
+    expect(mockSign.mock.calls.length).toBe(signs);
   });
 
   it("a swipe lands on the next reel: it plays its preloaded item, the previous pauses at 0, one slot re-pointed", async () => {
@@ -368,6 +374,101 @@ describe("ReelPager", () => {
     expect(list(utils).props.data).toHaveLength(2);
   });
 
+  describe("buffering (review B1: intent, never player.playing)", () => {
+    async function openBuffering(items = [reel(1), reel(2), reel(3), reel(4)], start = 0) {
+      const utils = render(<ReelPager session={session(items, start)} />);
+      fakePlayers.forEach((p) => (p.buffering = true));
+      fireEvent(utils.getByTestId("reel-pager"), "layout", { nativeEvent: { layout: { width: 390, height: H } } });
+      await flush();
+      return utils;
+    }
+
+    it("tap to pause during the buffer: the reel never starts once buffered", async () => {
+      const utils = await openBuffering();
+      expect(pool()[0].wantsPlay).toBe(true);
+      fireEvent.press(utils.getByTestId("highlight-player-toggle"));
+      act(() => bufferEnd(0));
+      expect(pool()[0].playing).toBe(false);
+    });
+
+    it("a sheet opened during the buffer: no sound behind it", async () => {
+      const utils = await openBuffering();
+      await act(async () => fireEvent.press(utils.getByTestId("viewer-share")));
+      await flush();
+      act(() => bufferEnd(0));
+      expect(pool()[0].playing).toBe(false);
+    });
+
+    it("a blur during the buffer (match detail pushed): it stays paused", async () => {
+      const utils = await openBuffering();
+      await act(async () => fireEvent.press(utils.getByText("Open match")));
+      // The focus effect's cleanup is the blur; unmounting runs it too.
+      utils.unmount();
+      act(() => bufferEnd(0));
+      expect(pool()[0].playing).toBe(false);
+    });
+
+    it("a two-page jump during the buffer: the page left never starts, only the landed one plays", async () => {
+      const utils = await openBuffering();
+      await swipeTo(utils, 2);
+      act(() => bufferEnd(0));
+      act(() => bufferEnd(2));
+      expect(pool()[0].playing).toBe(false);
+      expect(pool()[2].playing).toBe(true);
+    });
+  });
+
+  it("viewability during a gesture is ignored: one viewer_swiped per landing", async () => {
+    const utils = await open(session([reel(1), reel(2), reel(3)], 0));
+    await act(async () => list(utils).props.onScrollBeginDrag({ nativeEvent: { contentOffset: { y: 0 } } }));
+    await act(async () => list(utils).props.onViewableItemsChanged({ viewableItems: [{ index: 1, isViewable: true }] }));
+    await swipeTo(utils, 1);
+    await act(async () => {
+      pool()[1].emit("playingChange", { isPlaying: true });
+      pool()[1].emit("statusChange", { status: "readyToPlay" });
+    });
+    expect(steps("viewer_swiped")).toHaveLength(1);
+  });
+
+  it("a rejecting loadMore is not retried in a loop; the next landing may retry", async () => {
+    const loadMore = jest.fn(() => Promise.reject(new Error("offline")));
+    const utils = await open(session([reel(1), reel(2), reel(3)], 1, loadMore));
+    await flush(6);
+    expect(loadMore).toHaveBeenCalledTimes(1);
+    expect(utils.queryByTestId("reel-pager-loading")).toBeNull();
+    await swipeTo(utils, 2);
+    await flush(4);
+    expect(loadMore).toHaveBeenCalledTimes(2);
+  });
+
+  it("landing on the loading page after the last reel pauses the last reel", async () => {
+    const loadMore = jest.fn(() => new Promise<ReelItem[]>(() => undefined));
+    const utils = await open(session([reel(1), reel(2)], 1, loadMore));
+    expect(utils.getByTestId("reel-pager-loading")).toBeTruthy();
+    expect(pool()[1].playing).toBe(true);
+    await act(async () => list(utils).props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { y: 2 * H } } }));
+    expect(pool()[1].playing).toBe(false);
+    expect(steps("viewer_swiped")).toHaveLength(0);
+  });
+
+  it("Android: the offset clamps at the end, so a finger drag up on the last reel shows C-V2", async () => {
+    const original = Platform.OS;
+    Object.defineProperty(Platform, "OS", { value: "android", configurable: true });
+    try {
+      await AsyncStorage.setItem(REEL_SWIPE_HINT_KEY, "1");
+      const utils = await open(session([reel(1), reel(2)], 1));
+      await act(async () => {
+        list(utils).props.onTouchStart({ nativeEvent: { pageY: 600 } });
+        list(utils).props.onScrollEndDrag({ nativeEvent: { contentOffset: { y: H } } });
+        list(utils).props.onTouchEnd({ nativeEvent: { pageY: 480 } });
+      });
+      await flush();
+      expect(utils.getByText("You're all caught up")).toBeTruthy();
+    } finally {
+      Object.defineProperty(Platform, "OS", { value: original, configurable: true });
+    }
+  });
+
   it("Close goes back to the opening surface", async () => {
     const utils = await open(session([reel(1), reel(2)], 0));
     fireEvent.press(utils.getByLabelText("Close"));
@@ -391,5 +492,7 @@ describe("highlight route", () => {
     expect(utils.getByTestId("highlight-viewer")).toBeTruthy();
     expect(utils.queryByText("Swipe up for the next one")).toBeNull();
     expect(mockGetProgress).not.toHaveBeenCalled(); // no prefetch in single-reel mode
+    // It still reports the lane it came from (not match_detail).
+    expect(steps("viewer_opened")[0][2]).toMatchObject({ source: "home" });
   });
 });

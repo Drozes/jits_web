@@ -19,21 +19,21 @@ export function ViewerMeta({ progress, meta }: { progress: HighlightProgress | n
   const playback = progress?.playback ?? null;
   const href = secondaryHref(meta);
   return (
-    <View className="gap-1">
+    <View pointerEvents="box-none" className="gap-1">
       {progress?.phase === "regenerating" ? (
-        <View testID="viewer-regenerating" className="rounded-md px-3 py-2 mb-1" style={{ backgroundColor: ON_MEDIA.badge }}>
+        <View testID="viewer-regenerating" pointerEvents="none" className="rounded-md px-3 py-2 mb-1" style={{ backgroundColor: ON_MEDIA.badge }}>
           <Text className="font-body text-small text-ink">
             <MonoNumbers text={regeneratingBanner(progress.renderTotal)} />
           </Text>
         </View>
       ) : null}
       {meta.title ? (
-        <Text testID="viewer-title" className="font-heading text-title" style={{ color: ON_MEDIA.text }} numberOfLines={1}>
+        <Text testID="viewer-title" pointerEvents="none" className="font-heading text-title" style={{ color: ON_MEDIA.text }} numberOfLines={1}>
           {meta.title}
         </Text>
       ) : null}
       {playback ? (
-        <Text testID="viewer-meta" className="font-mono text-small uppercase" style={{ color: ON_MEDIA.text2, fontVariant: ["tabular-nums"] }}>
+        <Text testID="viewer-meta" pointerEvents="none" className="font-mono text-small uppercase" style={{ color: ON_MEDIA.text2, fontVariant: ["tabular-nums"] }}>
           {reelMetaLine(meta.dateIso, playback.durationS)}
         </Text>
       ) : null}

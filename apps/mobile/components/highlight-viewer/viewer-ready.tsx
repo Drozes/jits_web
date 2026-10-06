@@ -5,9 +5,8 @@ import { pageMeta } from "@/lib/highlight/reel-meta";
 import { ON_MEDIA } from "@/lib/theme/palette";
 import { ViewerFrame } from "./viewer-frame";
 import { ViewerMeta } from "./viewer-meta";
-import { ViewerActions, showsSave } from "./viewer-actions";
+import { ViewerActions } from "./viewer-actions";
 import { ViewerNoPlayback } from "./viewer-progress-state";
-import { ViewerSavePermission } from "./viewer-save-permission";
 import { ViewerSheets } from "./viewer-sheets";
 import { ReelOverlay } from "./reel-overlay";
 import { ReelScrims } from "./reel-scrims";
@@ -34,7 +33,6 @@ export function ViewerReady({ detail, source, binding }: { detail: HighlightDeta
     return <ViewerNoPlayback progress={progress} error={my.progressError} onRetry={my.reload} binding={binding} />;
   }
   const canSaveToPhotos = vs.share.capabilities?.saveToPhotos ?? false;
-  const saveShown = showsSave({ canManage: binding.canManage, shareEnabled, canSaveToPhotos });
   const top = binding.showHint ? (
     <SwipeHint />
   ) : binding.caughtUp ? (
@@ -58,13 +56,13 @@ export function ViewerReady({ detail, source, binding }: { detail: HighlightDeta
             primaryPath={vs.share.activePath}
             canSaveToPhotos={canSaveToPhotos}
             saving={vs.saving}
+            savePermissionDenied={vs.savePermissionDenied}
             improveDisabled={progress.phase === "regenerating"}
             onShare={vs.openSheet}
             onSave={vs.save}
             onImprove={improve}
           />
         }
-        below={saveShown && vs.savePermissionDenied ? <ViewerSavePermission /> : null}
       />
       <ViewerSheets canManage={binding.canManage} shareEnabled={shareEnabled} vs={vs} fb={fb} progress={progress} />
     </View>

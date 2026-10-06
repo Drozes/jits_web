@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { Download, Send, SlidersHorizontal } from "lucide-react-native";
 import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 import { SHARE_COPY, type SharePath } from "@/lib/highlight-share";
-import { ReelRailButton } from "./reel-rail-button";
+import { ReelRailButton, SettingsRailItem } from "./reel-rail-button";
 import { VIEWER_COPY } from "./viewer-copy";
 
 export interface ViewerActionsProps {
@@ -15,6 +15,8 @@ export interface ViewerActionsProps {
   primaryPath: SharePath | null;
   canSaveToPhotos: boolean;
   saving: boolean;
+  /** The last Save to Photos was refused by the Photos permission: the rail offers Settings (C-V9). */
+  savePermissionDenied: boolean;
   improveDisabled: boolean;
   onShare: () => void;
   onSave: () => void;
@@ -30,7 +32,8 @@ export function showsSave(p: Pick<ViewerActionsProps, "canManage" | "shareEnable
  * The right rail (spec 8.2), top to bottom: Share (the ONE Signal Red CTA,
  * "Share to Instagram" on the Reels path, "Share reel" on the share sheet;
  * absent when sharing is off or no share path exists), Save to Photos, and
- * Improve this reel. A reel that is not the athlete's offers none of them, so
+ * Improve this reel, with Settings (C-V9) after Save when the Photos
+ * permission was refused. A reel that is not the athlete's offers none of them, so
  * no rail renders at all (owner decision 2026-10-06, spec 8.6).
  */
 export function ViewerActions(props: ViewerActionsProps) {
@@ -38,7 +41,7 @@ export function ViewerActions(props: ViewerActionsProps) {
   if (!canManage) return null;
   const showShare = shareEnabled && primaryPath !== null;
   return (
-    <View testID="viewer-rail" className="items-center gap-5">
+    <View testID="viewer-rail" pointerEvents="box-none" className="items-center gap-5">
       {showShare ? (
         <ReelRailButton
           testID="viewer-share"
@@ -60,6 +63,7 @@ export function ViewerActions(props: ViewerActionsProps) {
           onPress={props.onSave}
         />
       ) : null}
+      {showsSave(props) && props.savePermissionDenied ? <SettingsRailItem /> : null}
       <ReelRailButton
         testID="viewer-improve"
         variant="secondary"

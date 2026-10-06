@@ -18,6 +18,7 @@ export const REEL_SWIPE_HINT_KEY = "reels:swipe-hint:v1";
 
 let muted = false;
 let loaded = false;
+let settled = false;
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -25,17 +26,28 @@ function emit(): void {
 }
 
 /** Reads the stored mute choice once per app run. */
+let priming: Promise<void> = Promise.resolve();
+
 export function primeReelMuted(): Promise<void> {
-  if (loaded) return Promise.resolve();
+  if (loaded) return priming;
   loaded = true;
-  return AsyncStorage.getItem(REEL_MUTED_KEY)
+  priming = AsyncStorage.getItem(REEL_MUTED_KEY)
     .then((v) => {
       if ((v === "1") !== muted) {
         muted = v === "1";
         emit();
       }
     })
-    .catch(() => undefined);
+    .catch(() => undefined)
+    .finally(() => {
+      settled = true;
+    });
+  return priming;
+}
+
+/** The stored mute choice has been read (or the read failed and the default stands). */
+export function reelMutedLoaded(): boolean {
+  return settled;
 }
 
 export function getReelMuted(): boolean {
@@ -44,6 +56,7 @@ export function getReelMuted(): boolean {
 
 export function setReelMuted(next: boolean): void {
   loaded = true;
+  settled = true;
   if (next === muted) return;
   muted = next;
   emit();
@@ -81,5 +94,7 @@ export function markSwipeHintShown(): void {
 export function __resetReelPrefsForTests(): void {
   muted = false;
   loaded = false;
+  settled = false;
+  priming = Promise.resolve();
   listeners.clear();
 }

@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import type { HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
 import type { ReelItem, ReelLaneKey } from "./reel-types";
 import { clampIndex } from "./reel-pager-math";
+import { onHighlightStoreReset } from "./reset-registry";
 
 /**
  * ENTRY API of the shorts-style swipe viewer (specs/matches-tab section 8,
@@ -83,7 +84,9 @@ export function laneSource(lane: ReelLaneKey): HighlightShareSourceTag {
   return lane as HighlightShareSourceTag;
 }
 
-/** Tests only. */
+/** Sign-out (lanes belong to the old account) and tests. */
 export function __resetReelSessionsForTests(): void {
   sessions.clear();
 }
+
+onHighlightStoreReset(__resetReelSessionsForTests);

@@ -1,6 +1,6 @@
 import type { VideoPlayer } from "expo-video";
 import type { HighlightSource } from "./use-my-highlight";
-import { poolAssignment } from "./reel-pager-math";
+import { poolAssignment, REEL_SIGN_REUSE_MS } from "./reel-pager-math";
 
 /**
  * The swipe viewer's player pool (jits-a4fw.5), as a plain controller so the
@@ -14,7 +14,11 @@ import { poolAssignment } from "./reel-pager-math";
  *   the page's slot with `replaceAsync` (in place, never a new player) and
  *   remembers it for when the page gets a slot later.
  * - Only the visible page plays (unless the athlete paused it); a page that
- *   stops being visible pauses and rewinds to frame 0.
+ *   stops being visible pauses and rewinds to frame 0. Playback is driven
+ *   by a per-slot INTENT, never by `player.playing` (false while buffering
+ *   on both platforms): a slot that must not play is always paused.
+ * - It plays only while the app is active, the screen focused, no sheet is
+ *   open and the mute preference has been read.
  * - The poster covers a slot until its item has played AND a frame is up
  *   (a paused, never-played AVPlayer item can be black).
  */
@@ -56,7 +60,18 @@ interface Slot {
   progress: number;
   /** Intrinsic aspect off 9:16 (from the video track); false until known. */
   offAspect: boolean;
+  /** The controller asked this player to play (and has not paused it since). */
+  wantPlay: boolean;
 }
+
+interface Offer {
+  key: string;
+  source: HighlightSource;
+  signedAt: number;
+}
+
+/** An offered signature older than this is not loaded into a slot (the page re-signs). */
+export const POOL_OFFER_MAX_AGE_MS = REEL_SIGN_REUSE_MS;
 
 const NO_SLOT: SlotSnapshot = { slot: null, player: null, covered: true, paused: false, fit: "cover" };
 
@@ -68,14 +83,20 @@ function safe(fn: () => void): void {
   }
 }
 
+function emptySlot(): Slot {
+  return { index: null, key: null, url: null, seq: 0, doneSeq: 0, ready: false, played: false, firstFrame: false, progress: 0, offAspect: false, wantPlay: false };
+}
+
 export class ReelPoolController {
   private slots: Slot[];
   private active = 0;
   private userPaused = false;
-  private focused = true;
+  private screenFocused = true;
+  private appActive = true;
   private suspended = false;
+  private ready = true;
   private alive = true;
-  private offered = new Map<number, { key: string; source: HighlightSource }>();
+  private offered = new Map<number, Offer>();
   private errorHandlers = new Map<number, () => void>();
   private listeners = new Set<() => void>();
   private progressListeners = new Set<() => void>();
@@ -84,8 +105,9 @@ export class ReelPoolController {
   constructor(
     readonly players: VideoPlayer[],
     private hooks: PoolHooks = {},
+    private now: () => number = Date.now,
   ) {
-    this.slots = players.map(() => ({ index: null, key: null, url: null, seq: 0, doneSeq: 0, ready: false, played: false, firstFrame: false, progress: 0, offAspect: false }));
+    this.slots = players.map(emptySlot);
   }
 
   // ---- subscriptions (useSyncExternalStore) ----
@@ -103,6 +125,10 @@ export class ReelPoolController {
   private emit(): void {
     this.snapshots.clear();
     for (const l of this.listeners) l();
+  }
+
+  private emitProgress(): void {
+    for (const l of this.progressListeners) l();
   }
 
   slotOf(index: number): number | null {
@@ -136,6 +162,12 @@ export class ReelPoolController {
     return k !== null && this.slots[k].url !== null;
   }
 
+  /** A fresh source was already offered for the page (no need to prefetch it again). */
+  hasFreshOffer(index: number): boolean {
+    const offer = this.offered.get(index);
+    return !!offer && this.now() - offer.signedAt < POOL_OFFER_MAX_AGE_MS;
+  }
+
   progress(index: number): number {
     const k = this.slotOf(index);
     return k === null ? 0 : this.slots[k].progress;
@@ -143,7 +175,10 @@ export class ReelPoolController {
 
   // ---- inputs ----
 
-  /** The visible page changed (or the lane grew). */
+  /**
+   * The visible page changed (or the lane grew). `active` may equal `count`:
+   * the loading page after the last reel, where nothing plays.
+   */
   setActive(active: number, count: number): void {
     const prev = this.active;
     const moved = active !== prev;
@@ -153,13 +188,17 @@ export class ReelPoolController {
     plan.forEach((index, k) => {
       const s = this.slots[k];
       if (s.index === index) return;
+      // Re-pointed: anything still in flight for the old page is stale.
+      s.seq += 1;
+      s.doneSeq = s.seq;
       s.index = index;
       s.key = null;
       s.url = null;
       s.ready = s.played = s.firstFrame = s.offAspect = false;
       s.progress = 0;
+      this.pauseSlot(k);
       const offer = index === null ? undefined : this.offered.get(index);
-      if (offer) this.load(k, offer.key, offer.source);
+      if (offer) this.load(k, offer);
     });
     if (moved) {
       const k = this.slotOf(prev);
@@ -167,17 +206,22 @@ export class ReelPoolController {
     }
     this.applyPlayback();
     this.emit();
+    this.emitProgress();
   }
 
-  /** A page's signed source (null: none yet / gone). `key` is `highlightId:version`. */
-  offer(index: number, key: string, source: HighlightSource | null): void {
+  /**
+   * A page's signed source (null: none yet / gone). `key` is
+   * `highlightId:version`; `signedAt` dates the signature (default: now).
+   */
+  offer(index: number, key: string, source: HighlightSource | null, signedAt: number = this.now()): void {
     if (!source) {
       this.offered.delete(index);
       return;
     }
-    this.offered.set(index, { key, source });
+    const offer = { key, source, signedAt };
+    this.offered.set(index, offer);
     const k = this.slotOf(index);
-    if (k !== null) this.load(k, key, source);
+    if (k !== null) this.load(k, offer);
   }
 
   onError(index: number, handler: (() => void) | null): void {
@@ -205,9 +249,21 @@ export class ReelPoolController {
     this.applyPlayback();
   }
 
-  /** Screen focus / app foreground: only a focused screen plays. */
+  /** The viewer screen gained / lost navigation focus (a pushed match detail blurs it). */
   setFocused(focused: boolean): void {
-    this.focused = focused;
+    this.screenFocused = focused;
+    this.applyPlayback();
+  }
+
+  /** The app came to / left the foreground. Foregrounding never resumes a blurred screen. */
+  setAppActive(active: boolean): void {
+    this.appActive = active;
+    this.applyPlayback();
+  }
+
+  /** Holds the first play until the mute preference is known (no blast of sound for a muted athlete). */
+  setReady(ready: boolean): void {
+    this.ready = ready;
     this.applyPlayback();
   }
 
@@ -218,17 +274,19 @@ export class ReelPoolController {
 
   release(): void {
     this.alive = false;
-    for (const p of this.players) safe(() => p.pause());
+    this.slots.forEach((_s, k) => this.pauseSlot(k));
   }
 
   // ---- player events (wired by the hook) ----
 
   statusChanged(k: number, status: string): void {
     const s = this.slots[k];
+    // Only about the slot's current, settled item: a stale item's error is not this page's.
+    if (s.doneSeq !== s.seq || !s.url) return;
     if (status === "error") {
       const handler = s.index === null ? undefined : this.errorHandlers.get(s.index);
       handler?.();
-    } else if (status === "readyToPlay" && s.doneSeq === s.seq && s.url && !s.ready) {
+    } else if (status === "readyToPlay" && !s.ready) {
       s.ready = true;
       this.emit();
     }
@@ -264,14 +322,16 @@ export class ReelPoolController {
     const s = this.slots[k];
     if (s.index !== this.active || !(duration > 0)) return;
     s.progress = Math.max(0, Math.min(1, currentTime / duration));
-    for (const l of this.progressListeners) l();
+    this.emitProgress();
   }
 
   // ---- internals ----
 
-  private load(k: number, key: string, source: HighlightSource): void {
+  private load(k: number, offer: Offer): void {
     const s = this.slots[k];
+    const { key, source } = offer;
     if (s.url === source.url) return;
+    if (this.now() - offer.signedAt >= POOL_OFFER_MAX_AGE_MS) return; // expired: the page re-signs
     const player = this.players[k];
     const sameKey = s.key === key && s.url !== null;
     let at = 0;
@@ -282,6 +342,8 @@ export class ReelPoolController {
       s.ready = s.played = s.firstFrame = s.offAspect = false;
       s.progress = 0;
     }
+    // A new item lands paused: the intent is re-applied once it settles.
+    s.wantPlay = false;
     const seq = ++s.seq;
     this.hooks.sourceAttached?.(k, sameKey);
     const settle = (ok: boolean) => {
@@ -319,38 +381,44 @@ export class ReelPoolController {
 
   private reload(k: number): void {
     const s = this.slots[k];
-    const key = s.key;
-    if (!s.url || !key) return;
+    if (!s.url || !s.key) return;
     s.url = null;
     const offer = s.index === null ? undefined : this.offered.get(s.index);
-    if (offer) this.load(k, key, offer.source);
+    if (offer) this.load(k, offer);
   }
 
   private rewind(k: number): void {
     const player = this.players[k];
+    this.pauseSlot(k);
     safe(() => {
-      player.pause();
       player.currentTime = 0;
     });
     this.slots[k].progress = 0;
   }
 
+  /** Always pauses (idempotent); reports the intent change once. */
+  private pauseSlot(k: number): void {
+    const s = this.slots[k];
+    safe(() => this.players[k].pause());
+    if (s.wantPlay) {
+      s.wantPlay = false;
+      this.hooks.playIntent?.(k, false);
+    }
+  }
+
   private applyPlayback(): void {
     if (!this.alive) return;
+    const may = this.screenFocused && this.appActive && !this.suspended && this.ready && !this.userPaused;
     this.slots.forEach((s, k) => {
-      const player = this.players[k];
-      const play = this.focused && !this.suspended && s.index === this.active && s.url !== null && s.doneSeq === s.seq && !this.userPaused;
-      let changed = false;
-      safe(() => {
-        if (play && !player.playing) {
-          player.play();
-          changed = true;
-        } else if (!play && player.playing) {
-          player.pause();
-          changed = true;
-        }
-      });
-      if (changed) this.hooks.playIntent?.(k, play);
+      const play = may && s.index === this.active && s.url !== null && s.doneSeq === s.seq;
+      if (!play) {
+        this.pauseSlot(k);
+        return;
+      }
+      if (s.wantPlay) return;
+      s.wantPlay = true;
+      safe(() => this.players[k].play());
+      this.hooks.playIntent?.(k, true);
     });
   }
 }

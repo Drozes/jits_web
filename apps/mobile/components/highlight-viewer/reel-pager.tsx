@@ -1,12 +1,12 @@
 import * as React from "react";
-import { FlatList, Platform, View, type LayoutChangeEvent } from "react-native";
+import { FlatList, View, type LayoutChangeEvent } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { darkTokens } from "@/lib/tokens";
 import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
 import type { ReelItem } from "@/lib/highlight/reel-types";
 import type { ReelViewerSession } from "@/lib/highlight/reel-viewer-session";
 import { pageLayout } from "@/lib/highlight/reel-pager-math";
-import { REEL_VIEWABILITY, useReelPager } from "./use-reel-pager";
+import { REEL_LIST_PROPS, REEL_VIEWABILITY, useKeepPageOnResize, useReelPager } from "./use-reel-pager";
 import { ReelLoadingPage, ReelPagerPage } from "./reel-pager-page";
 import { ViewerHeader } from "./viewer-header";
 import { useViewerClose } from "./use-viewer-close";
@@ -24,6 +24,8 @@ export function ReelPager({ session }: { session: ReelViewerSession }) {
   const [height, setHeight] = React.useState(0);
   const p = useReelPager(session, height);
   const onLayout = React.useCallback((e: LayoutChangeEvent) => setHeight(Math.round(e.nativeEvent.layout.height)), []);
+  const listRef = React.useRef<FlatList<ReelItem>>(null);
+  useKeepPageOnResize(listRef, height, p.active);
   const getItemLayout = React.useCallback((_: unknown, index: number) => pageLayout(height, index), [height]);
   const last = p.items.length - 1;
   const renderItem = ({ item, index }: { item: ReelItem; index: number }) => (
@@ -48,25 +50,22 @@ export function ReelPager({ session }: { session: ReelViewerSession }) {
       <View testID="reel-pager" className="flex-1" onLayout={onLayout}>
         {height > 0 ? (
           <FlatList
+            ref={listRef}
             testID="reel-pager-list"
             data={p.items}
             keyExtractor={keyOf}
             renderItem={renderItem}
             extraData={`${p.active}:${p.hintVisible}:${p.caughtUp}`}
             ListFooterComponent={p.loadingMore ? <ReelLoadingPage height={height} /> : null}
-            pagingEnabled
-            decelerationRate="fast"
-            snapToAlignment="start"
-            disableIntervalMomentum
-            showsVerticalScrollIndicator={false}
+            {...REEL_LIST_PROPS}
             initialScrollIndex={session.startIndex}
             getItemLayout={getItemLayout}
-            initialNumToRender={1}
-            maxToRenderPerBatch={2}
-            windowSize={3}
-            removeClippedSubviews={Platform.OS === "android"}
-            onMomentumScrollEnd={p.onMomentumScrollEnd}
+            onScrollBeginDrag={p.onScrollBeginDrag}
             onScrollEndDrag={p.onScrollEndDrag}
+            onMomentumScrollBegin={p.onMomentumScrollBegin}
+            onMomentumScrollEnd={p.onMomentumScrollEnd}
+            onTouchStart={p.onTouchStart}
+            onTouchEnd={p.onTouchEnd}
             onViewableItemsChanged={p.onViewableItemsChanged}
             viewabilityConfig={REEL_VIEWABILITY}
             scrollEnabled={!p.modalOpen}

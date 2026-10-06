@@ -31,6 +31,7 @@ function props(over: Partial<ViewerActionsProps> = {}): ViewerActionsProps {
     primaryPath: "reels",
     canSaveToPhotos: true,
     saving: false,
+    savePermissionDenied: false,
     improveDisabled: false,
     onShare: jest.fn(),
     onSave: jest.fn(),
@@ -57,6 +58,19 @@ describe("rail ownership (spec 8.6)", () => {
     expect(utils.getByTestId("viewer-share").props.className).toContain("bg-cta");
     expect(utils.getByTestId("viewer-save").props.className).not.toContain("bg-cta");
     fireEvent.press(utils.getByTestId("viewer-share"));
+  });
+
+  it("Photos permission refused: Settings (C-V9) joins the rail after Save and opens the system settings", () => {
+    const { Linking } = require("react-native");
+    const spy = jest.spyOn(Linking, "openSettings").mockResolvedValue(undefined);
+    const utils = render(<ViewerActions {...props({ savePermissionDenied: true })} />);
+    expect(utils.getByText("Settings", HIDDEN)).toBeTruthy();
+    const settings = utils.getByLabelText("Open Settings");
+    expect(settings.props.accessibilityHint).toBe("Allow ELO RATED to add to Photos in Settings to save your reel.");
+    fireEvent.press(settings);
+    expect(spy).toHaveBeenCalledTimes(1);
+    const order = utils.getByTestId("viewer-rail").findAll((n: { props: { accessibilityLabel?: string; accessibilityRole?: string } }) => n.props.accessibilityRole === "button" && typeof n.props.accessibilityLabel === "string" && typeof (n as unknown as { type: unknown }).type === "string").map((n: { props: { accessibilityLabel?: string } }) => n.props.accessibilityLabel);
+    expect(order).toEqual(["Share to Instagram", "Save to Photos", "Open Settings", "Improve this reel"]);
   });
 
   it("Share reel path: same short label, the share-sheet string for screen readers", () => {

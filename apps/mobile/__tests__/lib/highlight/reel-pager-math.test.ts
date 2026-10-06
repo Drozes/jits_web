@@ -10,6 +10,7 @@ import {
   slotForIndex,
   swipeDirection,
 } from "@/lib/highlight/reel-pager-math";
+import { isCaughtUpAttempt } from "@/lib/highlight/reel-pager-math";
 import { reel } from "../../support/reel-fixtures";
 
 describe("page math", () => {
@@ -65,11 +66,16 @@ describe("pool assignment (index mod 3)", () => {
 });
 
 describe("prefetch and pagination", () => {
-  it("prefetches i + 1, i + 2 and i - 1, nothing further", () => {
-    expect(prefetchTargets(3, 10)).toEqual([4, 5, 2]);
+  it("prefetches i + 1 and i + 2 only (the previous page is already in its slot)", () => {
+    expect(prefetchTargets(3, 10)).toEqual([4, 5]);
     expect(prefetchTargets(0, 10)).toEqual([1, 2]);
-    expect(prefetchTargets(8, 10)).toEqual([9, 7]);
+    expect(prefetchTargets(8, 10)).toEqual([9]);
     expect(prefetchTargets(0, 1)).toEqual([]);
+  });
+
+  it("the loading page after the last reel is a valid rest only with a footer", () => {
+    expect(pageIndexFromOffset(3 * 844, 844, 3)).toBe(2);
+    expect(pageIndexFromOffset(3 * 844, 844, 3, true)).toBe(3);
   });
 
   it("loads more within 2 of the last loaded reel", () => {
@@ -83,5 +89,23 @@ describe("prefetch and pagination", () => {
     const merged = mergeReelItems([reel(1), reel(2)], [reel(2), reel(3), reel(3), reel(4)]);
     expect(merged.map((r) => r.highlightId)).toEqual(["h1", "h2", "h3", "h4"]);
     expect(mergeReelItems([reel(1)], [])).toHaveLength(1);
+  });
+});
+
+describe("C-V2 attempt detection (both platforms)", () => {
+  const base = { active: 4, lastIndex: 4, pageHeight: 800 };
+  it("iOS: the bounce past the last page by more than 48 pt", () => {
+    expect(isCaughtUpAttempt({ ...base, platform: "ios", endOffsetY: 4 * 800 + 60 })).toBe(true);
+    expect(isCaughtUpAttempt({ ...base, platform: "ios", endOffsetY: 4 * 800 + 30 })).toBe(false);
+    expect(isCaughtUpAttempt({ ...base, platform: "ios", endOffsetY: 4 * 800 + 60, active: 3 })).toBe(false);
+  });
+  it("Android: the offset clamps, so the finger's travel up decides", () => {
+    expect(isCaughtUpAttempt({ ...base, platform: "android", endOffsetY: 4 * 800, touchDeltaY: 80 })).toBe(true);
+    expect(isCaughtUpAttempt({ ...base, platform: "android", endOffsetY: 4 * 800, touchDeltaY: 20 })).toBe(false);
+    expect(isCaughtUpAttempt({ ...base, platform: "android", touchDeltaY: -120 })).toBe(false);
+    expect(isCaughtUpAttempt({ ...base, platform: "android", touchDeltaY: 120, active: 2 })).toBe(false);
+  });
+  it("never on an empty lane", () => {
+    expect(isCaughtUpAttempt({ platform: "ios", active: 0, lastIndex: -1, pageHeight: 800, endOffsetY: 500 })).toBe(false);
   });
 });

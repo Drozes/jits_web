@@ -1,7 +1,9 @@
 import * as React from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Text, View } from "react-native";
 import { PressableScale } from "@/components/ui/pressable-scale";
-import type { LucideIcon } from "lucide-react-native";
+import { Settings, type LucideIcon } from "lucide-react-native";
+import { SHARE_COPY } from "@/lib/highlight-share";
+import { VIEWER_COPY } from "./viewer-copy";
 import { ON_MEDIA } from "@/lib/theme/palette";
 import { darkTokens } from "@/lib/tokens";
 
@@ -11,6 +13,7 @@ export interface ReelRailButtonProps {
   label: string;
   /** The full shipped string, for screen readers. */
   a11yLabel: string;
+  a11yHint?: string;
   Icon: LucideIcon;
   /** `primary`: the page's ONE Signal Red CTA (Share). */
   variant: "primary" | "secondary";
@@ -24,14 +27,15 @@ export interface ReelRailButtonProps {
  * Share is the Signal Red fill (Void icon); the others sit on the on-media
  * scrim. Press scale (Motion registry "Press scale"). Busy swaps the icon for a neutral spinner and makes it inert.
  */
-export function ReelRailButton({ testID, label, a11yLabel, Icon, variant, disabled = false, busy = false, onPress }: ReelRailButtonProps) {
+export function ReelRailButton({ testID, label, a11yLabel, a11yHint, Icon, variant, disabled = false, busy = false, onPress }: ReelRailButtonProps) {
   const primary = variant === "primary";
   return (
-    <View className="items-center gap-1" style={{ width: 64, opacity: disabled ? 0.5 : 1 }}>
+    <View pointerEvents="box-none" className="items-center gap-1" style={{ width: 64, opacity: disabled ? 0.5 : 1 }}>
       <PressableScale
         testID={testID}
         accessibilityRole="button"
         accessibilityLabel={a11yLabel}
+        accessibilityHint={a11yHint}
         accessibilityState={{ disabled, busy }}
         disabled={disabled || busy}
         onPress={onPress}
@@ -48,5 +52,20 @@ export function ReelRailButton({ testID, label, a11yLabel, Icon, variant, disabl
         {label}
       </Text>
     </View>
+  );
+}
+
+/** C-V9: after a refused Photos permission, Settings joins the rail (full copy read as the hint). */
+export function SettingsRailItem() {
+  return (
+    <ReelRailButton
+      testID="viewer-open-settings"
+      variant="secondary"
+      Icon={Settings}
+      label={VIEWER_COPY.settings}
+      a11yLabel={SHARE_COPY.openSettings}
+      a11yHint={SHARE_COPY.savePermissionDenied}
+      onPress={() => void Linking.openSettings().catch(() => undefined)}
+    />
   );
 }

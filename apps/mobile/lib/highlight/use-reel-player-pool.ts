@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { useVideoPlayer, type VideoPlayer } from "expo-video";
 import { usePlaybackTelemetry, type PlaybackTelemetry } from "@/lib/video/use-playback-telemetry";
 import { ReelPoolController, type SlotSnapshot } from "./reel-player-pool";
-import { useReelMuted } from "./reel-prefs";
+import { getReelMuted, primeReelMuted, reelMutedLoaded, useReelMuted } from "./reel-prefs";
 
 const TELEMETRY_META = { surface: "highlight", videoId: null, angle: null, angleCount: null } as const;
 
@@ -19,8 +19,9 @@ function setup(p: VideoPlayer): void {
  * their controller (`reel-player-pool.ts`). The single-reel viewer uses the
  * same pool with one page, so both modes play, pause, mute and cover alike.
  * `useVideoPlayer` releases each native player when the viewer unmounts.
- * Leaving the screen (blur) or the app (background) pauses; coming back
- * resumes the visible page unless the athlete paused it.
+ * Leaving the screen (blur) or the app (background) pauses. Focus and app
+ * state are separate: foregrounding resumes only a focused viewer (never one
+ * behind a pushed match detail). The first play waits for the mute pref.
  */
 export function useReelPlayerPool(): ReelPoolController {
   const p0 = useVideoPlayer(null, setup);
@@ -47,6 +48,19 @@ export function useReelPlayerPool(): ReelPoolController {
 
   const muted = useReelMuted();
   React.useEffect(() => pool.setMuted(muted), [pool, muted]);
+  // No first play before the stored mute choice is known (a muted athlete never gets a blast of sound).
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!reelMutedLoaded()) pool.setReady(false);
+    void primeReelMuted().then(() => {
+      if (cancelled) return;
+      pool.setMuted(getReelMuted());
+      pool.setReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pool]);
 
   React.useEffect(() => {
     pool.start();
@@ -67,8 +81,8 @@ export function useReelPlayerPool(): ReelPoolController {
       }),
     ]);
     const app = AppState.addEventListener("change", (next) => {
-      if (next === "background") pool.setFocused(false);
-      else if (next === "active") pool.setFocused(true);
+      if (next === "background") pool.setAppActive(false);
+      else if (next === "active") pool.setAppActive(true);
     });
     return () => {
       subs.forEach((s) => s.remove());
