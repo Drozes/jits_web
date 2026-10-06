@@ -29,6 +29,8 @@ import { MatchesListHeader } from "@/components/matches/matches-list-header";
 import { FEED_LAYOUT, type MatchListLayout } from "@/components/matches/match-list-layout";
 import { MatchesZeroState } from "@/components/matches/matches-zero-state";
 import { NextMatchGhostCard } from "@/components/matches/next-match-ghost-card";
+import { MilestoneMoment } from "@/components/milestones/milestone-moment";
+import { useMilestoneCelebration, type MilestoneData } from "@/lib/milestones/use-milestone-celebration";
 import { MatchesReelCarousel, matchesLaneTiles, type LaneMatchCount } from "@/components/reels/lane-carousels";
 
 /** How the feed draws a match: one full-width `MatchFeedCard` per row (jits-a4fw.4). */
@@ -52,7 +54,7 @@ export default function MatchesScreen() {
   const router = useRouter();
   const p = usePalette();
   const library = useMatchLibrary(athlete?.id);
-  const { history } = useProfileData(athlete?.id, athlete?.primary_gym_id);
+  const { history, stats } = useProfileData(athlete?.id, athlete?.primary_gym_id);
   const seen = useSeenMatches();
   const [filter, setFilter] = React.useState<LibraryFilter>(NO_FILTER);
   const [pickerOpen, setPickerOpen] = React.useState(false);
@@ -123,6 +125,27 @@ export default function MatchesScreen() {
   // C-L6 dedupe (spec 10.3, AC 6.7): no card helper while the carousel shows it.
   const carouselShowsHelper = laneShowsRecordingHelper(laneTiles);
   const helperId = useNoFilmHelperId(visible, phases, carouselShowsHelper);
+  // Milestones (spec 10.6): first match / first win on their card, the first
+  // highlight on the carousel (unless Home celebrated it first).
+  const newest = library.items[0] ?? null;
+  const newestWin = library.items.find((i) => i.outcome === "win") ?? null;
+  const firstReel = lane.items[0] ?? null;
+  const milestoneData: MilestoneData = {
+    stats: stats ? { wins: stats.wins, losses: stats.losses, draws: stats.draws } : null,
+    newestMatch: newest ? { matchId: newest.match_id, completedAt: newest.completed_at, outcome: newest.outcome } : null,
+    newestWin: newestWin ? { matchId: newestWin.match_id, completedAt: newestWin.completed_at } : null,
+    highlights:
+      lane.loading || !lane.clipsEnabled
+        ? null
+        : {
+            count: lane.items.length,
+            hasMore: lane.hasMore,
+            first: firstReel ? { highlightId: firstReel.highlightId, unseen: firstReel.unseen, readyAt: firstReel.readyAt } : null,
+          },
+  };
+  const { celebration, dismiss: dismissMilestone } = useMilestoneCelebration("matches", athlete?.id, milestoneData);
+  const cardCelebration = celebration && celebration.milestone !== "first_highlight" ? celebration : null;
+  const laneCelebration = celebration && celebration.milestone === "first_highlight" ? celebration : null;
   const onCarouselCta = React.useCallback(
     (tile: Extract<ReelTileModel, { kind: "cta" }>) =>
       logEmptyCta({ surface: "matches", state: tile.variant === "first_highlight" ? "zero" : "no_reels", cta: "arena" }),
@@ -136,25 +159,30 @@ export default function MatchesScreen() {
       if (row.type === "month") return <MonthHeader label={row.label} count={row.last && hasMore ? null : row.count} />;
       return (
         <View className="flex-row" style={{ gap: 16, marginBottom: 20 }}>
-          {row.items.map((m) => (
-            <React.Fragment key={m.match_id}>
-              {LAYOUT.renderMatch(m, {
-                viewer,
-                viewerId,
-                seen: !seen.ready || seen.isSeen(m.match_id),
-                phase: phases[m.match_id] ?? null,
-                tags: tagsFor(tags, m.match_id),
-                noFilmHelper: m.match_id === helperId,
-                onOpen: open,
-                onPlay: play,
-              })}
-            </React.Fragment>
-          ))}
+          {row.items.map((m) => {
+            const card = LAYOUT.renderMatch(m, {
+              viewer,
+              viewerId,
+              seen: !seen.ready || seen.isSeen(m.match_id),
+              phase: phases[m.match_id] ?? null,
+              tags: tagsFor(tags, m.match_id),
+              noFilmHelper: m.match_id === helperId,
+              onOpen: open,
+              onPlay: play,
+              });
+            return cardCelebration?.targetId === m.match_id ? (
+              <MilestoneMoment key={m.match_id} celebration={cardCelebration} onDismiss={dismissMilestone} flex>
+                {card}
+              </MilestoneMoment>
+            ) : (
+              <React.Fragment key={m.match_id}>{card}</React.Fragment>
+            );
+          })}
           {LAYOUT.perRow === 2 && row.items.length === 1 ? <View className="flex-1" /> : null}
         </View>
       );
     },
-    [viewer, viewerId, seen, open, play, hasMore, phases, tags, helperId],
+    [viewer, viewerId, seen, open, play, hasMore, phases, tags, helperId, cardCelebration, dismissMilestone],
   );
 
   const header = (
@@ -164,7 +192,9 @@ export default function MatchesScreen() {
       // tiles (clips off, or a failed read with nothing cached).
       carousel={
         laneTiles.length > 0 ? (
-          <MatchesReelCarousel lane={lane} viewerId={viewerId} matchCount={matchCount} onCtaPress={onCarouselCta} />
+          <MilestoneMoment celebration={laneCelebration} onDismiss={dismissMilestone}>
+            <MatchesReelCarousel lane={lane} viewerId={viewerId} matchCount={matchCount} onCtaPress={onCarouselCta} />
+          </MilestoneMoment>
         ) : null
       }
       filter={filter}

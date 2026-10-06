@@ -56,6 +56,8 @@ jest.mock("react-native-safe-area-context", () => ({
 
 // Theme tokens — include the ELO keys the new dashboard reads
 jest.mock("@/lib/theme/use-theme", () => ({
+  // The milestone banner and burst read the palette.
+  useResolvedColorScheme: () => "dark",
   useThemedTokens: () => ({
     primary: "#ff0000",
     foreground: "#000000",
@@ -789,6 +791,24 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
     fireEvent.press(cta);
     expect(mockNavigate).toHaveBeenCalledWith("/arena");
     expect(mockCapture).toHaveBeenCalledWith("matches.empty_cta", { level: "info", tags: { surface: "home", state: "zero", cta: "arena" } });
+  });
+
+  it("the first highlight celebrates over the carousel (C-C3), once, and logs matches.milestone_shown", async () => {
+    (require("@/lib/milestones/milestone-store") as { __resetMilestonesForTests: () => void }).__resetMilestonesForTests();
+    mockGetMyHighlights.mockResolvedValue(highlightsPage([reel("h1", { unseen: true, readyAt: new Date(mockNow - 60_000).toISOString() })]));
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("reel-tile-ready:h1");
+    const banner = await utils.findByTestId("milestone-banner-first_highlight");
+    expect(banner.props.accessibilityLabel).toBe("Your first highlight is ready");
+    expect(mockCapture).toHaveBeenCalledWith("matches.milestone_shown", { level: "info", tags: { milestone: "first_highlight" } });
+    fireEvent.press(banner);
+    await waitFor(() => expect(utils.queryByTestId("milestone-banner-first_highlight")).toBeNull());
+    // A later visit (remount) does not celebrate again.
+    utils.unmount();
+    const again = render(React.createElement(DashboardScreen));
+    await again.findByTestId("reel-tile-ready:h1");
+    expect(again.queryByTestId("milestone-banner-first_highlight")).toBeNull();
+    expect(mockCapture.mock.calls.filter((c) => c[0] === "matches.milestone_shown")).toHaveLength(1);
   });
 
   it("matches but no reels: the C-L2 CTA tile then the C-L5 ghost with the recording helper", async () => {

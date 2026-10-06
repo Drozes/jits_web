@@ -165,6 +165,7 @@ const GREEN_ALLOWED: Allow = {
   "components/athlete/head-to-head-card.tsx": { lines: 1, reason: "the head-to-head wins count" },
   "components/film-room/poster-card.tsx": { lines: 4, reason: "the W outcome" },
   "components/matches/match-feed-meta.tsx": { lines: 1, reason: "the Matches feed card's W letter and positive delta (a win, a gain; spec 6.2)" },
+  "components/milestones/milestone-banner.tsx": { lines: 1, reason: "the First win banner's left rule (a win; board P-MT-15, spec 10.6); first match and first highlight use ink" },
   "components/layout/elo-tab-bar.tsx": { lines: 1, reason: "the live dot on the Arena tab" },
   "components/layout/header-live-dot.tsx": { lines: 1, reason: "the header live dot" },
   "components/layout/header-status-chip.tsx": { lines: 3, reason: "the live header status chip" },

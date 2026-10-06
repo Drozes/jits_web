@@ -62,8 +62,10 @@ jest.mock("@/lib/auth/hooks", () => ({
     athlete: { id: mockAthleteId(), display_name: "Kai Reyes", current_elo: 1526, primary_gym_id: null, profile_photo_url: null },
   }),
 }));
+let mockStats: { wins: number; losses: number; draws: number } | null = null;
 jest.mock("@/lib/profile/use-profile-data", () => ({
   useProfileData: () => ({
+    stats: mockStats,
     history: [
       ...Array.from({ length: 15 }, () => ({ athlete_outcome: "win" })),
       ...Array.from({ length: 7 }, () => ({ athlete_outcome: "loss" })),
@@ -184,6 +186,7 @@ beforeEach(async () => {
   mockClipsOn = true;
   mockLaneOver = {};
   mockParams = {};
+  mockStats = null;
   mockFlagState.mockReturnValue({ enabled: true, known: true, state: "on" });
   __resetSeenMatches();
   resetMatchUploadStore();
@@ -604,6 +607,54 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(mockLaneRefetch).toHaveBeenCalledWith(true);
   });
 
+  describe("milestones (spec 10.6, AC 6.10)", () => {
+    const router = require("expo-router") as { useFocusEffect: jest.Mock };
+    beforeEach(() => {
+      // Focus effects run here (the milestone hook waits for focus).
+      router.useFocusEffect.mockImplementation((cb: () => void) => {
+        const R = require("react");
+        R.useEffect(() => cb(), [cb]);
+      });
+    });
+    afterEach(() => {
+      router.useFocusEffect.mockReset();
+    });
+
+    it("celebrates a first win on its card: the First win banner above it and the burst, logged once", async () => {
+      mockStats = { wins: 1, losses: 0, draws: 0 };
+      withReels();
+      const utils = await renderLoaded(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win" })]));
+      const banner = await utils.findByTestId("milestone-banner-first_win");
+      expect(banner.props.accessibilityLabel).toBe("First win. That one counts.");
+      expect(utils.queryByTestId("milestone-banner-first_match")).toBeNull();
+      expect(utils.getByTestId("milestone-burst", { includeHiddenElements: true })).toBeTruthy();
+      expect(mockCapture).toHaveBeenCalledWith("matches.milestone_shown", { level: "info", tags: { milestone: "first_win" } });
+      // Both permanent tags stay on the card (FIRST MATCH and FIRST WIN).
+      expect(within(utils.getByTestId("film-card-w1")).getByText("FIRST MATCH")).toBeTruthy();
+      expect(within(utils.getByTestId("film-card-w1")).getByText("FIRST WIN")).toBeTruthy();
+      // A tap dismisses it.
+      fireEvent.press(banner);
+      await waitFor(() => expect(utils.queryByTestId("milestone-banner-first_win")).toBeNull());
+    });
+
+    it("celebrates the first highlight on the carousel when Matches opens first", async () => {
+      mockLaneOver = { items: [reelItem("only", { unseen: true, readyAt: daysAgo(0) })] };
+      const utils = await renderLoaded();
+      const slot = utils.getByTestId("matches-carousel-slot");
+      expect(await within(slot).findByTestId("milestone-banner-first_highlight")).toBeTruthy();
+    });
+
+    it("an old first match (over 7 days) never celebrates", async () => {
+      mockStats = { wins: 0, losses: 1, draws: 0 };
+      withReels();
+      const utils = await renderLoaded(page([libItem({ match_id: "l1", completed_at: daysAgo(9), outcome: "loss" })]));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(utils.queryByTestId("milestone-banner-first_match")).toBeNull();
+    });
+  });
+
   it("never uses an em dash in its copy", () => {
     const fs = require("fs") as typeof import("fs");
     const path = require("path") as typeof import("path");
@@ -615,6 +666,11 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
       ...(fs.readdirSync(path.join(root, "components/matches")) as string[])
         .filter((f) => /\.tsx?$/.test(f))
         .map((f) => `components/matches/${f}`),
+      ...(fs.readdirSync(path.join(root, "components/milestones")) as string[])
+        .filter((f) => /\.tsx?$/.test(f))
+        .map((f) => `components/milestones/${f}`),
+      "lib/milestones/milestone-store.ts",
+      "lib/milestones/use-milestone-celebration.ts",
       "app/(app)/video/[id].tsx",
       "app/(app)/match-detail/[matchId].tsx",
       // Recursive: the multi-angle player's components live in a subfolder.

@@ -29,6 +29,8 @@ import { useMyActiveMatch } from "@/lib/match-flow/use-my-active-match";
 import { HomeHighlightsCarousel } from "@/components/reels/lane-carousels";
 import { useHomeHighlights } from "@/lib/highlight/use-home-highlights";
 import { logEmptyCta } from "@/lib/matches/telemetry";
+import { useMilestoneCelebration } from "@/lib/milestones/use-milestone-celebration";
+import { MilestoneMoment } from "@/components/milestones/milestone-moment";
 import { requestBellRefresh } from "@/lib/highlight/highlight-store";
 import { markNotificationRouterReady } from "@/lib/notifications/handlers";
 import { formatRecord, recordA11yLabel } from "@/lib/athlete/record";
@@ -86,6 +88,16 @@ export default function DashboardScreen() {
       : null;
   const highlights = useHomeHighlights(athlete?.id, matchCount);
   const refetchHighlights = highlights.refetch;
+  // The first highlight celebrates on the carousel (spec 10.6), unless the
+  // Matches carousel celebrated it first. Home never celebrates matches.
+  const firstReel = highlights.items[0] ?? null;
+  const { celebration, dismiss: dismissMilestone } = useMilestoneCelebration("home", athlete?.id, {
+    highlights: {
+      count: highlights.items.length,
+      hasMore: highlights.pageSource.cursor !== null,
+      first: firstReel ? { highlightId: firstReel.highlightId, unseen: firstReel.unseen, readyAt: firstReel.readyAt } : null,
+    },
+  });
   const refreshAll = React.useCallback(() => {
     refresh();
     refreshActiveMatch();
@@ -181,14 +193,19 @@ export default function DashboardScreen() {
             in phase 1, later friend, nearby and Elo sources in the same row.
             No red: Home's one red CTA stays Resume or the practice offer.
             Hidden with clips off or a failed read (Home stays quiet). */}
-        <HomeHighlightsCarousel
-          tiles={highlights.tiles}
-          pageSource={highlights.pageSource}
-          markSeenLocally={highlights.markSeenLocally}
-          onCtaPress={(tile) =>
-            logEmptyCta({ surface: "home", state: tile.variant === "first_highlight" ? "zero" : "no_reels", cta: "arena" })
-          }
-        />
+        {/* Only with tiles: an empty wrapper would add a gap to the scroll. */}
+        {highlights.tiles.length > 0 ? (
+          <MilestoneMoment celebration={celebration} onDismiss={dismissMilestone}>
+            <HomeHighlightsCarousel
+              tiles={highlights.tiles}
+              pageSource={highlights.pageSource}
+              markSeenLocally={highlights.markSeenLocally}
+              onCtaPress={(tile) =>
+                logEmptyCta({ surface: "home", state: tile.variant === "first_highlight" ? "zero" : "no_reels", cta: "arena" })
+              }
+            />
+          </MilestoneMoment>
+        ) : null}
 
         <View>
           <MetaTag>{hasMatches ? "Welcome back" : "Welcome"}</MetaTag>
