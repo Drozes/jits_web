@@ -18,8 +18,18 @@
  * - `setNativeTime(i, t)`: the native clock moves without a seek (a new item
  *   starting at 0, or playback progress without a time update).
  * - `buffering` (jits-a4fw.5 review B1): while true, `play()` only records
- *   the intent and `playing` stays false (as on iOS and Android while the
- *   item buffers) until `bufferEnd(i)`; a `pause()` before that cancels it.
+ *   the intent (`wantsPlay`) and `playing` stays false (as on iOS and Android
+ *   while the item buffers) until `bufferEnd(i)`; a `pause()` before that
+ *   cancels it. A `rateStartsPlayback` rate write records the same intent.
+ *
+ * Two slot players (jits-xfvd.19): every `useVideoPlayer` call returns its
+ * own fake, so the single match player's two slots are `fakePlayers[n]` and
+ * `fakePlayers[n + 1]`. Each records `muted`, `volume`, `playbackRate` and
+ * `bufferOptions` writes (`mutes`, `volumes`, `rates`, `bufferWrites`) and
+ * counts `replaceAsync(null)` releases; `failReplace(i, message)` rejects
+ * the next swap, and `emitStatus(i, status, message)` / `emitPlaying(i, on)`
+ * drive its status and playing events. `rateStartsPlayback` (opt-in) makes a
+ * rate write start a player that holds an item, as AVPlayer.rate does.
  */
 import * as React from "react";
 import { Text } from "react-native";
@@ -35,6 +45,16 @@ export interface FakePlayer {
   playbackRate: number;
   rates: number[];
   muted: boolean;
+  /** Every muted write. */
+  mutes: boolean[];
+  volume: number;
+  /** Every volume write. */
+  volumes: number[];
+  bufferOptions: { preferredForwardBufferDuration?: number; [k: string]: unknown };
+  /** Every bufferOptions write. */
+  bufferWrites: Array<{ preferredForwardBufferDuration?: number }>;
+  /** replaceAsync(null) calls (the item cleared, its decoder freed). */
+  releases: number;
   seeks: number[];
   currentTime: number;
   timeUpdateEventInterval: number;
@@ -43,6 +63,8 @@ export interface FakePlayer {
   preservesPitch: boolean;
   /** iOS: a paused item stays "loading" until play() (see readyPlayer). */
   pausedBufferStall: boolean;
+  /** iOS: a playbackRate write to a paused player with an item starts it (AVPlayer.rate). Opt-in. */
+  rateStartsPlayback: boolean;
   /** A readyPlayer that the paused-buffer stall held back (its duration). */
   heldReady: number | null;
   /** Buffering: play() leaves `playing` false until bufferEnd(). */
@@ -93,6 +115,9 @@ function createPlayer(): FakePlayer {
   let time = 0;
   let rate = 1;
   let interval = 0;
+  let muted = false;
+  let volume = 1;
+  let bufferOptions: Record<string, unknown> = { preferredForwardBufferDuration: 0 };
   const thumbsFor = (times: number | number[]) => (Array.isArray(times) ? times : [times]).map((t) => ({ fakeThumbnail: true, t }));
   const p = {
     id: fakePlayers.length,
@@ -102,10 +127,35 @@ function createPlayer(): FakePlayer {
     duration: 0,
     rates: [] as number[],
     intervals: [] as number[],
-    muted: false,
+    mutes: [] as boolean[],
+    volumes: [] as number[],
+    bufferWrites: [] as Array<Record<string, unknown>>,
+    releases: 0,
+    get muted() {
+      return muted;
+    },
+    set muted(v: boolean) {
+      muted = v;
+      p.mutes.push(v);
+    },
+    get volume() {
+      return volume;
+    },
+    set volume(v: number) {
+      volume = v;
+      p.volumes.push(v);
+    },
+    get bufferOptions() {
+      return bufferOptions;
+    },
+    set bufferOptions(v: Record<string, unknown>) {
+      bufferOptions = { ...v };
+      p.bufferWrites.push({ ...v });
+    },
     seeks: [] as number[],
     preservesPitch: false,
     pausedBufferStall: false,
+    rateStartsPlayback: false,
     heldReady: null,
     buffering: false,
     wantsPlay: false,
@@ -122,6 +172,11 @@ function createPlayer(): FakePlayer {
     set playbackRate(v: number) {
       rate = v;
       p.rates.push(v);
+      if (p.rateStartsPlayback && v > 0 && p.source != null) {
+        // AVPlayer.rate > 0 is a play intent; a buffering item still waits for bufferEnd.
+        p.wantsPlay = true;
+        if (!p.buffering) p.playing = true;
+      }
     },
     get currentTime() {
       return time;
@@ -144,10 +199,17 @@ function createPlayer(): FakePlayer {
       p.wantsPlay = false;
       p.playing = false;
     }),
-    replaceAsync: jest.fn((src: { uri: string }) => {
+    replaceAsync: jest.fn((src: { uri: string } | null) => {
       p.source = src;
-      p.status = "loading";
       p.heldReady = null;
+      if (src == null) {
+        p.releases += 1;
+        p.status = "idle";
+        p.playing = false;
+        p.wantsPlay = false;
+        return Promise.resolve();
+      }
+      p.status = "loading";
       const next = replaceQueue.get(p)?.shift();
       return next ? next.promise : Promise.resolve();
     }),
@@ -183,6 +245,9 @@ export function useVideoPlayer(_source: unknown, setup?: (p: FakePlayer) => void
     // The setup's own writes are not the app's rate or interval changes.
     ref.current.rates.length = 0;
     ref.current.intervals.length = 0;
+    ref.current.mutes.length = 0;
+    ref.current.volumes.length = 0;
+    ref.current.bufferWrites.length = 0;
   }
   return ref.current;
 }
@@ -259,12 +324,39 @@ export function tick(i: number, t: number): void {
   fakePlayers[i].emit("timeUpdate", { currentTime: t, bufferedPosition: t });
 }
 
-/** Player `i` finished buffering: it starts playing only if play() is still wanted. */
+/**
+ * Player `i` finished buffering: it starts playing only if play() (or a
+ * starting rate write) is still wanted; a ready report the paused-buffer
+ * stall held back lands with it.
+ */
 export function bufferEnd(i: number): void {
   const p = fakePlayers[i];
   p.buffering = false;
-  if (p.wantsPlay) {
-    p.playing = true;
-    p.emit("playingChange", { isPlaying: true });
+  if (!p.wantsPlay) return;
+  p.playing = true;
+  if (p.heldReady != null) {
+    const duration = p.heldReady;
+    p.heldReady = null;
+    readyNow(p, duration);
   }
+  p.emit("playingChange", { isPlaying: true });
+}
+
+/** The next `replaceAsync` on player `i` rejects with `message`. */
+export function failReplace(i: number, message = "load failed"): void {
+  deferReplace(i).reject(new Error(message));
+}
+
+/** Player `i` reports a status (and an error message for "error"). */
+export function emitStatus(i: number, status: string, message?: string): void {
+  const p = fakePlayers[i];
+  p.status = status;
+  p.emit("statusChange", status === "error" ? { status, error: { message: message ?? "error" } } : { status });
+}
+
+/** Player `i` reports it started or stopped playing. */
+export function emitPlaying(i: number, isPlaying: boolean): void {
+  const p = fakePlayers[i];
+  p.playing = isPlaying;
+  p.emit("playingChange", { isPlaying });
 }

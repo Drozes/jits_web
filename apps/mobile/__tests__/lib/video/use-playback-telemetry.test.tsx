@@ -310,3 +310,35 @@ describe("usePlaybackTelemetry adaptive quality", () => {
     expect(history.getPlaybackHistory("wifi")).toEqual([]);
   });
 });
+
+describe("usePlaybackTelemetry front rebind (jits-xfvd.19)", () => {
+  it("follows the new front player with a playing resync: no pause, no stall at the swap; the old one is dropped", async () => {
+    const a = Object.assign(fakePlayer(), { playing: true });
+    const b = Object.assign(fakePlayer(), { playing: true });
+    const hook = renderHook(({ p }: { p: ReturnType<typeof fakePlayer> }) => usePlaybackTelemetry(p as never, META), {
+      initialProps: { p: a },
+    });
+    await act(async () => undefined);
+    act(() => {
+      hook.result.current.playIntent(true);
+      hook.result.current.sourceAttached("normalized");
+      a.emit("statusChange", { status: "readyToPlay" });
+      a.emit("playingChange", { isPlaying: true });
+      now += 5_000;
+    });
+    hook.rerender({ p: b });
+    expect(a.count()).toBe(0);
+    act(() => {
+      // The old front pausing after the swap is not this session's pause.
+      a.emit("playingChange", { isPlaying: false });
+      now += 5_000;
+      b.emit("timeUpdate", { currentTime: 20 });
+      hook.result.current.switchTapIgnored();
+    });
+    hook.unmount();
+    const out = extra();
+    expect(out.watchMs).toBe(10_000);
+    expect(out.stallCount).toBe(0);
+    expect(out.switchIgnoredTapCount).toBe(1);
+  });
+});
