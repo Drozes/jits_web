@@ -1,4 +1,12 @@
+import type {
+  QualityPreference,
+  ServedRendition,
+  StartReason,
+  SwitchReason,
+  TargetRendition,
+} from "@jits/shared/utils";
 import * as tracking from "@/lib/error-tracking/sentry";
+import { ResidualStats } from "./multi-angle/sync-controller";
 
 /**
  * Playback telemetry (jits-n2im.21): the input for the deferred HLS / ABR
@@ -55,9 +63,32 @@ import * as tracking from "@/lib/error-tracking/sentry";
  *                       view's onFirstFrameRender for the new item, or the
  *                       first playback progress on it). Null with none.
  *   switchLatencyMaxMs  the slowest of those switches.
+ *   switchSwapCount / switchSeekCount / switchDipCount
+ *                       multi-angle player: how each switch happened (an
+ *                       opacity swap to a hot angle, an exact seek behind a
+ *                       held frame, or a dip to black for clock-only sync).
+ *   syncResidualP50Ms / syncResidualP95Ms / syncSamples
+ *                       multi-angle player: absolute error of the lock-stepped
+ *                       angles against the master clock, sampled every master
+ *                       time update (smoothed), in ms.
+ *   decoderCapEvents / decoderCapReasons
+ *                       multi-angle player: times a standby was kept warm by
+ *                       the decoder cap (weak phone) or demoted after a
+ *                       decoder error, and why.
  *   After a switch, `durationS` and `maxPositionS` are on the file then on
  *   screen (each angle has its own clock), so across a switched session they
  *   mix angles; read them per session, not as one timeline.
+ *
+ * Adaptive quality (jits-xfvd.12, spec 05 section 5.6): the quality meta of
+ * the session start (preference, settings, network key, start target and
+ * reason), the rendition served at start and at the end, watch time per
+ * served rendition (`msOn720 + msOn360 + msOnOriginal === watchMs` for a
+ * match session), every quality switch (first 8 kept), its landing latency,
+ * stalls before and after the first stall-driven step-down, the relapse
+ * lock and the cap. A quality switch is NOT an angle switch: it never
+ * counts in `switchCount` or the switch latency, and its reload is exempt
+ * from stalls exactly like an angle swap. For a reel the quality fields are
+ * null, 0 or false and the quality tags read `none`.
  */
 
 /** How long a seek's "the next load is ours" exemption lasts at most. */
@@ -84,7 +115,38 @@ export interface PlaybackSessionMeta {
   angle: PlaybackAngle | null;
   /** How many angles the match has (1 to 3); null when unknown. */
   angleCount: number | null;
+  /** Match player: single player (P0) or the multi-angle player (dev flag). */
+  playerMode?: "single" | "multi";
+  /** Multi-angle player: whether two players may decode at once. */
+  deviceTier?: "full" | "warm-only" | null;
 }
+
+export type SwitchMode = "swap" | "seek" | "dip";
+
+export type SettingsSource = "server" | "cache" | "builtin";
+
+/** What the start selection knew (set once per session). */
+export interface PlaybackQualityMeta {
+  qualityPreference: QualityPreference;
+  settingsVersion: number;
+  settingsSource: SettingsSource;
+  adaptiveEnabled: boolean;
+  networkKey: string;
+  connectionExpensive: boolean;
+  startTarget: TargetRendition;
+  startReason: StartReason;
+}
+
+export interface QualitySwitchRecord {
+  /** ms since the session opened. */
+  atMs: number;
+  from: TargetRendition;
+  to: TargetRendition;
+  reason: SwitchReason;
+}
+
+/** First quality switches kept per session. */
+export const QUALITY_SWITCHES_KEPT = 8;
 
 export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   sourceKind: PlaybackSourceKind | null;
@@ -120,6 +182,46 @@ export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   switchCount: number;
   switchLatencyMs: number | null;
   switchLatencyMaxMs: number | null;
+  switchSwapCount: number;
+  switchSeekCount: number;
+  switchDipCount: number;
+  syncResidualP50Ms: number | null;
+  syncResidualP95Ms: number | null;
+  syncSamples: number;
+  decoderCapEvents: number;
+  decoderCapReasons: string | null;
+  qualityPreference: QualityPreference | null;
+  settingsVersion: number | null;
+  settingsSource: SettingsSource | null;
+  adaptiveEnabled: boolean | null;
+  networkKey: string | null;
+  connectionExpensive: boolean | null;
+  startTarget: TargetRendition | null;
+  startReason: StartReason | null;
+  startRendition: ServedRendition | null;
+  /** Served start differs from the target; null on a continuation (it has no start of its own). */
+  startFallback: boolean | null;
+  playbackProfile: string | null;
+  finalRendition: ServedRendition | null;
+  qualitySwitchCount: number;
+  qualityStepDownCount: number;
+  qualityStepUpCount: number;
+  qualitySwitches: QualitySwitchRecord[];
+  qualitySwitchesTruncated: boolean;
+  qualitySwitchLatencyMs: number | null;
+  qualitySwitchLatencyMaxMs: number | null;
+  msOn720: number;
+  msOn360: number;
+  msOnOriginal: number;
+  stallsBeforeStepDown: number | null;
+  stallMsBeforeStepDown: number | null;
+  stallsAfterStepDown: number | null;
+  stallMsAfterStepDown: number | null;
+  qualityLockedLow: boolean;
+  qualityCapReached: boolean;
+  /** A stall-driven step-down happened in this screen session (this event or an earlier one). */
+  qualitySteppedDown: boolean;
+  playerStartupMs: number | null;
 }
 
 /** Longest error text kept. */
@@ -168,22 +270,127 @@ export class PlaybackSession {
   /** A switch is waiting for the new angle's first frame (tap time). */
   private switchAt: number | null = null;
   private switchLatencies: number[] = [];
+  private switchModes: Record<SwitchMode, number> = { swap: 0, seek: 0, dip: 0 };
+  private residuals = new ResidualStats();
+  private decoderCapEvents = 0;
+  private decoderCapReasons = new Set<string>();
+  // ---- adaptive quality ----
+  private quality: PlaybackQualityMeta | null = null;
+  private startRendition: ServedRendition | null = null;
+  private currentRendition: ServedRendition | null = null;
+  private playbackProfile: string | null = null;
+  private msOn: Record<ServedRendition, number> = { "720": 0, "360": 0, original: 0 };
+  private qualitySwitchCount = 0;
+  private qualityStepDowns = 0;
+  private qualityStepUps = 0;
+  private qualitySwitches: QualitySwitchRecord[] = [];
+  private qualitySwitchAt: number | null = null;
+  private qualityLatencies: number[] = [];
+  /** Stall figures frozen at the first stall-driven step-down. */
+  private beforeStepDown: { count: number; ms: number } | null = null;
+  private lockedLow = false;
+  private capReached = false;
+  private steppedDownInScreen = false;
+  private onStall: ((event: { kind: "start" | "end"; at: number }) => void) | null = null;
 
   constructor(
     meta: PlaybackSessionMeta,
     now: number,
-    opts: { resumed?: boolean; sourceKind?: PlaybackSourceKind | null; wantPlay?: boolean } = {},
+    opts: {
+      resumed?: boolean;
+      sourceKind?: PlaybackSourceKind | null;
+      wantPlay?: boolean;
+      /** A continuation: the rendition already on the player. */
+      rendition?: { served: ServedRendition; playbackProfile: string | null } | null;
+      onStall?: (event: { kind: "start" | "end"; at: number }) => void;
+    } = {},
   ) {
     this.meta = { ...meta };
     this.openedAt = now;
     if (meta.surface === "match" && !opts.resumed) this.signOutcome = "pending";
     this.resumed = opts.resumed ?? false;
+    this.onStall = opts.onStall ?? null;
     // A continuation already has its source on the player.
     if (opts.sourceKind) {
       this.sourceKind = opts.sourceKind;
       this.sourceAt = now;
     }
+    if (opts.rendition) {
+      this.startRendition = opts.rendition.served;
+      this.currentRendition = opts.rendition.served;
+      this.playbackProfile = opts.rendition.playbackProfile;
+    }
     if (opts.wantPlay) this.playIntent(true, now);
+  }
+
+  /** Called exactly where `stallCount` increments and where an open stall closes. */
+  setStallListener(fn: ((event: { kind: "start" | "end"; at: number }) => void) | null): void {
+    this.onStall = fn;
+  }
+
+  private emitStall(kind: "start" | "end", at: number): void {
+    try {
+      this.onStall?.({ kind, at });
+    } catch {
+      /* a listener never breaks telemetry */
+    }
+  }
+
+  /** The start selection's meta (once per session; a continuation gets a copy). */
+  setQuality(meta: PlaybackQualityMeta): void {
+    this.quality = { ...meta };
+  }
+
+  /**
+   * A file of this served rendition went to the player (every attach, and
+   * the angle on screen changing in the multi-angle player). The first one
+   * is the start rendition; each closes the current watch segment into the
+   * previous rendition's bucket.
+   */
+  renditionAttached(served: ServedRendition, playbackProfile: string | null, now: number): void {
+    if (this.startRendition === null) {
+      this.startRendition = served;
+      this.playbackProfile = playbackProfile;
+    }
+    if (this.playingSince != null) {
+      this.stopWatchClock(now);
+      this.playingSince = now;
+    }
+    this.currentRendition = served;
+  }
+
+  /**
+   * A quality switch was issued (not an angle switch). Its reload is the
+   * app's own wait (stall-exempt like an angle swap); the first stall-driven
+   * step-down freezes the "before" stall figures, an open stall included.
+   */
+  qualitySwitchStarted(from: TargetRendition, to: TargetRendition, reason: SwitchReason, now: number): void {
+    this.expectSwap(now);
+    this.qualitySwitchCount += 1;
+    const stepDown = reason !== "smooth";
+    if (stepDown) this.qualityStepDowns += 1;
+    else this.qualityStepUps += 1;
+    if (this.qualitySwitches.length < QUALITY_SWITCHES_KEPT + 1) {
+      this.qualitySwitches.push({ atMs: Math.max(0, now - this.openedAt), from, to, reason });
+    }
+    this.qualitySwitchAt = now;
+    if (stepDown && this.beforeStepDown === null) {
+      this.beforeStepDown = { count: this.stallCount, ms: this.stallMs };
+    }
+  }
+
+  /** The quality swap's new file showed its first frame after the resume seek. */
+  qualitySwitchLanded(now: number): void {
+    if (this.qualitySwitchAt == null) return;
+    this.qualityLatencies.push(Math.max(0, now - this.qualitySwitchAt));
+    this.qualitySwitchAt = null;
+  }
+
+  /** The controller's sticky screen-session state (relapse lock, cap). */
+  qualityFlags(flags: { lockedLow: boolean; capReached: boolean; steppedDown?: boolean }): void {
+    this.lockedLow = this.lockedLow || flags.lockedLow;
+    this.capReached = this.capReached || flags.capReached;
+    this.steppedDownInScreen = this.steppedDownInScreen || flags.steppedDown === true;
   }
 
   setMeta(partial: Partial<PlaybackSessionMeta>): void {
@@ -258,8 +465,9 @@ export class PlaybackSession {
    * The athlete switched angle (the tap). The new angle's load is the app's
    * own wait, not a stall; `switchLanded` measures how long it took.
    */
-  switchStarted(now: number): void {
+  switchStarted(now: number, mode?: SwitchMode): void {
     this.switchCount += 1;
+    if (mode) this.switchModes[mode] += 1;
     this.switchAt = now;
     this.expectSwap(now);
   }
@@ -269,6 +477,17 @@ export class PlaybackSession {
     if (this.switchAt == null) return;
     this.switchLatencies.push(Math.max(0, now - this.switchAt));
     this.switchAt = null;
+  }
+
+  /** One smoothed sync error sample of a lock-stepped angle (seconds). */
+  syncResidual(errorS: number): void {
+    this.residuals.add(errorS);
+  }
+
+  /** A standby was kept warm by the decoder cap, or demoted after a decoder error. */
+  decoderCap(reason: string): void {
+    this.decoderCapEvents += 1;
+    this.decoderCapReasons.add(reason);
   }
 
   /** The view rendered a frame (onFirstFrameRender). Only counts after the intent. */
@@ -283,6 +502,7 @@ export class PlaybackSession {
       if (this.firstFrameAt != null && this.wantPlay && this.stallSince == null) {
         this.stallSince = now;
         this.stallCount += 1;
+        this.emitStall("start", now);
       }
       return;
     }
@@ -370,6 +590,8 @@ export class PlaybackSession {
     // A sign that ended without a playable file is not an abandoned startup.
     const signBlocked = this.signOutcome != null && this.signOutcome !== "ok" && this.signOutcome !== "pending";
     const rebufferBase = this.watchMs + this.stallMs;
+    const signMs =
+      this.meta.surface === "match" && !this.resumed && this.sourceAt != null ? this.sourceAt - this.openedAt : null;
     return {
       ...this.meta,
       sourceKind: this.sourceKind,
@@ -379,8 +601,7 @@ export class PlaybackSession {
       resumed: this.resumed,
       endReason,
       sessionMs: now - this.openedAt,
-      signMs:
-        this.meta.surface === "match" && !this.resumed && this.sourceAt != null ? this.sourceAt - this.openedAt : null,
+      signMs,
       timeToFirstFrameMs: ttff,
       startupAbandoned: this.intentAt != null && this.firstFrameAt == null && !signBlocked && !this.unrecovered,
       watchMs: this.watchMs,
@@ -400,6 +621,87 @@ export class PlaybackSession {
       switchCount: this.switchCount,
       switchLatencyMs: median(this.switchLatencies),
       switchLatencyMaxMs: this.switchLatencies.length > 0 ? Math.max(...this.switchLatencies) : null,
+      switchSwapCount: this.switchModes.swap,
+      switchSeekCount: this.switchModes.seek,
+      switchDipCount: this.switchModes.dip,
+      syncResidualP50Ms: this.residuals.percentile(50),
+      syncResidualP95Ms: this.residuals.percentile(95),
+      syncSamples: this.residuals.count,
+      decoderCapEvents: this.decoderCapEvents,
+      decoderCapReasons: this.decoderCapReasons.size > 0 ? [...this.decoderCapReasons].sort().join(",") : null,
+      ...this.qualitySummary(ttff, signMs),
+    };
+  }
+
+  private qualitySummary(
+    ttff: number | null,
+    signMs: number | null,
+  ): Pick<
+    PlaybackSessionSummary,
+    | "qualityPreference"
+    | "settingsVersion"
+    | "settingsSource"
+    | "adaptiveEnabled"
+    | "networkKey"
+    | "connectionExpensive"
+    | "startTarget"
+    | "startReason"
+    | "startRendition"
+    | "startFallback"
+    | "playbackProfile"
+    | "finalRendition"
+    | "qualitySwitchCount"
+    | "qualityStepDownCount"
+    | "qualityStepUpCount"
+    | "qualitySwitches"
+    | "qualitySwitchesTruncated"
+    | "qualitySwitchLatencyMs"
+    | "qualitySwitchLatencyMaxMs"
+    | "msOn720"
+    | "msOn360"
+    | "msOnOriginal"
+    | "stallsBeforeStepDown"
+    | "stallMsBeforeStepDown"
+    | "stallsAfterStepDown"
+    | "stallMsAfterStepDown"
+    | "qualityLockedLow"
+    | "qualityCapReached"
+    | "qualitySteppedDown"
+    | "playerStartupMs"
+  > {
+    const q = this.quality;
+    const before = this.beforeStepDown;
+    return {
+      qualityPreference: q?.qualityPreference ?? null,
+      settingsVersion: q?.settingsVersion ?? null,
+      settingsSource: q?.settingsSource ?? null,
+      adaptiveEnabled: q?.adaptiveEnabled ?? null,
+      networkKey: q?.networkKey ?? null,
+      connectionExpensive: q?.connectionExpensive ?? null,
+      startTarget: q?.startTarget ?? null,
+      startReason: q?.startReason ?? null,
+      startRendition: this.startRendition,
+      startFallback: this.resumed ? null : q != null && this.startRendition != null && this.startRendition !== q.startTarget,
+      playbackProfile: this.playbackProfile,
+      finalRendition: this.currentRendition,
+      qualitySwitchCount: this.qualitySwitchCount,
+      qualityStepDownCount: this.qualityStepDowns,
+      qualityStepUpCount: this.qualityStepUps,
+      qualitySwitches: this.qualitySwitches.slice(0, QUALITY_SWITCHES_KEPT),
+      qualitySwitchesTruncated: this.qualitySwitchCount > QUALITY_SWITCHES_KEPT,
+      qualitySwitchLatencyMs: median(this.qualityLatencies),
+      qualitySwitchLatencyMaxMs: this.qualityLatencies.length > 0 ? Math.max(...this.qualityLatencies) : null,
+      msOn720: this.msOn["720"],
+      msOn360: this.msOn["360"],
+      msOnOriginal: this.msOn.original,
+      stallsBeforeStepDown: before?.count ?? null,
+      stallMsBeforeStepDown: before?.ms ?? null,
+      stallsAfterStepDown: before ? this.stallCount - before.count : null,
+      stallMsAfterStepDown: before ? this.stallMs - before.ms : null,
+      qualityLockedLow: this.lockedLow,
+      qualityCapReached: this.capReached,
+      qualitySteppedDown: this.steppedDownInScreen || before !== null,
+      playerStartupMs: ttff !== null && signMs !== null ? Math.max(0, ttff - signMs) : null,
     };
   }
 
@@ -409,11 +711,15 @@ export class PlaybackSession {
     this.stallMs += ms;
     this.longestStallMs = Math.max(this.longestStallMs, ms);
     this.stallSince = null;
+    this.emitStall("end", now);
   }
 
   private stopWatchClock(now: number): void {
     if (this.playingSince == null) return;
-    this.watchMs += now - this.playingSince;
+    const ms = now - this.playingSince;
+    this.watchMs += ms;
+    // Watch time per served rendition (unbucketed before any attach: a reel).
+    if (this.currentRendition) this.msOn[this.currentRendition] += ms;
     this.playingSince = null;
   }
 }
@@ -444,18 +750,59 @@ export function outcomeOf(
  * the thing that breaks playback (a doubled tracking module in a component
  * test may not even provide captureMessage).
  */
+/** `video.playback.startup_bucket`, from `playerStartupMs`. */
+export function startupBucket(ms: number | null): string {
+  if (ms === null) return "none";
+  if (ms < 1000) return "lt1s";
+  if (ms < 2000) return "1to2s";
+  if (ms < 2500) return "2to2.5s";
+  if (ms < 3000) return "2.5to3s";
+  if (ms < 5000) return "3to5s";
+  return "gte5s";
+}
+
+/** `video.playback.rebuffer_bucket`, from `rebufferRatio`. */
+export function rebufferBucket(ratio: number | null): string {
+  if (ratio === null) return "none";
+  if (ratio === 0) return "0";
+  if (ratio < 0.01) return "lt1pct";
+  if (ratio < 0.02) return "1to2pct";
+  if (ratio < 0.05) return "2to5pct";
+  return "gte5pct";
+}
+
+/** The Discover dimensions of one session (string values only). */
+export function playbackTags(s: PlaybackSessionSummary): Record<string, string> {
+  const match = s.surface === "match";
+  const rendition = (r: string | null) => (match ? (r ?? "unknown") : "none");
+  return {
+    "video.playback.surface": s.surface,
+    "video.playback.source": s.sourceKind ?? "unknown",
+    "video.playback.network": s.networkType ?? "unknown",
+    "video.playback.outcome": outcomeOf(s),
+    // The player mode only means something for the match player (#53 review N1).
+    ...(match ? { "video.playback.mode": s.playerMode ?? "single" } : null),
+    "video.playback.rendition": rendition(s.startRendition),
+    "video.playback.rendition_final": rendition(s.finalRendition),
+    "video.playback.start_reason": (match && s.startReason) || "none",
+    "video.playback.quality_pref": (match && s.qualityPreference) || "none",
+    "video.playback.stepdown": match && s.qualitySteppedDown ? "stall" : "none",
+    // Discover filters tags only: a continuation's start fields are not a startup.
+    "video.playback.resumed": s.resumed ? "true" : "false",
+    "video.playback.network_key": (match && s.networkKey) || "none",
+    "video.playback.stalled": s.stallCount > 0 ? "yes" : "no",
+    "video.playback.startup_bucket": startupBucket(s.playerStartupMs),
+    "video.playback.rebuffer_bucket": rebufferBucket(s.rebufferRatio),
+  };
+}
+
 export function reportPlaybackSession(s: PlaybackSessionSummary): void {
   const capture = (tracking as Partial<typeof tracking>).captureMessage;
   if (typeof capture !== "function") return;
   try {
     capture("Video playback session", {
       level: "info",
-      tags: {
-        "video.playback.surface": s.surface,
-        "video.playback.source": s.sourceKind ?? "unknown",
-        "video.playback.network": s.networkType ?? "unknown",
-        "video.playback.outcome": outcomeOf(s),
-      },
+      tags: playbackTags(s),
       extra: { ...s },
     });
   } catch {

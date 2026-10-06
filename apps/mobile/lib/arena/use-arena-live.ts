@@ -241,7 +241,8 @@ export interface UseArenaLiveResult {
   /**
    * Whether the server's current live session (started elsewhere) was
    * declined: the phone could not follow it and will not try again until the
-   * server reads false or the athlete chooses here (round 5, A1). The phone
+   * server reads false or the athlete chooses here (round 5, A1), and over
+   * once this phone's own live write lands (jits-smgb). The phone
    * then draws offline while the server is live elsewhere, by design.
    */
   adoptionDeclined: () => boolean;
@@ -381,7 +382,9 @@ export function useArenaLive({
    * A live session started elsewhere that this phone declined to follow
    * (round 5, A1): the intent sequence at which it was declined, or null.
    * Not adopted again until the server reads false or the athlete makes a
-   * new choice here (an explicit intent newer than it).
+   * new choice here (an explicit intent newer than it). Forgotten when this
+   * phone's own live write lands: the server's `true` is then its own
+   * (jits-smgb).
    */
   const adoptDeclinedAtRef = React.useRef<number | null>(null);
   onResumeParkedRef.current = onResumeParked;
@@ -481,6 +484,9 @@ export function useArenaLive({
       actualRef.current = true;
       clearFailedRef.current = false;
       clearRetryDelayRef.current = CLEAR_RETRY_MS;
+      // The server's `true` is this phone's own now, not a session elsewhere
+      // that it declined: the decline no longer applies (jits-smgb).
+      adoptDeclinedAtRef.current = null;
       setIsLive(true);
 
       // Intent can flip during that round trip. Tracking now would raise a

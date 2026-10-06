@@ -2548,4 +2548,40 @@ describe("round 6", () => {
     expect(out[1]).not.toBe("adopted");
     expect(autoLive).not.toHaveBeenCalled();
   });
+
+  it("jits-smgb: a declined web session, then the athlete's own go-live lands here: the server's true is this phone's, the decline is over", async () => {
+    const autoLive = jest.fn(async () => "live" as const);
+    const { result } = mount({ autoLive, canAdopt: () => false });
+    registerArenaController({
+      toggle: jest.fn(),
+      goOffline: () => result.current.goOffline(),
+      goLive: () => result.current.goLive(),
+      committed: () => result.current.committed(),
+      ensureOffline: () => result.current.ensureOffline(),
+      sendChallenge: jest.fn(),
+      cancelOutgoing: jest.fn(),
+      clearCap: jest.fn(),
+      tuckIncoming: jest.fn(),
+      reopenIncoming: jest.fn(),
+    });
+    await act(async () => {
+      expect(await result.current.checkServer(() => Promise.resolve(true))).toBeNull();
+      await flush();
+    });
+    expect(result.current.adoptionDeclined()).toBe(true);
+    // The athlete ends it here (false lands), then goes live here (true lands).
+    await act(async () => {
+      await liveSwitch.goOffline();
+      await flush();
+    });
+    expect(result.current.adoptionDeclined()).toBe(true);
+    await act(async () => {
+      await liveSwitch.goLive();
+      await flush();
+    });
+    expect(lastFlagWrite()).toMatchObject({ lookingForRanked: true });
+    expect(result.current.committed()).toEqual({ live: true, settled: true });
+    expect(result.current.adoptionDeclined()).toBe(false);
+    expect(autoLive).not.toHaveBeenCalled();
+  });
 });

@@ -15,3 +15,5 @@ export * from "./stats-window";
 export * from "./invite-codes";
 export * from "./invite-share";
 export * from "./invite-copy";
+export * from "./playback-quality";
+export * from "./playback-quality-controller";

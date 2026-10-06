@@ -298,7 +298,10 @@ describe("FilmRoomScreen", () => {
       "app/(app)/film-room.tsx",
       "app/(app)/video/[id].tsx",
       "app/(app)/match-detail/[matchId].tsx",
-      ...fs.readdirSync(path.join(root, "components/film-room")).map((f) => `components/film-room/${f}`),
+      // Recursive: the multi-angle player's components live in a subfolder.
+      ...(fs.readdirSync(path.join(root, "components/film-room"), { recursive: true }) as string[])
+        .filter((f) => /\.tsx?$/.test(f))
+        .map((f) => `components/film-room/${f}`),
       "components/match-detail/ai-breakdown.tsx",
       "components/match-detail/key-moments.tsx",
       "components/match-detail/film-angles.tsx",
