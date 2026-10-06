@@ -221,7 +221,21 @@ export function createInvite(supabase: Client, entryPoint: InviteEntryPoint | nu
   return rpc(supabase, "create_invite", { p_entry_point: entryPoint }, parseChallengeInvite);
 }
 
-export type InviteEntryPoint = "arena" | "profile" | "verdict" | "home" | "friends";
+/**
+ * Where an invite was created from (`invites.entry_point`, jr_be spec 016).
+ * `matches` is the Matches tab zero state's Challenge a friend (C-Z7,
+ * specs/matches-tab PM13); the backend accepts it only from jr_be B5
+ * (`jr_be-gpz`, migrations `20261008200000..200300`): `create_invite` raises
+ * `invalid_entry_point` on an older backend, so B5 must be on prod first.
+ */
+export const INVITE_ENTRY_POINTS = ["arena", "profile", "verdict", "home", "friends", "matches"] as const;
+
+export type InviteEntryPoint = (typeof INVITE_ENTRY_POINTS)[number];
+
+/** The `from` route param as an entry point, or null for a missing or unknown value. */
+export function parseInviteEntryPoint(from: unknown): InviteEntryPoint | null {
+  return typeof from === "string" && (INVITE_ENTRY_POINTS as readonly string[]).includes(from) ? (from as InviteEntryPoint) : null;
+}
 
 export function refreshInviteCode(supabase: Client, inviteId: string) {
   return rpc(supabase, "refresh_invite_code", { p_invite_id: inviteId }, (d) => {

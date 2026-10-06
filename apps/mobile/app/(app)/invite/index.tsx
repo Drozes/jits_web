@@ -6,7 +6,7 @@
 import * as React from "react";
 import { ActivityIndicator, Alert, Linking, ScrollView, Text, View } from "react-native";
 import { useLocalSearchParams, useNavigation, useRouter, type Href } from "expo-router";
-import type { InviteEntryPoint } from "@jits/shared/api/invites";
+import { parseInviteEntryPoint } from "@jits/shared/api/invites";
 import { BOOKED_COPY, BOOKING_CLOSED_COPY, LOCATION_DENIED_COPY, START_AVAILABLE_COPY } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
 import { Plate } from "@/components/ui/elo-system";
@@ -21,15 +21,15 @@ import { isInArenaMatch } from "@/lib/arena/arena-store";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAuth } from "@/lib/auth/hooks";
 
-const ENTRY_POINTS: readonly InviteEntryPoint[] = ["arena", "profile", "verdict", "home", "friends"];
-
 export default function InviteScreen() {
   const router = useRouter();
   const tokens = useThemedTokens();
   const { athlete } = useAuth();
   const me = athlete?.first_name || athlete?.display_name || "You";
   const { from } = useLocalSearchParams<{ from?: string }>();
-  const entry = ENTRY_POINTS.includes(from as InviteEntryPoint) ? (from as InviteEntryPoint) : null;
+  // `/invite?from=<entry>` attributes the invite (`invites.entry_point`);
+  // `matches` is the Matches zero state's Challenge a friend (needs jr_be B5).
+  const entry = parseInviteEntryPoint(from);
   // Until the flag is known neither variant shows (no Start match flash).
   const { required: locationRequired, known: flagKnown } = useMatchLocationFlag();
   const showStart = flagKnown && !locationRequired;

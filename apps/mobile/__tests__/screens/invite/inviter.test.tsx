@@ -25,7 +25,7 @@ jest.mock("@/lib/arena/match-location-flag", () => ({
 
 jest.mock("expo-router", () => ({
   useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
-  useLocalSearchParams: () => ({ from: "arena" }),
+  useLocalSearchParams: () => ({ from: mockFrom.value }),
   useNavigation: () => ({
     addListener: (name: string, l: Listener) => {
       mockListeners[name] = l;
@@ -52,6 +52,7 @@ jest.mock("@/components/invite/open-challenges", () => {
   return { OpenChallenges: ({ title }: { title?: string }) => R.createElement(RN.Text, { testID: "open-challenges" }, title ?? "open") };
 });
 const mockInMatch = { value: false };
+const mockFrom: { value: string | undefined } = { value: "arena" };
 jest.mock("@/lib/arena/arena-store", () => ({ isInArenaMatch: () => mockInMatch.value }));
 
 const mockHook = {
@@ -65,7 +66,13 @@ const mockHook = {
   wouldWithdrawOnLeave: jest.fn(() => true),
   start: jest.fn(),
 };
-jest.mock("@/lib/invites/use-challenge-invite", () => ({ useChallengeInvite: () => mockHook }));
+const mockEntry = jest.fn();
+jest.mock("@/lib/invites/use-challenge-invite", () => ({
+  useChallengeInvite: (entry: unknown) => {
+    mockEntry(entry);
+    return mockHook;
+  },
+}));
 
 import InviteScreen from "@/app/(app)/invite/index";
 
@@ -84,6 +91,22 @@ beforeEach(() => {
   mockHook.codeStale = false;
   mockHook.wouldWithdrawOnLeave.mockReturnValue(true);
   mockLocationRequired = true;
+  mockFrom.value = "arena";
+});
+
+describe("entry point (from param)", () => {
+  it.each([
+    ["arena", "arena"],
+    ["home", "home"],
+    ["matches", "matches"],
+    ["friends", "friends"],
+    ["film-room", null],
+    [undefined, null],
+  ])("from=%s creates the invite with entry point %s", (from, expected) => {
+    mockFrom.value = from;
+    render(<InviteScreen />);
+    expect(mockEntry).toHaveBeenCalledWith(expected);
+  });
 });
 
 it("too_many_open_invites lists the open challenges so one can be withdrawn", () => {
