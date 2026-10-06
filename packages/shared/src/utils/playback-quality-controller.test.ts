@@ -405,6 +405,44 @@ describe("QualityController angle changes", () => {
     expect(again.d).toEqual({ kind: "step_down", from: "720", to: "360", reason: "stall_long" });
   });
 
+  it("review R2-M1: an angle landing that supersedes a step-down sets target to what it serves (no silent up-skip)", () => {
+    const c = make();
+    c.sourceAttached("720", BOTH, now);
+    at(now + 5000);
+    c.stallStarted(now);
+    const { d } = run(c, now + 3000);
+    c.switchIssued(d!, now);
+    c.stallEnded(now);
+    // The new angle was signed at 360 and serves 360: level and target agree.
+    c.angleChanged(BOTH, now + 100, "360");
+    expect(c.level).toBe("360");
+    expect(c.target).toBe("360");
+    // Superseded while the new angle serves 720: both 720.
+    const c2 = make();
+    c2.sourceAttached("720", BOTH, now);
+    at(now + 5000);
+    c2.stallStarted(now);
+    const r2 = run(c2, now + 3000);
+    c2.switchIssued(r2.d!, now);
+    c2.angleChanged(BOTH, now + 100, "720");
+    expect(c2.level).toBe("720");
+    expect(c2.target).toBe("720");
+  });
+
+  it("invariant: with nothing outstanding after a landing, target never exceeds level unless the start target fell back", () => {
+    // A fallback start (720 wanted, only 360 on this angle) keeps target 720 by design.
+    const fb = make({ target: "720", available: { "720": false, "360": true } });
+    fb.sourceAttached("360", { "720": false, "360": true }, now);
+    expect([fb.level, fb.target]).toEqual(["360", "720"]);
+    // Any landing of a decision leaves target === level.
+    const c = make({ target: "360" });
+    c.sourceAttached("360", BOTH, now);
+    const { d } = run(c, now + 60_000);
+    c.switchIssued(d!, now);
+    c.switchLanded(BOTH, now + 300, "720");
+    expect([c.level, c.target]).toEqual(["720", "720"]);
+  });
+
   it("review H2: angleChanged clears an outstanding decision; a later step-up is possible", () => {
     const c = make({ target: "360" });
     c.sourceAttached("360", BOTH, now);

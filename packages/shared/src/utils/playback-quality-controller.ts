@@ -266,9 +266,14 @@ export class QualityController {
   angleChanged(available: Availability, now: number, served?: ServedRendition): void {
     this.accrue(now);
     // An angle landing supersedes any quality swap still outstanding.
-    if (this.outstanding !== null) this.switchFailed(now);
+    const superseded = this.outstanding !== null;
+    if (superseded) this.switchFailed(now);
     this.available = { ...available };
     this.follow(served);
+    // The superseded decision never served: what this angle serves is both the
+    // level and the next sign's target, so nothing later skips up without a
+    // step-up decision (review R2-M1).
+    if (superseded && (served === "720" || served === "360")) this._target = served;
     this.stallStarts = [];
     this.stallOpenAt = null;
     this.smoothAccrued = 0;
