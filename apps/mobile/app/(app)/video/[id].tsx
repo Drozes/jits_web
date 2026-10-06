@@ -328,11 +328,16 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                   // The route moves when activeId does (the effect above).
                   routeRef.current = { id: other, t: moved.t, approx: exact ? "0" : "1", seq: sw.seq + 1, entryId };
                   // The offsets let the engine map the two angles' times
-                  // continuously (keep_watching); without them it runs in_place.
-                  playback.switchAngle(other, moved.t, {
-                    approximate: !exact,
-                    offsets: { fromMs: from?.sync_offset_ms ?? null, toMs: to?.sync_offset_ms ?? null },
-                  });
+                  // continuously (keep_watching). Only angles that both
+                  // carry an offset (any sync source) are mapped; an
+                  // unsynced pair passes none and runs in_place.
+                  const fromMs = from?.sync_offset_ms;
+                  const toMs = to?.sync_offset_ms;
+                  const offsets =
+                    typeof fromMs === "number" && Number.isFinite(fromMs) && typeof toMs === "number" && Number.isFinite(toMs)
+                      ? { fromMs, toMs }
+                      : undefined;
+                  playback.switchAngle(other, moved.t, offsets ? { approximate: !exact, offsets } : { approximate: !exact });
                   // The note shows when an approximate switch lands, not at the tap.
                   setApproxAt(null);
                   setNoteQueued(false);
