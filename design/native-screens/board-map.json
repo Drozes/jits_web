@@ -1122,6 +1122,7 @@
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/video/**",
         "apps/mobile/components/film-room/angle-switcher.tsx",
+        "apps/mobile/components/film-room/angle-view-stack.tsx",
         "apps/mobile/components/film-room/film-back-button.tsx",
         "apps/mobile/components/film-room/film-chip.ts",
         "apps/mobile/components/film-room/film-scrim.tsx",

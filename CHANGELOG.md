@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## OTA "Keep-watching angle switch" (runtime 0.5.0), 2026-10-06
+
+Production OTA group `21ac992e-6b21-4784-82f4-9d05bc522667` from jits_web `main` `90fe9d4f` (release PR #71: #70, #69). JS-only, non-critical. Rollback target: `7e1d3be8-905e-47f4-bb13-9b05fa41ce51`. Every prod angle pair is currently unsynced (no video has a sync offset yet), so switches run as approximate keep-watching switches (the 80 ms dip at the landing).
+
 ### Match player: keep-watching angle switch, phase 1.5 (jits-xfvd.19)
 
 Owner feedback after phase 1: "When I switch, the video still stalls for a second." Now angle 1 keeps playing, with its audio, until angle 2 is ready and in step; then a crossfade. JS-only on mobile (OTA on runtime 0.5.0: a second `useVideoPlayer`, `VideoView` `surfaceType` at mount, `muted`, `volume`, `bufferOptions`, `replaceAsync(null)` and `expo-device` are all in build 25). Contract: `research/2026-10-multi-angle-playback/07-keep-watching-contract.md`. No video bytes before the tap (no preload on cellular). Rollback: `KEEP_WATCHING_ENABLED = false` in `apps/mobile/lib/match-detail/keep-watching.ts` restores phase 1 exactly.
