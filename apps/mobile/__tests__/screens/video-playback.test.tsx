@@ -150,6 +150,20 @@ jest.mock("expo-video", () => {
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 
+/**
+ * The device the engine reads its tier from: the test env's own by default;
+ * `forceInPlace()` makes it a warm-only Android, so every switch falls back
+ * to the phase-1 in-place switch (contract section 9 rule 2).
+ */
+const mockDeviceInfo: { current: { os: string; apiLevel: number | null; totalMemory: number | null; yearClass: number | null } | null } = { current: null };
+jest.mock("@/lib/video/multi-angle/device-tier", () => {
+  const actual = jest.requireActual("@/lib/video/multi-angle/device-tier");
+  return { ...actual, readDeviceInfo: () => mockDeviceInfo.current ?? actual.readDeviceInfo() };
+});
+function forceInPlace() {
+  mockDeviceInfo.current = { os: "android", apiLevel: 21, totalMemory: null, yearClass: null };
+}
+
 const mockCaptureMessage = jest.fn();
 jest.mock("@/lib/error-tracking/sentry", () => ({
   captureMessage: (...a: unknown[]) => mockCaptureMessage(...a),
@@ -364,6 +378,7 @@ beforeEach(() => {
   mockSwitchState = null;
   mockSwitchCalls.length = 0;
   mockPlaybackPatch = null;
+  mockDeviceInfo.current = null;
   // The route follows setParams, like expo-router (tests rerender to apply it).
   mockSetParams.mockImplementation((p: { id?: string }) => {
     if (p.id) mockId = p.id;
@@ -916,12 +931,22 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(h(utils.getByLabelText("YOUR ANGLE"))).toBe(44);
   });
 
-  it("switches angle in place, carrying the current time", async () => {
+  it("an unsynced pair keeps watching as an approximate switch, carrying the current time", async () => {
     const utils = await renderLoadedPlayer();
     statusAt(42.6);
     expect(utils.getByLabelText("YOUR ANGLE").props.accessibilityState).toMatchObject({ selected: true });
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
-    // No sync offsets: carry the exact position (never floored), flagged approximate.
+    // No sync offsets: carry the exact position (never floored), flagged
+    // approximate, with null offsets; the route waits for the landing.
+    expect(mockSwitchCalls.at(-1)).toEqual(["vid-2", 42.6, { approximate: true, offsets: { fromMs: null, toMs: null } }]);
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
+  it("in place (warm-only fallback) the route moves at the tap with the carried time", async () => {
+    forceInPlace();
+    const utils = await renderLoadedPlayer();
+    statusAt(42.6);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
     expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "42.600", approx: "1" });
   });
 
@@ -1065,7 +1090,8 @@ describe("angle switch in place (multi-angle P0)", () => {
     return utils;
   }
 
-  it("an unsynced switch mid-play runs in place: the ms position, play state and speed carry, no remount, no new sign", async () => {
+  it("in place (warm-only fallback) mid-play: the ms position, play state and speed carry, no remount, no new sign", async () => {
+    forceInPlace();
     const utils = await renderTwoAngles();
     fireEvent.press(utils.getByLabelText("Playback speed, 1x"));
     statusAt(42.637);
@@ -1085,10 +1111,11 @@ describe("angle switch in place (multi-angle P0)", () => {
     // The new item reaches the target: landed.
     timeTo(42.637);
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
-    // (The synced, keep-watching version is in "keep-watching switch on the real engine".)
+    // (The keep-watching versions are in "keep-watching switch on the real engine".)
   });
 
-  it("a paused switch lands paused", async () => {
+  it("in place (warm-only fallback): a paused switch lands paused", async () => {
+    forceInPlace();
     const utils = await renderTwoAngles();
     statusAt(12);
     fireEvent.press(utils.getByLabelText("Pause"));
@@ -1099,12 +1126,12 @@ describe("angle switch in place (multi-angle P0)", () => {
     expect(lastPlayer().seeks.at(-1)).toBe(12);
     expect(lastPlayer().play).not.toHaveBeenCalled();
     expect(utils.getByLabelText("Play")).toBeTruthy();
-    // Unsynced: the switch is flagged approximate (the note shows at landing).
-    // No offsets on either angle: none are passed, so the engine runs in_place.
-    expect(mockSwitchCalls.at(-1)).toEqual(["vid-2", 12, { approximate: true }]);
+    // Unsynced: flagged approximate, with null offsets (the note shows at landing).
+    expect(mockSwitchCalls.at(-1)).toEqual(["vid-2", 12, { approximate: true, offsets: { fromMs: null, toMs: null } }]);
   });
 
-  it("holds the outgoing frame instead of flashing the new angle's poster", async () => {
+  it("in place (warm-only fallback): holds the outgoing frame instead of flashing the new angle's poster", async () => {
+    forceInPlace();
     const utils = await renderTwoAngles({ poster: true });
     act(() => mockViewProps.current!.onFirstFrameRender());
     expect(utils.queryByTestId("video-poster")).toBeNull();
@@ -1113,7 +1140,8 @@ describe("angle switch in place (multi-angle P0)", () => {
     expect(utils.queryByTestId("video-poster")).toBeNull();
   });
 
-  it("sends ONE telemetry event for the screen, with the switch count and tap-to-frame latency", async () => {
+  it("in place (warm-only fallback): sends ONE telemetry event for the screen, with the switch count and tap-to-frame latency", async () => {
+    forceInPlace();
     const now = jest.spyOn(Date, "now");
     try {
       const utils = await renderTwoAngles();
@@ -1136,7 +1164,7 @@ describe("angle switch in place (multi-angle P0)", () => {
       utils.unmount();
       expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
       const payload = mockCaptureMessage.mock.calls[0][1];
-      expect(payload.extra).toMatchObject({ videoId: "vid-1", angle: "mine", angleCount: 2, switchCount: 2, switchLatencyMs: 240, switchLatencyMaxMs: 240 });
+      expect(payload.extra).toMatchObject({ videoId: "vid-1", angle: "mine", angleCount: 2, switchCount: 2, switchLatencyMs: 240, switchLatencyMaxMs: 240, switchFallbackCount: 2 });
     } finally {
       now.mockRestore();
     }
@@ -1158,7 +1186,8 @@ describe("angle switch in place (multi-angle P0)", () => {
 });
 
 describe("route id changes after a switch (review m4)", () => {
-  it("the route catching up with setParams reloads nothing, even after A, B, A", async () => {
+  it("the route catching up with setParams reloads nothing, even after A, B, A (in place)", async () => {
+    forceInPlace();
     const utils = await renderLoadedPlayer();
     statusAt(20);
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
@@ -1544,6 +1573,8 @@ describe("angle switch review fixes (jits-xfvd.16)", () => {
 describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
   const HIDDEN = { includeHiddenElements: true } as const;
   const OFFSET_S = 2.5;
+  /** The current test's angle 2 offset (0 for an unsynced pair: map is the identity). */
+  let offsetS = OFFSET_S;
   let announce: jest.SpyInstance;
   beforeEach(() => {
     jest.useFakeTimers();
@@ -1565,8 +1596,9 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
   };
 
   /** vid-1 signs at once; vid-2's sign answers with `vid2` (default: ready, with a poster when asked). */
-  async function renderEngine(opts: { vid2?: () => Promise<unknown>; poster?: boolean } = {}) {
+  async function renderEngine(opts: { vid2?: () => Promise<unknown>; poster?: boolean; unsynced?: boolean } = {}) {
     mockSwitchState = null;
+    offsetS = opts.unsynced ? 0 : OFFSET_S;
     const signed = (vid: string) => ({
       ok: true,
       data: { ...playableInMatch(`https://signed.example/${vid}.mp4`).data, posterUrl: opts.poster ? `https://signed.example/${vid}.jpg` : null },
@@ -1575,7 +1607,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
       vid === "vid-2" && opts.vid2 ? opts.vid2() : Promise.resolve(signed(vid)),
     );
     mockUseMatchDetail.mockImplementation((id: string | undefined) =>
-      id === MATCH ? detailView(2, [], AUDIO_SYNC) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
+      id === MATCH ? detailView(2, [], opts.unsynced ? {} : AUDIO_SYNC) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
     );
     mockGetVideoAnalysis.mockResolvedValue({ ok: true, data: null });
     const utils = render(React.createElement(MatchVideoScreen));
@@ -1591,7 +1623,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
   let tapA = 0;
   let tapRate = 1;
   /** Angle 1's time now (extrapolated from the tap) mapped onto angle 2. */
-  const mappedNow = () => tapA - OFFSET_S + ((Date.now() - tapAt) / 1000) * tapRate;
+  const mappedNow = () => tapA - offsetS + ((Date.now() - tapAt) / 1000) * tapRate;
 
   /** Angle 1 at `at` s, then a tap on angle 2. */
   async function tapAngle2(utils: ReturnType<typeof render>, at = 42.6, rate = 1) {
@@ -1733,6 +1765,51 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     await advance(500);
     expect(announce).toHaveBeenCalledTimes(1);
     expect(announce).toHaveBeenCalledWith("Could not load M. Park's angle. Tap it to try again.");
+  });
+
+  it("an unsynced pair keeps watching as an approximate switch: Switching angle pill, lands once angle 2 starts, dip, route approx, note after landing", async () => {
+    const utils = await renderEngine({ unsynced: true });
+    const A = lastPlayer();
+    await tapAngle2(utils, 42.6);
+    expect(mockSwitchCalls.at(-1)).toEqual(["vid-2", 42.6, { approximate: true, offsets: { fromMs: null, toMs: null } }]);
+    const B = incomingPlayer();
+    await waitFor(() => expect(replacedUrls(B)).toEqual(["https://signed.example/vid-2.mp4"]));
+    expect(A.pause).not.toHaveBeenCalled();
+    await advance(250);
+    expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Switching angle");
+    // Angle 1 still on screen and live; no note yet.
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
+    expect(utils.queryByTestId("player-approx-note")).toBeNull();
+    await landPlaying(B);
+    // LAND: the dip (approximate), angle 2's time on the clock and route.
+    expect(utils.getByTestId("angle-view-dip", HIDDEN)).toBeTruthy();
+    expect(mockSetParams).toHaveBeenCalledTimes(1);
+    expect(mockSetParams.mock.calls[0][0]).toMatchObject({ id: "vid-2", approx: "1" });
+    expect(Number(mockSetParams.mock.calls[0][0].t)).toBeCloseTo(B.currentTime, 3);
+    expect(announce).toHaveBeenCalledWith("M. Park's angle. Approximate sync.");
+    // The note waits for the pill to go, then shows.
+    await advance(500);
+    await advance(500);
+    expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
+    expect(utils.getByTestId("player-approx-note")).toBeTruthy();
+    utils.unmount();
+    expect(mockCaptureMessage.mock.calls.at(-1)?.[1].extra).toMatchObject({ switchKeepWatchingCount: 1 });
+  });
+
+  it("an unsynced pair, paused: lands on angle 2's first frame at the carried time", async () => {
+    const utils = await renderEngine({ unsynced: true });
+    timeOn(lastPlayer(), 12);
+    fireEvent.press(utils.getByLabelText("Pause"));
+    await tapAngle2(utils, 12);
+    const B = incomingPlayer();
+    await waitFor(() => expect(B.seeks.length).toBeGreaterThan(0));
+    expect(B.seeks.at(-1)).toBeCloseTo(12, 6);
+    readyOn(B);
+    act(() => mockViewPropsById["video-player-incoming"].onFirstFrameRender());
+    await flush();
+    expect(mockViewPropsById["video-player"].player).toBe(B);
+    expect(B.play).not.toHaveBeenCalled();
+    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "12.000", approx: "1" });
   });
 
   it("paused: angle 2 seeks to the exact moment and lands on its first frame after the seek; the route names its time", async () => {
