@@ -1,11 +1,12 @@
 import * as React from "react";
 import { AppState } from "react-native";
 import { useVideoPlayer, type VideoPlayer } from "expo-video";
-import { translateAngleTime } from "@jits/shared/utils";
+import { translateAngleTime, type QualityDecision } from "@jits/shared/utils";
 import { getMatchVideoPlaybackResult, type MatchVideoPlayback } from "@jits/shared/api/queries";
 import { supabase } from "@/lib/supabase/client";
 import { haptics } from "@/lib/motion";
 import { usePlaybackTelemetry, type PlaybackTelemetry } from "@/lib/video/use-playback-telemetry";
+import { servedOf, useQualitySession } from "@/lib/video/quality/use-quality-session";
 import type { PlaybackPhase, PlayerStateLabel } from "@/lib/match-detail/use-video-playback";
 import { DriftFilter, FRAME_S, SWAP_MAX_ERROR_S, correctionFor, extrapolate } from "./sync-controller";
 import { deviceTier, type DeviceInfo, type TierVerdict } from "./device-tier";
@@ -32,9 +33,19 @@ import { isHard, offsetOf, referenceAngleId, syncTrust, type AngleVideo, type Sy
  * clock, so it does not jump on a switch; each player's local time is the
  * timeline translated through the sync offsets (approximate for a clock
  * angle).
+ *
+ * Adaptive quality (jits-xfvd.12): the SAME start selection, settings,
+ * preference and controller as the single player (`useQualitySession`),
+ * one for the screen, fed by the visible slot. Every slot signs at the
+ * session's rendition. A quality decision reloads every slot at the new
+ * rendition: the visible one in place behind a held frame (resumed at the
+ * current moment, landed once its resume seek lands), the others in the
+ * background (re-seeked by the usual ready path). It is not an angle switch.
  */
 
 export const MAX_ANGLE_PLAYERS = 3;
+/** Never hold a quality reload longer than this (it then lands, or fails without a file). */
+export const QUALITY_SWAP_TIMEOUT_MS = 10_000;
 const TIME_UPDATE_S = 0.25;
 /** Warm players are re-seeked to the current moment this often while playing. */
 export const WARM_NUDGE_MS = 5000;
@@ -233,6 +244,30 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
     deviceTier: tier.tier,
   });
 
+  // ---- adaptive quality (shared policy, never forked) ---------------------
+  const qualitySwapRef = React.useRef<{ slot: number; timers: Array<ReturnType<typeof setTimeout>> } | null>(null);
+  const applyQualityRef = React.useRef<(d: QualityDecision) => boolean>(() => false);
+  const visibleFrameRef = React.useRef(false);
+  const dippedRef = React.useRef(false);
+  const quality = useQualitySession({
+    telemetry,
+    readConditions: () => {
+      const vi = slotsRef.current.findIndex((s) => s.angleId != null && s.angleId === visibleRef.current);
+      const vis = vi >= 0 ? slotsRef.current[vi] : null;
+      const sw = switchRef.current;
+      return {
+        playing: playingRef.current,
+        seeking: holdRef.current != null,
+        rate: rateRef.current,
+        swapInFlight: (sw != null && !sw.done) || dippedRef.current || qualitySwapRef.current != null || !vis?.loaded,
+        frameShown: visibleFrameRef.current,
+      };
+    },
+    apply: (d) => applyQualityRef.current(d),
+  });
+  dippedRef.current = dipped;
+  visibleFrameRef.current = visibleFrame;
+
   // ---- the angle model -------------------------------------------------
   const videos = input.videos;
   const offsetsMap = React.useMemo(() => {
@@ -354,17 +389,31 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
 
   // ---- signing and loading ----------------------------------------------
   const loadSlot = React.useCallback(
-    async (i: number, id: string, opts: { entry: boolean; silent: boolean }) => {
+    async (i: number, id: string, opts: { entry: boolean; silent: boolean; quality?: boolean }) => {
       const slot = slotsRef.current[i];
       const gen = ++slot.generation;
       slot.angleId = id;
       slot.loaded = false;
       if (opts.entry && !opts.silent) setPhase("loading");
-      const result = await getMatchVideoPlaybackResult(supabase, id);
+      // Every slot signs at the session's rendition (the start selection the first time).
+      const rendition = await quality.signTarget();
+      if (!mountedRef.current || gen !== slot.generation) return;
+      const result = await getMatchVideoPlaybackResult(supabase, id, { rendition });
       if (!mountedRef.current || gen !== slot.generation) return;
       const next = phaseFor(result);
       if (opts.entry) telemetry.signOutcome(next === "ready" ? "ok" : next === "loading" ? "pending" : next);
       if (next !== "ready" || !result.ok || !result.data) {
+        if (opts.quality && slot.data) {
+          // A failed quality re-sign is not a dead angle (review M2): the old
+          // file is still on this player, so it stays in use.
+          slot.loaded = true;
+          slot.landAt = null;
+          if (qualitySwapRef.current?.slot === i) failQualityRef.current();
+          setLoadedTick((n) => n + 1);
+          if (visibleRef.current) applyPlan(planFor(visibleRef.current));
+          return;
+        }
+        if (opts.quality && qualitySwapRef.current?.slot === i) failQualityRef.current();
         if (opts.entry) setPhase(next);
         else {
           slot.dead = true;
@@ -373,6 +422,12 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
         return;
       }
       slot.data = result.data;
+      if (id === visibleRef.current) {
+        const served = servedOf(result.data);
+        telemetry.renditionAttached(served.served, result.data.playbackProfile ?? null);
+        // A plain (re-)sign: the level follows the served file now; a quality reload lands later.
+        if (!opts.quality) quality.attached(served.served, served.available);
+      }
       if (opts.entry) {
         setPosterUrl(result.data.posterUrl);
         setMatchId(result.data.matchId ?? null);
@@ -387,10 +442,12 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
         if (gen === slot.generation) onSlotErrorRef.current(i, e instanceof Error ? e.message : String(e));
       }
     },
-    [players, telemetry],
+    [players, telemetry, quality, applyPlan, planFor],
   );
 
   const onSlotErrorRef = React.useRef<(i: number, message: string | null) => void>(() => undefined);
+  const failQualityRef = React.useRef<() => void>(() => undefined);
+  const landQualityRef = React.useRef<() => void>(() => undefined);
 
   // The entry angle signs at once on slot 0, so the screen plays before the
   // match (and its other angles) is known.
@@ -442,6 +499,13 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
       });
       const isEntry = i === 0 && s.angleId === input.entryId;
       const local = isEntry && !planRef.current ? entryStart : fromTimeline(s.angleId, timelineNow());
+      const q = qualitySwapRef.current;
+      if (q && q.slot === i) {
+        // The visible slot's quality reload lands once it reports this moment
+        // (paused: no time updates come, so after the seek settles).
+        s.landAt = local;
+        if (!playingRef.current) q.timers.push(setTimeout(() => landQualityRef.current(), PAUSED_SETTLE_MS));
+      }
       if (local > 0) {
         s.drift.seeked(Date.now());
         if (s.angleId === visibleRef.current) {
@@ -538,6 +602,12 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
     if (sw && !sw.done && sw.to === id && s.landAt != null && Math.abs(local - s.landAt) <= LAND_TOLERANCE_S) {
       landSwitchRef.current();
     }
+    const q = qualitySwapRef.current;
+    if (q && q.slot === i && s.landAt != null && Math.abs(local - s.landAt) <= LAND_TOLERANCE_S) {
+      landQualityRef.current();
+    }
+    // The visible slot's time update is the quality controller's tick.
+    if (id === visibleRef.current) quality.feed();
     const p = planRef.current;
     if (!p || id !== p.masterId) return;
     const t = toTimeline(id, local);
@@ -599,10 +669,12 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
     (next: boolean) => {
       playingRef.current = next;
       setPlayingState(next);
+      // The controller sees the pause BEFORE telemetry closes an open stall (review M3).
+      quality.feed();
       telemetry.playIntent(next);
       if (visibleRef.current) applyPlan(planFor(visibleRef.current));
     },
-    [telemetry, applyPlan, planFor],
+    [telemetry, applyPlan, planFor, quality],
   );
 
   React.useEffect(() => {
@@ -636,6 +708,7 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
       positionRefS.current = t;
       setPositionS(t);
       holdRef.current = { at: t, left: SEEK_HOLD_MAX_UPDATES };
+      quality.feed();
       telemetry.seekRequested();
       const now = Date.now();
       slotsRef.current.forEach((s, i) => {
@@ -649,7 +722,7 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
         });
       });
     },
-    [players, telemetry, fromTimeline],
+    [players, telemetry, fromTimeline, quality],
   );
 
   const toggle = React.useCallback(() => {
@@ -663,6 +736,7 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
       const value = typeof next === "function" ? next(rateRef.current) : next;
       rateRef.current = value;
       setRateState(value);
+      quality.feed();
       if (!playingRef.current) return;
       const p = planRef.current;
       slotsRef.current.forEach((s, i) => {
@@ -674,7 +748,7 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
         });
       });
     },
-    [players],
+    [players, quality],
   );
 
   const stepFrame = React.useCallback(
@@ -721,6 +795,13 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
         setSwitchingTo(null);
         setVisibleFrame(true);
         telemetry.switchLanded();
+        if (target.data) {
+          // The angle on screen changed: its file's rendition is now the one watched,
+          // and the controller follows what this angle serves.
+          const served = servedOf(target.data);
+          telemetry.renditionAttached(served.served, target.data.playbackProfile ?? null);
+          quality.angleChanged(served.served, served.available);
+        }
         input.onSwitchLanded?.(to, approximate);
         if (mode === "dip") {
           if (input.reduceMotion) setDipped(false);
@@ -789,8 +870,77 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
       else sw.timers.push(setTimeout(startTarget, DIP_MS));
       return mode;
     },
-    [players, slotOf, timelineNow, planFor, telemetry, applyPlan, fromTimeline, input],
+    [players, slotOf, timelineNow, planFor, telemetry, applyPlan, fromTimeline, input, quality],
   );
+
+  // ---- quality swaps ---------------------------------------------------------
+  const endQualitySwap = () => {
+    const q = qualitySwapRef.current;
+    if (!q) return null;
+    qualitySwapRef.current = null;
+    q.timers.forEach(clearTimeout);
+    const s = slotsRef.current[q.slot];
+    s.landAt = null;
+    if (mountedRef.current) setHeldFrame(null);
+    return s;
+  };
+  landQualityRef.current = () => {
+    const s = endQualitySwap();
+    if (!s) return;
+    telemetry.qualitySwitchLanded();
+    if (s.data) {
+      const served = servedOf(s.data);
+      quality.landed(served.served, served.available);
+    } else {
+      quality.failed();
+    }
+    quality.feed();
+  };
+  failQualityRef.current = () => {
+    if (!endQualitySwap()) return;
+    quality.failed();
+  };
+  /**
+   * A quality decision: every loaded slot reloads at `d.to`. The visible one
+   * reloads in place behind a held frame of the moment on screen, resumes
+   * there (`onSlotReady`) with play intent, speed and mute restored by the
+   * plan, and lands once that seek lands. Not an angle switch: no
+   * `switchStarted`, no switch mode counted.
+   */
+  applyQualityRef.current = () => {
+    const vis = slotOf(visibleRef.current);
+    if (vis < 0 || !slotsRef.current[vis].data) return false;
+    const T = timelineNow();
+    // The timeline holds here until the reloaded file reports it.
+    holdRef.current = { at: T, left: SEEK_HOLD_MAX_UPDATES };
+    const visId = slotsRef.current[vis].angleId as string;
+    const q = { slot: vis, timers: [] as Array<ReturnType<typeof setTimeout>> };
+    qualitySwapRef.current = q;
+    q.timers.push(
+      setTimeout(() => {
+        // A slow reload still ends: landed when the file is up, else failed.
+        if (slotsRef.current[vis].loaded) landQualityRef.current();
+        else failQualityRef.current();
+      }, QUALITY_SWAP_TIMEOUT_MS),
+    );
+    safely(() => {
+      void players[vis]
+        .generateThumbnailsAsync([fromTimeline(visId, T)])
+        .then((thumbs) => {
+          if (qualitySwapRef.current === q && mountedRef.current && thumbs?.[0]) setHeldFrame(thumbs[0]);
+        })
+        .catch(() => undefined);
+    });
+    slotsRef.current.forEach((s, i) => {
+      if (!s.angleId || !s.data || s.dead) return;
+      safely(() => players[i].pause());
+      s.landAt = i === vis ? fromTimeline(s.angleId, T) : null;
+      s.drift.reset();
+      void loadSlot(i, s.angleId, { entry: false, silent: true, quality: true });
+    });
+    setLoadedTick((n) => n + 1);
+    return true;
+  };
 
   // ---- first frames ----------------------------------------------------------
   const frameHandlers = React.useMemo(

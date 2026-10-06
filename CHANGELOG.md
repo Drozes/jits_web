@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### Match player: adaptive playback quality (jits-xfvd.12)
+
+JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change, no `app.json` change: NetInfo and AsyncStorage are already linked). Needs the jr_be `20261008100400` migration (`get_playback_settings`, applied to prod) for server-tuned settings; without it the client uses its compiled-in defaults. Spec: `research/2026-10-multi-angle-playback/05-adaptive-quality-spec.md`.
+
+**Added**
+- Video settings: a PLAYBACK QUALITY choice, Auto (adaptive), High (always the 720p copy) or Data saver (always the 360p copy), saved per phone on tap (`apps/mobile/app/(app)/settings/video.tsx`, store `apps/mobile/lib/video/quality/preference.ts`, key `video-playback:quality`). Radio rows use the design-system selection surface and check; no Signal Red.
+- `packages/shared/src/utils/playback-quality.ts`: the settings contract (`BUILTIN_PLAYBACK_SETTINGS`, pinned to `__fixtures__/playback-settings-defaults.json`, byte-identical to jr_be `docs/fixtures/playback-settings-defaults.json`), `parsePlaybackSettings` (server merge, per-field fallback, cross-field rules), `networkKey`, the history entry rules, `selectStartRendition` and `pickPlaybackPath`.
+- `packages/shared/src/utils/playback-quality-controller.ts`: the in-session controller (step down on one stall of 1 s or two stalls within 30 s; step up after 30 s smooth on Wi-Fi, ethernet, 4G or 5G, 90 s after a step-down; relapse lock; at most 4 switches, the last kept for a step-down; never while paused, seeking, in slow motion or mid-swap). Its level is the rendition actually served, so a match missing a copy only moves between copies that exist, and an original-only angle makes no quality decision.
+- `packages/shared/src/api/playback-settings.ts` (`getPlaybackSettings`, export `@jits/shared/api/playback-settings`).
+- `apps/mobile/lib/video/quality/`: `settings-store.ts` (server, then a cache under 30 days, then builtin; background refresh hourly), `history-store.ts` (per-network history, key `video-playback:history:v1`, 8 entries per key), `network-store.ts` (latest NetInfo state, 300 ms start cap), `use-quality-session.ts` (the one start selection and controller both players use).
+- Playback telemetry: quality preference, settings version and source, adaptive flag, network key, expensive flag, start target, reason, served start and final rendition, fallback, playback profile, quality switches (count, split, first 8, latency), watch time per rendition, stalls before and after the first step-down, relapse lock, cap, player startup; tags `video.playback.rendition`, `rendition_final`, `start_reason`, `quality_pref`, `stepdown`, `network_key`, `stalled`, `startup_bucket`, `rebuffer_bucket`.
+
+**Changed**
+- `getMatchVideoPlaybackResult` takes `{ rendition, expiresInSeconds }` (a number still means the expiry; the default 720 keeps today's choice, so the web callers are unchanged), selects `playback_360_path` and `playback_profile`, follows the fallback chain (360: 360p copy, 720p copy, original; 720: 720p copy, original, 360p copy) and returns `target`, `servedRendition`, `available` and `playbackProfile`. Generated types gain the rendition columns, `client_settings`, `get_playback_settings` and `admin_set_client_setting`.
+- The single player's angle switch is now `swapSource`, the one in-place swap used for angle and quality switches (exact position, held frame, play intent and speed kept, landed after the resume seek); signed URLs are cached per angle and rendition; angle switches keep the session's rendition.
+- The multi-angle player signs every slot at the session's rendition and reloads them in place on a quality decision (the visible one behind a held frame).
+- A quality switch is never counted as an angle switch, and its reload is stall-exempt.
+
+**Fixed**
+- The `video.playback.mode` tag is sent only for the match player, not for highlight reels (#53 review N1); a test pins the multi-angle dev flag OFF when `EXPO_PUBLIC_MULTI_ANGLE_PLAYER` is unset (N2).
+- Review round 1:
+  - A quality swap whose sign fails no longer fails playback: the previous file goes back in at the exact position behind the held frame (play intent and speed kept), and the controller is told the swap failed so later decisions still happen (H1). An angle switch while a quality sign is pending also releases it (H2); `QualityController.angleChanged` clears an outstanding decision defensively.
+  - `switchFailed` restores the level (and the next sign's target) to the rendition still served (M1); `switchIssued` closes the controller's open stall; a landed quality swap clears the stall log.
+  - Pausing or seeking during a long stall can no longer trigger a step-down: both players refresh the controller's conditions before telemetry closes the stall (M3).
+  - Multi-angle (dev flag): a failed quality re-sign keeps each slot on its old file instead of marking it dead (M2).
+  - Telemetry: a continuation reports `startFallback: null`, carries `qualitySteppedDown` from earlier in the screen session (the `stepdown` tag follows it), and every event has the `video.playback.resumed` tag.
+  - Review round 2: an angle switch drops a pending quality swap before reading the rendition, so the new angle signs at the level still served, and a superseded decision leaves the controller's target equal to what the new angle serves (no later silent step-up); a quality restore whose URL expired re-signs behind the held frame; a new start selection resets the telemetry flags carried into continuations.
+  - Stores: history lists are cut to 20 on read; the settings read times out after 5 s and a failed read retries after 60 s; a hung AsyncStorage costs only the first start the 300 ms wait; the signer's `available` treats an empty path as absent, like the path choice.
+
 ### Arena live switch: a stale declined web session (jits-smgb)
 
 JS-only on mobile (OTA-eligible on runtime 0.5.0, build 25). No backend change.

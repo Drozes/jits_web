@@ -574,6 +574,30 @@ export type Database = {
           },
         ]
       }
+      client_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
       conversation_participants: {
         Row: {
           athlete_id: string
@@ -1913,6 +1937,8 @@ export type Database = {
           normalized_path: string | null
           platform: string
           platform_asset_id: string | null
+          playback_360_path: string | null
+          playback_profile: string | null
           playback_url: string | null
           primary_video_id: string | null
           record_duration_ms: number | null
@@ -1959,6 +1985,8 @@ export type Database = {
           normalized_path?: string | null
           platform?: string
           platform_asset_id?: string | null
+          playback_360_path?: string | null
+          playback_profile?: string | null
           playback_url?: string | null
           primary_video_id?: string | null
           record_duration_ms?: number | null
@@ -2005,6 +2033,8 @@ export type Database = {
           normalized_path?: string | null
           platform?: string
           platform_asset_id?: string | null
+          playback_360_path?: string | null
+          playback_profile?: string | null
           playback_url?: string | null
           primary_video_id?: string | null
           record_duration_ms?: number | null
@@ -4173,6 +4203,10 @@ export type Database = {
           platform_role: Database["public"]["Enums"]["platform_role"]
         }[]
       }
+      admin_set_client_setting: {
+        Args: { p_key: string; p_value: Json }
+        Returns: Json
+      }
       admin_set_feature_flag: {
         Args: { p_enabled: boolean; p_key: string }
         Returns: undefined
@@ -4554,6 +4588,7 @@ export type Database = {
         Returns: Json
       }
       get_or_create_personal_invite: { Args: never; Returns: Json }
+      get_playback_settings: { Args: never; Returns: Json }
       get_recent_activity: {
         Args: { p_limit?: number }
         Returns: {

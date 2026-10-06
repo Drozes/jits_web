@@ -2,17 +2,41 @@ import * as React from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import type { VideoPlayer } from "expo-video";
+import type { PlaybackSettings, ServedRendition, SwitchReason, TargetRendition } from "@jits/shared/utils";
 import {
   PlaybackSession,
   reportPlaybackSession,
   type PlaybackEndReason,
+  type PlaybackQualityMeta,
   type PlaybackSessionMeta,
   type PlaybackSourceKind,
   type SignOutcome,
   type SwitchMode,
 } from "./playback-telemetry";
+import { recordSessionHistory } from "./quality/history-store";
+
+export type StallEvent = { kind: "start" | "end"; at: number };
 
 export interface PlaybackTelemetry {
+  /**
+   * The start selection's meta, once per screen session; every continuation
+   * gets a copy. `settings` (not reported) are the ones the history entry of
+   * each finished session is judged with.
+   */
+  setQuality: (meta: PlaybackQualityMeta, settings: PlaybackSettings) => void;
+  /** A file of this served rendition is now the one on screen. */
+  renditionAttached: (served: ServedRendition, playbackProfile: string | null) => void;
+  /** A quality switch was issued (never an angle switch); flags are the controller's after the issue. */
+  qualitySwitchStarted: (
+    from: TargetRendition,
+    to: TargetRendition,
+    reason: SwitchReason,
+    flags: { lockedLow: boolean; capReached: boolean; steppedDown?: boolean },
+  ) => void;
+  /** The quality swap landed (first frame after the resume seek). */
+  qualitySwitchLanded: () => void;
+  /** Counted stalls of the current session (continuations included). Returns an unsubscribe. */
+  onStall: (cb: (event: StallEvent) => void) => () => void;
   setMeta: (partial: Partial<PlaybackSessionMeta>) => void;
   sourceAttached: (kind: PlaybackSourceKind) => void;
   /** How the latest sign ended (match player). */
@@ -62,32 +86,64 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
   const sessionRef = React.useRef<PlaybackSession | null>(null);
   const lastKindRef = React.useRef<PlaybackSourceKind | null>(null);
   const wantPlayRef = React.useRef(false);
+  const qualityRef = React.useRef<{ meta: PlaybackQualityMeta; settings: PlaybackSettings } | null>(null);
+  const renditionRef = React.useRef<{ served: ServedRendition; playbackProfile: string | null } | null>(null);
+  const flagsRef = React.useRef({ lockedLow: false, capReached: false, steppedDown: false });
+  const stallListenersRef = React.useRef(new Set<(event: StallEvent) => void>());
+  const emitStall = React.useCallback((event: StallEvent) => {
+    for (const cb of stallListenersRef.current) {
+      try {
+        cb(event);
+      } catch {
+        /* a listener never breaks telemetry */
+      }
+    }
+  }, []);
+  /** A new session (first or continuation) carrying what the screen session already knows. */
+  const open = React.useCallback(
+    (opts: { resumed?: boolean; sourceKind?: PlaybackSourceKind | null; wantPlay?: boolean } = {}) => {
+      const session = new PlaybackSession(metaRef.current, Date.now(), {
+        ...opts,
+        rendition: opts.sourceKind ? renditionRef.current : null,
+        onStall: emitStall,
+      });
+      const q = qualityRef.current;
+      if (q) session.setQuality(q.meta);
+      session.qualityFlags(flagsRef.current);
+      return session;
+    },
+    [emitStall],
+  );
   // Only the FIRST render opens a session; later ones come from the AppState
   // listener (a render during an "inactive" blip after a background flush
   // must not open a sourceless, non-resumed session).
   const createdRef = React.useRef(false);
   if (!createdRef.current) {
     createdRef.current = true;
-    if (AppState.currentState !== "background") sessionRef.current = new PlaybackSession(metaRef.current, Date.now());
+    if (AppState.currentState !== "background") sessionRef.current = open();
   }
 
   const flush = React.useCallback((reason: PlaybackEndReason) => {
     const session = sessionRef.current;
     sessionRef.current = null;
     if (!session || !session.shouldReport()) return;
-    reportPlaybackSession(session.summary(Date.now(), reason));
+    const summary = session.summary(Date.now(), reason);
+    reportPlaybackSession(summary);
+    // Per-network history for the next start (spec 3.4): best effort.
+    const q = qualityRef.current;
+    if (q) recordSessionHistory(summary, q.settings);
   }, []);
 
   React.useEffect(() => {
     // A StrictMode / fast-refresh re-run of this effect follows a flush.
     if (sessionRef.current == null && AppState.currentState !== "background") {
-      sessionRef.current = new PlaybackSession(metaRef.current, Date.now(), { sourceKind: lastKindRef.current });
+      sessionRef.current = open({ sourceKind: lastKindRef.current });
     }
     if (sessionRef.current) void readNetwork(sessionRef.current);
     const appSub = AppState.addEventListener("change", (next: AppStateStatus) => {
       if (next === "background") flush("background");
       else if (next === "active" && sessionRef.current == null) {
-        const session = new PlaybackSession(metaRef.current, Date.now(), {
+        const session = open({
           resumed: true,
           sourceKind: lastKindRef.current,
           wantPlay: wantPlayRef.current,
@@ -100,7 +156,7 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
       appSub?.remove?.();
       flush("unmount");
     };
-  }, [flush]);
+  }, [flush, open]);
 
   React.useEffect(() => {
     const subs: Array<{ remove: () => void }> = [];
@@ -163,6 +219,34 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
       decoderCap: (reason) => sessionRef.current?.decoderCap(reason),
       switchLanded: () => sessionRef.current?.switchLanded(Date.now()),
       error: (message) => sessionRef.current?.error(message),
+      setQuality: (meta, settings) => {
+        // A new start selection (a new video on this screen): no flags carry over from the last one.
+        flagsRef.current = { lockedLow: false, capReached: false, steppedDown: false };
+        qualityRef.current = { meta, settings };
+        sessionRef.current?.setQuality(meta);
+      },
+      renditionAttached: (served, playbackProfile) => {
+        renditionRef.current = { served, playbackProfile };
+        sessionRef.current?.renditionAttached(served, playbackProfile, Date.now());
+      },
+      qualitySwitchStarted: (from, to, reason, flags) => {
+        flagsRef.current = {
+          lockedLow: flags.lockedLow,
+          capReached: flags.capReached,
+          steppedDown: flagsRef.current.steppedDown || flags.steppedDown === true || reason !== "smooth",
+        };
+        const s = sessionRef.current;
+        if (!s) return;
+        s.qualitySwitchStarted(from, to, reason, Date.now());
+        s.qualityFlags(flagsRef.current);
+      },
+      qualitySwitchLanded: () => sessionRef.current?.qualitySwitchLanded(Date.now()),
+      onStall: (cb) => {
+        stallListenersRef.current.add(cb);
+        return () => {
+          stallListenersRef.current.delete(cb);
+        };
+      },
     }),
     [],
   );

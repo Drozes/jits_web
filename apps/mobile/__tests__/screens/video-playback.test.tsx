@@ -301,7 +301,7 @@ describe("MatchVideoScreen", () => {
 
     render(React.createElement(MatchVideoScreen));
     await waitFor(() => {
-      expect(queries().getMatchVideoPlaybackResult).toHaveBeenCalledWith({}, "vid-1");
+      expect(queries().getMatchVideoPlaybackResult).toHaveBeenCalledWith({}, "vid-1", { rendition: "720" });
     });
     expect(queries().getMatchVideoSignedUrl).not.toHaveBeenCalled();
     expect(queries().getMatchVideoSignedUrlResult).not.toHaveBeenCalled();
@@ -858,7 +858,7 @@ describe("angle switch in place (multi-angle P0)", () => {
     await waitFor(() => expect(lastPlayer()?.replaceAsync).toHaveBeenCalledTimes(1), { timeout: 5000 });
     ready(400);
     // Every playable angle is signed at open, before any switch.
-    await waitFor(() => expect(queries().getMatchVideoPlaybackResult).toHaveBeenCalledWith({}, "vid-2"));
+    await waitFor(() => expect(queries().getMatchVideoPlaybackResult).toHaveBeenCalledWith({}, "vid-2", { rendition: "720" }));
     await act(async () => undefined);
     return utils;
   }
@@ -980,7 +980,7 @@ describe("route id changes after a switch (review m4)", () => {
     mockT = "15";
     mockApprox = "1";
     utils.rerender(React.createElement(MatchVideoScreen));
-    await waitFor(() => expect(queries().getMatchVideoPlaybackResult).toHaveBeenLastCalledWith({}, "vid-9"));
+    await waitFor(() => expect(queries().getMatchVideoPlaybackResult).toHaveBeenLastCalledWith({}, "vid-9", { rendition: "720" }));
     await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(2));
     ready(400);
     expect(lastPlayer().seeks.at(-1)).toBe(15);
