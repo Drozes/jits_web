@@ -80,6 +80,7 @@ describe("usePlaybackTelemetry", () => {
       "video.playback.surface": "match",
       "video.playback.source": "original",
       "video.playback.network": "cellular",
+      "video.playback.mode": "single",
       "video.playback.outcome": "watched",
     });
     expect(extra()).toMatchObject({

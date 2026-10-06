@@ -1,4 +1,5 @@
 import * as tracking from "@/lib/error-tracking/sentry";
+import { ResidualStats } from "./multi-angle/sync-controller";
 
 /**
  * Playback telemetry (jits-n2im.21): the input for the deferred HLS / ABR
@@ -55,6 +56,18 @@ import * as tracking from "@/lib/error-tracking/sentry";
  *                       view's onFirstFrameRender for the new item, or the
  *                       first playback progress on it). Null with none.
  *   switchLatencyMaxMs  the slowest of those switches.
+ *   switchSwapCount / switchSeekCount / switchDipCount
+ *                       multi-angle player: how each switch happened (an
+ *                       opacity swap to a hot angle, an exact seek behind a
+ *                       held frame, or a dip to black for clock-only sync).
+ *   syncResidualP50Ms / syncResidualP95Ms / syncSamples
+ *                       multi-angle player: absolute error of the lock-stepped
+ *                       angles against the master clock, sampled every master
+ *                       time update (smoothed), in ms.
+ *   decoderCapEvents / decoderCapReasons
+ *                       multi-angle player: times a standby was kept warm by
+ *                       the decoder cap (weak phone) or demoted after a
+ *                       decoder error, and why.
  *   After a switch, `durationS` and `maxPositionS` are on the file then on
  *   screen (each angle has its own clock), so across a switched session they
  *   mix angles; read them per session, not as one timeline.
@@ -84,7 +97,13 @@ export interface PlaybackSessionMeta {
   angle: PlaybackAngle | null;
   /** How many angles the match has (1 to 3); null when unknown. */
   angleCount: number | null;
+  /** Match player: single player (P0) or the multi-angle player (dev flag). */
+  playerMode?: "single" | "multi";
+  /** Multi-angle player: whether two players may decode at once. */
+  deviceTier?: "full" | "warm-only" | null;
 }
+
+export type SwitchMode = "swap" | "seek" | "dip";
 
 export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   sourceKind: PlaybackSourceKind | null;
@@ -120,6 +139,14 @@ export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   switchCount: number;
   switchLatencyMs: number | null;
   switchLatencyMaxMs: number | null;
+  switchSwapCount: number;
+  switchSeekCount: number;
+  switchDipCount: number;
+  syncResidualP50Ms: number | null;
+  syncResidualP95Ms: number | null;
+  syncSamples: number;
+  decoderCapEvents: number;
+  decoderCapReasons: string | null;
 }
 
 /** Longest error text kept. */
@@ -168,6 +195,10 @@ export class PlaybackSession {
   /** A switch is waiting for the new angle's first frame (tap time). */
   private switchAt: number | null = null;
   private switchLatencies: number[] = [];
+  private switchModes: Record<SwitchMode, number> = { swap: 0, seek: 0, dip: 0 };
+  private residuals = new ResidualStats();
+  private decoderCapEvents = 0;
+  private decoderCapReasons = new Set<string>();
 
   constructor(
     meta: PlaybackSessionMeta,
@@ -258,8 +289,9 @@ export class PlaybackSession {
    * The athlete switched angle (the tap). The new angle's load is the app's
    * own wait, not a stall; `switchLanded` measures how long it took.
    */
-  switchStarted(now: number): void {
+  switchStarted(now: number, mode?: SwitchMode): void {
     this.switchCount += 1;
+    if (mode) this.switchModes[mode] += 1;
     this.switchAt = now;
     this.expectSwap(now);
   }
@@ -269,6 +301,17 @@ export class PlaybackSession {
     if (this.switchAt == null) return;
     this.switchLatencies.push(Math.max(0, now - this.switchAt));
     this.switchAt = null;
+  }
+
+  /** One smoothed sync error sample of a lock-stepped angle (seconds). */
+  syncResidual(errorS: number): void {
+    this.residuals.add(errorS);
+  }
+
+  /** A standby was kept warm by the decoder cap, or demoted after a decoder error. */
+  decoderCap(reason: string): void {
+    this.decoderCapEvents += 1;
+    this.decoderCapReasons.add(reason);
   }
 
   /** The view rendered a frame (onFirstFrameRender). Only counts after the intent. */
@@ -400,6 +443,14 @@ export class PlaybackSession {
       switchCount: this.switchCount,
       switchLatencyMs: median(this.switchLatencies),
       switchLatencyMaxMs: this.switchLatencies.length > 0 ? Math.max(...this.switchLatencies) : null,
+      switchSwapCount: this.switchModes.swap,
+      switchSeekCount: this.switchModes.seek,
+      switchDipCount: this.switchModes.dip,
+      syncResidualP50Ms: this.residuals.percentile(50),
+      syncResidualP95Ms: this.residuals.percentile(95),
+      syncSamples: this.residuals.count,
+      decoderCapEvents: this.decoderCapEvents,
+      decoderCapReasons: this.decoderCapReasons.size > 0 ? [...this.decoderCapReasons].sort().join(",") : null,
     };
   }
 
@@ -455,6 +506,7 @@ export function reportPlaybackSession(s: PlaybackSessionSummary): void {
         "video.playback.source": s.sourceKind ?? "unknown",
         "video.playback.network": s.networkType ?? "unknown",
         "video.playback.outcome": outcomeOf(s),
+        "video.playback.mode": s.playerMode ?? "single",
       },
       extra: { ...s },
     });

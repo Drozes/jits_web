@@ -9,6 +9,7 @@ import {
   type PlaybackSessionMeta,
   type PlaybackSourceKind,
   type SignOutcome,
+  type SwitchMode,
 } from "./playback-telemetry";
 
 export interface PlaybackTelemetry {
@@ -24,7 +25,11 @@ export interface PlaybackTelemetry {
   /** Wire to VideoView's onFirstFrameRender. */
   firstFrame: () => void;
   /** The athlete switched angle (tap time); the session carries on. */
-  switchStarted: () => void;
+  switchStarted: (mode?: SwitchMode) => void;
+  /** Multi-angle: one smoothed sync error sample (seconds). */
+  syncResidual: (errorS: number) => void;
+  /** Multi-angle: a standby kept warm by the decoder cap or demoted on a decoder error. */
+  decoderCap: (reason: string) => void;
   /** The switched-to angle showed its first frame. */
   switchLanded: () => void;
   error: (message: string | null | undefined) => void;
@@ -153,7 +158,9 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
       seekRequested: () => sessionRef.current?.seekRequested(Date.now()),
       expectWait: () => sessionRef.current?.expectWait(Date.now()),
       firstFrame: () => sessionRef.current?.firstFrame(Date.now()),
-      switchStarted: () => sessionRef.current?.switchStarted(Date.now()),
+      switchStarted: (mode) => sessionRef.current?.switchStarted(Date.now(), mode),
+      syncResidual: (errorS) => sessionRef.current?.syncResidual(errorS),
+      decoderCap: (reason) => sessionRef.current?.decoderCap(reason),
       switchLanded: () => sessionRef.current?.switchLanded(Date.now()),
       error: (message) => sessionRef.current?.error(message),
     }),
