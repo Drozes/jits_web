@@ -1,40 +1,28 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, RefreshControl, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import Animated from "react-native-reanimated";
 import { ArrowUpRight } from "lucide-react-native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useProfileData } from "@/lib/profile/use-profile-data";
-import { useRefetchOnUploadSettled } from "@/lib/profile/use-my-match-videos";
-import { useMatchLibraryFirstPage } from "@/lib/film-room/use-match-library";
 import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
-import { matchDetailHref } from "@/lib/match-detail/href";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ProfileQuickStats } from "@/components/profile/profile-quick-stats";
 import { AccountSection } from "@/components/profile/account-section";
-import { FilmRoomPreview } from "@/components/profile/film-room-preview";
-import { HighlightsRow } from "@/components/profile/highlights-row";
-import { useMyHighlights } from "@/lib/highlight/use-my-highlights";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
 import { ProfileInviteActions } from "@/components/invite/profile-invite-actions";
 import { TabHeader } from "@/components/layout/tab-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { AppVersionLabel } from "@/components/layout/app-version-label";
-import { MetaTag, ParticipantRow } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
-import { HistoryRowAction } from "@/components/profile/history-row-action";
 import {
   SkeletonProvider,
   SkeletonPlate,
   SkeletonAvatar,
   SkeletonText,
   SkeletonBlock,
-  SkeletonParticipantRow,
 } from "@/components/ui/skeleton";
-import { formatRelativeDate } from "@jits/shared/utils";
-import { useFirstLoadEntering } from "@/lib/motion";
 
 type ShareAthlete = {
   id: string;
@@ -73,9 +61,10 @@ function ShareProfileButton({ athlete }: { athlete: ShareAthlete }) {
 
 /**
  * Cold-load placeholder mirroring the real layout: header plate (avatar + two
- * name/gym lines), a 3-tile stat strip, then four recent-match rows under the
- * "Recent Matches" tag. The bars carry the shared skeleton shimmer (Motion
- * Rule, Ambient tier); the real rows then rise in once (list enter stagger).
+ * name/gym lines), then the 3-tile stat strip. The bars carry the shared
+ * skeleton shimmer (Motion Rule, Ambient tier). Match history lives on the
+ * Matches tab now (spec specs/matches-tab/spec.md section 9), so there are no
+ * recent-match rows here.
  */
 function ProfileSkeleton() {
   return (
@@ -94,15 +83,6 @@ function ProfileSkeleton() {
         <SkeletonBlock width="100%" height={84} className="flex-1" />
         <SkeletonBlock width="100%" height={84} className="flex-1" />
       </View>
-
-      <View className="gap-3">
-        <MetaTag>Recent Matches</MetaTag>
-        <View className="gap-[1px]">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonParticipantRow key={i} />
-          ))}
-        </View>
-      </View>
     </SkeletonProvider>
   );
 }
@@ -111,33 +91,14 @@ export default function ProfileScreen() {
   const { athlete } = useRequireAthlete();
   const router = useRouter();
   const tokens = useThemedTokens();
-  const { stats, gymName, eloThisMonth, history, isLoading, refreshing: profileBusy, onRefresh: refetchProfile } =
+  const { stats, gymName, eloThisMonth, isLoading, refreshing: profileBusy, onRefresh: refetchProfile } =
     useProfileData(athlete?.id, athlete?.primary_gym_id);
-  const library = useMatchLibraryFirstPage(athlete?.id);
-  const refetchVideos = library.refetch;
-  const highlights = useMyHighlights(athlete?.id);
-  const refetchHighlights = highlights.refetch;
 
-  // Pull-to-refresh and returning to the tab both reload the profile, the
-  // Film Room preview and the highlights row, so a video uploaded from the
-  // match wizard (and the reel made from it) shows up here.
-  const refetchAll = React.useCallback(() => {
-    refetchProfile();
-    refetchVideos();
-    refetchHighlights();
-  }, [refetchProfile, refetchVideos, refetchHighlights]);
-  const { refreshing, onRefresh } = usePullToRefresh(refetchAll, profileBusy || library.isValidating);
-  useRefetchOnRefocus(refetchAll, useMatchExitCount());
-  // The video row lands when the upload settles, often after that refocus.
-  const historyMatchIds = React.useMemo(() => history.map((m) => m.match_id), [history]);
-  useRefetchOnUploadSettled(historyMatchIds, refetchVideos);
-
-  // Serve recent matches from the single cached history payload fetched by
-  // useProfileData; no separate round-trip.
-  const recent = React.useMemo(() => history.slice(0, 5), [history]);
-  // List enter stagger (Motion Rule): the recent-match rows rise in the
-  // first time they appear, never on refetch, pull-to-refresh or refocus.
-  const entering = useFirstLoadEntering();
+  // Pull-to-refresh and returning to the tab (or out of a match) re-read the
+  // profile only: match history, film and highlights live on the Matches tab
+  // and Home now (spec specs/matches-tab/spec.md section 9).
+  const { refreshing, onRefresh } = usePullToRefresh(refetchProfile, profileBusy);
+  useRefetchOnRefocus(refetchProfile, useMatchExitCount());
 
   if (!athlete) {
     return (
@@ -181,48 +142,6 @@ export default function ProfileScreen() {
               bestWinStreak={stats?.bestWinStreak ?? 0}
               eloThisMonth={eloThisMonth}
               winRate={stats?.winRate}
-            />
-
-            <View className="gap-3">
-              <MetaTag>Recent Matches</MetaTag>
-              {recent.length === 0 ? (
-                <View className="bg-surface-3 border border-hairline-faint rounded-xs px-4 py-6 items-center">
-                  <Text className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
-                    No Matches Yet
-                  </Text>
-                </View>
-              ) : (
-                <View className="gap-[1px]">
-                  {recent.map((m, i) => {
-                    const name = m.opponent_display_name ?? "Opponent";
-                    return (
-                      <Animated.View key={m.match_id} entering={entering(i)}>
-                        <ParticipantRow
-                          name={`vs ${name}`}
-                          subtitle={formatRelativeDate(m.completed_at)}
-                          onPress={() => router.push(matchDetailHref(m.match_id))}
-                          accessibilityLabel={`Open match vs ${name}`}
-                          action={<HistoryRowAction eloDelta={m.elo_delta} eloAfter={m.elo_after} />}
-                        />
-                      </Animated.View>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-
-            <HighlightsRow
-              items={highlights.items}
-              clipsEnabled={highlights.clipsEnabled}
-              onOpen={highlights.markSeenLocally}
-            />
-
-            <FilmRoomPreview
-              items={library.data?.items}
-              error={!!library.error}
-              onRetry={refetchVideos}
-              viewer={{ name: athlete.display_name ?? "You", photoUrl: athlete.profile_photo_url }}
-              viewerId={athlete.id}
             />
 
             <View className="gap-2">

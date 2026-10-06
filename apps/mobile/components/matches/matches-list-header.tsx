@@ -1,0 +1,51 @@
+import * as React from "react";
+import { Text, View } from "react-native";
+import { FilterChips } from "@/components/film-room/filter-chips";
+import type { LibraryFilter, OutcomeFilter } from "@/lib/film-room/rows";
+import { usePalette } from "@/lib/theme/palette";
+import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
+
+export interface MatchesListHeaderProps {
+  /** `recordStrip(...)` output, e.g. `21 MATCHES · 14W 6L 1D · 1487`. */
+  record: string;
+  /**
+   * The "Your highlights" reel carousel (spec 6.1 item 3), between the record
+   * strip and the chips. Filters never apply to it. Null renders nothing, so
+   * the tab ships without it until the carousel lands (jits-a4fw.4).
+   */
+  carousel?: React.ReactNode;
+  filter: LibraryFilter;
+  opponentName: string | null;
+  onOutcome: (outcome: OutcomeFilter) => void;
+  onOpenOpponents: () => void;
+  /** The cold-load placeholder, drawn under the chips (null once loaded). */
+  skeleton?: React.ReactNode;
+}
+
+/**
+ * Everything above the Matches feed, top to bottom (spec 6.1): the record
+ * strip, the carousel slot, the result chips with the opponent picker
+ * button, then the cold-load skeleton. The tab header itself (`TabHeader`)
+ * sits outside the list so it never scrolls away.
+ */
+export function MatchesListHeader({ record, carousel = null, filter, opponentName, onOutcome, onOpenOpponents, skeleton = null }: MatchesListHeaderProps) {
+  const p = usePalette();
+  return (
+    <View testID="matches-list-header">
+      <Text
+        testID="matches-record"
+        className="font-mono-medium"
+        style={[typeStep("caption"), { marginBottom: 18, letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}
+      >
+        {record}
+      </Text>
+      {carousel ? (
+        <View testID="matches-carousel-slot" style={{ marginBottom: 18 }}>
+          {carousel}
+        </View>
+      ) : null}
+      <FilterChips filter={filter} opponentName={opponentName} onOutcome={onOutcome} onOpenOpponents={onOpenOpponents} />
+      {skeleton}
+    </View>
+  );
+}

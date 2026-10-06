@@ -165,9 +165,10 @@ function useSelectBounce() {
  * Custom bottom tab bar mirroring apps/web/components/layout/bottom-nav-bar.tsx.
  *
  * Equal-width columns, one per tab registered in `(tabs)/_layout.tsx`: Home,
- * Arena, Rankings, Profile once Arena lands, three until then. Each column is
+ * Arena, Matches, Rankings, Profile (5-up since 2026-10-06). Each column is
  * `flex-1`, so the row divides evenly at whatever count is registered and no
- * item is squeezed. 2px CTA top border on active, mono-caps labels, hairline
+ * item is squeezed (75 pt per column at 375 pt; the labels' fit is measured
+ * in elo-tab-bar.test.tsx). 2px CTA top border on active, mono-caps labels, hairline
  * top border, bottom safe-area inset applied to the container. A tab can
  * carry a static badge (red count, green dot, hollow ring) on its icon; see
  * `TabBadge`. Pressing a tab that is not active plays the tab select bounce

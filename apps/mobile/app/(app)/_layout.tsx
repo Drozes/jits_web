@@ -44,7 +44,9 @@ export default function AppLayout() {
             {/* One of the athlete's own highlight reels, full screen (push, bell,
               Home, Profile, match detail). Header hidden: a dark video surface. */}
             <Stack.Screen name="highlight/[id]" options={{ headerShown: false }} />
-            {/* The Film Room: every past match as a poster grid, from Profile. */}
+            {/* The retired Film Room: now only a redirect to the Matches tab,
+              kept for two OTA releases (restored navigation state, old
+              bundles), then deleted with this Screen. */}
             <Stack.Screen name="film-room" />
             <Stack.Screen name="settings" />
             {/* The practice match: a local walk through one Arena match against
