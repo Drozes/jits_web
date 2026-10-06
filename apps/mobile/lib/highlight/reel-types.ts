@@ -33,10 +33,23 @@ export interface ReelItem {
   opponentName: string | null;
   readyAt: string;
   unseen: boolean;
+  /**
+   * The signed-in athlete fought in the reel's match. Drives the viewer's
+   * secondary action: Open match only when true, else View profile
+   * (`athlete/[subjectAthleteId]`). Own reels are always participant. Absent
+   * reads as false (spec section 8, round-2 owner decision 2026-10-06).
+   */
+  viewerIsParticipant?: boolean;
+  /** The athlete the reel is about (its subject); null or absent when unknown. */
+  subjectAthleteId?: string | null;
 }
 
-/** Maps the caller's own highlight row (get_my_highlights) to a lane item. */
-export function ownReelItem(item: MyHighlightItem, posterUrl: string | null): ReelItem {
+/**
+ * Maps the caller's own highlight row (get_my_highlights) to a lane item. The
+ * viewer is always a participant of an own reel and its subject, so pass the
+ * viewer's athlete id when the caller has it (absent leaves the subject unset).
+ */
+export function ownReelItem(item: MyHighlightItem, posterUrl: string | null, viewerId?: string | null): ReelItem {
   return {
     highlightId: item.highlightId,
     matchId: item.matchId,
@@ -50,7 +63,20 @@ export function ownReelItem(item: MyHighlightItem, posterUrl: string | null): Re
     opponentName: item.opponentName,
     readyAt: item.readyAt,
     unseen: item.unseen,
+    viewerIsParticipant: true,
+    ...(viewerId ? { subjectAthleteId: viewerId } : {}),
   };
+}
+
+/**
+ * The viewer's secondary action for a reel: Open match only when the viewer
+ * fought in it, else View profile of the reel's subject (none when unknown).
+ */
+export function reelSecondaryAction(
+  item: Pick<ReelItem, "viewerIsParticipant" | "subjectAthleteId">,
+): "open_match" | "view_profile" | null {
+  if (item.viewerIsParticipant === true) return "open_match";
+  return item.subjectAthleteId ? "view_profile" : null;
 }
 
 /** Owner-only actions on a reel (share, save, improve). */
