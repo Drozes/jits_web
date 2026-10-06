@@ -12,6 +12,7 @@ import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { OpeningStill, type StillAthlete } from "@/components/film-room/opening-still";
 import { FilmBadge, toneFor } from "@/components/film-room/status-badge";
 import { Button } from "@/components/ui/elo-system/button";
+import { drawsNoFilmCaption } from "@/lib/matches/feed-states";
 import { FeedPoster } from "./feed-poster";
 
 /** C-L7, only on a card whose match has no video rows at all. */
@@ -21,6 +22,7 @@ export const RECORDING_HELPER = "Turn on Record from my phone at face-off.";
 
 /** The fallback art's caption (mono caps), or "" for none. */
 export function feedFallbackCaption(item: MatchLibraryItem, status: CardStatus): string {
+  if (drawsNoFilmCaption(item, status)) return NO_FILM_CAPTION.toUpperCase();
   switch (status.kind) {
     case "uploading":
     case "upload_failed":
@@ -36,17 +38,20 @@ export function feedFallbackCaption(item: MatchLibraryItem, status: CardStatus):
     default:
       break;
   }
-  if (item.videos.length === 0) {
-    const coming = status.kind === "collecting" || status.kind === "waiting" || status.kind === "building";
-    return coming ? CARD_CAPTION.arrivesAfterUpload : NO_FILM_CAPTION.toUpperCase();
-  }
+  // No rows yet but film is on its way (collecting, waiting, building).
+  if (item.videos.length === 0) return CARD_CAPTION.arrivesAfterUpload;
   // Film is on the server and its still is not cut yet.
   return "PROCESSING FILM";
 }
 
-/** The one top-left badge, by the deck priority (`statusBadgeLabel`, plus this phone's upload %). */
-export function feedBadgeLabel(status: CardStatus): string | null {
+/**
+ * The one top-left badge, by the deck priority (`statusBadgeLabel`, plus this
+ * phone's upload %). A card with no video rows that draws C-L7 gets no
+ * NO FILM badge: the two never stack (the badge is for cards WITH rows).
+ */
+export function feedBadgeLabel(item: Pick<MatchLibraryItem, "videos">, status: CardStatus): string | null {
   if (status.kind === "uploading") return uploadingLabel(status.progress);
+  if (drawsNoFilmCaption(item, status)) return null;
   return statusBadgeLabel(status);
 }
 
@@ -78,9 +83,9 @@ export function MatchFeedMedia({ item, status, media, viewer, opp, helper, onPre
   const p = usePalette();
   const playable = media.playVideo != null;
   const duration = playable ? formatDuration(media.durationSeconds) : null;
-  const badge = feedBadgeLabel(status);
+  const badge = feedBadgeLabel(item, status);
   const caption = media.posterUrl ? "" : feedFallbackCaption(item, status);
-  const noFilm = caption === NO_FILM_CAPTION.toUpperCase();
+  const noFilm = !media.posterUrl && drawsNoFilmCaption(item, status);
   const uploading = status.kind === "uploading";
   const progress = uploading && status.progress != null ? Math.min(1, Math.max(0, status.progress)) : null;
   const label = playable

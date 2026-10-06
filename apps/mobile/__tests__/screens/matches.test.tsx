@@ -78,6 +78,9 @@ jest.mock("@/lib/match-flow/use-my-active-match", () => ({ useMyActiveMatch: () 
 jest.mock("@/lib/practice/use-has-ever-played", () => ({ useHasEverPlayed: () => false }));
 const mockCapture = jest.fn();
 jest.mock("@/lib/error-tracking/sentry", () => ({ captureMessage: (...a: unknown[]) => mockCapture(...a), addBreadcrumb: jest.fn() }));
+// The feed mounts a small window (4 rows) and grows it on layout and scroll,
+// which never happen in a test renderer: mount every row here.
+jest.mock("@/lib/matches/feed-list-tuning", () => ({ FEED_LIST_TUNING: { initialNumToRender: 100, windowSize: 21, removeClippedSubviews: false } }));
 const mockGetMyMatchLibrary = jest.fn();
 jest.mock("@jits/shared/api/film-room", () => ({
   getMyMatchLibrary: (...a: unknown[]) => mockGetMyMatchLibrary(...a),
@@ -176,7 +179,7 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(utils.getByText(`${month} ${NOW.getFullYear()}`)).toBeTruthy();
     expect(utils.getByText("5 MATCHES")).toBeTruthy();
     const meta = utils.getByTestId("film-card-m-new");
-    expect(meta.props.accessibilityLabel).toMatch(/^Open match vs M\. Park\. Won, plus 14, [A-Z][a-z]{2} \d{1,2}$/);
+    expect(meta.props.accessibilityLabel).toMatch(/^Open match vs M\. Park, new\. Won, plus 14, [A-Z][a-z]{2} \d{1,2}$/);
     expect(isMatchSeen("m-new")).toBe(false);
     fireEvent.press(meta);
     expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m-new");
@@ -251,6 +254,27 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     const noFilm = utils.getByTestId("match-feed-card-m-up");
     expect(within(noFilm).getByText("NO FILM FOR THIS ONE")).toBeTruthy();
     expect(within(noFilm).getByTestId("film-card-helper")).toHaveTextContent("Turn on Record from my phone at face-off.");
+  });
+
+  it("a zero-video card still uploading on this phone is skipped: the helper moves to the next C-L7 card", async () => {
+    act(() => {
+      setMatchUpload("nf-1", { status: "uploading", progress: 0.2 });
+    });
+    const utils = await renderLoaded(
+      page([
+        libItem({ match_id: "nf-1", completed_at: daysAgo(1), videos: [] }),
+        libItem({ match_id: "nf-2", completed_at: daysAgo(2), videos: [] }),
+        libItem({ match_id: "nf-3", completed_at: daysAgo(3), videos: [] }),
+        libItem({ match_id: "nf-4", completed_at: daysAgo(4), videos: [] }),
+      ]),
+    );
+    expect(within(utils.getByTestId("match-feed-card-nf-2")).getByTestId("film-card-helper")).toBeTruthy();
+    expect(utils.getAllByTestId("film-card-helper")).toHaveLength(1);
+    // The upload fails over to paused: still not C-L7. Cleared: nf-1 takes the helper back.
+    act(() => {
+      setMatchUpload("nf-1", { status: "paused" });
+    });
+    expect(within(utils.getByTestId("match-feed-card-nf-2")).getByTestId("film-card-helper")).toBeTruthy();
   });
 
   it("teaches the recording helper on the first no-film card only (AC 6.7)", async () => {
@@ -350,6 +374,7 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(mockCapture).toHaveBeenCalledWith("matches.empty_cta", { level: "info", tags: { surface: "matches", state: "zero", cta: "arena" } });
     fireEvent.press(utils.getByTestId("matches-zero-invite"));
     expect(mockPush).toHaveBeenCalledWith("/invite?from=matches");
+    expect(mockCapture).toHaveBeenCalledWith("matches.empty_cta", { level: "info", tags: { surface: "matches", state: "zero", cta: "invite" } });
   });
 
   it("zero matches with clips off uses the film copy (AC 6.11)", async () => {

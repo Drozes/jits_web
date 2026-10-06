@@ -7,7 +7,7 @@ import { cardOffersRetry, deriveCardStatus, type CardPhase } from "@/lib/film-ro
 import { pickCardMedia } from "@/lib/film-room/card-media";
 import { shortName } from "@/lib/film-room/format";
 import type { StillAthlete } from "@/components/film-room/opening-still";
-import { MatchFeedMedia } from "./match-feed-media";
+import { feedBadgeLabel, MatchFeedMedia } from "./match-feed-media";
 import { MatchFeedMeta } from "./match-feed-meta";
 
 export interface MatchFeedCardProps {
@@ -59,7 +59,7 @@ export const MatchFeedCard = React.memo(function MatchFeedCard({ item, viewer, v
         onPress={onMedia}
         onRetry={cardOffersRetry(status) ? retry : undefined}
       />
-      <MatchFeedMeta item={item} opp={opp} tags={tags} onPress={open} />
+      <MatchFeedMeta item={item} opp={opp} tags={tags} badge={feedBadgeLabel(item, status)} onPress={open} />
     </View>
   );
 });

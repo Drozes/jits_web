@@ -42,6 +42,8 @@ interface MatchFeedMetaProps {
   opp: string;
   /** FIRST MATCH / FIRST WIN (only once the full history is loaded). */
   tags: readonly string[];
+  /** The media's status badge (`feedBadgeLabel`), read after the opponent; null when none. */
+  badge: string | null;
   onPress: () => void;
 }
 
@@ -52,7 +54,7 @@ interface MatchFeedMetaProps {
  * trailing chevron is decoration inside it with no target of its own.
  * `film-card-<matchId>` is what the match-loop harness taps.
  */
-export function MatchFeedMeta({ item, opp, tags, onPress }: MatchFeedMetaProps) {
+export function MatchFeedMeta({ item, opp, tags, badge, onPress }: MatchFeedMetaProps) {
   const p = usePalette();
   const letter = outcomeLetter(item.outcome);
   const letterTone: Tone = letter === "W" ? "gain" : letter === "L" ? "loss" : "neutral";
@@ -61,7 +63,7 @@ export function MatchFeedMeta({ item, opp, tags, onPress }: MatchFeedMetaProps) 
   const disputed = item.status === "disputed";
   const date = shortDate(item.completed_at);
   const label = [
-    `Open match vs ${opp}. ${outcomeWord(item.outcome)}`,
+    `Open match vs ${opp}${badge ? `, ${badge.toLowerCase()}` : ""}. ${outcomeWord(item.outcome)}`,
     deltaWords(item.elo_delta, disputed),
     titleDate(item.completed_at),
     ...tags.map((t) => t.toLowerCase()),

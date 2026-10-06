@@ -25,13 +25,16 @@ interface FeedPosterProps {
  * `onLoad` reports the intrinsic size, then applies the rule.
  */
 export function FeedPoster({ url, cacheKey, width, height, dim = false }: FeedPosterProps) {
-  const [loaded, setLoaded] = React.useState<{ w: number; h: number } | null>(null);
+  // Keyed by URL: a recycled card (or a new poster) never reuses the
+  // previous image's intrinsic size.
+  const [loaded, setLoaded] = React.useState<{ url: string; w: number; h: number } | null>(null);
+  const size = loaded?.url === url ? loaded : null;
   const server = cropFor(width, height);
-  const rule = server.known ? server : cropFor(loaded?.w, loaded?.h);
+  const rule = server.known ? server : cropFor(size?.w, size?.h);
   const source = cacheKey ? { uri: url, cacheKey: `film-still-${cacheKey}` } : { uri: url };
   const onLoad = server.known
     ? undefined
-    : (e: ImageLoadEventData) => setLoaded({ w: e.source.width, h: e.source.height });
+    : (e: ImageLoadEventData) => setLoaded({ url, w: e.source.width, h: e.source.height });
   const opacity = dim ? 0.38 : 1;
 
   if (rule.fit === "pillarbox") {
@@ -53,6 +56,7 @@ export function FeedPoster({ url, cacheKey, width, height, dim = false }: FeedPo
           source={source}
           recyclingKey={cacheKey ?? undefined}
           contentFit="contain"
+          onLoad={onLoad}
           style={FILL}
         />
       </View>

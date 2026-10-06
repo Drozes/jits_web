@@ -1,4 +1,5 @@
 import type { MatchLibraryItem } from "@jits/shared/api/film-room";
+import type { CardStatus } from "@/lib/film-room/card-status";
 
 /**
  * Pure rules for the Matches feed's low-data and empty states
@@ -38,14 +39,30 @@ export function tagsFor(tags: ReadonlyMap<string, readonly string[]>, matchId: s
 }
 
 /**
- * The one card that teaches the recording helper (C-L6): the first card in
- * the list whose match has no video rows at all (C-L7). None while the
- * carousel on the same screen already shows C-L6, so the tip never appears
- * twice on one screen.
+ * The card draws C-L7 "No film for this one" (spec 10.3): its match has no
+ * video rows at all and nothing is on its way. That is a card with no status
+ * to show (`none`: nothing recorded, or the phase says no video yet) or the
+ * server's final `no_film` (nobody recorded, after the grace period). A card
+ * whose film is still coming (collecting, waiting for an angle, building, a
+ * local upload, processing) is not one. The ONE predicate the caption, the
+ * badge and the helper card all use, so they never disagree.
  */
-export function noFilmHelperMatchId(items: readonly MatchLibraryItem[], carouselShowsHelper: boolean): string | null {
+export function drawsNoFilmCaption(item: Pick<MatchLibraryItem, "videos">, status: CardStatus): boolean {
+  return item.videos.length === 0 && (status.kind === "none" || status.kind === "no_film");
+}
+
+/**
+ * The one card that teaches the recording helper (C-L6): the first card in
+ * the list that draws C-L7 (`drawsNoFilmCaption`). None while the carousel
+ * on the same screen already shows C-L6, so the tip never appears twice.
+ */
+export function noFilmHelperMatchId(
+  items: readonly MatchLibraryItem[],
+  carouselShowsHelper: boolean,
+  statusOf: (item: MatchLibraryItem) => CardStatus,
+): string | null {
   if (carouselShowsHelper) return null;
-  return items.find((i) => i.videos.length === 0)?.match_id ?? null;
+  return items.find((i) => drawsNoFilmCaption(i, statusOf(i)))?.match_id ?? null;
 }
 
 /** Zero: the first page loaded with no matches, no error and no filter. */

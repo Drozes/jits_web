@@ -92,6 +92,23 @@ describe("media and the crop rule (spec 6.3, AC 2.8)", () => {
     expect(u.getByTestId("feed-poster-pillarbox")).toBeTruthy();
   });
 
+  it("a loaded size belongs to its URL: a new poster URL draws cover again until it loads", () => {
+    const v = (url: string) => libItem({ videos: [libVideo({ thumbnail_width: null, thumbnail_height: null, poster_url: url, thumbnail_key: url })] });
+    const u = renderCard({ item: v("https://signed/a.jpg") });
+    act(() => {
+      u.getByTestId("feed-poster").props.onLoad({ source: { width: 1080, height: 1920 } });
+    });
+    expect(u.getByTestId("feed-poster-pillarbox")).toBeTruthy();
+    u.rerender(<MatchFeedCard {...u.props} item={v("https://signed/b.jpg")} />);
+    expect(u.queryByTestId("feed-poster-pillarbox")).toBeNull();
+    expect(u.getByTestId("feed-poster").props.contentFit).toBe("cover");
+    // The contained image also reports its size (after a pillarbox switch).
+    act(() => {
+      u.getByTestId("feed-poster").props.onLoad({ source: { width: 1080, height: 1920 } });
+    });
+    expect(u.getByTestId("feed-poster").props.onLoad).toEqual(expect.any(Function));
+  });
+
   it("a match with no video rows shows the two-athlete fallback with C-L7", () => {
     const u = renderCard({ item: libItem({ videos: [] }) });
     expect(u.getByTestId("opening-still-fallback")).toBeTruthy();
@@ -138,7 +155,7 @@ describe("play glyph, duration and taps (AC 2.6, 2.9)", () => {
   it("the meta row always opens match detail, even when the media would play", () => {
     const u = renderCard();
     const meta = u.getByTestId("film-card-m-1");
-    expect(meta.props.accessibilityLabel).toMatch(/^Open match vs M\. Park\. Won, plus 14, [A-Z][a-z]{2} \d{1,2}$/);
+    expect(meta.props.accessibilityLabel).toMatch(/^Open match vs M\. Park, breakdown ready\. Won, plus 14, [A-Z][a-z]{2} \d{1,2}$/);
     fireEvent.press(meta);
     expect(u.onOpen).toHaveBeenCalledWith("m-1");
     expect(u.onPlay).not.toHaveBeenCalled();
@@ -198,6 +215,34 @@ describe("one badge, deck priority (AC 2.5)", () => {
     expect(textOf(u.getByTestId("film-card-badge"))).toBe("NO FILM");
     expect(u.queryByText("NO FILM FOR THIS ONE")).toBeNull();
     expect(u.queryByTestId("film-card-helper")).toBeNull();
+  });
+
+  it("a recent unrecorded match (zero videos, no_film / nobody_recorded) draws C-L7 with no badge, and can teach the helper", () => {
+    const u = renderCard({
+      item: libItem({ match_id: "m-1", videos: [] }),
+      phase: { phase: "no_film", reason: "nobody_recorded", waitRemainingMs: null } as never,
+      noFilmHelper: true,
+    });
+    expect(u.queryByTestId("film-card-badge")).toBeNull();
+    expect(u.getByText("NO FILM FOR THIS ONE")).toBeTruthy();
+    expect(u.getByTestId("film-card-helper")).toBeTruthy();
+    expect(u.getByTestId("film-card-m-1").props.accessibilityLabel).toMatch(/^Open match vs M\. Park\. Won/);
+  });
+
+  it("a zero-video card still collecting shows its badge and the arrives-after-upload caption, never C-L7", () => {
+    const u = renderCard({
+      item: libItem({ match_id: "m-1", videos: [] }),
+      phase: { phase: "waiting_for_angle", reason: null, waitRemainingMs: 60_000 },
+      noFilmHelper: true,
+    });
+    expect(u.queryByText("NO FILM FOR THIS ONE")).toBeNull();
+    expect(u.queryByTestId("film-card-helper")).toBeNull();
+    expect(u.getByText("STILL ARRIVES AFTER UPLOAD")).toBeTruthy();
+  });
+
+  it("the meta row reads the badge after the opponent", () => {
+    const u = renderCard({ seen: false, item: libItem({ match_id: "m-1", completed_at: fresh }) });
+    expect(u.getByTestId("film-card-m-1").props.accessibilityLabel).toMatch(/^Open match vs M\. Park, new\. Won/);
   });
 
   it("a retryable failed upload offers Try again on the media", () => {

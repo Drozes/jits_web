@@ -15,7 +15,9 @@ import { applyFilter, buildRows, NO_FILTER, opponentsOf, recordOf, type LibraryF
 import { recordStrip } from "@/lib/film-room/format";
 import { usePalette } from "@/lib/theme/palette";
 import { useMatchesRefresh } from "@/lib/matches/use-matches-refresh";
-import { firstTags, isLowData, isZeroState, noFilmHelperMatchId, tagsFor } from "@/lib/matches/feed-states";
+import { firstTags, isLowData, isZeroState, tagsFor } from "@/lib/matches/feed-states";
+import { useNoFilmHelperId } from "@/lib/matches/use-no-film-helper";
+import { FEED_LIST_TUNING } from "@/lib/matches/feed-list-tuning";
 import { useHighlightFlags } from "@/lib/highlight/use-highlight-flags";
 import { TabHeader } from "@/components/layout/tab-header";
 import { OpponentPicker } from "@/components/film-room/opponent-picker";
@@ -88,7 +90,7 @@ export default function MatchesScreen() {
   // The carousel slot is empty until the carousel lands, so it never shows
   // C-L6 yet; once it does, pass whether its tiles carry the helper.
   const carouselShowsHelper = false;
-  const helperId = React.useMemo(() => noFilmHelperMatchId(visible, carouselShowsHelper), [visible, carouselShowsHelper]);
+  const helperId = useNoFilmHelperId(visible, phases, carouselShowsHelper);
   const zero = isZeroState({ loading: library.isLoading, error: library.error, items: library.items, filtered });
   const lowData = isLowData({ items: library.items, hasMore, filtered });
 
@@ -164,6 +166,7 @@ export default function MatchesScreen() {
         }
         onEndReached={library.hasMore && !library.moreError ? library.loadMore : undefined}
         onEndReachedThreshold={0.6}
+        {...FEED_LIST_TUNING}
         contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={p.text3} />
