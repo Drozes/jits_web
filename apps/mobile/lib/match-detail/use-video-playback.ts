@@ -650,6 +650,13 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     onPlayerErrorRef.current = onPlayerError;
   });
 
+  /**
+   * The item on the player is a superseded angle: a newer angle switch (or
+   * restore) is still signing. It is never loaded (review M1) and never
+   * started (review L6).
+   */
+  const supersededWhileSigning = () => signingRef.current && seeksAtSettle(swapKindRef.current);
+
   const startPlayback = React.useCallback(() => {
     safely(() => {
       // Setting the rate on iOS sets AVPlayer.rate, which also starts playback:
@@ -669,7 +676,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     // A newer angle switch (or restore) is still signing: this item is a
     // superseded angle. It never loads, so it does not seek, play, report
     // time, or move the point the new angle resumes at (review M1).
-    if (signingRef.current && seeksAtSettle(swapKindRef.current)) return;
+    if (supersededWhileSigning()) return;
     let ready = false;
     safely(() => {
       ready = player.status === "readyToPlay";
@@ -876,7 +883,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
           autoplayTimerRef.current = setTimeout(() => {
             autoplayTimerRef.current = null;
             if (!mountedRef.current || loadedRef.current || settledGenRef.current !== next.generation) return;
-            if (playingRef.current) startPlayback();
+            if (playingRef.current && !supersededWhileSigning()) startPlayback();
           }, AUTOPLAY_FALLBACK_MS);
         }
       };
@@ -1017,8 +1024,9 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       // settle-time play() (review L1), like the autoplay backstop.
       const current = sourceRef.current;
       if (current && settledGenRef.current === current.generation) {
-        if (playing) startPlayback();
-        else safely(() => player.pause());
+        if (playing) {
+          if (!supersededWhileSigning()) startPlayback();
+        } else safely(() => player.pause());
       }
       return;
     }

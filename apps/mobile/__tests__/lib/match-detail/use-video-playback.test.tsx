@@ -1660,6 +1660,36 @@ describe("useVideoPlayback angle switch phase 1 (jits-xfvd.16)", () => {
       beforeEach(() => jest.useFakeTimers());
       afterEach(() => jest.useRealTimers());
 
+      it("L6 (round 3): a superseded B held during C's sign is never started by the backstop or Play", async () => {
+        let resolveC!: (v: unknown) => void;
+        signAll({ "vid-9": () => new Promise((r) => (resolveC = r)) });
+        const { result } = await open();
+        const swapB = deferReplace(idx());
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/b.mp4" }));
+        act(() => result.current.switchAngle("vid-9", 21));
+        await waitFor(() => expect(mockSign).toHaveBeenCalledWith({}, "vid-9", { rendition: "720" }));
+        player().play.mockClear();
+        await act(async () => swapB.resolve());
+        // (1) The 3 s autoplay backstop, play intent on.
+        act(() => jest.advanceTimersByTime(3500));
+        expect(player().play).not.toHaveBeenCalled();
+        // (2) Pause, then Play during C's sign.
+        act(() => result.current.toggle());
+        act(() => result.current.toggle());
+        act(() => jest.advanceTimersByTime(3500));
+        expect(player().play).not.toHaveBeenCalled();
+        expect(player().playing).toBe(false);
+        await act(async () => resolveC(playable("https://s/nine.mp4")));
+        expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/nine.mp4" });
+        await flush();
+        expect(player().play).toHaveBeenCalled();
+        ready();
+        time(21.05);
+        expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+        expect(state(result)).toMatchObject({ phase: "landing", targetId: "vid-9" });
+      });
+
       it("M1 (round 2): a gate handed to C while C's sign is pending never swaps in B", async () => {
         let resolveC!: (v: unknown) => void;
         signAll({ "vid-9": () => new Promise((r) => (resolveC = r)) });
