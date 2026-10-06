@@ -212,11 +212,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
       router.setParams({ id: restoreId, t: snap.fromT.toFixed(3), approx: snap.approx });
     },
   });
-  const onPillShown = React.useCallback(() => {
-    // Added to PlaybackTelemetry by slice B1 (contract section 5); optional
-    // until both slices are merged.
-    (telemetry as { switchPillShown?: () => void }).switchPillShown?.();
-  }, [telemetry]);
+  const onPillShown = React.useCallback(() => telemetry.switchPillShown(), [telemetry]);
 
   const title = view
     ? `${shortName(view.me.display_name)} vs ${shortName(view.opponent?.display_name)}`
