@@ -6,6 +6,7 @@ import type {
   TargetRendition,
 } from "@jits/shared/utils";
 import * as tracking from "@/lib/error-tracking/sentry";
+import type { AbandonReason, InPlaceReason } from "@/lib/match-detail/keep-watching";
 import { ResidualStats } from "./multi-angle/sync-controller";
 
 /**
@@ -79,6 +80,17 @@ import { ResidualStats } from "./multi-angle/sync-controller";
  *                       multi-angle player: how each switch happened (an
  *                       opacity swap to a hot angle, an exact seek behind a
  *                       held frame, or a dip to black for clock-only sync).
+ *                       The single player counts "keep_watching" (a second
+ *                       player loads the new angle while the old one keeps
+ *                       playing, jits-xfvd.19) or "seek" (the in-place
+ *                       phase-1 switch).
+ *   switchKeepWatchingCount .. switchLoadRetryLandedCount
+ *                       single player, keep-watching switch (contract 07
+ *                       section 8): the median lead and landed-late, the p95
+ *                       sync error at LAND (exact angles), retargets plus
+ *                       hidden re-seeks, in-place fallbacks and abandons
+ *                       (count and the first 4 reasons), lock-ignored taps,
+ *                       and the silent load retries (and those that landed).
  *   syncResidualP50Ms / syncResidualP95Ms / syncSamples
  *                       multi-angle player: absolute error of the lock-stepped
  *                       angles against the master clock, sampled every master
@@ -133,7 +145,10 @@ export interface PlaybackSessionMeta {
   deviceTier?: "full" | "warm-only" | null;
 }
 
-export type SwitchMode = "swap" | "seek" | "dip";
+export type SwitchMode = "swap" | "seek" | "dip" | "keep_watching";
+
+/** Fallback and abandon reasons kept per session (the first ones, in order). */
+export const SWITCH_REASONS_KEPT = 4;
 
 export type SettingsSource = "server" | "cache" | "builtin";
 
@@ -201,6 +216,30 @@ export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   switchPillShownCount: number;
   switchFailedCount: number;
   switchSupersededCount: number;
+  /** Single player (jits-xfvd.19): started keep-watching switches. */
+  switchKeepWatchingCount: number;
+  /** Median chosen lead (ms) over landed keep-watching switches; null with none. */
+  switchLeadMs: number | null;
+  /** Median (media ms) of B's time at LAND minus map(A's time at the tap), over landed keep-watching switches. */
+  switchLandedLateMs: number | null;
+  /** p95 of |sync error| at LAND (ms), exact-synced keep-watching switches only. */
+  switchSyncErrorP95Ms: number | null;
+  /** Late-ready retargets plus hidden re-seeks. */
+  switchRetargetCount: number;
+  /** Switches that ran in place for a fallback reason. */
+  switchFallbackCount: number;
+  /** The first SWITCH_REASONS_KEPT fallback reasons, in order. */
+  switchFallbackReasons: string[];
+  /** Keep-watching switches abandoned. */
+  switchAbandonedCount: number;
+  /** The first SWITCH_REASONS_KEPT abandon reasons, in order. */
+  switchAbandonReasons: string[];
+  /** Chip taps ignored by the angle lock. */
+  switchIgnoredTapCount: number;
+  /** Silent retries of an incoming load error. */
+  switchLoadRetryCount: number;
+  /** Switches that landed after a silent retry. */
+  switchLoadRetryLandedCount: number;
   syncResidualP50Ms: number | null;
   syncResidualP95Ms: number | null;
   syncSamples: number;
@@ -286,7 +325,18 @@ export class PlaybackSession {
   /** A switch is waiting for the new angle's first frame (tap time). */
   private switchAt: number | null = null;
   private switchLatencies: number[] = [];
-  private switchModes: Record<SwitchMode, number> = { swap: 0, seek: 0, dip: 0 };
+  private switchModes: Record<SwitchMode, number> = { swap: 0, seek: 0, dip: 0, keep_watching: 0 };
+  private switchLeads: number[] = [];
+  private switchLandedLate: number[] = [];
+  private switchSyncErrors: number[] = [];
+  private switchRetargetCount = 0;
+  private switchFallbackCount = 0;
+  private switchFallbackReasons: string[] = [];
+  private switchAbandonedCount = 0;
+  private switchAbandonReasons: string[] = [];
+  private switchIgnoredTapCount = 0;
+  private switchLoadRetryCount = 0;
+  private switchLoadRetryLandedCount = 0;
   private switchHeldStillCount = 0;
   private switchPillShownCount = 0;
   private switchFailedCount = 0;
@@ -520,6 +570,42 @@ export class PlaybackSession {
     this.switchSupersededCount += 1;
   }
 
+  /** A keep-watching switch landed (jits-xfvd.19): lead, landed-late, |error| at LAND, exact-synced, after a retry. */
+  switchKeepWatchingLanded(s: { leadMs: number; landedLateMs: number; syncErrorMs: number; exact: boolean; afterRetry: boolean }): void {
+    if (Number.isFinite(s.leadMs)) this.switchLeads.push(Math.round(s.leadMs));
+    if (Number.isFinite(s.landedLateMs)) this.switchLandedLate.push(Math.round(s.landedLateMs));
+    if (s.exact && Number.isFinite(s.syncErrorMs)) this.switchSyncErrors.push(Math.abs(s.syncErrorMs));
+    if (s.afterRetry) this.switchLoadRetryLandedCount += 1;
+  }
+
+  /** A late-ready retarget or a hidden re-seek of the incoming angle. */
+  switchRetarget(): void {
+    this.switchRetargetCount += 1;
+  }
+
+  /** A switch ran in place for a fallback reason. */
+  switchFallback(reason: InPlaceReason): void {
+    this.switchFallbackCount += 1;
+    if (this.switchFallbackReasons.length < SWITCH_REASONS_KEPT) this.switchFallbackReasons.push(reason);
+  }
+
+  /** A keep-watching switch was abandoned; it will never land. */
+  switchAbandoned(reason: AbandonReason): void {
+    this.switchAbandonedCount += 1;
+    if (this.switchAbandonReasons.length < SWITCH_REASONS_KEPT) this.switchAbandonReasons.push(reason);
+    this.switchAt = null;
+  }
+
+  /** The one silent retry of an incoming load error. */
+  switchLoadRetried(): void {
+    this.switchLoadRetryCount += 1;
+  }
+
+  /** A chip tap ignored by the angle lock. */
+  switchTapIgnored(): void {
+    this.switchIgnoredTapCount += 1;
+  }
+
   /** One smoothed sync error sample of a lock-stepped angle (seconds). */
   syncResidual(errorS: number): void {
     this.residuals.add(errorS);
@@ -669,6 +755,18 @@ export class PlaybackSession {
       switchPillShownCount: this.switchPillShownCount,
       switchFailedCount: this.switchFailedCount,
       switchSupersededCount: this.switchSupersededCount,
+      switchKeepWatchingCount: this.switchModes.keep_watching,
+      switchLeadMs: median(this.switchLeads),
+      switchLandedLateMs: median(this.switchLandedLate),
+      switchSyncErrorP95Ms: percentile(this.switchSyncErrors, 95),
+      switchRetargetCount: this.switchRetargetCount,
+      switchFallbackCount: this.switchFallbackCount,
+      switchFallbackReasons: [...this.switchFallbackReasons],
+      switchAbandonedCount: this.switchAbandonedCount,
+      switchAbandonReasons: [...this.switchAbandonReasons],
+      switchIgnoredTapCount: this.switchIgnoredTapCount,
+      switchLoadRetryCount: this.switchLoadRetryCount,
+      switchLoadRetryLandedCount: this.switchLoadRetryLandedCount,
       syncResidualP50Ms: this.residuals.percentile(50),
       syncResidualP95Ms: this.residuals.percentile(95),
       syncSamples: this.residuals.count,
@@ -767,6 +865,14 @@ export class PlaybackSession {
     if (this.currentRendition) this.msOn[this.currentRendition] += ms;
     this.playingSince = null;
   }
+}
+
+/** Nearest-rank percentile, rounded; null with no values. */
+function percentile(values: number[], p: number): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const i = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+  return Math.round(sorted[i]);
 }
 
 function median(values: number[]): number | null {

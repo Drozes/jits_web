@@ -14,6 +14,7 @@ import {
   type SwitchMode,
 } from "./playback-telemetry";
 import { recordSessionHistory } from "./quality/history-store";
+import type { AbandonReason, InPlaceReason } from "@/lib/match-detail/keep-watching";
 
 export type StallEvent = { kind: "start" | "end"; at: number };
 
@@ -60,6 +61,18 @@ export interface PlaybackTelemetry {
   switchHeldStill: () => void;
   /** The Syncing pill became visible for a switch (once per switch seq). */
   switchPillShown: () => void;
+  /** A keep_watching switch landed: lead (ms), landed-late (media ms), |error| at LAND (ms), exact-synced? */
+  switchKeepWatchingLanded: (s: { leadMs: number; landedLateMs: number; syncErrorMs: number; exact: boolean; afterRetry: boolean }) => void;
+  /** A late-ready retarget or a hidden re-seek. */
+  switchRetarget: () => void;
+  /** A switch ran in_place for a fallback reason. */
+  switchFallback: (reason: InPlaceReason) => void;
+  /** A keep_watching switch was abandoned. */
+  switchAbandoned: (reason: AbandonReason) => void;
+  /** The one silent retry of an incoming load error (7.1). */
+  switchLoadRetried: () => void;
+  /** A chip tap ignored by the angle lock (called by the screen, jits-xfvd.19). */
+  switchTapIgnored: () => void;
   /** A switch failed (its angle could not be loaded; the previous one is restored). */
   switchFailed: () => void;
   /** A pending switch was replaced by another before it landed. */
@@ -166,8 +179,22 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
     };
   }, [flush, open]);
 
+  // The match player's front slot changes at a keep-watching landing
+  // (jits-xfvd.19): the session follows the new front player, and its playing
+  // state is resynced from it, so the role swap is never seen as a pause or a
+  // stall. The incoming player is never observed while hidden.
+  const boundPlayerRef = React.useRef<VideoPlayer | null>(null);
   React.useEffect(() => {
     const subs: Array<{ remove: () => void }> = [];
+    const rebound = boundPlayerRef.current != null && boundPlayerRef.current !== player;
+    boundPlayerRef.current = player;
+    if (rebound) {
+      try {
+        sessionRef.current?.playing(player.playing === true, Date.now());
+      } catch {
+        /* a released player: nothing to resync */
+      }
+    }
     try {
       subs.push(
         player.addListener("statusChange", ({ status, error }) => {
@@ -228,6 +255,12 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
       switchLanded: () => sessionRef.current?.switchLanded(Date.now()),
       switchHeldStill: () => sessionRef.current?.switchHeldStill(),
       switchPillShown: () => sessionRef.current?.switchPillShown(),
+      switchKeepWatchingLanded: (s) => sessionRef.current?.switchKeepWatchingLanded(s),
+      switchRetarget: () => sessionRef.current?.switchRetarget(),
+      switchFallback: (reason) => sessionRef.current?.switchFallback(reason),
+      switchAbandoned: (reason) => sessionRef.current?.switchAbandoned(reason),
+      switchLoadRetried: () => sessionRef.current?.switchLoadRetried(),
+      switchTapIgnored: () => sessionRef.current?.switchTapIgnored(),
       switchFailed: () => sessionRef.current?.switchFailed(),
       switchSuperseded: () => sessionRef.current?.switchSuperseded(),
       error: (message) => sessionRef.current?.error(message),
