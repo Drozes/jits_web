@@ -310,6 +310,13 @@ TABS = APP + ["app/(app)/(tabs)/_layout.tsx"]
 HOME = TABS + ["app/(app)/(tabs)/(home)/_layout.tsx", "app/(app)/(tabs)/(home)/index.tsx"]
 ARENA = TABS + ["app/(app)/(tabs)/arena/_layout.tsx", "app/(app)/(tabs)/arena/index.tsx"]
 PROFILE = TABS + ["app/(app)/(tabs)/profile/_layout.tsx"]
+MATCHES = TABS + ["app/(app)/(tabs)/matches/_layout.tsx", "app/(app)/(tabs)/matches/index.tsx"]
+# The Matches tab's state rules and tile models are lib view models the walk does not traverse
+# (feed-states: FIRST MATCH / FIRST WIN, low data, no film; reel-lane: the carousel tiles;
+# card-media: the feed card media; milestone-store: which milestone celebrates).
+MATCHES_LIB = ["apps/mobile/lib/" + x for x in [
+    "matches/feed-states.ts", "highlight/reel-lane.ts", "film-room/card-media.ts", "milestones/milestone-store.ts"]]
+MC = "components/matches/"
 SETTINGS = APP + ["app/(app)/settings/_layout.tsx"]
 MF = "components/match-flow/"
 # Every step body of the match wizard; each match board keeps only the steps it draws.
@@ -371,6 +378,15 @@ BOARDS = {
     "17-Profile.dc.html": dict(seeds=PROFILE + ["app/(app)/(tabs)/profile/index.tsx"],
                                exclude=["components/share-profile-sheet.tsx"], extra=UPLOAD_LIB),
     "18-Profile-Stats.dc.html": dict(seeds=PROFILE + ["app/(app)/(tabs)/profile/stats.tsx"]),
+    # The Matches tab (specs/matches-tab, shipped db429e41): default feed, zero state, low data,
+    # and one sheet of its loading, error, empty-filter, reel tile and milestone states.
+    "19-Matches.dc.html": dict(seeds=MATCHES, exclude=[
+        MC + "matches-zero-state.tsx", MC + "match-feed-skeleton.tsx", MC + "next-match-ghost-card.tsx"],
+        extra=MATCHES_LIB),
+    "19b-Matches-Zero.dc.html": dict(seeds=MATCHES, exclude=[MC + "match-feed-skeleton.tsx"], extra=MATCHES_LIB),
+    "19c-Matches-Low-Data.dc.html": dict(seeds=MATCHES, exclude=[
+        MC + "matches-zero-state.tsx", MC + "match-feed-skeleton.tsx"], extra=MATCHES_LIB),
+    "19d-Matches-States.dc.html": dict(seeds=MATCHES, extra=MATCHES_LIB),
     "21-Faceoff-Weight.dc.html": match("faceoff/faceoff-body.tsx"),
     "22-Ready-Check.dc.html": match("faceoff/faceoff-body.tsx", "match-recorder-surface.tsx", "camera-overlay.tsx"),
     "21b-Faceoff-Flagged.dc.html": match("faceoff/faceoff-body.tsx", "faceoff/faceoff-weight-check.tsx"),
@@ -385,7 +401,9 @@ BOARDS = {
     "27-Confirm.dc.html": match("steps/confirm-step.tsx"),
     "28-Dispute.dc.html": match("steps/confirm-step.tsx", "steps/dispute-form.tsx"),
     "29-Verdict.dc.html": dict(**{**match("verdict/verdict-step.tsx"), "extra": FILM_STATUS_LIB}),
-    "31-Film-Room.dc.html": dict(seeds=APP + ["app/(app)/film-room.tsx"], extra=UPLOAD_LIB + [M + "lib/video/video-status-copy.ts"]),
+    # Retired 2026-10-06 (db429e41): the route renders nothing and redirects to the Matches tab;
+    # the board is kept, relabelled, until the route is deleted (jits-766g).
+    "31-Film-Room.dc.html": dict(seeds=APP + ["app/(app)/film-room.tsx"]),
     "32-Match-Detail.dc.html": dict(seeds=APP + ["app/(app)/match-detail/[matchId].tsx"], extra=UPLOAD_LIB + FILM_STATUS_LIB),
     "33-Video-Player.dc.html": dict(seeds=APP + ["app/(app)/video/[id].tsx"]),
     "34-Highlight-Viewer.dc.html": dict(seeds=APP + ["app/(app)/highlight/[id].tsx"],
@@ -398,7 +416,7 @@ BOARDS = {
     "36-Athlete.dc.html": dict(seeds=APP + ["app/(app)/athlete/[id].tsx"], exclude=["components/compare-stats-modal.tsx"]),
     "37-Compare-Stats.dc.html": dict(seeds=APP + ["app/(app)/athlete/[id].tsx"]),
     # Upload states sheet (approved 2026-10-05): the verdict / match page upload card in every
-    # state, the Film Room card upload badges, and the backgrounded-upload local notification.
+    # state, the Matches feed card upload badges, and the backgrounded-upload local notification.
     "38-Upload-States.dc.html": dict(seeds=[
         "components/match-flow/upload-progress-banner.tsx", "components/match-detail/match-upload-card.tsx",
         "components/matches/match-feed-media.tsx", "components/film-room/status-badge.tsx",
