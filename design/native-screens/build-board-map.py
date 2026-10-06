@@ -421,6 +421,8 @@ BOARDS = {
                       "lib/updates/update-policy.ts"]),
     # Admin repeat disputers list (Settings > Admin > Repeat disputers).
     "49-Admin-Disputers.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/admin/disputers.tsx"]),
+    # Video settings: playback quality (jits-xfvd.12; board approved 2026-10-06).
+    "62-Settings-Video.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/video.tsx"]),
     # Invites, friends & location (jr_be spec 016, shipped dark in 41d79a4; drawn flag-on).
     "50-Invite-Challenge.dc.html": dict(seeds=APP + ["app/(app)/invite/index.tsx"]),
     "51-Invite-Join.dc.html": dict(seeds=APP + ["app/(app)/invite/join.tsx"]),
