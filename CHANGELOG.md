@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Match player: keep-watching angle switch, phase 1.5 (jits-xfvd.19)
+
+Owner feedback after phase 1: "When I switch, the video still stalls for a second." Now angle 1 keeps playing, with its audio, until angle 2 is ready and in step; then a crossfade. JS-only on mobile (OTA on runtime 0.5.0: a second `useVideoPlayer`, `VideoView` `surfaceType` at mount, `muted`, `volume`, `bufferOptions`, `replaceAsync(null)` and `expo-device` are all in build 25). Contract: `research/2026-10-multi-angle-playback/07-keep-watching-contract.md`. No video bytes before the tap (no preload on cellular). Rollback: `KEEP_WATCHING_ENABLED = false` in `apps/mobile/lib/match-detail/keep-watching.ts` restores phase 1 exactly.
+
+**Added**
+- `apps/mobile/lib/match-detail/keep-watching.ts`: the pure planner (constants, network class, the incoming target t0 with coverage, start decision, chase step, equal-power ramp gains, the retry re-sign rule, the Android decoder check). `apps/mobile/lib/match-detail/switch-lead-store.ts`: per network class EWMAs of ready and start latency (the adaptive lead) and the decoder latch. Neither imports the single player, so the multi-angle player (jits-xfvd.3) can reuse them.
+- `useVideoPlayback` (`apps/mobile/lib/match-detail/use-video-playback.ts`): two slot players for the screen's life (`players`, `frontSlot`, `onSlotFirstFrame`). A tap between angles that both carry a sync offset, on a ready front, loads the target muted in the other slot while the front keeps playing, chases it into step hidden (within 2 frames for 2 samples, or lands by a cap with the leftover offset), and lands with an equal-power 240 ms audio ramp: the front, activeId, source and clock move to the new slot in one update; the old slot is released 300 ms later. Paused switches land on the post-seek frame. Pause, play, speed, seek and the front ending retarget the incoming player. Abandons (sign failure, a load error after one silent retry, an Android decoder error with a latch, an 8 s / 12 s timeout, background, navigation, unmount, a front error) leave angle 1 playing and always unlock; failures show the phase-1 tag. Everything else (no offsets, warm-only Android tier, kill switch, latch, front not ready, a quality swap) runs the shipped in-place switch.
+- `apps/mobile/components/film-room/angle-view-stack.tsx`: `AngleViewStack`, one `VideoView` per slot (Android TextureViews on both), each an opaque black box. The outgoing angle's view stays on top at the landing and fades out over `duration.fast` on the brand ease-out (Angle crossfade), dips for an approximate angle (Angle dip) or cuts under Reduce Motion; the poster never shows during a keep-watching switch.
+- Telemetry (`apps/mobile/lib/video/playback-telemetry.ts`, `use-playback-telemetry.ts`): switch mode `keep_watching`; keep-watching count, median lead and landed-late, p95 sync error at landing, retargets, fallbacks and abandons (first 4 reasons each), lock-ignored taps, silent load retries. The telemetry follows the front player across the role swap.
+
+**Changed**
+- The angle LOCK (owner, 2026-10-06), both modes: from the tap until the switch settles or is abandoned, the tapped chip is busy + selected and every other chip is disabled and dimmed to `opacity-disabled` 0.5; their taps only count in telemetry (no haptic, no switch). The engine also ignores `switchAngle` while a switch is in flight. No haptic at the landing or at an abandon.
+- `AngleSwitcher` (`apps/mobile/components/film-room/angle-switcher.tsx`): `locked` and `onIgnoredTap`; locked chips hold still on the same element (`PressableScale` gains `still`: no press scale or Reduce Motion dip, the press still fires), so screen-reader focus is kept.
+- Match player screen (`apps/mobile/app/(app)/video/[id].tsx`): renders `AngleViewStack`; passes both angles' offsets to `switchAngle` only when both carry one (an unsynced pair runs in place); in keep-watching the clock, seek bar, key moments and route flip at the crossfade (the route with the landed time), and the phase-1 chrome snapshot applies to in-place switches only. `SwitchOverlay` holds its still for in-place switches only.
+- DESIGN.md Motion registry and its mirror `design/system/project/Motion.md`: Angle crossfade, Angle dip, new Audio crossfade, Held frame, Syncing pill, Angle segment press and Press scale rows.
+
 ### Video: film chip contrast over bright frames (jits-3liz)
 
 **Fixed**
