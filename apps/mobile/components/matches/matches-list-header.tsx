@@ -10,8 +10,8 @@ export interface MatchesListHeaderProps {
   record: string;
   /**
    * The "Your highlights" reel carousel (spec 6.1 item 3), between the record
-   * strip and the chips. Filters never apply to it. Null renders nothing, so
-   * the tab ships without it until the carousel lands (jits-a4fw.4).
+   * strip and the chips. Filters never apply to it. Null renders nothing (the
+   * screen passes null when the lane has no tiles: clips off or a failed read).
    */
   carousel?: React.ReactNode;
   filter: LibraryFilter;

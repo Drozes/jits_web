@@ -1,6 +1,5 @@
 import * as React from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { SkeletonBlock, SkeletonProvider } from "@/components/ui/skeleton";
 import { usePalette } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { matchCountLabel } from "@/lib/film-room/format";
@@ -19,27 +18,6 @@ export function MonthHeader({ label, count }: { label: string; count: number | n
           {matchCountLabel(count)}
         </Text>
       ) : null}
-    </View>
-  );
-}
-
-/**
- * A month rule and three rows of 3:4 poster blocks with the registered
- * skeleton shimmer (Motion Rule registry, Ambient, while loading); plain
- * static bars under Reduce Motion.
- */
-export function FilmRoomSkeleton() {
-  return (
-    <View testID="film-room-loading" accessibilityLabel="Loading your matches" style={{ marginTop: 22 }}>
-      <SkeletonProvider>
-        <SkeletonBlock height={10} width="40%" radius="xs" />
-        {[0, 1, 2].map((r) => (
-          <View key={r} className="flex-row" style={{ gap: 16, marginTop: 16 }}>
-            <SkeletonBlock className="flex-1" style={{ aspectRatio: 3 / 4 }} radius="xs" />
-            <SkeletonBlock className="flex-1" style={{ aspectRatio: 3 / 4 }} radius="xs" />
-          </View>
-        ))}
-      </SkeletonProvider>
     </View>
   );
 }

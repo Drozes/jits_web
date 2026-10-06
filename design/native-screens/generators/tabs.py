@@ -709,7 +709,8 @@ def highlight_tile(opp, secs):
 
 
 def film_poster(opp_short, opp_full, letter, line, date, line_color):
-    # film-room/poster-card.tsx compact (120 wide, 3:4), poster present: still + bottom scrim (0 -> .88 over 58%),
+    # Draws the retired Film Room poster card (was film-room/poster-card.tsx, deleted in jits-a4fw.8; the Matches
+    # feed card replaced it and this board is redrawn by /canvas-sync), compact (120 wide, 3:4), poster present: still + bottom scrim (0 -> .88 over 58%),
     # READY outline badge top/right 8, W tag (h20 rounded 2, border green, tag fill .45 black), name heading 13 caps,
     # data line mono-bold 11 in outcome colour, date mono-medium 10 text2 (all inline: literal)
     return (f'<a href="32-Match-Detail.dc.html" aria-label="Open match video vs {opp_full}" style="position: relative; flex-shrink: 0; width: 120px; '

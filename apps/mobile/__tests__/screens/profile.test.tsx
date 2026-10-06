@@ -73,9 +73,10 @@ jest.mock("@/lib/film-room/use-match-library", () => ({
   useMatchLibraryFirstPage: (...a: unknown[]) => mockUseMatchLibraryFirstPage(...a),
   useMatchLibrary: (...a: unknown[]) => mockUseMatchLibrary(...a),
 }));
-const mockUseMyHighlights = jest.fn();
-jest.mock("@/lib/highlight/use-my-highlights", () => ({
-  useMyHighlights: (...a: unknown[]) => mockUseMyHighlights(...a),
+// useMyHighlights was deleted (jits-a4fw.8); the reel lane is the only highlights reader now.
+const mockUseReelLane = jest.fn();
+jest.mock("@/lib/highlight/use-reel-lane", () => ({
+  useReelLane: (...a: unknown[]) => mockUseReelLane(...a),
 }));
 function mockStub(testID: string) {
   const R = require("react");
@@ -132,7 +133,7 @@ describe("Profile refresh", () => {
     expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
     expect(mockUseMatchLibraryFirstPage).not.toHaveBeenCalled();
     expect(mockUseMatchLibrary).not.toHaveBeenCalled();
-    expect(mockUseMyHighlights).not.toHaveBeenCalled();
+    expect(mockUseReelLane).not.toHaveBeenCalled();
   });
 
   it("pull-to-refresh re-reads the profile only", () => {
@@ -145,7 +146,7 @@ describe("Profile refresh", () => {
     });
     expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
     expect(mockUseMatchLibraryFirstPage).not.toHaveBeenCalled();
-    expect(mockUseMyHighlights).not.toHaveBeenCalled();
+    expect(mockUseReelLane).not.toHaveBeenCalled();
   });
 });
 

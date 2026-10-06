@@ -401,7 +401,7 @@ BOARDS = {
     # state, the Film Room card upload badges, and the backgrounded-upload local notification.
     "38-Upload-States.dc.html": dict(seeds=[
         "components/match-flow/upload-progress-banner.tsx", "components/match-detail/match-upload-card.tsx",
-        "components/film-room/poster-card.tsx", "components/film-room/status-badge.tsx",
+        "components/matches/match-feed-media.tsx", "components/film-room/status-badge.tsx",
         "lib/film-room/card-status.ts", "lib/match-detail/film-section.ts",
         "lib/video/upload-copy.ts", "lib/video/upload-errors.ts", "lib/video/upload-banner-state.ts",
         "lib/video/use-upload-actions.ts", "lib/video/upload-capabilities.ts", "lib/video/upload-background-notice.ts"]),

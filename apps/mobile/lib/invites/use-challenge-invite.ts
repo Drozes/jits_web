@@ -95,7 +95,13 @@ export function useChallengeInvite(
 
   const create = React.useCallback(async () => {
     setPhase({ kind: "creating" });
-    const res = await createInvite(supabase, entryPoint);
+    let res = await createInvite(supabase, entryPoint);
+    // A backend that lags the client's entry points (e.g. `matches` before
+    // jr_be B5) rejects the value: retry once unattributed, so the invite
+    // itself never fails over analytics.
+    if (!res.ok && res.error.hint === "invalid_entry_point" && entryPoint !== null) {
+      res = await createInvite(supabase, null);
+    }
     if (unmountedRef.current) {
       if (res.ok) void revokeInvite(supabase, res.data.invite_id);
       return;

@@ -11,9 +11,13 @@ configure({ asyncUtilTimeout: 5_000 });
 type HostNode = ReturnType<typeof render>["UNSAFE_root"];
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
+const mockSetParams = jest.fn();
+let mockParams: Record<string, string | undefined> = {};
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
+  useRouter: () => ({ push: mockPush, navigate: mockNavigate, setParams: mockSetParams, back: jest.fn(), replace: jest.fn(), canGoBack: () => true }),
   useFocusEffect: jest.fn(),
+  useLocalSearchParams: () => mockParams,
 }));
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -58,8 +62,13 @@ jest.mock("@/lib/auth/hooks", () => ({
     athlete: { id: mockAthleteId(), display_name: "Kai Reyes", current_elo: 1526, primary_gym_id: null, profile_photo_url: null },
   }),
 }));
+let mockStats: { wins: number; losses: number; draws: number } | null = null;
+const mockProfileRefetch = jest.fn();
+const mockUseProfileData = jest.fn();
 jest.mock("@/lib/profile/use-profile-data", () => ({
-  useProfileData: () => ({
+  useProfileData: (...a: unknown[]) => (mockUseProfileData(...a), {
+    stats: mockStats,
+    onRefresh: mockProfileRefetch,
     history: [
       ...Array.from({ length: 15 }, () => ({ athlete_outcome: "win" })),
       ...Array.from({ length: 7 }, () => ({ athlete_outcome: "loss" })),
@@ -67,11 +76,35 @@ jest.mock("@/lib/profile/use-profile-data", () => ({
     ],
   }),
 }));
-jest.mock("@/lib/highlight/use-highlight-flags", () => ({ useHighlightFlags: () => ({ clipsEnabled: mockClips(), shareEnabled: false }) }));
+// The screen owns the Matches reel lane: a controllable lane result here
+// (the lane hook has its own suite). Clips come from the lane read.
 let mockClipsOn = true;
-function mockClips() {
-  return mockClipsOn;
-}
+let mockLaneOver: Record<string, unknown> = {};
+const mockLaneRefetch = jest.fn();
+const mockUseReelLane = jest.fn();
+jest.mock("@/lib/highlight/use-reel-lane", () => ({
+  useReelLane: (...a: unknown[]) => {
+    mockUseReelLane(...a);
+    return {
+      items: [],
+      inFlight: [],
+      clipsEnabled: mockClipsOn,
+      loading: false,
+      error: null,
+      loadMoreError: null,
+      hasMore: false,
+      loadingMore: false,
+      cursor: null,
+      loadMore: jest.fn(),
+      refetch: mockLaneRefetch,
+      markSeenLocally: jest.fn(),
+      ...mockLaneOver,
+    };
+  },
+  fetchReelPage: jest.fn(),
+}));
+jest.mock("@/components/reels/reel-motion", () => ({ runRingPulse: jest.fn(), runReveal: jest.fn(), runShimmer: jest.fn() }));
+jest.mock("@/lib/highlight/highlight-event", () => ({ logHighlightEvent: jest.fn() }));
 const mockFlagState = jest.fn();
 jest.mock("@/lib/invites/use-invites-enabled", () => ({ useInvitesFlagState: () => mockFlagState() }));
 jest.mock("@/lib/match-flow/use-my-active-match", () => ({ useMyActiveMatch: () => ({ match: null, refresh: jest.fn() }) }));
@@ -97,6 +130,12 @@ import MatchesScreen from "@/app/(app)/(tabs)/matches/index";
 import { __resetSeenMatches, isMatchSeen, loadSeenMatches, markMatchSeen } from "@/lib/film-room/seen-store";
 import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 import { libItem, libVideo } from "../support/film-fixtures";
+import { reelItem } from "../support/reel-tile-fixtures";
+
+/** A lane with three ready reels: the carousel shows no C-L5 ghost, so no C-L6 there. */
+function withReels() {
+  mockLaneOver = { items: [reelItem("r1"), reelItem("r2"), reelItem("r3")] };
+}
 
 const NOW = new Date();
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000).toISOString();
@@ -148,6 +187,9 @@ beforeEach(async () => {
   jest.clearAllMocks();
   mockSeq += 1;
   mockClipsOn = true;
+  mockLaneOver = {};
+  mockParams = {};
+  mockStats = null;
   mockFlagState.mockReturnValue({ enabled: true, known: true, state: "on" });
   __resetSeenMatches();
   resetMatchUploadStore();
@@ -169,8 +211,9 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     // A tab root: no back button, and no Film Room title any more.
     expect(utils.queryByLabelText("Go back")).toBeNull();
     expect(utils.queryByText("FILM ROOM")).toBeNull();
-    // The carousel slot stays empty until the carousel lands (jits-a4fw.4).
-    expect(utils.queryByTestId("matches-carousel-slot")).toBeNull();
+    // The carousel slot holds the lane's skeleton while the library loads.
+    expect(utils.getByTestId("matches-carousel-slot")).toBeTruthy();
+    expect(utils.getByText("Your highlights")).toBeTruthy();
   });
 
   it("lists full-width feed cards under a month heading; the meta row opens the match page and clears NEW", async () => {
@@ -244,19 +287,21 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
   });
 
   it("uses the signed still when there is one and the two-athlete fallback otherwise", async () => {
+    withReels();
     const utils = await renderLoaded();
     const still = within(utils.getByTestId("match-feed-card-m-new")).getByTestId("feed-poster");
     expect(still.props.source).toEqual({ uri: "https://signed/k.jpg", cacheKey: "film-still-k.jpg" });
     const failed = utils.getByTestId("match-feed-card-m-failed");
     expect(within(failed).getByTestId("opening-still-fallback")).toBeTruthy();
     expect(within(failed).getByText("FILM FAILED TO PROCESS")).toBeTruthy();
-    // No video rows at all: C-L7, and the first such card teaches C-L6 (the carousel slot is empty).
+    // No video rows at all: C-L7, and the first such card teaches C-L6 (the carousel shows reels, so no C-L6 there).
     const noFilm = utils.getByTestId("match-feed-card-m-up");
     expect(within(noFilm).getByText("NO FILM FOR THIS ONE")).toBeTruthy();
     expect(within(noFilm).getByTestId("film-card-helper")).toHaveTextContent("Turn on Record from my phone at face-off.");
   });
 
   it("a zero-video card still uploading on this phone is skipped: the helper moves to the next C-L7 card", async () => {
+    withReels();
     act(() => {
       setMatchUpload("nf-1", { status: "uploading", progress: 0.2 });
     });
@@ -278,6 +323,7 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
   });
 
   it("teaches the recording helper on the first no-film card only (AC 6.7)", async () => {
+    withReels();
     const utils = await renderLoaded(
       page([
         libItem({ match_id: "f", completed_at: daysAgo(0) }),
@@ -496,6 +542,196 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     await waitFor(() => expect(utils.getByTestId("film-card-m-new")).toBeTruthy());
   });
 
+  it("mounts the Your highlights carousel over its own lane, with the library's phases as the building fallback", async () => {
+    withReels();
+    const utils = await renderLoaded();
+    expect(mockUseReelLane).toHaveBeenLastCalledWith(mockAthleteId(), "matches", { fallbackInFlight: expect.any(Array) });
+    expect(within(utils.getByTestId("matches-carousel-slot")).getByText("Your highlights")).toBeTruthy();
+    expect(utils.getByTestId("reel-tile-ready:r1")).toBeTruthy();
+  });
+
+  it("the card helper is suppressed while the carousel shows C-L6 (no reels yet, AC 6.7)", async () => {
+    const utils = await renderLoaded();
+    const slot = utils.getByTestId("matches-carousel-slot");
+    expect(within(slot).getByLabelText("Record your next match to get a highlight")).toBeTruthy();
+    expect(within(slot).getByText("Turn on Record from my phone at face-off.")).toBeTruthy();
+    expect(within(utils.getByTestId("match-feed-card-m-up")).getByText("NO FILM FOR THIS ONE")).toBeTruthy();
+    expect(utils.queryByTestId("film-card-helper")).toBeNull();
+  });
+
+  it("a short shelf (1 to 2 reels) appends the C-L5 ghost, so the card helper is suppressed too (AC 6.7a)", async () => {
+    mockLaneOver = { items: [reelItem("r1")] };
+    const utils = await renderLoaded();
+    expect(within(utils.getByTestId("matches-carousel-slot")).getByLabelText("Record your next match to get a highlight")).toBeTruthy();
+    expect(utils.queryByTestId("film-card-helper")).toBeNull();
+  });
+
+  it("clips off hides the carousel entirely (AC 6.11)", async () => {
+    mockClipsOn = false;
+    const utils = await renderLoaded();
+    expect(utils.queryByTestId("matches-carousel-slot")).toBeNull();
+    // With no carousel C-L6, the first no-film card teaches it.
+    expect(within(utils.getByTestId("match-feed-card-m-up")).getByTestId("film-card-helper")).toBeTruthy();
+  });
+
+  it("zero matches: the carousel shows the first-highlight ghosts above the hero (AC 6.1)", async () => {
+    const utils = await renderLoaded(page([]));
+    const slot = utils.getByTestId("matches-carousel-slot");
+    expect(within(slot).getByLabelText("Your first highlight lands here")).toBeTruthy();
+    expect(utils.getByTestId("matches-zero")).toBeTruthy();
+  });
+
+  it("zero matches waits for the lane's clips read instead of flashing the clips-off copy", async () => {
+    mockClipsOn = false;
+    mockLaneOver = { loading: true };
+    const utils = await renderLoaded(page([]));
+    expect(utils.queryByTestId("matches-zero")).toBeNull();
+    expect(utils.queryByText("Your first match lands here")).toBeNull();
+    mockLaneOver = { loading: false };
+    utils.rerender(<MatchesScreen />);
+    expect(utils.getByText("Your first match lands here")).toBeTruthy();
+  });
+
+  it("zero matches when the lane read failed: fail-closed film copy, no carousel", async () => {
+    mockClipsOn = false;
+    mockLaneOver = { error: { code: "UNKNOWN", message: "offline" } };
+    const utils = await renderLoaded(page([]));
+    expect(utils.queryByTestId("matches-carousel-slot")).toBeNull();
+    expect(utils.getByText("Your first match lands here")).toBeTruthy();
+  });
+
+  it("pull to refresh re-reads the reel lane too, forcing past the read throttle (AC 2.3)", async () => {
+    const utils = await renderLoaded();
+    mockLaneRefetch.mockClear();
+    const list = utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0];
+    await act(async () => {
+      list.props.refreshControl.props.onRefresh();
+    });
+    expect(mockLaneRefetch).toHaveBeenCalledWith(true);
+  });
+
+  describe("milestones (spec 10.6, AC 6.10)", () => {
+    const router = require("expo-router") as { useFocusEffect: jest.Mock };
+    beforeEach(() => {
+      // Focus effects run here (the milestone hook waits for focus).
+      router.useFocusEffect.mockImplementation((cb: () => void) => {
+        const R = require("react");
+        R.useEffect(() => cb(), [cb]);
+      });
+    });
+    afterEach(() => {
+      router.useFocusEffect.mockReset();
+    });
+
+    it("celebrates a first win on its card: the First win banner above it and the burst, logged once", async () => {
+      mockStats = { wins: 1, losses: 0, draws: 0 };
+      withReels();
+      const utils = await renderLoaded(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win" })]));
+      const banner = await utils.findByTestId("milestone-banner-first_win");
+      expect(banner.props.accessibilityLabel).toBe("First win. That one counts.");
+      expect(utils.queryByTestId("milestone-banner-first_match")).toBeNull();
+      expect(utils.getByTestId("milestone-burst", { includeHiddenElements: true })).toBeTruthy();
+      expect(mockCapture).toHaveBeenCalledWith("matches.milestone_shown", { level: "info", tags: { milestone: "first_win" } });
+      // Both permanent tags stay on the card (FIRST MATCH and FIRST WIN).
+      expect(within(utils.getByTestId("film-card-w1")).getByText("FIRST MATCH")).toBeTruthy();
+      expect(within(utils.getByTestId("film-card-w1")).getByText("FIRST WIN")).toBeTruthy();
+      // A tap dismisses it.
+      fireEvent.press(banner);
+      await waitFor(() => expect(utils.queryByTestId("milestone-banner-first_win")).toBeNull());
+    });
+
+    it("celebrates the first highlight on the carousel when Matches opens first", async () => {
+      mockLaneOver = { items: [reelItem("only", { unseen: true, readyAt: daysAgo(0) })] };
+      const utils = await renderLoaded();
+      const slot = utils.getByTestId("matches-carousel-slot");
+      expect(await within(slot).findByTestId("milestone-banner-first_highlight")).toBeTruthy();
+    });
+
+    it("after the athlete's first match (a match exit), the stats are refetched and First match shows (B1)", async () => {
+      mockStats = { wins: 0, losses: 0, draws: 0 };
+      const utils = await renderLoaded(page([]));
+      expect(utils.getByTestId("matches-zero")).toBeTruthy();
+      const { useArenaMatchScreen } = require("@/lib/arena/arena-store") as { useArenaMatchScreen: (id?: string) => void };
+      function InMatch() {
+        useArenaMatchScreen();
+        return null;
+      }
+      const match = render(<InMatch />);
+      // The match ends: the profile and the library re-read on the exit.
+      mockStats = { wins: 0, losses: 1, draws: 0 };
+      mockGetMyMatchLibrary.mockResolvedValue(page([libItem({ match_id: "first", completed_at: daysAgo(0), outcome: "loss", elo_delta: -9 })]));
+      mockProfileRefetch.mockClear();
+      await act(async () => {
+        match.unmount();
+      });
+      expect(mockProfileRefetch).toHaveBeenCalled();
+      await waitFor(() => expect(utils.getByTestId("film-card-first")).toBeTruthy());
+      const banner = await utils.findByTestId("milestone-banner-first_match");
+      expect(banner.props.accessibilityLabel).toBe("First match in the books");
+    });
+
+    it("pull to refresh re-reads the profile stats too, read quietly (no profile toast on this tab)", async () => {
+      const utils = await renderLoaded();
+      expect(mockUseProfileData).toHaveBeenLastCalledWith(mockAthleteId(), null, { quiet: true });
+      mockProfileRefetch.mockClear();
+      const list = utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0];
+      await act(async () => {
+        list.props.refreshControl.props.onRefresh();
+      });
+      expect(mockProfileRefetch).toHaveBeenCalled();
+    });
+
+    it("the celebrated card is not remounted when the celebration starts or ends (M1)", async () => {
+      withReels();
+      const utils = await renderLoaded(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win" })]));
+      const before = utils.getByTestId("match-feed-card-w1");
+      mockStats = { wins: 1, losses: 0, draws: 0 };
+      utils.rerender(<MatchesScreen />);
+      const banner = await utils.findByTestId("milestone-banner-first_win");
+      expect(utils.getByTestId("match-feed-card-w1")).toBe(before);
+      fireEvent.press(banner);
+      await waitFor(() => expect(utils.queryByTestId("milestone-banner-first_win")).toBeNull());
+      expect(utils.getByTestId("match-feed-card-w1")).toBe(before);
+    });
+
+    it("no card milestone is claimed while a filter is applied; it shows once the filter clears", async () => {
+      withReels();
+      const utils = await renderLoaded(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win" })]));
+      fireEvent.press(utils.getByTestId("film-filter-loss"));
+      mockStats = { wins: 1, losses: 0, draws: 0 };
+      utils.rerender(<MatchesScreen />);
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(utils.queryByTestId("milestone-banner-first_win")).toBeNull();
+      fireEvent.press(utils.getByTestId("film-filter-all"));
+      expect(await utils.findByTestId("milestone-banner-first_win")).toBeTruthy();
+    });
+
+    it("waits while the opponent picker is open (host block)", async () => {
+      mockStats = { wins: 1, losses: 0, draws: 0 };
+      withReels();
+      mockGetMyMatchLibrary.mockResolvedValue(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win", opponent: PARK })]));
+      const hook = require("@/lib/milestones/use-milestone-celebration") as typeof import("@/lib/milestones/use-milestone-celebration");
+      const spy = jest.spyOn(hook, "useMilestoneCelebration");
+      const utils = await renderLoaded(page([libItem({ match_id: "w1", completed_at: daysAgo(0), outcome: "win", opponent: PARK })]));
+      expect(spy.mock.calls.at(-1)?.[3]).toEqual({ blocked: false });
+      fireEvent.press(utils.getByTestId("film-filter-opponent"));
+      expect(spy.mock.calls.at(-1)?.[3]).toEqual({ blocked: true });
+      spy.mockRestore();
+    });
+
+    it("an old first match (over 7 days) never celebrates", async () => {
+      mockStats = { wins: 0, losses: 1, draws: 0 };
+      withReels();
+      const utils = await renderLoaded(page([libItem({ match_id: "l1", completed_at: daysAgo(9), outcome: "loss" })]));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(utils.queryByTestId("milestone-banner-first_match")).toBeNull();
+    });
+  });
+
   it("never uses an em dash in its copy", () => {
     const fs = require("fs") as typeof import("fs");
     const path = require("path") as typeof import("path");
@@ -507,6 +743,11 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
       ...(fs.readdirSync(path.join(root, "components/matches")) as string[])
         .filter((f) => /\.tsx?$/.test(f))
         .map((f) => `components/matches/${f}`),
+      ...(fs.readdirSync(path.join(root, "components/milestones")) as string[])
+        .filter((f) => /\.tsx?$/.test(f))
+        .map((f) => `components/milestones/${f}`),
+      "lib/milestones/milestone-store.ts",
+      "lib/milestones/use-milestone-celebration.ts",
       "app/(app)/video/[id].tsx",
       "app/(app)/match-detail/[matchId].tsx",
       // Recursive: the multi-angle player's components live in a subfolder.

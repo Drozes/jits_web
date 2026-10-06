@@ -51,6 +51,9 @@ export function TabHeader({ title, onArena = false }: TabHeaderProps) {
       }}
     >
       <Text
+        // An element every state of the tab root draws (the match-loop
+        // harness proves which tab is open by it: `tab-header-title-matches`).
+        testID={`tab-header-title-${title.toLowerCase()}`}
         accessibilityRole="header"
         numberOfLines={1}
         maxFontSizeMultiplier={1.3}

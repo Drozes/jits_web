@@ -11,7 +11,9 @@
  * - `moment`: named durations of single Moments, ms: `goFade` 700,
  *   `confettiFall` 1800, `confettiFadeDelay` 1200, `confettiFade` 600,
  *   `slamIn` 520, `slamInFade` 300, `riseInDelay` 500, `riseIn` 400,
- *   `tapMarkFill` 80, `tapNudge` 50, `angleDip` 80.
+ *   `tapMarkFill` 80, `tapNudge` 50, `angleDip` 80, `reelRingPulse` 600,
+ *   `milestoneBurstFall` 900, `milestoneBurstStagger` 180,
+ *   `milestoneBurstFadeDelay` 600, `milestoneBurstFade` 300.
  * - `easing`: `{ brandOut, outCubic, inQuad, linear }`, Reanimated easings
  *   for `withTiming`.
  * - `BRAND_EASE_OUT_CURVE`: `[0.22, 1, 0.36, 1]`, the brand curve as a tuple.
@@ -25,7 +27,7 @@
  *   not fire it again), `.ratingGain()`, `.countdownTick()`,
  *   `.countdownGo()`, `.tapTick()` (winner only), plus the match-flow events
  *   `.matchStart()`, `.matchEnd()`, `.resultRecorded()`, `.error()`,
- *   `.timeWarning()`. Each returns a promise that never rejects.
+ *   `.timeWarning()`, `.reelRevealed()`, `.milestone()` (never on a loss). Each returns a promise that never rejects.
  * - `HapticEvent`: the union of event names.
  *
  * Hooks

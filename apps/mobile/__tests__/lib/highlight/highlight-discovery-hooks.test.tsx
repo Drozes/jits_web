@@ -18,7 +18,6 @@ jest.mock("@jits/shared/api/queries", () => ({
 }));
 
 import { useHighlightDetail } from "@/lib/highlight/use-highlight-detail";
-import { PROFILE_HIGHLIGHTS_LIMIT, useMyHighlights } from "@/lib/highlight/use-my-highlights";
 
 const SB = { tag: "sb" };
 
@@ -82,57 +81,3 @@ describe("useHighlightDetail", () => {
   });
 });
 
-describe("useMyHighlights", () => {
-  it("reads 10 own reels, signs posters, keeps the clips flag", async () => {
-    mockGetMine.mockResolvedValue({
-      ok: true,
-      data: { clipsEnabled: true, shareEnabled: true, items: [item("a", { unseen: true }), item("b", { posterPath: null })] },
-    });
-    mockSignPoster.mockImplementation((_s: unknown, key: string | null) => Promise.resolve(key ? `https://signed/${key}` : null));
-    const { result } = renderHook(() => useMyHighlights("me"));
-    await waitFor(() => expect(result.current.items).toHaveLength(2));
-    expect(PROFILE_HIGHLIGHTS_LIMIT).toBe(10);
-    expect(mockGetMine).toHaveBeenCalledWith(SB, { limit: 10 });
-    expect(result.current.clipsEnabled).toBe(true);
-    expect(result.current.items[0].posterUrl).toBe("https://signed/p/a.jpg");
-    expect(result.current.items[1].posterUrl).toBeNull();
-  });
-
-  it("fail-closed: clips off until a read succeeds; a failed read keeps what is shown", async () => {
-    mockGetMine.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "x" } });
-    const { result } = renderHook(() => useMyHighlights("me"));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(result.current.clipsEnabled).toBe(false);
-    expect(result.current.items).toEqual([]);
-  });
-
-  it("no athlete: no read", () => {
-    renderHook(() => useMyHighlights(undefined));
-    expect(mockGetMine).not.toHaveBeenCalled();
-  });
-
-  it("only the newest refetch writes", async () => {
-    const resolvers: ((v: unknown) => void)[] = [];
-    mockGetMine.mockImplementation(() => new Promise((r) => resolvers.push(r)));
-    mockSignPoster.mockResolvedValue(null);
-    const { result } = renderHook(() => useMyHighlights("me"));
-    act(() => result.current.refetch());
-    await act(async () => resolvers[1]({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [item("new")] } }));
-    await act(async () => resolvers[0]({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [item("old")] } }));
-    expect(result.current.items.map((i) => i.highlightId)).toEqual(["new"]);
-  });
-
-  it("markSeenLocally clears one tile's unseen flag", async () => {
-    mockGetMine.mockResolvedValue({
-      ok: true,
-      data: { clipsEnabled: true, shareEnabled: true, items: [item("a", { unseen: true }), item("b", { unseen: true })] },
-    });
-    mockSignPoster.mockResolvedValue(null);
-    const { result } = renderHook(() => useMyHighlights("me"));
-    await waitFor(() => expect(result.current.items).toHaveLength(2));
-    act(() => result.current.markSeenLocally("a"));
-    expect(result.current.items.map((i) => i.unseen)).toEqual([false, true]);
-  });
-});

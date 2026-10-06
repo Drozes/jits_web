@@ -36,7 +36,7 @@ jest.mock("@/lib/highlight/use-reel-lane", () => ({ fetchReelPage: (...a: unknow
 const mockLog = jest.fn();
 jest.mock("@/lib/highlight/highlight-event", () => ({ logHighlightEvent: (...a: unknown[]) => mockLog(...a) }));
 
-import { HomeHighlightsCarousel, MatchesReelCarousel } from "@/components/reels/lane-carousels";
+import { HomeHighlightsCarousel, MatchesReelCarousel, matchesLaneTiles } from "@/components/reels/lane-carousels";
 import { laneLoadMore, openReelFromLane } from "@/components/reels/open-reel";
 import { buildLaneTiles } from "@/lib/highlight/reel-lane";
 import type { UseReelLaneResult } from "@/lib/highlight/use-reel-lane";
@@ -138,6 +138,22 @@ describe("MatchesReelCarousel", () => {
   it("zero matches picks the first-highlight ghosts", () => {
     const { getByLabelText } = render(<MatchesReelCarousel lane={lane()} matchCount={0} />);
     expect(getByLabelText("Your first highlight lands here")).toBeTruthy();
+  });
+
+  it("keeps the skeletons while the match count is loading, instead of flashing the wrong ghosts", () => {
+    expect(matchesLaneTiles(lane(), "loading").map((t) => t.kind)).toEqual(["skeleton", "skeleton", "skeleton", "skeleton"]);
+    const { getByLabelText, queryByLabelText } = render(<MatchesReelCarousel lane={lane()} matchCount="loading" />);
+    expect(getByLabelText("Loading")).toBeTruthy();
+    expect(queryByLabelText("Record your next match to get a highlight")).toBeNull();
+    // Reels already loaded draw at once.
+    expect(matchesLaneTiles(lane({ items: [reelItem("a"), reelItem("b"), reelItem("c")] }), "loading").map((t) => t.kind)).toEqual(["ready", "ready", "ready"]);
+    // A failed lane read still hides it (no skeleton forever).
+    expect(render(<MatchesReelCarousel lane={lane({ error: { code: "UNKNOWN", message: "x" } })} matchCount="loading" />).toJSON()).toBeNull();
+  });
+
+  it("the Matches lane never draws a CTA tile (its CTAs live in the hero)", () => {
+    expect(matchesLaneTiles(lane(), 0).some((t) => t.kind === "cta")).toBe(false);
+    expect(matchesLaneTiles(lane(), 2).some((t) => t.kind === "cta")).toBe(false);
   });
 
   it("pages near the end only when more exist and no load is running or failed", () => {
