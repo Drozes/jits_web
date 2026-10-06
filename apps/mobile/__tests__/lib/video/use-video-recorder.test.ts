@@ -180,20 +180,29 @@ afterEach(() => {
 describe("useVideoRecorder", () => {
   it("builds the storage key ONCE and hands it to the upload runner (jits-voh)", async () => {
     mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    // The clock is driven explicitly (jits-qcuw). The fake camera resolves
+    // recordAsync synchronously inside stopRecording(), so on the real clock
+    // start and stop can land in the same millisecond; recordTimingOf maps a
+    // 0 ms clip to recordDurationMs null by design (no real recording is
+    // 0 ms long), and this test then failed at random.
+    const nowSpy = jest.spyOn(Date, "now");
 
     const { result } = renderHook(() => useVideoRecorder("M", "A"));
     const cam = makeFakeCamera();
     result.current.cameraRef.current = cam as never;
     act(() => result.current.markCameraReady());
 
+    nowSpy.mockReturnValue(1_791_000_000_000);
     let startPromise: Promise<void>;
     act(() => {
       startPromise = result.current.start();
     });
+    nowSpy.mockReturnValue(1_791_000_005_000);
     await act(async () => {
       await result.current.stop();
       await startPromise;
     });
+    nowSpy.mockRestore();
 
     await waitFor(() => expect(result.current.state).toBe("uploaded"));
     expect(result.current.videoId).toBe("VID");
@@ -209,8 +218,8 @@ describe("useVideoRecorder", () => {
       fileUri: "file://clip.mp4",
       storagePath: "M/A/111.mp4",
       truncation: null,
-      recordStartedAt: expect.any(Number),
-      recordDurationMs: expect.any(Number),
+      recordStartedAt: 1_791_000_000_000,
+      recordDurationMs: 5_000,
     });
   });
 
