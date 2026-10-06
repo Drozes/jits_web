@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Video: film chip contrast over bright frames (jits-3liz)
+
+**Fixed**
+- `apps/mobile/components/film-room/film-chip.ts`: the unselected film chip (key moment stepper chip and arrows, the player's angle switcher over film) now sits on `ON_MEDIA.badge` (0.88 black) instead of `ON_MEDIA.tag` (0.45 black), so its `ON_MEDIA.white` label holds WCAG AA over a pure white frame (about 16.5:1, was about 3.4:1). Owner approved 2026-10-06. The selected (inverted) chip and the `ON_MEDIA.strong` edge are unchanged. No new token: `badge` is already the on-media text ground in the contrast rule.
+- Tests: new `apps/mobile/__tests__/components/film-room/film-chip-contrast.test.tsx` asserts 4.5:1 over a white frame for the rendered stepper and switcher chips; `angle-switcher.test.tsx` updated for the new ground.
+
 ## OTA "AI move labels hidden" (runtime 0.5.0), 2026-10-06
 
 Production OTA group `7e1d3be8-905e-47f4-bb13-9b05fa41ce51` from jits_web `main` `a054b5a5` (release PR #66: #65). JS-only, non-critical. Rollback target: `ff7e974d-d271-4eca-a76a-1cb594723d91`. Server-side reel labels remain until jr_be-du1.10.

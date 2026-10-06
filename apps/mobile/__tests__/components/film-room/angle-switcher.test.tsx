@@ -66,8 +66,10 @@ describe("AngleSwitcher press feedback", () => {
     expect(s.getByText("YOUR ANGLE")).toHaveStyle(filmChipLabelStyle(true) as Record<string, unknown>);
     expect(s.getByText("D. OKAFOR'S ANGLE")).toHaveStyle(filmChipLabelStyle(false) as Record<string, unknown>);
     expect(filmChipStyle(true)).toMatchObject({ backgroundColor: ON_MEDIA.text, borderColor: ON_MEDIA.text, borderWidth: 1, borderRadius: 2, height: 44 });
-    expect(filmChipStyle(false)).toMatchObject({ backgroundColor: ON_MEDIA.tag, borderColor: ON_MEDIA.strong });
+    expect(filmChipStyle(false)).toMatchObject({ backgroundColor: ON_MEDIA.badge, borderColor: ON_MEDIA.strong });
     expect(filmChipLabelStyle(true).color).toBe(ON_MEDIA.ink);
+    // jits-3liz: the unselected label holds 4.5:1 over a white frame.
+    expect(contrast(filmChipLabelStyle(false).color as string, composite(ON_MEDIA.badge, "#FFFFFF"))).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
   });
 
   it("the Best angle tag sits inside the chip and holds 4.5:1 over a white frame (jits-tn2h)", () => {
@@ -76,8 +78,8 @@ describe("AngleSwitcher press feedback", () => {
     expect(within(s.getByTestId("angle-b")).getByTestId("angle-best-b")).toBeTruthy();
     expect(tag).toHaveStyle({ backgroundColor: ON_MEDIA.badge });
     expect(s.getByTestId("angle-best-b")).toHaveStyle({ color: ON_MEDIA.text });
-    // Unselected: tag ground = badge over the chip's tag fill over a white frame.
-    const ground = composite(ON_MEDIA.badge, composite(ON_MEDIA.tag, "#FFFFFF"));
+    // Unselected: tag ground = badge over the chip's own fill over a white frame.
+    const ground = composite(ON_MEDIA.badge, composite(filmChipStyle(false).backgroundColor as string, "#FFFFFF"));
     expect(contrast(ON_MEDIA.text, ground)).toBeGreaterThanOrEqual(AA_NORMAL_TEXT);
     // Selected: ink on the light chip fill (over white, the worst case for light ink is moot).
     const t = render(<AngleSwitcher variant="film" angles={[mine, { ...theirs, is_primary: true }]} activeId="b" onSelect={jest.fn()} />);
