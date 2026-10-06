@@ -139,11 +139,12 @@ export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, v
           </Text>
           {isBest ? (
             // Unselected, the tag sits on its own ON_MEDIA.badge ground so it
-            // holds 4.5:1 over a bright frame (jits-tn2h); selected, it is
-            // outlined in the chip's own ink.
+            // holds 4.5:1 over a bright frame (jits-tn2h), outlined in
+            // ON_MEDIA.strong so it stays distinct on the badge chip
+            // (jits-3liz); selected, it is outlined in the chip's own ink.
             <View
               testID={`angle-best-tag-${a.id}`}
-              style={{ paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, borderWidth: 1, borderColor: on ? ON_MEDIA.ink : ON_MEDIA.badge, backgroundColor: on ? "transparent" : ON_MEDIA.badge }}
+              style={{ paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, borderWidth: 1, borderColor: on ? ON_MEDIA.ink : ON_MEDIA.strong, backgroundColor: on ? "transparent" : ON_MEDIA.badge }}
             >
               <Text testID={`angle-best-${a.id}`} numberOfLines={1} className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: on ? ON_MEDIA.ink : ON_MEDIA.text }, TABULAR]}>
                 {BEST_ANGLE.toUpperCase()}

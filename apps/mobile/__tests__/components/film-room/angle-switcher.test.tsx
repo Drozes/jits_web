@@ -76,7 +76,8 @@ describe("AngleSwitcher press feedback", () => {
     const s = render(<AngleSwitcher variant="film" angles={[mine, { ...theirs, is_primary: true }]} activeId="a" onSelect={jest.fn()} />);
     const tag = s.getByTestId("angle-best-tag-b");
     expect(within(s.getByTestId("angle-b")).getByTestId("angle-best-b")).toBeTruthy();
-    expect(tag).toHaveStyle({ backgroundColor: ON_MEDIA.badge });
+    // Outlined in ON_MEDIA.strong so it stays distinct on the badge chip (jits-3liz).
+    expect(tag).toHaveStyle({ backgroundColor: ON_MEDIA.badge, borderColor: ON_MEDIA.strong, borderWidth: 1 });
     expect(s.getByTestId("angle-best-b")).toHaveStyle({ color: ON_MEDIA.text });
     // Unselected: tag ground = badge over the chip's own fill over a white frame.
     const ground = composite(ON_MEDIA.badge, composite(filmChipStyle(false).backgroundColor as string, "#FFFFFF"));
