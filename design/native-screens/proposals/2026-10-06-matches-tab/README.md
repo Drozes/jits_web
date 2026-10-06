@@ -1,8 +1,8 @@
 # Proposed (Oct 6 Matches tab): boards, decisions, open questions
 
-Status: **ROUND 2 DRAFT, NOT YET REPUBLISHED.** The owner's round 2 decisions (2026-10-06, final) are drawn
-here and wait for an independent review; the coordinator republishes after it (see "Round 2 changes" and
-"Publishing"). Round 1: reviewed 2026-10-06 by an independent reviewer (verdict:
+Status: **PROPOSED, FOR OWNER REVIEW · ROUND 2 REVIEWED 2026-10-06.** The owner's round 2 decisions
+(2026-10-06, final) are drawn here; the independent round 2 review's fixes are applied (see "Round 2
+review fixes"); the coordinator republishes (see "Publishing"). Round 1: reviewed 2026-10-06 by an independent reviewer (verdict:
 publishable after fixes, no blockers; every fix applied, see "Review fixes" below). Published 2026-10-06
 to the canvas "ELO RATED Native Screens" (https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D) as the page
 "Proposed (Oct 6 Matches tab)", canvas version 1791312407-fcdb. Clickable prototype for the owner review:
@@ -82,7 +82,7 @@ From the spec (owner and PM, 2026-10-06), as drawn:
 
 Design decisions taken on this page (within the spec):
 
-- **Unseen ring token: `ink` at `stroke-edge` (2 px), with a 2 px surface gap.** The design system ("ELO RATED Design System" README and `tokens.json`) has no highlight accent token. Its colour rules give every hue a meaning: signal-red is act or lose (and the spec forbids it here), gain-green is gain, win or live only, attention (amber) is draw or waiting, heat is the Arena's alone, and "if a color does not mean one of the above, it is grey". An unseen reel is a state, and the system draws state edges as a 2 px `stroke-edge`; `ink` is the strongest neutral and matches the light NEW film badge (`on-media-chip`), the other "unseen" mark in the app. Spec assumption 2 anticipated this ("if not, design picks one at canvas review"). No new token is proposed; if the team wants a name, a semantic alias `unseen-ring` pointing at `ink` is enough.
+- **Unseen ring token: `ink` at `stroke-edge` (2 px), with a 2 px surface gap.** The design system ("ELO RATED Design System" README and `tokens.json`) has no highlight accent token. Its colour rules give every hue a meaning: signal-red is act or lose (and the spec forbids it here), gain-green is gain, win or live only, attention (amber) is draw or waiting, heat is the Arena's alone, and "if a color does not mean one of the above, it is grey". An unseen reel is a state, and the system draws state edges as a 2 px `stroke-edge`; `ink` is the strongest neutral and matches the light NEW film badge (`on-media-chip`), the other "unseen" mark in the app. Spec assumption 2 anticipated this ("if not, design picks one at canvas review"). The alias `unseen-ring` (pointing at `ink`) now exists in the spec and the design system.
 - Meta row keeps a chevron at the right, as decoration inside the meta tap target (aria-hidden), so the second target reads as its own control (the spec lists the row's content only).
 - A draw delta in a list (`± 0`) is neutral ink-3, matching the shipped poster card's D colours; amber is kept for the verdict, DeltaChip, EloTile and stakes. Pending and DISPUTED stay amber.
 - Every tile reserves two caption lines so baselines align across a lane. On Home, the CTA tile comes first, then the ghost, in both the zero and low-data states.
@@ -92,12 +92,12 @@ Design decisions taken on this page (within the spec):
 - Milestone banner: a plate line with a 3 px rail (ink; gain-green for First win) and one icon. Confetti reuses the verdict confetti's brand colours (signal-red, ink, signal-red-text), 14 sharp rectangles, bursting from the banner ends and the celebrated card or tile and never over the header chrome or wordmark. A first match that was a loss uses ink-only pieces and no haptic.
 - One match that is both first match and first win shows only the First win banner; both tags remain and both milestones are marked.
 - Viewer swipe hint "Swipe up for the next one": shown once per install, only when the carousel has 2 or more pages, on its own on-media plate above the bottom meta.
-- Full-screen page (spec 8.2): close top left and mute top right (44 pt); right rail 12 pt from the edge, 20 pt apart, 44 pt targets on on-media-badge plates (Share in signal-red, Save, Improve; small mono labels); bottom meta (`vs {opp}`, `OCT 04 · 0:28`, Open match); a 2 pt progress bar (ink on ink-3 40%) above the home indicator. Scrims per spec: top void 50% to 0 (120 pt), bottom 0 to void 70% (240 pt). No new token. Icons: lucide `share`, `download`, `scissors`, `volume-2`, `x`.
+- Full-screen page (spec 8.2): close top left and mute top right (44 pt); right rail 12 pt from the edge, 20 pt apart, 44 pt targets on on-media-badge plates (Share in signal-red, Save, Improve) with short mono labels C-V6 `Share`, C-V7 `Save`, C-V8 `Improve` (C-V9 `Settings` for the permission-denied fallback); bottom meta (`vs {opp}`, `OCT 04 · 0:28`, Open match); a 2 pt progress bar (ink on ink-3 40%) above the home indicator. Scrims: top void 50% to 0 (120 pt); bottom 0 to void 70% (400 pt, so the rail labels sit on it); a soft right-edge scrim, 0 to void 45%, 96 pt wide, behind the rail (round 2 review, option a). No new colour token. Icons: lucide `share`, `download`, `scissors`, `volume-2`, `x`.
 - Not-yours page (spec 8.6): no rail at all (Share, Save, Improve hidden, never disabled), close and mute stay; the meta shows the athlete's short name with the source tag, then View profile (C-V5, board 36) when you were not in the match. No red.
 - Source chip (spec 5): `surface-3` (plate-bright) at 85% with `ink-2` text, 2 pt radius, mono caps, 6 pt inset top left; only non-own tiles carry one. Future tiles are drawn at 38% and are not pressable in phase 1.
 - A carousel with 1 to 2 ready reels appends one ghost tile (C-L5) so the shelf reads as filling (spec Q7, owner confirmed 2026-10-06; drawn on board 15).
 - Matches zero secondary (spec 10.2): C-Z7 Challenge a friend, a UserPlus text button under the red CTA, pushing `/invite?from=matches` (board 50). `invites_enabled` off: C-Z5 Try a practice match while `shouldOfferPracticeMatch`. Flag unknown: the slot is empty. Never both. Home keeps its practice offer card.
-- Zero-state order on Matches: lane, ghost card, progress, red CTA, practice text button, helper. The record strip and the filter chips are hidden at zero matches (nothing to count or filter).
+- Zero-state order on Matches: lane, ghost card, progress, red CTA, Challenge a friend (C-Z7; C-Z5 practice link when invites are off, slot empty while the flag is unknown), helper. The record strip and the filter chips are hidden at zero matches (nothing to count or filter).
 - Profile board is rebuilt from the live 17-Profile board, so everything Profile keeps is exactly the current app (Friends row shown, invite row hidden, as on 17).
 
 ## Highlights carousel sources and gates
@@ -186,13 +186,21 @@ carried footer string. The ring pulse is registered as `moment.reelRingPulse` (6
 3. Record strip and filter chips are hidden at zero matches.
 4. The zero-match Elo tile shows `0W · 0L · 0D` (the `jits-r75.2` zero-match reframing is out of scope here).
 
+## Round 2 review fixes (2026-10-06)
+
+1. Map status chip and this README: "Proposed, for owner review · Round 2 reviewed 2026-10-06".
+2. Rail labels on a scrim (spec 8.2, never on raw video): bottom scrim extended to 400 pt and a 96 pt right-edge scrim behind the rail; short labels C-V6 to C-V8 kept, C-V9 `Settings` for the permission-denied fallback; accessible labels stay the full shipped strings. Same in the prototype.
+3. Board 08 end-of-list frame now shows the bottom of the page including the whole rail, captioned "bottom of the page"; swipe hint raised 16 pt to clear the IMPROVE label.
+4. README: zero-state order reads Challenge a friend; the stale "no new token" line is replaced.
+5. Prototype: 2 ANGLES toggle defaults off; with invites off the practice link respects shouldOfferPracticeMatch (Home practice offer still shown); the secondary slot keeps its height while the flag is unknown.
+
 ## Open questions
 
 Decided by the owner in round 2 (no longer open): Q3 no Matches badge; Q5 delete the Film Room redirect
 after two OTAs (`jits-766g`); Q6 full-screen pages, pager and single-reel mode; Q7 ghost tile after 1 to
 2 reels; Q8 no auto-advance, the reel loops (spec recommendation, per the coordinator).
 
-1. Rail labels under the icons (`Share`, `Save`, `Improve`): spec 8.2 asks for "a small label under each" but has no copy id; the full strings are the accessible labels. Add ids to spec 11?
+1. Rail label ids C-V6 to C-V9 are set by the coordinator in the round 2 review; the spec copy table (section 11) should add them.
 2. Nearby (`jr_be-880`): a definition of "near" (radius, the Arena's location model).
 3. Spec Q9: Home's practice offer card stays for zero-match athletes (recommendation, no invite swap). Drawn that way.
 4. Mute moved from the rail to the top right (spec 8.2); the round-2 brief listed it on the rail. Drawn per spec.

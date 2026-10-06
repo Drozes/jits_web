@@ -1,4 +1,4 @@
-# Matches tab and Home reel carousel: copy deck (ROUND 2 DRAFT, NOT YET REPUBLISHED; round 1 reviewed 2026-10-06)
+# Matches tab and Home reel carousel: copy deck (PROPOSED, FOR OWNER REVIEW; round 2 reviewed 2026-10-06)
 
 Every user-facing string on the `P-MT-*` boards, by board and state. Source: `specs/matches-tab/spec.md`
 section 11 (ids `C-*`), the Oct 4 video status deck for badge strings (`lib/video/video-status-copy.ts`
@@ -104,7 +104,10 @@ Round 2: full-screen pages (spec 8). The shipped header title `Your highlight` i
 |---|---|---|
 | C-V4 | a11y, close (top left) | `Close` |
 | C-V3 | a11y, mute toggle (top right) | `Mute` / `Unmute` |
-| no id yet | Rail labels, mono caps, own reels only | `Share`, `Save`, `Improve` |
+| C-V6 | Rail label, own reels only (a11y `Share to Instagram`, or `Share reel`) | `Share` |
+| C-V7 | Rail label, own reels only (a11y `Save to Photos`) | `Save` |
+| C-V8 | Rail label, own reels only (a11y `Improve this reel`) | `Improve` |
+| C-V9 | Rail label, permission-denied fallback for Save (a11y `Open Settings`) | `Settings` |
 | shipped | Rail a11y labels | `Share to Instagram` (or `Share reel`), `Save to Photos`, `Improve this reel` |
 | spec 8.2 | Bottom meta, own reel | `vs {opp}`; `{shortDate} · {m:ss}` (e.g. `OCT 04 · 0:28`); link `Open match` |
 | spec 8.6 | Bottom meta, not your reel (future) | `{athlete short name}` plus source tag (`FRIEND`, `NEARBY`, `ELO RATED`); `SEP 30 · 0:31` |

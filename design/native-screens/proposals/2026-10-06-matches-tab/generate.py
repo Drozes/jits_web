@@ -74,7 +74,7 @@ C = {
     "OFF": "You're offline. Some features may not work.",
     # viewer, full-screen page (round 2): rail labels and bottom meta
     "V1": "Swipe up for the next one", "V2": "You're all caught up", "V5": "View profile",
-    "VR1": "Share", "VR2": "Save", "VR3": "Improve",  # rail labels under the icons (spec 8.2 "a small label"; no copy id yet)
+    "VR1": "Share", "VR2": "Save", "VR3": "Improve", "VR9": "Settings",  # C-V6..C-V9 rail labels (coordinator, round 2 review); a11y keeps the full shipped strings
     "VM1": "Open match",
     # carousel source chips C-S1..C-S3 (future sources; own reels carry no chip)
     "SF": "FRIEND", "SN": "NEARBY", "SE": "ELO RATED",
@@ -832,9 +832,11 @@ def b07():
 
 
 # ---------- 08 reel viewer: full-screen pages (round 2, spec 8, Q6 resolved) ----------
-# Scrims per spec 8.2: top void 50% to 0 (120 pt), bottom 0 to void 70% (240 pt).
+# Scrims (spec 8.2, overlays never on raw video; round 2 review option a): top void 50% to 0 (120 pt),
+# bottom 0 to void 70% (400 pt, so the rail labels sit on it), right edge 0 to void 45% (96 pt) behind the rail.
 SCRIM_TOP = "linear-gradient(to bottom, rgba(13,15,20,0.5) 0%, rgba(13,15,20,0) 100%)"
 SCRIM_BOTTOM = "linear-gradient(to bottom, rgba(13,15,20,0) 0%, rgba(13,15,20,0.7) 100%)"
+SCRIM_RIGHT = "linear-gradient(to right, rgba(13,15,20,0) 0%, rgba(13,15,20,0.45) 100%)"
 
 
 def rail_btn(icon, label, aria, primary=False):
@@ -861,7 +863,8 @@ def viewer_fs(own=True, hint=True, pct=38, src=None, close_href=HOME_HREF, h=844
              f'display: flex; align-items: center; justify-content: center; box-sizing: border-box; text-align: center; font-family: {MONO}; font-weight: 500; font-size: 10px; line-height: 16px; letter-spacing: 2px; color: {PH}">'
              f'{"HIGHLIGHT REEL 9:16, EDGE TO EDGE, COVER, LOOPING" if own else "FRIEND REEL 9:16, EDGE TO EDGE, COVER, LOOPING"}</button>')
     scrims = ((f'<div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 120px; background: {SCRIM_TOP}; pointer-events: none"></div>' if h == 844 else "")
-              + f'<div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 240px; background: {SCRIM_BOTTOM}; pointer-events: none"></div>')
+              + f'<div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 0; height: 400px; background: {SCRIM_BOTTOM}; pointer-events: none"></div>'
+              + (f'<div aria-hidden="true" style="position: absolute; top: 0; bottom: 0; right: 0; width: 96px; background: {SCRIM_RIGHT}; pointer-events: none"></div>' if own else ""))
     top = (top_btn("x", "Close", close_href, "left") + top_btn("volume", "Mute", side="right")) if h == 844 else ""
     if own:
         rail = (f'<div style="position: absolute; right: 12px; bottom: 150px; display: flex; flex-direction: column; gap: 20px; align-items: center">'
@@ -881,7 +884,7 @@ def viewer_fs(own=True, hint=True, pct=38, src=None, close_href=HOME_HREF, h=844
             f'<span style="font-family: {DM}; font-weight: 700; font-size: 12px; line-height: 16px; letter-spacing: 1.12px; text-transform: uppercase; color: {OM_TEXT}">{q(link[0])}</span>{ic("chev_r", 14, OM_TEXT)}</a></div>')
     prog = (f'<div aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 34px; height: 2px; background: rgba(141,146,157,0.4)">'
             f'<div style="width: {pct}%; height: 2px; background: {INK}"></div></div>')
-    hint_ = (f'<div style="position: absolute; left: 95px; width: 200px; bottom: 150px; display: flex; flex-direction: column; align-items: center; gap: 2px">{ic("chev_u", 16, OM_TEXT)}'
+    hint_ = (f'<div style="position: absolute; left: 95px; width: 200px; bottom: 166px; display: flex; flex-direction: column; align-items: center; gap: 2px">{ic("chev_u", 16, OM_TEXT)}'
              f'{mono(C["V1"], 10, OM_TEXT, 700, 1.68, True, "padding: 3px 6px; border-radius: 2px; background: " + OM_BADGE)}</div>') if hint else ""
     cu = (f'<div role="status" style="position: absolute; left: 0; right: 0; bottom: 46px; display: flex; justify-content: center">'
           f'{mono(C["V2"], 10, OM_TEXT, 700, 1.68, True, "padding: 3px 6px; border-radius: 2px; background: " + OM_BADGE)}</div>') if caught_up else ""
@@ -906,11 +909,11 @@ def b08():
     s = sheet_title("Reel viewer: full-screen vertical pager",
                     "Owner decision R2-2 (spec 8, Q6): every page is the reel edge to edge, Shorts style, in pager and single-reel mode alike. The video fills the 390 x 844 frame (cover); close top left, mute top right, the actions on a right rail, the meta bottom left, a 2 pt progress bar at the bottom. Swipe up for the next reel of the carousel, down for the previous. Close and back return to the surface that opened it; a swipe never closes.")
     s += caption("Your reel, playing (pager mode, first open shows the swipe hint once)") + viewer_fs()
-    s += note("Rail, top to bottom (12 pt from the edge, 20 pt apart, each a 44 pt target with a small label): Share (Share to Instagram, or Share reel when the Reels path is unavailable; the one signal-red control, own reels only), Save (Save to Photos), Improve (Improve this reel). Their show rules (highlight_share_enabled, canSaveToPhotos, the Open Settings fallback, the regenerating banner) are carried from viewer-actions.tsx; only the placement changes. Bottom meta: vs {opp}, shortDate and duration (OCT 04 · 0:28), Open match (32).")
-    s += note("Legibility: overlays sit on scrims, never on raw video: a top scrim (void 50% to 0, 120 pt) under close and mute, a bottom scrim (0 to void 70%, 240 pt) under the meta and the rail, and the rail icons on on-media-badge plates. Progress: ink on an ink-3 40% track, not scrubbable. Tap the video to pause (a centred 64 pt play glyph, ink at 80%, shows while paused); tap again to play. The reel loops; no auto-advance in phase 1 (Q8).")
+    s += note("Rail, top to bottom (12 pt from the edge, 20 pt apart, each a 44 pt target with a short label: C-V6 Share, C-V7 Save, C-V8 Improve; the accessible labels stay the full shipped strings; the permission-denied Open Settings fallback reads C-V9 Settings): Share (Share to Instagram, or Share reel when the Reels path is unavailable; the one signal-red control, own reels only), Save (Save to Photos), Improve (Improve this reel). Their show rules (highlight_share_enabled, canSaveToPhotos, the Open Settings fallback, the regenerating banner) are carried from viewer-actions.tsx; only the placement changes. Bottom meta: vs {opp}, shortDate and duration (OCT 04 · 0:28), Open match (32).")
+    s += note("Legibility: overlays sit on scrims, never on raw video: a top scrim (void 50% to 0, 120 pt) under close and mute, a bottom scrim (0 to void 70%, 400 pt) under the meta and the whole rail, a soft right-edge scrim (0 to void 45%, 96 pt) behind the rail, and the rail icons on on-media-badge plates. Progress: ink on an ink-3 40% track, not scrubbable. Tap the video to pause (a centred 64 pt play glyph, ink at 80%, shows while paused); tap again to play. The reel loops; no auto-advance in phase 1 (Q8).")
     s += caption("Not your reel and not your match (future source): rail hidden, View profile") + viewer_fs(own=False, hint=False, pct=64, src=C["SF"])
     s += note("Ownership rule (spec 8.6, canManageReel): when the reel is not yours, Share to Instagram, Save to Photos and Improve this reel are hidden with every sheet they open, so the rail is empty and not rendered. Close and mute stay. The meta shows the athlete's short name with the source tag (FRIEND, NEARBY, ELO RATED), and View profile (C-V5) opens their profile (36) because you were not in the match; a participant would see Open match. No red on the page. Not phase 1: phase 1 pages are always your own reels, but the rule ships and is tested now.")
-    s += caption("End of list: swipe past the last reel (C-V2, 2 s)") + viewer_fs(hint=False, pct=91, h=300, caught_up=True)
+    s += caption("End of list: swipe past the last reel (C-V2, 2 s), bottom of the page") + viewer_fs(hint=False, pct=91, h=420, caught_up=True)
     s += note("The last page bounces: no extra page, no wrap to the first reel. C-V2 shows above the progress bar for 2 s when a drag passes the last page by more than 48 pt on a fully loaded list. Never in single-reel mode.")
     s += caption("Pager model")
     s += (f'<div style="padding: 0 16px; display: flex; flex-direction: row; gap: 12px; align-items: center">'
@@ -1229,7 +1232,7 @@ def b00():
         "Swipe hint C-V1, once per install, 2+ pages (spec 8, AC 4.6). Clips off: C-L6 replaces C-Z6 (spec 10.7).",
         "Record strip: the shipped recordStrip format (spec 6.1). Meta-row chevron: decoration inside the meta target (spec 6.2).",
     ], 12))
-    status = (f'<div style="display: flex; flex-direction: row; gap: 12px; align-items: center">{badge("Round 2 draft, not yet republished", "amber")}'
+    status = (f'<div style="display: flex; flex-direction: row; gap: 12px; align-items: center">{badge("Proposed, for owner review · Round 2 reviewed 2026-10-06", "amber")}'
               f'{mono("Owner decisions 2026-10-06 · Spec specs/matches-tab/spec.md · Epic jits-a4fw", 10, INK3, 500)}</div>')
     top = (f'<div style="padding: 40px 48px 0; display: flex; flex-direction: column; gap: 10px">{status}'
            f'{heading("Matches tab: map", 32, INK, tag="h1")}'
