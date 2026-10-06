@@ -35,10 +35,11 @@ beforeEach(() => {
 });
 
 describe("constants", () => {
-  it("lists the 18 steps of the DB CHECK enum and the 6 sources", () => {
-    expect(HIGHLIGHT_SHARE_STEPS).toHaveLength(18);
-    expect(new Set(HIGHLIGHT_SHARE_STEPS).size).toBe(18);
-    expect(HIGHLIGHT_SHARE_SOURCES).toEqual(["push", "bell", "home", "profile", "match_detail", "summary"]);
+  it("lists the 20 steps of the DB CHECK enum (with B4) and the 7 sources", () => {
+    expect(HIGHLIGHT_SHARE_STEPS).toHaveLength(20);
+    expect(new Set(HIGHLIGHT_SHARE_STEPS).size).toBe(20);
+    expect(HIGHLIGHT_SHARE_STEPS).toEqual(expect.arrayContaining(["matches_reel_tapped", "viewer_swiped"]));
+    expect(HIGHLIGHT_SHARE_SOURCES).toEqual(["push", "bell", "home", "profile", "match_detail", "summary", "matches"]);
     expect(HIGHLIGHT_DOWNLOAD_URL_TTL_S).toBe(300);
   });
 });
@@ -124,6 +125,10 @@ describe("getMyHighlights", () => {
             origin: "regen",
           },
         ],
+        nextBefore: null,
+        nextBeforeId: null,
+        inFlight: [],
+        inFlightSupported: false,
       },
     });
   });
@@ -185,6 +190,174 @@ describe("getMyHighlights", () => {
     const { client: c2 } = rpcClient({ data: { clips_enabled: false, share_enabled: false }, error: null });
     const r2 = await getMyHighlights(c2);
     expect(r2.ok && r2.data.items).toEqual([]);
+  });
+
+  describe("B1 cursor (p_before_id, next_before / next_before_id)", () => {
+    const B1 = "44444444-4444-4444-8444-444444444444";
+
+    it("sends p_before_id only when beforeId is set", async () => {
+      const { client, rpc } = rpcClient({ data: { clips_enabled: true, share_enabled: true, items: [] }, error: null });
+      await getMyHighlights(client, { limit: 10, before: "2026-09-28T00:00:00Z", beforeId: B1 });
+      expect(rpc).toHaveBeenLastCalledWith("get_my_highlights", {
+        p_limit: 10,
+        p_before: "2026-09-28T00:00:00Z",
+        p_before_id: B1,
+      });
+      await getMyHighlights(client, { limit: 10, before: "2026-09-28T00:00:00Z", beforeId: null });
+      expect(rpc).toHaveBeenLastCalledWith("get_my_highlights", { p_limit: 10, p_before: "2026-09-28T00:00:00Z" });
+      await getMyHighlights(client, { limit: 10, beforeId: "" });
+      expect(rpc).toHaveBeenLastCalledWith("get_my_highlights", { p_limit: 10 });
+    });
+
+    it.each(["PGRST202", "42883"])(
+      "retries once without p_before_id on function-not-found (%s), keeping p_before",
+      async (code) => {
+        const rpc = vi
+          .fn()
+          .mockResolvedValueOnce({ data: null, error: { code, message: "no function", details: "", hint: "" } })
+          .mockResolvedValueOnce({ data: { clips_enabled: true, share_enabled: true, items: [ITEM] }, error: null });
+        const result = await getMyHighlights({ rpc } as never, { limit: 5, before: "2026-09-28T00:00:00Z", beforeId: B1 });
+        expect(rpc).toHaveBeenCalledTimes(2);
+        expect(rpc.mock.calls[0][1]).toEqual({ p_limit: 5, p_before: "2026-09-28T00:00:00Z", p_before_id: B1 });
+        expect(rpc.mock.calls[1][1]).toEqual({ p_limit: 5, p_before: "2026-09-28T00:00:00Z" });
+        expect(result.ok && result.data.items).toHaveLength(1);
+        expect(result.ok && result.data.nextBefore).toBeNull();
+      },
+    );
+
+    it("does not retry a function-not-found when no beforeId was sent", async () => {
+      const rpc = vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST202", message: "x", details: "", hint: "" } });
+      const result = await getMyHighlights({ rpc } as never, { limit: 5 });
+      expect(rpc).toHaveBeenCalledTimes(1);
+      expect(result.ok).toBe(false);
+    });
+
+    it("does not retry other errors, and surfaces a failed retry", async () => {
+      const other = vi.fn().mockResolvedValue({ data: null, error: pgErr("highlight_no_athlete") });
+      const r1 = await getMyHighlights({ rpc: other } as never, { before: "2026-09-28T00:00:00Z", beforeId: B1 });
+      expect(other).toHaveBeenCalledTimes(1);
+      expect(!r1.ok && r1.error.code).toBe("ATHLETE_NOT_FOUND");
+
+      const twice = vi.fn().mockResolvedValue({ data: null, error: { code: "PGRST202", message: "x", details: "", hint: "" } });
+      const r2 = await getMyHighlights({ rpc: twice } as never, { before: "2026-09-28T00:00:00Z", beforeId: B1 });
+      expect(twice).toHaveBeenCalledTimes(2);
+      expect(r2.ok).toBe(false);
+    });
+
+    it("reads next_before / next_before_id when present", async () => {
+      const { client } = rpcClient({
+        data: { clips_enabled: true, share_enabled: true, items: [ITEM], next_before: "2026-09-27T10:00:00Z", next_before_id: HL },
+        error: null,
+      });
+      const result = await getMyHighlights(client, { limit: 1 });
+      expect(result.ok && [result.data.nextBefore, result.data.nextBeforeId]).toEqual(["2026-09-27T10:00:00Z", HL]);
+    });
+
+    it("reads null cursor keys (last page) and drops an id without a time", async () => {
+      const { client } = rpcClient({
+        data: { clips_enabled: true, share_enabled: true, items: [], next_before: null, next_before_id: HL },
+        error: null,
+      });
+      const result = await getMyHighlights(client);
+      expect(result.ok && [result.data.nextBefore, result.data.nextBeforeId]).toEqual([null, null]);
+    });
+  });
+
+  describe("B2 in_flight", () => {
+    const RAW_IN_FLIGHT = {
+      match_id: MATCH,
+      match_video_id: VIDEO,
+      reel_state: "waiting",
+      wait_deadline_at: "2026-10-06T10:05:00Z",
+      server_now: "2026-10-06T10:01:00Z",
+      opponent_name: "Ana",
+      played_at: "2026-10-06T09:50:00Z",
+      poster_path: "m/u/poster.jpg",
+    };
+
+    it("is [] when the key is absent (older backend) or not an array", async () => {
+      const { client } = rpcClient({ data: { clips_enabled: true, share_enabled: true, items: [] }, error: null });
+      const r1 = await getMyHighlights(client);
+      expect(r1.ok && r1.data.inFlight).toEqual([]);
+      expect(r1.ok && r1.data.inFlightSupported).toBe(false);
+      const { client: c2 } = rpcClient({ data: { clips_enabled: true, share_enabled: true, items: [], in_flight: { a: 1 } }, error: null });
+      const r2 = await getMyHighlights(c2);
+      expect(r2.ok && r2.data.inFlight).toEqual([]);
+    });
+
+    it("maps the spec keys to camelCase with a derived step", async () => {
+      const { client } = rpcClient({
+        data: {
+          clips_enabled: true,
+          share_enabled: true,
+          items: [],
+          in_flight: [
+            RAW_IN_FLIGHT,
+            { ...RAW_IN_FLIGHT, match_id: "m-2", reel_state: "planning", wait_deadline_at: "2026-10-06T10:05:00Z" },
+            { ...RAW_IN_FLIGHT, match_id: "m-3", reel_state: "rendering", poster_path: null },
+          ],
+        },
+        error: null,
+      });
+      const result = await getMyHighlights(client);
+      if (!result.ok) throw new Error("expected ok");
+      expect(result.data.inFlightSupported).toBe(true);
+      expect(result.data.inFlight).toEqual([
+        {
+          matchId: MATCH,
+          matchVideoId: VIDEO,
+          highlightId: null,
+          reelState: "waiting",
+          step: 1,
+          waitDeadlineAt: "2026-10-06T10:05:00Z",
+          serverNow: "2026-10-06T10:01:00Z",
+          opponentName: "Ana",
+          playedAt: "2026-10-06T09:50:00Z",
+          posterPath: "m/u/poster.jpg",
+        },
+        expect.objectContaining({ matchId: "m-2", reelState: "planning", step: 1, waitDeadlineAt: null }),
+        expect.objectContaining({ matchId: "m-3", reelState: "rendering", step: 2, posterPath: null }),
+      ]);
+    });
+
+    it("accepts the phase / poster_key / highlight_id / step spellings", async () => {
+      const { client } = rpcClient({
+        data: {
+          clips_enabled: true,
+          share_enabled: true,
+          items: [],
+          in_flight: [{ match_id: MATCH, highlight_id: HL, phase: "rendering", step: 2, poster_key: "k.jpg", opponent_name: "" }],
+        },
+        error: null,
+      });
+      const result = await getMyHighlights(client);
+      expect(result.ok && result.data.inFlight[0]).toEqual(
+        expect.objectContaining({ highlightId: HL, reelState: "rendering", step: 2, posterPath: "k.jpg", opponentName: null, matchVideoId: null }),
+      );
+    });
+
+    it("drops entries with no match id or a state that is not in flight", async () => {
+      const { client } = rpcClient({
+        data: {
+          clips_enabled: true,
+          share_enabled: true,
+          items: [],
+          in_flight: [null, 7, { reel_state: "rendering" }, { ...RAW_IN_FLIGHT, reel_state: "ready" }, { ...RAW_IN_FLIGHT, reel_state: "failed" }, { ...RAW_IN_FLIGHT, reel_state: null }, RAW_IN_FLIGHT],
+        },
+        error: null,
+      });
+      const result = await getMyHighlights(client);
+      expect(result.ok && result.data.inFlight.map((r) => r.matchId)).toEqual([MATCH]);
+    });
+
+    it("is [] with clips off even if the server sent entries", async () => {
+      const { client } = rpcClient({
+        data: { clips_enabled: false, share_enabled: false, items: [], in_flight: [RAW_IN_FLIGHT] },
+        error: null,
+      });
+      const result = await getMyHighlights(client);
+      expect(result.ok && result.data.inFlight).toEqual([]);
+    });
   });
 
   it("maps a hinted error", async () => {

@@ -34,7 +34,7 @@ const inFlight = new Map<string, Read>();
 const lastRead = new Map<string, { at: number; result: Result<MyHighlights> }>();
 
 export function readMyHighlights(opts: GetMyHighlightsOptions, { force = false }: { force?: boolean } = {}): Read {
-  const key = JSON.stringify([opts.limit ?? null, opts.before ?? null, opts.unseenOnly ?? null]);
+  const key = JSON.stringify([opts.limit ?? null, opts.before ?? null, opts.beforeId ?? null, opts.unseenOnly ?? null]);
   if (!force) {
     const running = inFlight.get(key);
     if (running) return running;

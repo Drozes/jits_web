@@ -57,6 +57,10 @@ export const HIGHLIGHT_SHARE_STEPS = [
   "home_card_dismissed",
   "notification_opened",
   "profile_row_tapped",
+  // Matches tab + Home reel carousel (specs/matches-tab 13, jr_be-62n / B4).
+  // Rejected server side (and swallowed) until B4 is applied.
+  "matches_reel_tapped",
+  "viewer_swiped",
 ] as const;
 
 export type HighlightShareStep = (typeof HIGHLIGHT_SHARE_STEPS)[number];
@@ -69,6 +73,8 @@ export const HIGHLIGHT_SHARE_SOURCES = [
   "profile",
   "match_detail",
   "summary",
+  /** The Matches tab carousel (specs/matches-tab). */
+  "matches",
 ] as const;
 
 export type HighlightShareSourceTag = (typeof HIGHLIGHT_SHARE_SOURCES)[number];
