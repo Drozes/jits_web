@@ -271,6 +271,22 @@ describe("color semantics (WP2)", () => {
     }
   });
 
+  it("reel tiles draw no Signal Red and no gain or loss colour; the unseen ring is the unseen-ring token (AC 3.5)", () => {
+    const reels = FILES.filter((f) => f.file.startsWith("components/reels/"));
+    expect(reels.length).toBeGreaterThan(0);
+    const offenders = reels.filter((f) => RED.test(f.text) || GREEN.test(f.text)).map((f) => f.file);
+    expect(offenders).toEqual([]);
+    // Neither the amber attention ink nor a heat colour stands in for the ring.
+    const frame = reels.find((f) => f.file === "components/reels/reel-tile-frame.tsx");
+    expect(frame?.text).toMatch(/ring \? "border-unseen-ring"/);
+    expect(reels.some((f) => /\bunseenRing\b|border-unseen-ring/.test(f.text) && f.file !== "components/reels/reel-tile-frame.tsx")).toBe(false);
+    for (const t of [darkTokens, lightTokens]) {
+      expect(t.unseenRing).toBe(t.textPrimary);
+      expect(t.unseenRing).not.toBe(t.accentCta);
+      expect(t.unseenRing).not.toBe(t.accentCtaText);
+    }
+  });
+
   it("every switch takes its colors from the one switch look", () => {
     const offenders = FILES.filter(
       (f) => /\b(trackColor|thumbColor)\s*=/.test(f.text) && f.file !== "components/ui/switch.tsx",
