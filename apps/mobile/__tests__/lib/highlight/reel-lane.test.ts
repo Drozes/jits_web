@@ -151,6 +151,36 @@ describe("ordering", () => {
     expect(ids(out.items)).toEqual(["N", "J", "A", "B", "C", "D", "E", "F", "G", "H", "I", "K", "L"]);
   });
 
+  const at = (i: number) => new Date(Date.UTC(2026, 9, 1) - i * 60_000).toISOString();
+  const twenty = () => "ABCDEFGHIJKLMNOPQRST".split("").map((l, i) => reel(l, { matchId: `m${l}`, readyAt: at(i + 1) }));
+
+  it("supersede probe: a reel replaced by another of its match is dropped, the new one kept", () => {
+    const old = twenty();
+    // The server replaced C (match mC) with C2: the full new first page is A, B, C2, D..J.
+    const c2 = reel("C2", { matchId: "mC", readyAt: at(3) });
+    const page = [old[0], old[1], c2, ...old.slice(3, 10)];
+    const out = mergeFirstPage(old, page, true);
+    expect(ids(out.items)).not.toContain("C");
+    expect(ids(out.items).filter((id) => id === "C2")).toHaveLength(1);
+    expect(out.items.filter((i) => i.matchId === "mC")).toHaveLength(1);
+    expect(ids(out.items).slice(-1)).toEqual(["T"]);
+    expect(out.keptTail).toBe(true);
+  });
+
+  it("delete probe: a reel newer than the anchor and missing from the page is dropped", () => {
+    const old = twenty();
+    // A was deleted: the full new first page is B..K.
+    const out = mergeFirstPage(old, old.slice(1, 11), true);
+    expect(ids(out.items)).toEqual(ids(old.slice(1)));
+    expect(out.keptTail).toBe(true);
+  });
+
+  it("an equal or unparseable time never drops a missing reel", () => {
+    const old = [reel("x", { readyAt: at(5) }), reel("y", { readyAt: "junk" }), reel("a", { readyAt: at(5) })];
+    const out = mergeFirstPage(old, [reel("n", { readyAt: at(0) }), reel("a", { readyAt: at(5) })], true);
+    expect(ids(out.items)).toEqual(["n", "x", "y", "a"]);
+  });
+
   it("keptTail is false when no on-screen reel outside the new page was kept", () => {
     const old = [reel("a"), reel("b")];
     // Every reel on screen is in the new page: nothing extra kept, so the new first cursor applies.

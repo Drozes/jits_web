@@ -165,12 +165,26 @@ export function mergeFirstPage(current: readonly ReelItem[], firstPage: readonly
   // stays, in place: none can be lost past the old cursor. When the first
   // page is the last page, reels missing from it are gone (deletions clear).
   const anchorOnScreen = firstPageHasMore && anchor !== null && current.some((i) => i.highlightId === anchor.highlightId);
+  const pageMatches = new Set(page.map((i) => i.matchId));
+  const anchorAt = anchor ? Date.parse(anchor.readyAt) : NaN;
+  /**
+   * A missing on-screen reel is gone (dropped) when the page now holds
+   * another reel of its match (superseded: one item per match), or when it
+   * is strictly newer than the anchor so it should have been in the page
+   * (deleted). Time only ever drops, never keeps: unparseable or equal
+   * instants keep the reel, so no gap can come back.
+   */
+  const isGone = (old: ReelItem): boolean => {
+    if (pageMatches.has(old.matchId)) return true;
+    const oldAt = Date.parse(old.readyAt);
+    return Number.isFinite(oldAt) && Number.isFinite(anchorAt) && oldAt > anchorAt;
+  };
   const kept: ReelItem[] = [];
   let tailKept = false;
   for (const old of current) {
     const updated = pageById.get(old.highlightId);
     if (updated) kept.push(updated);
-    else if (anchorOnScreen) {
+    else if (anchorOnScreen && !isGone(old)) {
       kept.push(old);
       tailKept = true;
     }
