@@ -404,7 +404,54 @@ describe("PlaybackSession angle switches (multi-angle P0)", () => {
 
   it("reports no switch fields' values without a switch", () => {
     const out = matchSession().summary(1000, "unmount");
-    expect(out).toMatchObject({ switchCount: 0, switchLatencyMs: null, switchLatencyMaxMs: null });
+    expect(out).toMatchObject({
+      switchCount: 0,
+      switchLatencyMs: null,
+      switchLatencyMaxMs: null,
+      switchHeldStillCount: 0,
+      switchPillShownCount: 0,
+      switchFailedCount: 0,
+      switchSupersededCount: 0,
+    });
+  });
+
+  it("phase 1 counters (jits-xfvd.16): held still, pill, failed, superseded", () => {
+    const s = matchSession();
+    s.playing(true, 1000);
+    // Superseded before it landed, then the next one lands at 600 ms.
+    s.switchStarted(2000);
+    s.switchSuperseded();
+    s.switchStarted(2100);
+    s.switchPillShown();
+    s.switchLanded(2700);
+    s.switchHeldStill();
+    const out = s.summary(3000, "unmount");
+    expect(out).toMatchObject({
+      switchCount: 2,
+      switchLatencyMs: 600,
+      switchHeldStillCount: 1,
+      switchPillShownCount: 1,
+      switchFailedCount: 0,
+      switchSupersededCount: 1,
+    });
+  });
+
+  it("a failed switch is counted and never gets a latency, even if a restore later 'lands'", () => {
+    const s = matchSession();
+    s.switchStarted(2000);
+    s.switchFailed();
+    // A stray landing (the restore) after the failure is not a switch landing.
+    s.switchLanded(2900);
+    const out = s.summary(3000, "unmount");
+    expect(out).toMatchObject({ switchCount: 1, switchFailedCount: 1, switchLatencyMs: null, switchLatencyMaxMs: null });
+  });
+
+  it("reports the new counters on the Sentry event", () => {
+    const s = matchSession();
+    s.switchStarted(10);
+    s.switchFailed();
+    reportPlaybackSession(s.summary(20, "unmount"));
+    expect(mockCaptureMessage.mock.calls.at(-1)[1].extra).toMatchObject({ switchFailedCount: 1, switchSupersededCount: 0 });
   });
 
   it("accepts the timekeeper angle as its own dimension", () => {
