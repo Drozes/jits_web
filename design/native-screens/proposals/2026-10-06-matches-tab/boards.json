@@ -1,0 +1,104 @@
+[
+  {
+    "file": "P-MT-01-Tab-Bar.dc.html",
+    "title": "Proposed: Tab bar, 5 tabs (Home \u00b7 Arena \u00b7 Matches \u00b7 Rankings \u00b7 Profile)",
+    "w": 390,
+    "h": 1380
+  },
+  {
+    "file": "P-MT-02-Matches-Default.dc.html",
+    "title": "Proposed: Matches tab, default (record strip, Your highlights, chips, feed)",
+    "w": 390,
+    "h": 2041
+  },
+  {
+    "file": "P-MT-03-Card-States.dc.html",
+    "title": "Proposed: Matches tab, MatchFeedCard states (badge priority, crop rule, tags)",
+    "w": 390,
+    "h": 6132
+  },
+  {
+    "file": "P-MT-04-Matches-Loading-Errors.dc.html",
+    "title": "Proposed: Matches tab, loading, filter with no results, offline, errors",
+    "w": 390,
+    "h": 4304
+  },
+  {
+    "file": "P-MT-05-Home-Default.dc.html",
+    "title": "Proposed: Home, Your reels lane first (phase 1, replaces the NEW HIGHLIGHT card)",
+    "w": 390,
+    "h": 1136
+  },
+  {
+    "file": "P-MT-06-Home-Resume.dc.html",
+    "title": "Proposed: Home with a lost live match (Resume above Your reels)",
+    "w": 390,
+    "h": 1234
+  },
+  {
+    "file": "P-MT-07-Home-Future-Lanes.dc.html",
+    "title": "Proposed: Home, future lanes (annotated, gated, not in phase 1)",
+    "w": 390,
+    "h": 2094
+  },
+  {
+    "file": "P-MT-08-Reel-Viewer.dc.html",
+    "title": "Proposed: Reel viewer, vertical swipe pager (wraps board 34)",
+    "w": 390,
+    "h": 2057
+  },
+  {
+    "file": "P-MT-09-Profile-Clean.dc.html",
+    "title": "Proposed: Profile, identity, stats and settings only (no Recent Matches, highlights or Film Room)",
+    "w": 390,
+    "h": 1262
+  },
+  {
+    "file": "P-MT-10-Zero-Matches.dc.html",
+    "title": "Proposed: Zero matches, Matches tab (first match hero)",
+    "w": 390,
+    "h": 956
+  },
+  {
+    "file": "P-MT-11-Zero-Home.dc.html",
+    "title": "Proposed: Zero matches, Home (CTA tile, never red; practice offer keeps the red)",
+    "w": 390,
+    "h": 1292
+  },
+  {
+    "file": "P-MT-12-Low-Data-Matches.dc.html",
+    "title": "Proposed: Low data, Matches tab (3 matches, no film, no highlights yet)",
+    "w": 390,
+    "h": 1723
+  },
+  {
+    "file": "P-MT-13-Low-Data-Home.dc.html",
+    "title": "Proposed: Low data, Home (matches but no reels yet)",
+    "w": 390,
+    "h": 1095
+  },
+  {
+    "file": "P-MT-14-Reel-Tiles-In-Flight.dc.html",
+    "title": "Proposed: Reel tile kinds and the in-flight reveal",
+    "w": 390,
+    "h": 2310
+  },
+  {
+    "file": "P-MT-15-Milestones.dc.html",
+    "title": "Proposed: Milestones (first match, first win, first highlight)",
+    "w": 390,
+    "h": 2330
+  },
+  {
+    "file": "P-MT-16-Clips-Off.dc.html",
+    "title": "Proposed: Highlights flag off (both carousels hidden)",
+    "w": 390,
+    "h": 1961
+  },
+  {
+    "file": "P-MT-00-Map.dc.html",
+    "title": "Proposed: Matches tab map (what changed, decisions, lanes and gates, open questions)",
+    "w": 1440,
+    "h": 1772
+  }
+]

@@ -1,0 +1,213 @@
+{
+ "pages_append": [
+  {
+   "id": "matches-tab",
+   "name": "Proposed (Oct 6 Matches tab)"
+  }
+ ],
+ "boards_add": {
+  "P-MT-00-Map.dc.html": {
+   "h": 1772,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Matches tab map (what changed, decisions, lanes and gates, open questions)",
+   "w": 1440,
+   "x": 0,
+   "y": 0
+  },
+  "P-MT-01-Tab-Bar.dc.html": {
+   "h": 1380,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Tab bar, 5 tabs (Home · Arena · Matches · Rankings · Profile)",
+   "w": 390,
+   "x": 0,
+   "y": 2115
+  },
+  "P-MT-02-Matches-Default.dc.html": {
+   "h": 2041,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Matches tab, default (record strip, Your highlights, chips, feed)",
+   "w": 390,
+   "x": 470,
+   "y": 2115
+  },
+  "P-MT-03-Card-States.dc.html": {
+   "h": 6132,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Matches tab, MatchFeedCard states (badge priority, crop rule, tags)",
+   "w": 390,
+   "x": 940,
+   "y": 2115
+  },
+  "P-MT-04-Matches-Loading-Errors.dc.html": {
+   "h": 4304,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Matches tab, loading, filter with no results, offline, errors",
+   "w": 390,
+   "x": 1410,
+   "y": 2115
+  },
+  "P-MT-05-Home-Default.dc.html": {
+   "h": 1136,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Home, Your reels lane first (phase 1, replaces the NEW HIGHLIGHT card)",
+   "w": 390,
+   "x": 1880,
+   "y": 2115
+  },
+  "P-MT-06-Home-Resume.dc.html": {
+   "h": 1234,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Home with a lost live match (Resume above Your reels)",
+   "w": 390,
+   "x": 2350,
+   "y": 2115
+  },
+  "P-MT-07-Home-Future-Lanes.dc.html": {
+   "h": 2094,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Home, future lanes (annotated, gated, not in phase 1)",
+   "w": 390,
+   "x": 2820,
+   "y": 2115
+  },
+  "P-MT-08-Reel-Viewer.dc.html": {
+   "h": 2057,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Reel viewer, vertical swipe pager (wraps board 34)",
+   "w": 390,
+   "x": 3290,
+   "y": 2115
+  },
+  "P-MT-09-Profile-Clean.dc.html": {
+   "h": 1262,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Profile, identity, stats and settings only (no Recent Matches, highlights or Film Room)",
+   "w": 390,
+   "x": 3760,
+   "y": 2115
+  },
+  "P-MT-10-Zero-Matches.dc.html": {
+   "h": 956,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Zero matches, Matches tab (first match hero)",
+   "w": 390,
+   "x": 0,
+   "y": 8590
+  },
+  "P-MT-11-Zero-Home.dc.html": {
+   "h": 1292,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Zero matches, Home (CTA tile, never red; practice offer keeps the red)",
+   "w": 390,
+   "x": 470,
+   "y": 8590
+  },
+  "P-MT-12-Low-Data-Matches.dc.html": {
+   "h": 1723,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Low data, Matches tab (3 matches, no film, no highlights yet)",
+   "w": 390,
+   "x": 940,
+   "y": 8590
+  },
+  "P-MT-13-Low-Data-Home.dc.html": {
+   "h": 1095,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Low data, Home (matches but no reels yet)",
+   "w": 390,
+   "x": 1410,
+   "y": 8590
+  },
+  "P-MT-14-Reel-Tiles-In-Flight.dc.html": {
+   "h": 2310,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Reel tile kinds and the in-flight reveal",
+   "w": 390,
+   "x": 1880,
+   "y": 8590
+  },
+  "P-MT-15-Milestones.dc.html": {
+   "h": 2330,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Milestones (first match, first win, first highlight)",
+   "w": 390,
+   "x": 2350,
+   "y": 8590
+  },
+  "P-MT-16-Clips-Off.dc.html": {
+   "h": 1961,
+   "is_interactive": true,
+   "page": "matches-tab",
+   "title": "Proposed: Highlights flag off (both carousels hidden)",
+   "w": 390,
+   "x": 2820,
+   "y": 8590
+  }
+ },
+ "notes_add": {
+  "mt-row-0": {
+   "kind": "title1",
+   "maxW": 1440,
+   "page": "matches-tab",
+   "text": "Oct 6 Matches tab: map",
+   "w": 240,
+   "x": 0,
+   "y": -280
+  },
+  "mt-row-1": {
+   "kind": "title1",
+   "maxW": 4150,
+   "page": "matches-tab",
+   "text": "Tab bar, Matches tab, Home, reel viewer, Profile",
+   "w": 240,
+   "x": 0,
+   "y": 1835
+  },
+  "mt-row-2": {
+   "kind": "title1",
+   "maxW": 3210,
+   "page": "matches-tab",
+   "text": "Zero, low data, in-flight, milestones and highlights off",
+   "w": 240,
+   "x": 0,
+   "y": 8310
+  }
+ },
+ "order_append": [
+  "P-MT-00-Map.dc.html",
+  "P-MT-01-Tab-Bar.dc.html",
+  "P-MT-02-Matches-Default.dc.html",
+  "P-MT-03-Card-States.dc.html",
+  "P-MT-04-Matches-Loading-Errors.dc.html",
+  "P-MT-05-Home-Default.dc.html",
+  "P-MT-06-Home-Resume.dc.html",
+  "P-MT-07-Home-Future-Lanes.dc.html",
+  "P-MT-08-Reel-Viewer.dc.html",
+  "P-MT-09-Profile-Clean.dc.html",
+  "P-MT-10-Zero-Matches.dc.html",
+  "P-MT-11-Zero-Home.dc.html",
+  "P-MT-12-Low-Data-Matches.dc.html",
+  "P-MT-13-Low-Data-Home.dc.html",
+  "P-MT-14-Reel-Tiles-In-Flight.dc.html",
+  "P-MT-15-Milestones.dc.html",
+  "P-MT-16-Clips-Off.dc.html"
+ ],
+ "based_on_canvas_version": "1791310189-a890",
+ "note": "Additive only: no existing board, note, page or key changes. Re-read project/canvas.json right before publishing and merge these keys into the fresh copy."
+}
