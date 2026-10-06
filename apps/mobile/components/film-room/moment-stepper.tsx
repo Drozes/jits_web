@@ -47,9 +47,11 @@ function StepArrow({ dir, target, onJump }: { dir: "prev" | "next"; target: KeyM
 export function MomentStepper({ moments, positionS, currentT, onJump }: MomentStepperProps) {
   const step = keyMomentStepAt(moments, positionS);
   if (!step) return null;
-  const on = step.reached && currentT === step.shown.t;
+  // The stepper's stops are per second, so the lit moment may be another
+  // one in the same second (keyMomentsBySecond).
+  const on = step.reached && currentT != null && Math.round(currentT) === Math.round(step.shown.t);
   const clock = formatClock(step.shown.t);
-  const count = `${step.index + 1}/${moments.length}`;
+  const count = `${step.index + 1}/${step.count}`;
   return (
     <View testID="moment-stepper" accessibilityLabel="Key moments" className="flex-row items-center self-start" style={{ gap: 8 }}>
       <StepArrow dir="prev" target={step.prev} onJump={onJump} />
@@ -57,7 +59,7 @@ export function MomentStepper({ moments, positionS, currentT, onJump }: MomentSt
         dim
         testID="moment-step-current"
         accessibilityRole="button"
-        accessibilityLabel={`Key moment ${step.index + 1} of ${moments.length}, ${clock}`}
+        accessibilityLabel={`Key moment ${step.index + 1} of ${step.count}, ${clock}`}
         accessibilityHint="Plays from this moment"
         accessibilityState={{ selected: on }}
         onPress={() => onJump(step.shown.t)}

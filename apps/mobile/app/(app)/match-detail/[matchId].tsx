@@ -179,6 +179,7 @@ export default function MatchDetailScreen() {
                 durationS={active.duration_seconds}
                 tags={film.tags}
                 showLabels={showLabels}
+                recordedSubmission={data.match.submission_name}
                 onJump={(t) => play(active.id, t)}
               />
             ) : null}

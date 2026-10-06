@@ -512,6 +512,46 @@ describe("MatchDetailScreen (Film Room match page)", () => {
       expect(utils.queryByText("Analysis complete.")).toBeNull();
     });
 
+    it("a member sees the finish named by the RECORDED submission, never an AI fallback label (review L1)", async () => {
+      mockRole = "member";
+      // The analysis names the recorded submission: the finish takes its name.
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: {
+          ...ANALYSIS.data,
+          technique_tags: [{ id: "t3", technique_name: "Rear naked choke", category: null, athlete_id: null, timestamp_start: 237, timestamp_end: null, submission_type_name: null }],
+        },
+      });
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByLabelText("Play from 03:57, Rear-naked choke")).toBeTruthy());
+      expect(within(utils.getByTestId("key-moment-3")).getByText("Rear-naked choke")).toBeTruthy();
+      // The AI moments around it stay time only.
+      expect(utils.getByLabelText("Play from 03:20")).toBeTruthy();
+      expect(utils.queryByText(/back take/i)).toBeNull();
+    });
+
+    it("a member gets one row per second when two moments share it (review M1)", async () => {
+      mockRole = "member";
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: { ...ANALYSIS.data, positions: [{ position: "standing", timestamp_s: 27 }], scoring_moments: [{ type: "takedown", timestamp_s: 27 }, { type: "back_take", timestamp_s: 200 }] },
+      });
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByLabelText("Play from 00:27")).toBeTruthy());
+      expect(utils.getAllByLabelText(/^Play from 00:27/)).toHaveLength(1);
+      expect(utils.queryByTestId("key-moment-2")).toBeNull();
+    });
+
+    it("an admin keeps both labelled rows in a shared second", async () => {
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: { ...ANALYSIS.data, positions: [{ position: "standing", timestamp_s: 27 }], scoring_moments: [{ type: "takedown", timestamp_s: 27 }, { type: "back_take", timestamp_s: 200 }] },
+      });
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByLabelText("Play from 00:27, Takedown")).toBeTruthy());
+      expect(utils.getByLabelText("Play from 00:27, Engage")).toBeTruthy();
+    });
+
     it("a member with only technique tags and no moments sees no KEY MOMENTS block", async () => {
       mockRole = "member";
       mockGetVideoAnalysis.mockResolvedValue({ ok: true, data: { ...ANALYSIS.data, positions: [], scoring_moments: [] } });

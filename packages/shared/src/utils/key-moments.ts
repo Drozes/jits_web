@@ -213,21 +213,59 @@ export function canSeeAnalysisLabels(platformRole: string | null | undefined): b
 }
 
 /**
- * What a key moment row says for this viewer: its label when labels are
- * shown, else null (time only). Display-time only, so `buildKeyMoments`'
- * dedupe and finish logic never depends on who is looking. The finish is
- * marked separately (`kind === "finish"`), from the recorded result.
+ * What a key moment row says for this viewer. Admins (`showLabels`) see
+ * every label. Everyone else sees only a finish labelled with the
+ * user-RECORDED submission (`recordedSubmission`, the match's
+ * `submission_name`): `buildKeyMoments` gives the finish that name only when
+ * the analysis named it, so a finish that fell back to an AI scoring moment
+ * keeps its AI label and stays hidden. Else null (time only).
+ * Display-time only, so `buildKeyMoments`' dedupe and finish logic never
+ * depends on who is looking.
  */
-export function keyMomentDisplayLabel(moment: KeyMoment, showLabels: boolean): string | null {
-  return showLabels ? moment.label : null;
+export function keyMomentDisplayLabel(
+  moment: KeyMoment,
+  showLabels: boolean,
+  recordedSubmission?: string | null,
+): string | null {
+  if (showLabels) return moment.label;
+  const recorded = recordedSubmission?.trim();
+  if (moment.kind === "finish" && recorded && moment.label === recorded) return moment.label;
+  return null;
+}
+
+/**
+ * Key moments with one entry per second (by rounded time), for a view that
+ * shows times only: `buildKeyMoments` keeps two moments in the same second
+ * when their labels differ. Each entry takes the earliest time in its
+ * second; a finish wins (its kind and label) when any moment there is one.
+ */
+export function keyMomentsBySecond(moments: KeyMoment[]): KeyMoment[] {
+  const out: KeyMoment[] = [];
+  const at = new Map<number, number>();
+  for (const m of [...moments].sort((a, b) => a.t - b.t)) {
+    const key = Math.round(m.t);
+    const i = at.get(key);
+    if (i == null) {
+      at.set(key, out.length);
+      out.push({ ...m });
+      continue;
+    }
+    const kept = out[i];
+    if (m.kind === "finish" && kept.kind !== "finish") {
+      out[i] = { ...m, t: kept.t };
+    }
+  }
+  return out;
 }
 
 /** Where the playhead sits among the key moments (the player's stepper). */
 export interface KeyMomentStep {
   /** The moment the stepper shows: the latest at or before the playhead, else the first. */
   shown: KeyMoment;
-  /** Its index in `moments` (0-based). */
+  /** Its index in the per-second list (0-based). */
   index: number;
+  /** How many distinct seconds there are to step through. */
+  count: number;
   /** True when the playhead has reached `shown` (false before the first moment). */
   reached: boolean;
   /** The moment before `shown`, or null at the start. */
@@ -237,28 +275,33 @@ export interface KeyMomentStep {
 }
 
 /**
- * The stepper state for playback time `t` over `moments` (oldest first, as
- * `buildKeyMoments` returns them). A quarter second of slack counts a moment
- * the player just seeked to as reached. Before the first moment the stepper
- * shows the first one's time and "next" jumps to it. Null with no moments.
+ * The stepper state for playback time `t`. It steps over DISTINCT seconds
+ * (`keyMomentsBySecond`), so two moments in one second are one stop and
+ * prev never lands on the same time twice. A quarter second of slack counts
+ * a moment the player just seeked to as reached. Before the first moment the
+ * stepper shows the first one's time and "next" jumps to it. Null with no
+ * moments.
  */
 export function keyMomentStepAt(moments: KeyMoment[], t: number): KeyMomentStep | null {
-  if (moments.length === 0) return null;
+  const stops = keyMomentsBySecond(moments);
+  if (stops.length === 0) return null;
   const pos = Number.isFinite(t) ? t : 0;
+  const count = stops.length;
   let index = -1;
-  for (let i = 0; i < moments.length; i++) {
-    if (moments[i].t <= pos + 0.25) index = i;
+  for (let i = 0; i < stops.length; i++) {
+    if (stops[i].t <= pos + 0.25) index = i;
     else break;
   }
   if (index < 0) {
-    return { shown: moments[0], index: 0, reached: false, prev: null, next: moments[0] };
+    return { shown: stops[0], index: 0, count, reached: false, prev: null, next: stops[0] };
   }
   return {
-    shown: moments[index],
+    shown: stops[index],
     index,
+    count,
     reached: true,
-    prev: index > 0 ? moments[index - 1] : null,
-    next: index < moments.length - 1 ? moments[index + 1] : null,
+    prev: index > 0 ? stops[index - 1] : null,
+    next: index < stops.length - 1 ? stops[index + 1] : null,
   };
 }
 

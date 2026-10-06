@@ -10,6 +10,7 @@ import {
   canSeeAnalysisLabels,
   keyMomentDisplayLabel,
   keyMomentStepAt,
+  keyMomentsBySecond,
   type KeyMoment,
 } from "./key-moments";
 
@@ -206,6 +207,24 @@ describe("analysis label gate (jits-xfvd.18)", () => {
     expect(keyMomentDisplayLabel(m, true)).toBe("Single leg takedown");
     expect(keyMomentDisplayLabel(m, false)).toBeNull();
   });
+
+  it("non-admins see a finish label only when it is the recorded submission", () => {
+    const named: KeyMoment = { t: 200, label: "Rear-naked choke", kind: "finish", description: null };
+    const fallback: KeyMoment = { t: 200, label: "Back take", kind: "finish", description: null };
+    expect(keyMomentDisplayLabel(named, false, " Rear-naked choke ")).toBe("Rear-naked choke");
+    expect(keyMomentDisplayLabel(fallback, false, "Rear-naked choke")).toBeNull();
+    expect(keyMomentDisplayLabel(named, false, null)).toBeNull();
+    const score: KeyMoment = { t: 27, label: "Rear-naked choke", kind: "score", description: null };
+    expect(keyMomentDisplayLabel(score, false, "Rear-naked choke")).toBeNull();
+  });
+
+  it("the recorded name survives buildKeyMoments only when the analysis named it", () => {
+    const match = { result: "submission", submission_name: "Armbar" };
+    const named = buildKeyMoments({ scoring_moments: [{ type: "armbar", timestamp_s: 90 }] }, match);
+    expect(keyMomentDisplayLabel(named.at(-1)!, false, "Armbar")).toBe("Armbar");
+    const fallback = buildKeyMoments({ scoring_moments: [{ type: "sweep", timestamp_s: 90 }] }, match);
+    expect(keyMomentDisplayLabel(fallback.at(-1)!, false, "Armbar")).toBeNull();
+  });
 });
 
 describe("keyMomentStepAt", () => {
@@ -244,5 +263,32 @@ describe("keyMomentStepAt", () => {
 
   it("treats a non-finite playhead as 0", () => {
     expect(keyMomentStepAt(ms, Number.NaN)!.reached).toBe(false);
+  });
+});
+
+describe("same-second moments (review M1)", () => {
+  const same: KeyMoment[] = [
+    { t: 6, label: "Engage", kind: "engage", description: null },
+    { t: 6, label: "Takedown", kind: "score", description: null },
+    { t: 40, label: "Sweep", kind: "score", description: null },
+  ];
+
+  it("keyMomentsBySecond keeps one entry per second, the finish winning", () => {
+    expect(keyMomentsBySecond(same).map((m) => m.t)).toEqual([6, 40]);
+    const withFinish: KeyMoment[] = [
+      { t: 5.8, label: "Sweep", kind: "score", description: null },
+      { t: 6.2, label: "Armbar", kind: "finish", description: null },
+    ];
+    expect(keyMomentsBySecond(withFinish)).toEqual([{ t: 5.8, label: "Armbar", kind: "finish", description: null }]);
+    expect(keyMomentsBySecond([])).toEqual([]);
+  });
+
+  it("the stepper steps over distinct times and reaches the first", () => {
+    const at40 = keyMomentStepAt(same, 40)!;
+    expect(at40).toMatchObject({ index: 1, count: 2 });
+    expect(at40.prev?.t).toBe(6);
+    const at6 = keyMomentStepAt(same, at40.prev!.t)!;
+    expect(at6).toMatchObject({ index: 0, count: 2, prev: null });
+    expect(at6.next?.t).toBe(40);
   });
 });

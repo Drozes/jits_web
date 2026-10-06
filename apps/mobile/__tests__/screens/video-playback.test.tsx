@@ -735,6 +735,25 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(utils.getByTestId("moment-step-next").props.accessibilityLabel).toBe("Next key moment");
   });
 
+  it("steps over a second shared by two moments without sticking (review M1)", async () => {
+    const utils = await renderLoadedPlayer({
+      videos: 1,
+      analysis: {
+        ok: true,
+        data: { ...ANALYSIS.data, positions: [{ position: "standing", timestamp_s: 6 }], scoring_moments: [{ type: "takedown", timestamp_s: 6 }, { type: "sweep", timestamp_s: 40 }], technique_tags: [] },
+      },
+    });
+    await waitFor(() => expect(utils.getByTestId("moment-stepper")).toBeTruthy());
+    statusAt(45);
+    expect(utils.getByTestId("moment-step-count")).toHaveTextContent("2/2");
+    fireEvent.press(utils.getByLabelText("Previous key moment, 00:06"));
+    expect(lastPlayer().seeks.at(-1)).toBe(6);
+    statusAt(6);
+    expect(utils.getByTestId("moment-step-count")).toHaveTextContent("1/2");
+    expect(utils.getByTestId("moment-step-current").props.accessibilityState).toMatchObject({ selected: true });
+    expect(utils.getByTestId("moment-step-prev").props.accessibilityState).toMatchObject({ disabled: true });
+  });
+
   it("lights the current moment and shows no AI move wording or caption (jits-xfvd.18)", async () => {
     const utils = await renderLoadedPlayer();
     await waitFor(() => expect(utils.getByTestId("moment-stepper")).toBeTruthy());

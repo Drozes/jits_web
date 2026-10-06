@@ -2,7 +2,7 @@ import * as React from "react";
 import { Pressable, Text, View } from "react-native";
 import { TRACKING, typeStep } from "@/lib/typography";
 import { PlayCircle } from "lucide-react-native";
-import { formatClock, keyMomentDisplayLabel, type KeyMoment } from "@jits/shared/utils";
+import { formatClock, keyMomentDisplayLabel, keyMomentsBySecond, type KeyMoment } from "@jits/shared/utils";
 import { usePalette, TABULAR } from "@/lib/theme/palette";
 
 /**
@@ -38,10 +38,12 @@ interface KeyMomentsProps {
   tags: string[];
   /** AI move labels and technique tags (admins only, `useShowAnalysisLabels`). */
   showLabels: boolean;
+  /** The match's user-recorded submission name: a finish carrying it is shown to everyone. */
+  recordedSubmission?: string | null;
   onJump: (t: number) => void;
 }
 
-/** "Play from 00:27, Takedown" / "Play from 06:15, finish" / "Play from 00:09". */
+/** "Play from 00:27, Takedown" / "Play from 03:20, Rear-naked choke" / "Play from 06:15, finish" / "Play from 00:09". */
 function rowA11yLabel(m: KeyMoment, label: string | null): string {
   const parts = [`Play from ${formatClock(m.t)}`];
   if (label) parts.push(label);
@@ -53,11 +55,15 @@ function rowA11yLabel(m: KeyMoment, label: string | null): string {
  * KEY MOMENTS: timeline, one tappable row per moment, technique tags. Without
  * `showLabels` (everyone but admins, jits-xfvd.18) a row is its time and the
  * FINISH marker only (the finish exists only for a recorded submission
- * result), and the AI technique tags are left out.
+ * result, and is named only by the recorded submission), one row per
+ * second, and the AI technique tags are left out.
  */
-export function KeyMoments({ moments, durationS, tags: allTags, showLabels, onJump }: KeyMomentsProps) {
+export function KeyMoments({ moments: allMoments, durationS, tags: allTags, showLabels, recordedSubmission, onJump }: KeyMomentsProps) {
   const p = usePalette();
   const tags = showLabels ? allTags : [];
+  // Two moments in one second differ only by their AI labels: one row each
+  // for admins, one time-only row for everyone else.
+  const moments = showLabels ? allMoments : keyMomentsBySecond(allMoments);
   if (moments.length === 0 && tags.length === 0) return null;
   const span = durationS && durationS > 0 ? durationS : Math.max(...moments.map((m) => m.t), 1) * 1.05;
   return (
@@ -75,7 +81,7 @@ export function KeyMoments({ moments, durationS, tags: allTags, showLabels, onJu
       {moments.length > 0 ? <MomentTimeline moments={moments} durationS={span} /> : null}
       <View style={{ borderTopWidth: moments.length ? 1 : 0, borderTopColor: p.hairline }}>
         {moments.map((m, i) => {
-          const label = keyMomentDisplayLabel(m, showLabels);
+          const label = keyMomentDisplayLabel(m, showLabels, recordedSubmission);
           return (
             <Pressable
               key={`${m.t}-${i}`}
