@@ -107,22 +107,60 @@ export function appendReelPage(current: readonly ReelItem[], page: readonly Reel
   return [...current, ...unseenFirst(fresh)];
 }
 
+/** Same reel, same content: the previous object is reused so memoised tiles skip a render. */
+function sameReel(a: ReelItem, b: ReelItem): boolean {
+  return a.highlightId === b.highlightId && a.version === b.version && a.unseen === b.unseen && a.posterUrl === b.posterUrl;
+}
+
+/** Returns `next` with every unchanged reel replaced by its previous object (stable identities). */
+export function reuseReels(prev: readonly ReelItem[], next: readonly ReelItem[]): ReelItem[] {
+  if (prev.length === 0) return [...next];
+  const byId = new Map(prev.map((i) => [i.highlightId, i]));
+  return next.map((i) => {
+    const old = byId.get(i.highlightId);
+    return old && sameReel(old, i) ? old : i;
+  });
+}
+
+export interface FirstPageMerge {
+  items: ReelItem[];
+  /** True when the previously loaded tail (and so the previous cursor) was kept. */
+  keptTail: boolean;
+}
+
 /**
- * A refetch of the first page. The new first page is ordered unseen-first;
- * items already loaded past it are kept (de-duplicated) when the new first
- * page is full, so a focus refresh does not collapse a deep carousel. When
- * the new first page is the last one, the old tail is dropped.
+ * A refetch of the first page (owner decision 2026-10-06: ordering is STABLE
+ * across refetches).
+ *
+ * - Nothing on screen yet: the first page, unseen first (the only time
+ *   unseen-first reorders existing reels).
+ * - Otherwise reels already on screen keep their relative order (with the
+ *   fresh data: a watched reel loses its ring but does not move), and newly
+ *   arrived reels enter at the front, unseen first among themselves. A reel
+ *   gone from the first page's range is dropped.
+ * - The previously loaded tail (reels past the first page) is kept only when
+ *   the new first page is full AND its last item (server order) is already on
+ *   screen, so the tail still continues where the page ends; the caller then
+ *   keeps the old cursor. Otherwise the tail is dropped and the caller uses
+ *   the new first cursor.
  */
-export function mergeFirstPage(current: readonly ReelItem[], firstPage: readonly ReelItem[], firstPageHasMore: boolean): ReelItem[] {
-  const head = unseenFirst(dedupe(firstPage));
-  if (!firstPageHasMore) return head;
-  const ids = new Set(head.map((i) => i.highlightId));
-  // Compared as instants (spelling-agnostic); the cursor strings themselves are never rebuilt.
-  const oldestHead = head.length > 0 ? Math.min(...head.map((i) => Date.parse(i.readyAt))) : null;
-  const tail = current.filter(
-    (i) => !ids.has(i.highlightId) && (oldestHead == null || !Number.isFinite(oldestHead) || Date.parse(i.readyAt) <= oldestHead),
-  );
-  return [...head, ...tail];
+export function mergeFirstPage(current: readonly ReelItem[], firstPage: readonly ReelItem[], firstPageHasMore: boolean): FirstPageMerge {
+  const page = dedupe(firstPage);
+  if (current.length === 0) return { items: unseenFirst(page), keptTail: false };
+  const pageById = new Map(page.map((i) => [i.highlightId, i]));
+  const currentIds = new Set(current.map((i) => i.highlightId));
+  const fresh = unseenFirst(page.filter((i) => !currentIds.has(i.highlightId)));
+  const anchor = page.length > 0 ? page[page.length - 1] : null;
+  const keepTail = firstPageHasMore && anchor !== null && currentIds.has(anchor.highlightId);
+  // Instants, spelling-agnostic (the cursor strings themselves are never rebuilt).
+  const anchorAt = anchor ? Date.parse(anchor.readyAt) : NaN;
+  const kept: ReelItem[] = [];
+  for (const old of current) {
+    const updated = pageById.get(old.highlightId);
+    if (updated) kept.push(updated);
+    else if (keepTail && Number.isFinite(anchorAt) && Date.parse(old.readyAt) <= anchorAt) kept.push(old);
+  }
+  return { items: [...fresh, ...kept], keptTail: keepTail };
 }
 
 function dedupe(items: readonly ReelItem[]): ReelItem[] {
@@ -142,13 +180,21 @@ export function visibleBuilding<T extends Pick<InFlightReel, "matchId">>(inFligh
 }
 
 /**
- * Reels that just landed: a match that had a building tile in `prev` and
- * now has a ready reel. The host plays the reveal for these (cross-fade,
- * one ring pulse, a success haptic; spec 10.5).
+ * Reels that just landed: a match that showed a building tile last time
+ * (`visibleBuilding(prevBuilding, prevItems)`) and now has a ready reel that
+ * was not already ready. A building tile that was hidden because its reel
+ * was already ready (a lagging phase read) never "lands" again. The host
+ * plays the reveal for these (cross-fade, one ring pulse, a success haptic;
+ * spec 10.5).
  */
-export function landedReels(prev: readonly Pick<InFlightReel, "matchId">[], items: readonly ReelItem[]): ReelItem[] {
-  const was = new Set(prev.map((r) => r.matchId));
-  return items.filter((i) => was.has(i.matchId));
+export function landedReels(
+  prevBuilding: readonly Pick<InFlightReel, "matchId">[],
+  prevItems: readonly ReelItem[],
+  items: readonly ReelItem[],
+): ReelItem[] {
+  const shown = new Set(visibleBuilding(prevBuilding, prevItems).map((r) => r.matchId));
+  const wasReady = new Set(prevItems.map((i) => i.highlightId));
+  return items.filter((i) => shown.has(i.matchId) && !wasReady.has(i.highlightId));
 }
 
 // ---- Matches fallback without B2 (spec 12.3) -----------------------------------

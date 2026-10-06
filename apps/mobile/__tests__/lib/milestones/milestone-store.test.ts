@@ -9,6 +9,7 @@ import {
   claimMilestone,
   decideMilestone,
   loadMilestones,
+  milestoneLoadState,
   milestoneStorageKey,
   MILESTONE_COPY,
   MILESTONE_FRESH_MS,
@@ -148,7 +149,18 @@ describe("decideMilestone", () => {
 });
 
 describe("store", () => {
+  it("refuses a claim before the marks have loaded, and writes nothing", async () => {
+    const setItem = AsyncStorage.setItem as jest.Mock;
+    setItem.mockClear();
+    expect(milestoneLoadState("a1")).toBe("pending");
+    expect(claimMilestone("a1", { marks: ["first_match"] })).toBe(false);
+    expect(setItem).not.toHaveBeenCalled();
+    await loadMilestones("a1");
+    expect(claimMilestone("a1", { marks: ["first_match"] })).toBe(true);
+  });
+
   it("claims once, writes every mark in one write under milestones:v1:<athleteId>", async () => {
+    await loadMilestones("a1");
     const setItem = AsyncStorage.setItem as jest.Mock;
     setItem.mockClear();
     expect(claimMilestone("a1", { marks: ["first_match", "first_win"] }, NOW)).toBe(true);
@@ -160,42 +172,67 @@ describe("store", () => {
     expect(setItem).toHaveBeenCalledTimes(1);
   });
 
-  it("a Home fire suppresses the Matches fire (same id, synchronously)", () => {
+  it("a read error fails closed: no celebration and no write for the session", async () => {
+    (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error("io"));
+    const setItem = AsyncStorage.setItem as jest.Mock;
+    setItem.mockClear();
+    expect((await loadMilestones("a1")).size).toBe(0);
+    expect(milestoneLoadState("a1")).toBe("failed");
+    expect(claimMilestone("a1", { marks: ["first_match"] })).toBe(false);
+    // Still closed on a second load in the same session (the read is not retried).
+    await loadMilestones("a1");
+    expect(claimMilestone("a1", { marks: ["first_highlight"] })).toBe(false);
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it("persists merged with what is stored: existing and unknown keys are preserved", async () => {
+    await AsyncStorage.setItem(milestoneStorageKey("a1"), JSON.stringify({ first_match: "2026-10-01T00:00:00.000Z", future_key: 7 }));
+    await loadMilestones("a1");
+    const setItem = AsyncStorage.setItem as jest.Mock;
+    setItem.mockClear();
+    expect(claimMilestone("a1", { marks: ["first_highlight"] }, NOW)).toBe(true);
+    expect(JSON.parse(setItem.mock.calls[0][1] as string)).toEqual({
+      first_match: "2026-10-01T00:00:00.000Z",
+      future_key: 7,
+      first_highlight: iso(NOW),
+    });
+  });
+
+  it("a Home fire suppresses the Matches fire (same id, synchronously)", async () => {
+    await loadMilestones("a1");
     expect(claimMilestone("a1", { marks: ["first_highlight"] })).toBe(true);
     expect(claimMilestone("a1", { marks: ["first_highlight"] })).toBe(false);
     expect(decideMilestone({ surface: "matches", now: NOW, inActiveMatch: false, highlights: { count: 1, hasMore: false, first: { highlightId: "h", unseen: true, readyAt: iso(NOW) } } }, seenMilestones("a1"))).toBeNull();
   });
 
-  it("is per athlete", () => {
+  it("is per athlete", async () => {
+    await loadMilestones("a1");
+    await loadMilestones("a2");
     expect(claimMilestone("a1", { marks: ["first_match"] })).toBe(true);
     expect(claimMilestone("a2", { marks: ["first_match"] })).toBe(true);
   });
 
-  it("refuses an empty claim", () => {
+  it("refuses an empty claim", async () => {
+    await loadMilestones("a1");
     expect(claimMilestone("a1", { marks: [] })).toBe(false);
   });
 
-  it("survives a restart (reads back from storage) and keeps marks made during the read", async () => {
+  it("survives a restart (reads back from storage); a later claim is visible to a later load", async () => {
+    await loadMilestones("a1");
     claimMilestone("a1", { marks: ["first_match"] }, NOW);
     await Promise.resolve();
     __resetMilestonesForTests();
     expect(seenMilestones("a1").size).toBe(0);
-    const loading = loadMilestones("a1");
-    claimMilestone("a1", { marks: ["first_highlight"] }, NOW);
-    expect([...(await loading)].sort()).toEqual(["first_highlight", "first_match"]);
-    // A later claim is visible to a later load.
+    expect([...(await loadMilestones("a1"))]).toEqual(["first_match"]);
     claimMilestone("a1", { marks: ["first_win"] }, NOW);
     expect((await loadMilestones("a1")).has("first_win")).toBe(true);
   });
 
-  it("reads junk or unreadable storage as nothing celebrated", async () => {
+  it("reads junk storage as nothing celebrated (and may then record marks)", async () => {
     await AsyncStorage.setItem(milestoneStorageKey("a1"), "{nope");
     expect((await loadMilestones("a1")).size).toBe(0);
-    __resetMilestonesForTests();
+    expect(claimMilestone("a1", { marks: ["first_match"] })).toBe(true);
     await AsyncStorage.setItem(milestoneStorageKey("a2"), JSON.stringify({ first_match: 5, bogus: "x", first_win: true }));
     expect([...(await loadMilestones("a2"))]).toEqual(["first_win"]);
-    __resetMilestonesForTests();
-    (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error("io"));
-    expect((await loadMilestones("a3")).size).toBe(0);
   });
 });

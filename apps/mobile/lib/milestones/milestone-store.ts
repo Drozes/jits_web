@@ -8,7 +8,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * AsyncStorage `milestones:v1:<athleteId>` holds `{ [id]: markedAtIso }`. A
  * milestone is marked the moment its celebration starts (`claimMilestone`),
  * in memory first and synchronously, so a crash mid-animation never repeats
- * it and a Home fire suppresses the Matches fire. The 7 day freshness guard
+ * it and a Home fire suppresses the Matches fire. Claims need a successful
+ * `loadMilestones` first; an unreadable store fails closed (no celebration,
+ * no write). The 7 day freshness guard
  * stops a reinstall, a new phone or a returning athlete from celebrating an
  * old first.
  *
@@ -153,6 +155,15 @@ export function decideMilestone(
 
 const marked = new Map<string, Map<MilestoneId, string>>();
 const loading = new Map<string, Promise<void>>();
+/**
+ * Per athlete: "ok" once storage was read (even if empty or junk), "failed"
+ * when the read threw. A failed athlete is fail-closed for the session: no
+ * claim succeeds and nothing is written, so an unreadable store can never
+ * cause a repeat celebration or overwrite what is stored.
+ */
+const loadState = new Map<string, "ok" | "failed">();
+/** The last stored object as parsed, so a write never drops keys this build does not know. */
+const storedRaw = new Map<string, Record<string, unknown>>();
 
 function memoryFor(athleteId: string): Map<MilestoneId, string> {
   let m = marked.get(athleteId);
@@ -163,37 +174,47 @@ function memoryFor(athleteId: string): Map<MilestoneId, string> {
   return m;
 }
 
-function parseStored(raw: string | null): Map<MilestoneId, string> {
-  const out = new Map<MilestoneId, string>();
-  if (!raw) return out;
+function parseObject(raw: string | null): Record<string, unknown> {
+  if (!raw) return {};
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      for (const id of MILESTONE_IDS) {
-        const v = (parsed as Record<string, unknown>)[id];
-        if (typeof v === "string" || v === true) out.set(id, typeof v === "string" ? v : "");
-      }
-    }
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
   } catch {
-    // Unreadable storage reads as nothing celebrated; the freshness guard bounds the cost.
+    // Junk reads as nothing celebrated; the freshness guard bounds the cost.
+    return {};
+  }
+}
+
+function marksOf(obj: Record<string, unknown>): Map<MilestoneId, string> {
+  const out = new Map<MilestoneId, string>();
+  for (const id of MILESTONE_IDS) {
+    const v = obj[id];
+    if (typeof v === "string" || v === true) out.set(id, typeof v === "string" ? v : "");
   }
   return out;
 }
 
-/** The milestones this device already celebrated for the athlete (memory merged with storage). */
+/**
+ * Reads the stored marks once per athlete per session and returns what this
+ * device already celebrated (memory merged with storage). Claims are refused
+ * until this has finished successfully.
+ */
 export async function loadMilestones(athleteId: string): Promise<ReadonlySet<MilestoneId>> {
   let running = loading.get(athleteId);
   if (!running) {
     running = (async () => {
-      let raw: string | null = null;
+      let raw: string | null;
       try {
         raw = await AsyncStorage.getItem(milestoneStorageKey(athleteId));
       } catch {
-        raw = null;
+        loadState.set(athleteId, "failed");
+        return;
       }
+      const obj = parseObject(raw);
+      storedRaw.set(athleteId, obj);
       const mem = memoryFor(athleteId);
-      // A mark made while the read was in flight stays.
-      for (const [id, at] of parseStored(raw)) if (!mem.has(id)) mem.set(id, at);
+      for (const [id, at] of marksOf(obj)) if (!mem.has(id)) mem.set(id, at);
+      loadState.set(athleteId, "ok");
     })();
     loading.set(athleteId, running);
   }
@@ -206,19 +227,27 @@ export function seenMilestones(athleteId: string): ReadonlySet<MilestoneId> {
   return new Set(memoryFor(athleteId).keys());
 }
 
+/** "ok", "failed", or "pending" before `loadMilestones` finished. */
+export function milestoneLoadState(athleteId: string): "ok" | "failed" | "pending" {
+  return loadState.get(athleteId) ?? "pending";
+}
+
 function persist(athleteId: string): void {
-  const obj: Record<string, string> = {};
+  const obj: Record<string, unknown> = { ...(storedRaw.get(athleteId) ?? {}) };
   for (const [id, at] of memoryFor(athleteId)) obj[id] = at;
+  storedRaw.set(athleteId, obj);
   void AsyncStorage.setItem(milestoneStorageKey(athleteId), JSON.stringify(obj)).catch(() => undefined);
 }
 
 /**
  * Starts a celebration: true when it may show, after marking every id in
- * `marks` in ONE write. False when any of them was already marked (another
- * surface fired first), in which case nothing is written.
+ * `marks` in ONE write (merged with the stored object). False, with nothing
+ * written, when the athlete's marks have not loaded successfully yet (call
+ * `loadMilestones` first; a failed read stays fail-closed for the session) or
+ * when any of the ids was already marked (another surface fired first).
  */
 export function claimMilestone(athleteId: string, c: Pick<MilestoneCelebration, "marks">, now = Date.now()): boolean {
-  if (c.marks.length === 0) return false;
+  if (c.marks.length === 0 || loadState.get(athleteId) !== "ok") return false;
   const mem = memoryFor(athleteId);
   if (c.marks.some((id) => mem.has(id))) return false;
   const at = new Date(now).toISOString();
@@ -231,4 +260,6 @@ export function claimMilestone(athleteId: string, c: Pick<MilestoneCelebration, 
 export function __resetMilestonesForTests(): void {
   marked.clear();
   loading.clear();
+  loadState.clear();
+  storedRaw.clear();
 }

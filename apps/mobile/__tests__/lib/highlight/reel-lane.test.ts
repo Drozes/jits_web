@@ -11,6 +11,7 @@ import {
   mergeFirstPage,
   nextReelCursor,
   pagerItems,
+  reuseReels,
   unseenFirst,
   visibleBuilding,
   type BuildingReel,
@@ -91,18 +92,61 @@ describe("ordering", () => {
     expect(ids(appendReelPage(current, page))).toEqual(["1", "2", "4", "3"]);
   });
 
-  it("merges a full refetched first page with the old tail, de-duplicated", () => {
-    const current = [reel("1"), reel("2", { readyAt: "2026-10-05T00:00:00Z" }), reel("3", { readyAt: "2026-10-01T00:00:00Z" })];
-    const first = [reel("0", { unseen: true, readyAt: "2026-10-07T00:00:00Z" }), reel("1", { readyAt: "2026-10-06T00:00:00Z" })];
-    expect(ids(mergeFirstPage(current, first, true))).toEqual(["0", "1", "2", "3"]);
+  it("first load (nothing on screen) orders the first page unseen first", () => {
+    const out = mergeFirstPage([], [reel("1"), reel("2", { unseen: true })], false);
+    expect(ids(out.items)).toEqual(["2", "1"]);
+    expect(out.keptTail).toBe(false);
   });
 
-  it("drops the old tail when the refetched first page is the last page", () => {
-    expect(ids(mergeFirstPage([reel("1"), reel("2")], [reel("1")], false))).toEqual(["1"]);
+  it("keeps on-screen order across a refetch; new reels enter at the front, unseen first among new", () => {
+    const current = [reel("2", { unseen: true }), reel("1")];
+    // Server order (newest first): 4, 3 are new; 2 was watched meanwhile.
+    const page = [reel("4"), reel("3", { unseen: true }), reel("2", { unseen: false }), reel("1")];
+    const out = mergeFirstPage(current, page, false);
+    expect(ids(out.items)).toEqual(["3", "4", "2", "1"]);
+    expect(out.items.find((i) => i.highlightId === "2")?.unseen).toBe(false);
   });
 
-  it("drops a duplicate inside the first page", () => {
-    expect(ids(mergeFirstPage([], [reel("1"), reel("1")], false))).toEqual(["1"]);
+  it("a watched tile does not move on the next refetch", () => {
+    const current = [reel("a", { unseen: true }), reel("b", { unseen: true }), reel("c")];
+    const page = [reel("a", { unseen: true }), reel("b"), reel("c")];
+    expect(ids(mergeFirstPage(current, page, false).items)).toEqual(["a", "b", "c"]);
+  });
+
+  it("drops a reel that left the first page's range, and duplicates", () => {
+    const out = mergeFirstPage([reel("1"), reel("2")], [reel("1"), reel("1")], false);
+    expect(ids(out.items)).toEqual(["1"]);
+  });
+
+  it("20 loaded + a full 10-item first page whose last item is on screen: keeps the tail (and the old cursor)", () => {
+    const at = (i: number) => new Date(Date.UTC(2026, 9, 1) - i * 60_000).toISOString();
+    const old = Array.from({ length: 20 }, (_, i) => reel(`o${i}`, { readyAt: at(i + 2) }));
+    // Two new reels arrive; the new first page is n0, n1, o0..o7 (o7 is on screen).
+    const page = [reel("n0", { readyAt: at(0) }), reel("n1", { readyAt: at(1) }), ...old.slice(0, 8)];
+    const out = mergeFirstPage(old, page, true);
+    expect(out.keptTail).toBe(true);
+    expect(out.items).toHaveLength(22);
+    expect(ids(out.items).slice(0, 3)).toEqual(["n0", "n1", "o0"]);
+    expect(ids(out.items).slice(-1)).toEqual(["o19"]);
+  });
+
+  it("20 loaded + a full first page of 10 brand-new reels: drops the tail (new first cursor)", () => {
+    const old = Array.from({ length: 20 }, (_, i) => reel(`o${i}`, { readyAt: "2026-09-01T00:00:00Z" }));
+    const page = Array.from({ length: 10 }, (_, i) => reel(`n${i}`, { readyAt: "2026-10-01T00:00:00Z" }));
+    const out = mergeFirstPage(old, page, true);
+    expect(out.keptTail).toBe(false);
+    expect(ids(out.items)).toEqual(ids(page));
+  });
+
+  it("reuses unchanged reel objects and replaces changed ones", () => {
+    const a = reel("a");
+    const b = reel("b", { unseen: true });
+    const next = reuseReels([a, b], [reel("a"), reel("b", { unseen: false }), reel("c")]);
+    expect(next[0]).toBe(a);
+    expect(next[1]).not.toBe(b);
+    expect(next[1].unseen).toBe(false);
+    expect(reuseReels([a], [reel("a", { posterUrl: "https://new" })])[0]).not.toBe(a);
+    expect(reuseReels([a], [reel("a", { version: 2 })])[0]).not.toBe(a);
   });
 });
 
@@ -113,8 +157,17 @@ describe("building tiles", () => {
   });
 
   it("finds reels that landed since the last read", () => {
-    expect(ids(landedReels([building("m-1"), building("m-9")], [reel("1"), reel("2")]))).toEqual(["1"]);
-    expect(landedReels([], [reel("1")])).toEqual([]);
+    expect(ids(landedReels([building("m-1"), building("m-9")], [], [reel("1"), reel("2")]))).toEqual(["1"]);
+    expect(landedReels([], [], [reel("1")])).toEqual([]);
+  });
+
+  it("a lagging phase (building tile hidden because the reel was already ready) never lands again", () => {
+    expect(landedReels([building("m-1")], [reel("1")], [reel("1")])).toEqual([]);
+  });
+
+  it("a reel already ready last time does not land, even if a building entry lingered", () => {
+    // The hidden building tile was not shown, so nothing lands; and a new version of a ready reel is not a reveal.
+    expect(landedReels([building("m-1")], [reel("1")], [reel("1", { version: 2 })])).toEqual([]);
   });
 });
 

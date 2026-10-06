@@ -6,6 +6,7 @@ import type { DomainError } from "@jits/shared/api/errors";
 import type { InFlightReel, MyHighlightItem } from "@jits/shared/api/highlight-share";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import {
+  onHighlightStoreReset,
   readMyHighlights,
   useForegroundEffect,
   useHighlightsChangedCount,
@@ -16,6 +17,7 @@ import {
   appendReelPage,
   mergeFirstPage,
   nextReelCursor,
+  reuseReels,
   REEL_LANE_PAGE_SIZE,
   type BuildingReel,
   type ReelCursor,
@@ -28,7 +30,7 @@ export const LANE_POSTER_RESIGN_AFTER_MS = 50 * 60_000;
 
 // ---- module state: posters, local seen marks, warm lanes ------------------------
 
-const posters = new Map<string, { url: string | null; at: number }>();
+const posters = new Map<string, { url: string; at: number }>();
 /** `highlightId:version` marked seen on this device this session; survives a read racing the server mark. */
 const locallySeen = new Set<string>();
 
@@ -64,14 +66,19 @@ async function signAll(keys: (string | null)[], now = Date.now()): Promise<Map<s
   if (stale.length > 0) {
     const signed = await signPosterKeys(supabase, stale, POSTER_TTL_S);
     const at = Date.now();
-    stale.forEach((k, i) => posters.set(k, { url: signed[i] ?? null, at }));
+    stale.forEach((k, i) => {
+      const url = signed[i] ?? null;
+      // A failed sign is never cached: the next read tries again.
+      if (url) posters.set(k, { url, at });
+      else posters.delete(k);
+    });
   }
   return new Map(unique.map((k) => [k, posters.get(k)?.url ?? null]));
 }
 
-function toItems(raw: MyHighlightItem[], urls: Map<string, string | null>): ReelItem[] {
+function toItems(raw: MyHighlightItem[], urls: Map<string, string | null>, viewerId: string | null): ReelItem[] {
   return raw.map((item) => {
-    const reel = ownReelItem(item, item.posterPath ? (urls.get(item.posterPath) ?? null) : null);
+    const reel = ownReelItem(item, item.posterPath ? (urls.get(item.posterPath) ?? null) : null, viewerId);
     return locallySeen.has(seenKey(item.highlightId, item.version)) ? { ...reel, unseen: false } : reel;
   });
 }
@@ -88,13 +95,19 @@ export interface ReelPage {
 /**
  * One later page of the athlete's own reels, posters signed (one batch).
  * Shared with the swipe viewer, which pages the same lane past what the
- * carousel loaded. Null on a failed read.
+ * carousel loaded. Null ONLY on a failed read; clips switched off reads as
+ * an empty last page (not an error).
  */
-export async function fetchReelPage(cursor: ReelCursor, limit = REEL_LANE_PAGE_SIZE): Promise<ReelPage | null> {
-  const res = await readMyHighlights({ limit, before: cursor.before, beforeId: cursor.beforeId });
-  if (!res.ok || !res.data.clipsEnabled) return null;
+export async function fetchReelPage(
+  cursor: ReelCursor,
+  limit = REEL_LANE_PAGE_SIZE,
+  viewerId: string | null = null,
+): Promise<ReelPage | null> {
+  const res = await readMyHighlights({ limit, before: cursor.before, beforeId: cursor.beforeId }, { owner: viewerId });
+  if (!res.ok) return null;
+  if (!res.data.clipsEnabled) return { items: [], cursor: null };
   const urls = await signAll(res.data.items.map((i) => i.posterPath));
-  return { items: toItems(res.data.items, urls), cursor: nextReelCursor(res.data, limit) };
+  return { items: toItems(res.data.items, urls, viewerId), cursor: nextReelCursor(res.data, limit) };
 }
 
 export interface UseReelLaneOptions {
@@ -106,7 +119,11 @@ export interface UseReelLaneOptions {
 }
 
 export interface UseReelLaneResult {
-  /** Ready reels in lane order: unseen first, then seen, newest first within each. */
+  /**
+   * Ready reels in lane order. The first load is unseen first, then seen,
+   * newest first within each; after that the order is stable: reels on
+   * screen keep their order across refetches, new reels enter at the front.
+   */
   items: ReelItem[];
   /** Building tiles with signed posters (B2, or the Matches fallback). */
   inFlight: BuildingReel[];
@@ -114,8 +131,10 @@ export interface UseReelLaneResult {
   clipsEnabled: boolean;
   /** True only while the first read is in flight with nothing cached. */
   loading: boolean;
-  /** The last read's error; content already on screen is kept. Null after a good read. */
+  /** The last first-page read's error; content already on screen is kept. Null after a good read. */
   error: DomainError | null;
+  /** The last load-more's error (the list footer's retry); cleared by the next load-more or a good first read. */
+  loadMoreError: DomainError | null;
   /** More ready reels exist past `items`. */
   hasMore: boolean;
   loadingMore: boolean;
@@ -149,11 +168,13 @@ export function useReelLane(
   const cacheKey = athleteId ? `${laneKey}:${athleteId}` : null;
   const [state, setState] = React.useState<LaneState>(() => (cacheKey ? lanes.get(cacheKey) : undefined) ?? EMPTY);
   const [error, setError] = React.useState<DomainError | null>(null);
+  const [loadMoreError, setLoadMoreError] = React.useState<DomainError | null>(null);
   const [pending, setPending] = React.useState(false);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const stateRef = React.useRef(state);
   const seq = React.useRef(0);
   const moreSeq = React.useRef(0);
+  const loadingMoreRef = React.useRef(false);
   const alive = React.useRef(true);
 
   React.useEffect(() => {
@@ -174,20 +195,29 @@ export function useReelLane(
     [cacheKey],
   );
 
-  // A different athlete (or lane) starts from its own cache.
+  // A different athlete (or lane) starts from its own cache, and nothing
+  // still in flight for the previous one may write.
+  const firstKey = React.useRef(cacheKey);
   React.useEffect(() => {
+    if (firstKey.current === cacheKey) return;
+    firstKey.current = cacheKey;
+    seq.current += 1;
+    moreSeq.current += 1;
+    loadingMoreRef.current = false;
+    setPending(false);
+    setLoadingMore(false);
     const warm = (cacheKey ? lanes.get(cacheKey) : undefined) ?? EMPTY;
     stateRef.current = warm;
     setState(warm);
     setError(null);
+    setLoadMoreError(null);
   }, [cacheKey]);
 
-  // Another instance marked a reel seen: reflect it here without a read.
+  // Another instance marked a reel seen, or the store was reset: reflect it here without a read.
   React.useEffect(() => {
     const onChange = () => {
-      if (!cacheKey) return;
-      const shared = lanes.get(cacheKey);
-      if (shared && shared !== stateRef.current) {
+      const shared = (cacheKey ? lanes.get(cacheKey) : undefined) ?? EMPTY;
+      if (shared !== stateRef.current) {
         stateRef.current = shared;
         setState(shared);
       }
@@ -204,7 +234,7 @@ export function useReelLane(
       if (!athleteId) return;
       setPending(true);
       void (async () => {
-        const res = await readMyHighlights({ limit: REEL_LANE_PAGE_SIZE }, { force });
+        const res = await readMyHighlights({ limit: REEL_LANE_PAGE_SIZE }, { force, owner: athleteId });
         if (id !== seq.current) return;
         if (!res.ok) {
           setError(res.error);
@@ -215,6 +245,7 @@ export function useReelLane(
         if (!page.clipsEnabled) {
           commit({ ...EMPTY, loaded: true });
           setError(null);
+          setLoadMoreError(null);
           setPending(false);
           return;
         }
@@ -222,21 +253,22 @@ export function useReelLane(
         if (id !== seq.current) return;
         const prev = stateRef.current;
         const firstCursor = nextReelCursor(page, REEL_LANE_PAGE_SIZE);
-        const items = mergeFirstPage(prev.items, toItems(page.items, urls), firstCursor !== null);
-        // Keep the deeper cursor when the old tail survived the merge.
-        const keptTail = firstCursor !== null && items.length > page.items.length && prev.cursor !== null;
+        const merged = mergeFirstPage(prev.items, toItems(page.items, urls, athleteId), firstCursor !== null);
         commit({
-          items,
+          items: reuseReels(prev.items, merged.items),
           inFlight: toBuilding(page.inFlight, urls),
           inFlightSupported: page.inFlightSupported,
           clipsEnabled: true,
-          cursor: keptTail ? prev.cursor : firstCursor,
+          // The old tail continues where the new first page ends: keep the deeper cursor.
+          cursor: merged.keptTail ? prev.cursor : firstCursor,
           loaded: true,
         });
         setError(null);
         setPending(false);
-      })().catch(() => {
-        if (id === seq.current && alive.current) setPending(false);
+      })().catch((err: unknown) => {
+        if (id !== seq.current || !alive.current) return;
+        setError({ code: "UNKNOWN", message: err instanceof Error ? err.message : "Couldn't load your highlights." });
+        setPending(false);
       });
     },
     [athleteId, commit],
@@ -244,15 +276,21 @@ export function useReelLane(
 
   const loadMore = React.useCallback(() => {
     const cursor = stateRef.current.cursor;
-    if (!athleteId || !cursor || loadingMore) return;
+    if (!athleteId || !cursor || loadingMoreRef.current) return;
     const id = ++moreSeq.current;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
-    void fetchReelPage(cursor)
+    setLoadMoreError(null);
+    const done = () => {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    };
+    void fetchReelPage(cursor, REEL_LANE_PAGE_SIZE, athleteId)
       .then((page) => {
         if (id !== moreSeq.current) return;
-        setLoadingMore(false);
+        done();
         if (!page) {
-          setError({ code: "UNKNOWN", message: "Couldn't load more highlights." });
+          setLoadMoreError({ code: "UNKNOWN", message: "Couldn't load more highlights." });
           return;
         }
         const prev = stateRef.current;
@@ -260,42 +298,34 @@ export function useReelLane(
         if (prev.cursor !== cursor) return;
         commit({ ...prev, items: appendReelPage(prev.items, page.items), cursor: page.cursor });
       })
-      .catch(() => {
-        if (id === moreSeq.current && alive.current) setLoadingMore(false);
+      .catch((err: unknown) => {
+        if (id !== moreSeq.current || !alive.current) return;
+        done();
+        setLoadMoreError({ code: "UNKNOWN", message: err instanceof Error ? err.message : "Couldn't load more highlights." });
       });
-  }, [athleteId, commit, loadingMore]);
+  }, [athleteId, commit]);
 
   const markSeenLocally = React.useCallback(
     (highlightId: string) => {
       let changed = false;
       for (const [key, lane] of lanes) {
-        if (!lane.items.some((i) => i.highlightId === highlightId && i.unseen)) continue;
         lane.items.forEach((i) => {
           if (i.highlightId === highlightId) locallySeen.add(seenKey(i.highlightId, i.version));
         });
+        if (!lane.items.some((i) => i.highlightId === highlightId && i.unseen)) continue;
+        // Never reorders: only the ring goes.
         lanes.set(key, {
           ...lane,
           items: lane.items.map((i) => (i.highlightId === highlightId ? { ...i, unseen: false } : i)),
         });
         changed = true;
       }
-      if (!changed) {
-        const current = stateRef.current;
-        current.items
-          .filter((i) => i.highlightId === highlightId)
-          .forEach((i) => locallySeen.add(seenKey(i.highlightId, i.version)));
-        return;
-      }
-      if (cacheKey) {
-        const mine = lanes.get(cacheKey);
-        if (mine) {
-          stateRef.current = mine;
-          setState(mine);
-        }
-      }
-      for (const l of laneListeners) l();
+      stateRef.current.items
+        .filter((i) => i.highlightId === highlightId)
+        .forEach((i) => locallySeen.add(seenKey(i.highlightId, i.version)));
+      if (changed) for (const l of laneListeners) l();
     },
-    [cacheKey],
+    [],
   );
 
   useFocusEffect(React.useCallback(() => refetch(), [refetch]));
@@ -319,7 +349,8 @@ export function useReelLane(
     return () => {
       cancelled = true;
     };
-  }, [fallbackKeys]);
+    // Re-run on every committed read too, so a poster that failed to sign retries (signAll caches only successes).
+  }, [fallbackKeys, state]);
 
   const inFlight = React.useMemo(() => {
     if (!state.clipsEnabled) return [];
@@ -333,6 +364,7 @@ export function useReelLane(
     clipsEnabled: state.clipsEnabled,
     loading: !state.loaded && (pending || (!!athleteId && error === null)),
     error,
+    loadMoreError,
     hasMore: state.cursor !== null,
     loadingMore,
     cursor: state.cursor,
@@ -342,9 +374,12 @@ export function useReelLane(
   };
 }
 
-/** Sign-out, and tests: forget every lane, poster and local seen mark. */
+/** Sign-out, and tests: forget every lane, poster and local seen mark. Also runs on `resetHighlightStore()`. */
 export function resetReelLanes(): void {
   lanes.clear();
   posters.clear();
   locallySeen.clear();
+  for (const l of laneListeners) l();
 }
+
+onHighlightStoreReset(resetReelLanes);

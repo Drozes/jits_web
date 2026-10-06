@@ -178,9 +178,105 @@ describe("useReelLane", () => {
     act(() => result.current.loadMore());
     await settle();
     expect(result.current.items).toHaveLength(1);
-    expect(result.current.error).not.toBeNull();
+    expect(result.current.loadMoreError).not.toBeNull();
+    expect(result.current.error).toBeNull(); // the first read is fine
     expect(result.current.loadingMore).toBe(false);
     expect(result.current.hasMore).toBe(true);
+  });
+
+  it("a load-more that finds clips switched off is an empty last page, not an error", async () => {
+    mockGetMy.mockResolvedValueOnce(page([item("1")], { nextBefore: "t", nextBeforeId: "1" }));
+    const { result } = renderHook(() => useReelLane("ath-1", "matches"));
+    await settle();
+    mockGetMy.mockResolvedValueOnce(page([], { clipsEnabled: false }));
+    act(() => result.current.loadMore());
+    await settle();
+    expect(result.current).toMatchObject({ loadMoreError: null, error: null, hasMore: false });
+    expect(result.current.items).toHaveLength(1);
+  });
+
+  it("ignores a second loadMore while one is in flight (same tick)", async () => {
+    mockGetMy.mockResolvedValueOnce(page([item("1")], { nextBefore: "t", nextBeforeId: "1" }));
+    const { result } = renderHook(() => useReelLane("ath-1", "matches"));
+    await settle();
+    mockGetMy.mockResolvedValueOnce(page([item("2")]));
+    act(() => {
+      result.current.loadMore();
+      result.current.loadMore();
+    });
+    await settle();
+    expect(mockGetMy).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports an error when the read throws", async () => {
+    mockGetMy.mockRejectedValueOnce(new Error("boom"));
+    const { result } = renderHook(() => useReelLane("ath-1", "home"));
+    await settle();
+    expect(result.current.error).toMatchObject({ code: "UNKNOWN" });
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("does not cache a failed poster sign: a forced refetch signs it again", async () => {
+    mockGetMy.mockResolvedValue(page([item("1")]));
+    mockSign.mockImplementationOnce(async (_c: unknown, keys: string[]) => keys.map(() => null));
+    const { result } = renderHook(() => useReelLane("ath-1", "home"));
+    await settle();
+    expect(result.current.items[0].posterUrl).toBeNull();
+    act(() => result.current.refetch(true));
+    await settle();
+    expect(mockSign).toHaveBeenCalledTimes(2);
+    expect(result.current.items[0].posterUrl).toBe("https://signed/1.jpg");
+  });
+
+  it("drops a read still in flight for the previous athlete", async () => {
+    let resolveOld: (v: unknown) => void = () => {};
+    mockGetMy.mockImplementationOnce(() => new Promise((r) => (resolveOld = r)));
+    mockGetMy.mockResolvedValue(page([item("b1")]));
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useReelLane(id, "home"), { initialProps: { id: "ath-a" } });
+    rerender({ id: "ath-b" });
+    await settle();
+    await act(async () => resolveOld(page([item("a1")])));
+    await settle();
+    expect(result.current.items.map((i) => i.highlightId)).toEqual(["b1"]);
+  });
+
+  it("dedupes reads per owner, and resetHighlightStore forgets every lane", async () => {
+    mockGetMy.mockResolvedValue(page([item("1")]));
+    __setHighlightReadThrottleForTests(60_000);
+    const a = renderHook(() => useReelLane("ath-a", "home"));
+    const b = renderHook(() => useReelLane("ath-b", "home"));
+    await settle();
+    expect(mockGetMy).toHaveBeenCalledTimes(2); // not shared across accounts
+    act(() => resetHighlightStore());
+    expect(a.result.current.items).toEqual([]);
+    expect(b.result.current.items).toEqual([]);
+  });
+
+  it("a focus refetch after watching a tile does not move it", async () => {
+    mockGetMy.mockResolvedValue(page([item("1"), item("2", { unseen: true }), item("3", { unseen: true })]));
+    const { result } = renderHook(() => useReelLane("ath-1", "home"));
+    await settle();
+    expect(result.current.items.map((i) => i.highlightId)).toEqual(["2", "3", "1"]);
+    act(() => result.current.markSeenLocally("2"));
+    mockGetMy.mockResolvedValue(page([item("1"), item("2"), item("3", { unseen: true })]));
+    act(() => mockFocus[mockFocus.length - 1]());
+    await settle();
+    expect(result.current.items.map((i) => [i.highlightId, i.unseen])).toEqual([
+      ["2", false],
+      ["3", true],
+      ["1", false],
+    ]);
+  });
+
+  it("keeps the same ReelItem objects across a refetch that changed nothing", async () => {
+    mockGetMy.mockResolvedValue(page([item("1"), item("2")]));
+    const { result } = renderHook(() => useReelLane("ath-1", "home"));
+    await settle();
+    const before = result.current.items;
+    act(() => result.current.refetch(true));
+    await settle();
+    expect(result.current.items[0]).toBe(before[0]);
+    expect(result.current.items[1]).toBe(before[1]);
   });
 
   it("uses the Matches fallback building tiles only when the backend has no in_flight", async () => {
