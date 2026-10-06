@@ -246,13 +246,12 @@ describe("HighlightCard phases", () => {
     expect(redCtas(utils)).toHaveLength(0);
   });
 
-  it("ready: shows what changed and the failed-attempt note", async () => {
+  it("ready: the failed-attempt note, and never the AI change summary (jits-xfvd.18)", async () => {
     const utils = await renderCard(
-      progress("ready", { lastChangeSummary: "Built from your moments.", lastAttemptFailed: true }),
+      progress("ready", { lastChangeSummary: "Added your SWEEP and the armbar finish.", lastAttemptFailed: true }),
     );
-    expect(utils.getByTestId("highlight-change-summary")).toHaveTextContent(
-      "What changed: Built from your moments.",
-    );
+    expect(utils.queryByTestId("highlight-change-summary")).toBeNull();
+    expect(utils.queryByText(/armbar|sweep|what changed/i)).toBeNull();
     expect(utils.getByTestId("highlight-last-attempt-failed")).toHaveTextContent(
       "We couldn't make the new version. Your previous reel is still here.",
     );

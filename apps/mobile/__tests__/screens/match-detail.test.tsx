@@ -62,8 +62,11 @@ jest.mock("@jits/shared/hooks/use-match-videos-realtime", () => ({
   useMatchVideosRealtime: (...a: unknown[]) => mockMatchVideosRealtime(...a) ?? { subscribed: true },
 }));
 
+// The viewer's platform role: the AI labels are admin-only (jits-xfvd.18).
+// Most cases run as an admin (today's labels); the gate block flips it.
+let mockRole: string | undefined = "admin";
 jest.mock("@/lib/auth/hooks", () => ({
-  useAuth: () => ({ athlete: { id: "me-1" }, user: { id: "u" }, isLoading: false }),
+  useAuth: () => ({ athlete: { id: "me-1", platform_role: mockRole }, user: { id: "u" }, isLoading: false }),
 }));
 
 let mockScheme: "light" | "dark" = "light";
@@ -226,6 +229,7 @@ async function renderLoaded(result: unknown) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRole = "admin";
   mockHighlightByVideo = {};
   mockScheme = "light";
   mockMatchId = "11111111-1111-4111-8111-111111111111";
@@ -469,6 +473,92 @@ describe("MatchDetailScreen (Film Room match page)", () => {
     expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-mine?t=27");
     expect(within(utils.getByTestId("technique-tags")).getByText("Single leg")).toBeTruthy();
     expect(within(utils.getByTestId("technique-tags")).getByText("RNC")).toBeTruthy();
+  });
+
+  describe("AI labels are admin-only (jits-xfvd.18)", () => {
+    // "Rear-naked choke" stays: the verdict line is the user-recorded
+    // submission, not AI (it is asserted below). Only AI wording must go.
+    const AI_WORDS = [/single leg/i, /\bRNC\b/, /takedown/i, /back take/i, /engage/i, /standing/i];
+
+    it.each([["member", "member"], ["no role", undefined]])("%s: times and the FINISH marker only, a neutral breakdown, no tags", async (_l, role) => {
+      mockRole = role;
+      mockGetVideoAnalysis.mockResolvedValue(ANALYSIS);
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByText("Analysis complete.")).toBeTruthy());
+      expect(utils.queryByText(ANALYSIS.data.summary)).toBeNull();
+      expect(utils.getByText("KEY MOMENTS")).toBeTruthy();
+      expect(utils.getByLabelText("Play from 00:09")).toBeTruthy();
+      expect(utils.getByLabelText("Play from 00:27")).toBeTruthy();
+      // The finish comes from the recorded submission result.
+      expect(utils.getByLabelText("Play from 03:20, finish")).toBeTruthy();
+      expect(utils.getByText("FINISH")).toBeTruthy();
+      expect(utils.queryByTestId("technique-tags")).toBeNull();
+      for (const word of AI_WORDS) {
+        expect(utils.queryAllByText(word, { includeHiddenElements: true })).toHaveLength(0);
+        expect(utils.queryAllByLabelText(word, { includeHiddenElements: true })).toHaveLength(0);
+      }
+      expect(utils.getAllByText(/Rear-naked choke/).length).toBeGreaterThan(0);
+      fireEvent.press(utils.getByLabelText("Play from 00:27"));
+      expect(mockPush).toHaveBeenCalledWith("/(app)/video/v-mine?t=27");
+    });
+
+    it.each(["admin", "founder"])("%s: today's summary, labels and tags", async (role) => {
+      mockRole = role;
+      mockGetVideoAnalysis.mockResolvedValue(ANALYSIS);
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByText(ANALYSIS.data.summary)).toBeTruthy());
+      expect(utils.getByLabelText("Play from 00:27, Takedown")).toBeTruthy();
+      expect(within(utils.getByTestId("technique-tags")).getByText("RNC")).toBeTruthy();
+      expect(utils.queryByText("Analysis complete.")).toBeNull();
+    });
+
+    it("a member sees the finish named by the RECORDED submission, never an AI fallback label (review L1)", async () => {
+      mockRole = "member";
+      // The analysis names the recorded submission: the finish takes its name.
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: {
+          ...ANALYSIS.data,
+          technique_tags: [{ id: "t3", technique_name: "Rear naked choke", category: null, athlete_id: null, timestamp_start: 237, timestamp_end: null, submission_type_name: null }],
+        },
+      });
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByLabelText("Play from 03:57, Rear-naked choke")).toBeTruthy());
+      expect(within(utils.getByTestId("key-moment-3")).getByText("Rear-naked choke")).toBeTruthy();
+      // The AI moments around it stay time only.
+      expect(utils.getByLabelText("Play from 03:20")).toBeTruthy();
+      expect(utils.queryByText(/back take/i)).toBeNull();
+    });
+
+    it("a member gets one row per second when two moments share it (review M1)", async () => {
+      mockRole = "member";
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: { ...ANALYSIS.data, positions: [{ position: "standing", timestamp_s: 27 }], scoring_moments: [{ type: "takedown", timestamp_s: 27 }, { type: "back_take", timestamp_s: 200 }] },
+      });
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByLabelText("Play from 00:27")).toBeTruthy());
+      expect(utils.getAllByLabelText(/^Play from 00:27/)).toHaveLength(1);
+      expect(utils.queryByTestId("key-moment-2")).toBeNull();
+    });
+
+    it("an admin keeps both labelled rows in a shared second", async () => {
+      mockGetVideoAnalysis.mockResolvedValue({
+        ok: true,
+        data: { ...ANALYSIS.data, positions: [{ position: "standing", timestamp_s: 27 }], scoring_moments: [{ type: "takedown", timestamp_s: 27 }, { type: "back_take", timestamp_s: 200 }] },
+      });
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByLabelText("Play from 00:27, Takedown")).toBeTruthy());
+      expect(utils.getByLabelText("Play from 00:27, Engage")).toBeTruthy();
+    });
+
+    it("a member with only technique tags and no moments sees no KEY MOMENTS block", async () => {
+      mockRole = "member";
+      mockGetVideoAnalysis.mockResolvedValue({ ok: true, data: { ...ANALYSIS.data, positions: [], scoring_moments: [] } });
+      const utils = await renderLoaded(view({ videos: [video({ has_analysis: true, status: "analyzed" })] }));
+      await waitFor(() => expect(utils.getByText("Analysis complete.")).toBeTruthy());
+      expect(utils.queryByTestId("technique-tags")).toBeNull();
+    });
   });
 
   describe("no match detected (jr_be-0qf)", () => {

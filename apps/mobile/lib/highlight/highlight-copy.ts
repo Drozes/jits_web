@@ -40,10 +40,6 @@ export function metaLine(durationS: number, version: number): string {
   return `${Math.round(durationS)}s · Version ${version}`;
 }
 
-export function whatChanged(summary: string): string {
-  return `What changed: ${summary}`;
-}
-
 export function regeneratingBanner(renderTotal: number): string {
   return `Making version ${renderTotal}… You can keep watching this one.`;
 }

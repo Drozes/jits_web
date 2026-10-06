@@ -194,7 +194,7 @@ function makeShare(over: Share = {}): Share {
     stage: "idle",
     progress: null,
     error: null,
-    caption: "Got the Armbar against Bea.",
+    caption: "Took the win against Bea.",
     collabTip: "Tag Bea as a collaborator: in Instagram tap Tag people, then Invite collaborator. One post shows on both profiles.",
     start: jest.fn(),
     handoff: jest.fn((path: string) => Promise.resolve({ ok: true, path, oversize: false })),

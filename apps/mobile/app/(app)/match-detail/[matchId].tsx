@@ -25,6 +25,7 @@ import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { angleWatchable, localAngleJob } from "@/lib/video/angle-status";
 import { useFilmStatus } from "@/lib/video/use-film-status";
 import { useAuth } from "@/lib/auth/hooks";
+import { useShowAnalysisLabels } from "@/lib/video/use-show-analysis-labels";
 import { deriveUploadBannerState, showRecorderBanner } from "@/lib/video/upload-banner-state";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { FilmStatusPlate } from "@/components/video-status/film-status-plate";
@@ -35,7 +36,8 @@ import type { FilmRow } from "@/lib/video/film-status";
 /**
  * One past match, the Film Room's match page: the opening still with play,
  * the verdict and rating change, the AI breakdown of the selected angle, its
- * key moments (each opens the player at that second), technique tags, the
+ * key moments (each opens the player at that second), technique tags (the
+ * AI summary, move labels and tags for admins only, jits-xfvd.18), the
  * angle switcher when both athletes recorded, and the Film status plate
  * (jits-n2im.25): the canonical status of every angle, a Watch row per
  * ready angle, Try again for this phone's own upload. The video pushes
@@ -56,6 +58,8 @@ export default function MatchDetailScreen() {
   const [pastHero, setPastHero] = React.useState(false);
   const { state, data, error, refreshing, refetch } = useMatchDetail(matchId);
   const film = useMatchFilm(state === "ready" ? data : null, matchId ?? "");
+  // AI move labels, technique tags and the summary are admin-only (jits-xfvd.18).
+  const showLabels = useShowAnalysisLabels();
   // The canonical Film status (jits-n2im.25). Until it has loaded, or if
   // the status read fails, the wave 2 rows below stand in.
   const { athlete } = useAuth();
@@ -168,12 +172,14 @@ export default function MatchDetailScreen() {
                 onSelect={film.setActiveId}
               />
             ) : null}
-            {film.phase ? <AiBreakdown phase={film.phase} onRetry={film.retryAnalysis} /> : null}
+            {film.phase ? <AiBreakdown phase={film.phase} onRetry={film.retryAnalysis} showLabels={showLabels} /> : null}
             {active ? (
               <KeyMoments
                 moments={film.moments}
                 durationS={active.duration_seconds}
                 tags={film.tags}
+                showLabels={showLabels}
+                recordedSubmission={data.match.submission_name}
                 onJump={(t) => play(active.id, t)}
               />
             ) : null}

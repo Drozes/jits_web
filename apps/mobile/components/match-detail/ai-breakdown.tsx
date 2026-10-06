@@ -34,12 +34,17 @@ function Body({ children, tone = "text" }: { children: React.ReactNode; tone?: "
   );
 }
 
+/** What a non-admin reads in place of the AI summary (which names moves). */
+export const BREAKDOWN_NEUTRAL = "Analysis complete.";
+
 /**
  * The analysis summary for the selected angle, or why there is none yet:
  * uploading, analyzing (live chunk count), failed, or not analyzed. When the
  * analysis found no match in the video it says so instead of a summary.
+ * The summary names moves and positions, so only admins (`showLabels`,
+ * jits-xfvd.18) read it; everyone else gets a neutral line.
  */
-export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry: () => void }) {
+export function AiBreakdown({ phase, onRetry, showLabels }: { phase: BreakdownPhase; onRetry: () => void; showLabels: boolean }) {
   const p = usePalette();
   let tier: string | null = null;
   let body: React.ReactNode;
@@ -60,7 +65,11 @@ export function AiBreakdown({ phase, onRetry }: { phase: BreakdownPhase; onRetry
     body = <NoMatchBreakdown reason={phase.analysis.no_match_reason} tips={phase.analysis.recommendations} />;
   } else if (phase.state === "ready" && phase.analysis) {
     tier = phase.analysis.analysis_tier;
-    body = <Body>{phase.analysis.summary ?? "The breakdown has key moments but no summary."}</Body>;
+    body = showLabels ? (
+      <Body>{phase.analysis.summary ?? "The breakdown has key moments but no summary."}</Body>
+    ) : (
+      <Body>{BREAKDOWN_NEUTRAL}</Body>
+    );
   } else if (phase.state === "error") {
     body = (
       <View style={{ gap: 8 }}>

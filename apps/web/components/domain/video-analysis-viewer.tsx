@@ -10,6 +10,7 @@ import { useVideoProgress, type VideoProgress } from "@jits/shared/hooks/use-vid
 import { cn } from "@/lib/utils";
 import { getMatchVideoSignedUrlResult } from "@jits/shared/api/queries";
 import { NO_MATCH_COPY, isNoMatch, toNoMatchReason } from "@jits/shared/utils";
+import { useShowAnalysisLabels } from "@/lib/video/use-show-analysis-labels";
 
 // ---------------------------------------------------------------------------
 // Types (mirror BE `get_video_analysis` return shape — see jr_be
@@ -139,10 +140,16 @@ function chunkBgClass(status: string): string {
  * summary + timeline + technique tags; biomechanics is rendered as a
  * raw JSON dump in v1 (the BE has structured shape but the UX design
  * is deferred to feature-011).
+ *
+ * AI labels (jits-xfvd.18): the summary, position names, scoring moment
+ * types and descriptions, technique tags and tips name moves, so only
+ * platform admins see the tabs (`useShowAnalysisLabels`, default hidden).
+ * Everyone else gets a neutral line and the key moment times.
  */
 export function VideoAnalysisViewer({ videoId, videoSrc, title }: VideoAnalysisViewerProps) {
   const supabase = useMemo(() => createClient(), []);
   const progress = useVideoProgress(supabase, videoId);
+  const showLabels = useShowAnalysisLabels(supabase);
 
   const [analysis, setAnalysis] = useState<VideoAnalysisPayload | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -227,7 +234,7 @@ export function VideoAnalysisViewer({ videoId, videoSrc, title }: VideoAnalysisV
 
         {/* Merged analysis tabs */}
         {status === "analyzed" && (
-          <AnalysisTabs payload={analysis} loading={analysisLoading} error={analysisError} />
+          <AnalysisTabs payload={analysis} loading={analysisLoading} error={analysisError} showLabels={showLabels} />
         )}
 
         {/* Pre-analyzed state hint */}
@@ -306,10 +313,12 @@ function AnalysisTabs({
   payload,
   loading,
   error,
+  showLabels,
 }: {
   payload: VideoAnalysisPayload | null;
   loading: boolean;
   error: string | null;
+  showLabels: boolean;
 }) {
   if (error) {
     return (
@@ -343,6 +352,8 @@ function AnalysisTabs({
     (r) => recommendationText(r) !== "",
   );
   const tags = payload.technique_tags ?? [];
+
+  if (!showLabels) return <NeutralAnalysis moments={moments} />;
 
   return (
     <Tabs defaultValue="summary" className="w-full">
@@ -430,6 +441,31 @@ function AnalysisTabs({
         )}
       </TabsContent>
     </Tabs>
+  );
+}
+
+/**
+ * The non-admin view of a finished analysis (jits-xfvd.18): no AI wording,
+ * just that it is done and when the key moments happen.
+ */
+function NeutralAnalysis({ moments }: { moments: ScoringMoment[] }) {
+  const times = moments
+    .map((m) => m.timestamp_s)
+    .filter((t): t is number => typeof t === "number" && Number.isFinite(t) && t >= 0)
+    .sort((a, b) => a - b);
+  return (
+    <div data-testid="analysis-neutral" className="space-y-2">
+      <p className="text-sm">Analysis complete.</p>
+      {times.length > 0 && (
+        <ul data-testid="analysis-moment-times" aria-label="Key moments" className="flex flex-wrap gap-2">
+          {times.map((t, i) => (
+            <li key={i} className="font-mono text-xs tabular-nums text-muted-foreground">
+              {formatTime(t)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

@@ -177,8 +177,10 @@ describe("multi-angle player (dev flag on)", () => {
   it("opens a key moment on its clearest angle when the planner scored the angles", async () => {
     const utils = await openPlayer();
     act(() => tick(0, 5));
-    await waitFor(() => expect(utils.getByLabelText("Jump to 00:27, Takedown")).toBeTruthy());
-    fireEvent.press(utils.getByLabelText("Jump to 00:27, Takedown"));
+    await waitFor(() => expect(utils.getByLabelText("Next key moment, 00:27")).toBeTruthy());
+    expect(utils.queryByText(/takedown/i)).toBeNull();
+    expect(utils.queryByTestId("player-caption")).toBeNull();
+    fireEvent.press(utils.getByLabelText("Next key moment, 00:27"));
     // The opponent's file is 2.5 s behind the Best angle's.
     await waitFor(() => expect(fakePlayers[1].seeks.at(-1)).toBeCloseTo(24.5, 6));
     act(() => tick(1, 24.5));
