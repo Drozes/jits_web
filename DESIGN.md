@@ -137,7 +137,7 @@ Every value below is exact from `apps/mobile/lib/tokens.ts` (the source of truth
 | `hairline-faint` | `rgba(107, 114, 128, 0.20)` | `rgba(13, 15, 20, 0.11)` | `border-hairline-faint` | `borderHairlineFaint` (`darkTokens` / `lightTokens`) | Faintest divider |
 | `hairline-strong` | `rgba(107, 114, 128, 0.62)` | `rgba(13, 15, 20, 0.34)` | `border-hairline-strong` | `borderHairlineStrong` (`darkTokens` / `lightTokens`) | Chips, actions, avatars, selected edge |
 
-The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange` and `--heat-red`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js` `theme.extend.textColor.cta`).
+The mobile CSS variables behind the classes are the web names (`--bg-primary`, `--text-tertiary`, `--accent-cta-text`, ...), written by `lib/theme/theme-provider.tsx` (`buildVars`, which also writes `--attention`, `--attention-rule`, `--heat-orange`, `--heat-red` and the alias `--unseen-ring`). One class is remapped on purpose: `text-cta` resolves to `--accent-cta-text`, while `bg-cta` and `border-cta` stay the brand red (`tailwind.config.js` `theme.extend.textColor.cta`).
 
 ### Sub-palettes
 
@@ -158,6 +158,14 @@ Amber marks the draw headline (the verdict DRAW and the draw delta; a D letter i
 | `heat-red` | `#EC6A74` | `lib/tokens.ts` key `heatRed`; Tailwind `bg-heat-red` (`arena-tab-icon.tsx` `HEAT_EMBER_RED` reads it) |
 
 Heat colors draw Arena heat and nothing else: the live embers (two `heat-orange`, one `signal-red`), the countable embers (`heat-red`), the blade clash spark (`signal-red`) and the challenge afterglow edge. Both are fixed across themes and both fall below 3:1 on every light surface (see [Accessibility](#accessibility)).
+
+#### Semantic aliases
+
+| Token | Dark | Light | Source |
+|---|---|---|---|
+| `unseen-ring` | `#E8EDF2` | `#0D0F14` | `lib/tokens.ts` key `unseenRing` (alias of `ink`, same value); Tailwind `border-unseen-ring` |
+
+A semantic alias carries the same value as its base token and exists so a guard can assert what a mark means. `unseen-ring` is the 2px ring on an unwatched reel tile, separated from the poster by a 2px surface gap (design review ruling 2026-10-06, specs/matches-tab). It is never Signal Red: Home keeps its one red CTA.
 
 #### On-media (fixed, over camera, video and photos)
 
@@ -602,7 +610,7 @@ Motion in ELO RATED carries meaning or it does not exist. This section carries o
 | `duration.pulse` | 1400ms | 19 | `--duration-pulse` |
 | `duration.ember` | 2400ms | 21 | (none) |
 | `duration.shimmer` | 1400ms | 23 | (none; web Tailwind `shimmer` is 3s) |
-| `moment.*` (single Moments) | `goFade` 700, `confettiFall` 1800, `confettiFadeDelay` 1200, `confettiFade` 600, `slamIn` 520, `slamInFade` 300, `riseInDelay` 500, `riseIn` 400, `tapMarkFill` 80, `tapNudge` 50, `angleDip` 80ms | 33-54 | (none) |
+| `moment.*` (single Moments) | `goFade` 700, `confettiFall` 1800, `confettiFadeDelay` 1200, `confettiFade` 600, `slamIn` 520, `slamInFade` 300, `riseInDelay` 500, `riseIn` 400, `tapMarkFill` 80, `tapNudge` 50, `angleDip` 80, `reelRingPulse` 600ms | 33-54 | (none) |
 | `tempo.quiet` / `normal` / `busy` | 3000 / 1600 / 800ms | 66-70 | (none) |
 | `BRAND_EASE_OUT_CURVE`, `easing.brandOut` | `cubic-bezier(0.22, 1, 0.36, 1)` | 80, 85 | `--easing-default` |
 | `easing.outCubic` | `Easing.out(Easing.cubic)` | 87 | (none) |
@@ -624,7 +632,7 @@ Mobile tokens live in `apps/mobile/lib/motion/tokens.ts` and are imported from `
 
 - **Durations:** `instant` 100ms (reactive feedback), `fast` 240ms, `base` 480ms (rating tick), `slow` 720ms, `pulse` 1400ms (fixed LIVE pulse cycle), `ember` 2400ms (Arena ember cycle), `shimmer` 1400ms (skeleton sweep).
 - **LIVE pulse tempo:** `tempo.quiet` 3000ms, `tempo.normal` 1600ms, `tempo.busy` 800ms, chosen by how many athletes are live in the lobby. One shared clock drives every live dot so they never beat out of step.
-- **Single Moments:** `moment` names the durations that belong to one registered Moment (`goFade`, `confettiFall`, `confettiFadeDelay`, `confettiFade`, `slamIn`, `slamInFade`, `riseInDelay`, `riseIn`, `tapMarkFill`, `tapNudge`, `angleDip`). Name a new Moment's own timing there instead of writing a literal.
+- **Single Moments:** `moment` names the durations that belong to one registered Moment (`goFade`, `confettiFall`, `confettiFadeDelay`, `confettiFade`, `slamIn`, `slamInFade`, `riseInDelay`, `riseIn`, `tapMarkFill`, `tapNudge`, `angleDip`, `reelRingPulse`). Name a new Moment's own timing there instead of writing a literal.
 - **Easing:** brand ease-out `cubic-bezier(0.22, 1, 0.36, 1)` (`easing.brandOut`, no bounce) by default; `easing.outCubic` for counts; `easing.inQuad` for a fall or a fade off; `easing.linear` for a readout of elapsed time.
 - **Springs:** `spring.press` (damping 18, stiffness 300) for a pressed control returning to rest; `spring.select` (damping 14, stiffness 260) for the tab select bounce.
 - **Press scale:** `PRESS_SCALE` 0.97.
@@ -705,6 +713,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 | Offline banner | Moment | Root layout, challenge prompt (`components/offline-banner.tsx`) | Connectivity changes: slides down on the UI thread when offline (Reanimated `translateY`, `duration.fast` 240ms, brand ease-out); its content drops at once when back online | none | Appears in place, no slide |
 | Angle crossfade | Moment | `SwitchOverlay` (`apps/mobile/components/film-room/switch-overlay.tsx`), match player | An exact-synced angle switch (or the return after a failed one) lands: the held still of the outgoing frame fades out over the landed video, `duration.fast` (240ms) on the brand ease-out, inside the hook's 300ms settle | `select` on the tap (switcher), none here | Cut: the still is removed at landing |
 | Angle dip | Moment | `SwitchOverlay`, match player | An approximate (clock-only or unsynced) angle switch lands: `ON_MEDIA.black` fades in over `moment.angleDip` (80ms), the still is removed, the black fades out over 80ms (160ms in all) | none | Cut |
+| Reel ring pulse | Moment | `ReelTile` (Home lane, Matches carousel) | The first unseen reel tile appears for the first time in a session, or a building tile lands as ready: the tile scales 1.0 to 1.04 and back over `moment.reelRingPulse` (600ms), once | success on the building-to-ready reveal only | No pulse (the ring alone marks it) |
 | Held frame | (no animation) | `SwitchOverlay`, match player | While an angle switch is pending: a native still of the outgoing frame (`expo-image`, `contain`) covers the player, so no black and no frame 0 of the next angle shows; dropped at once if the switch is still pending after 4s | none | Same |
 | Syncing pill | Moment + Ambient | `SyncingPill` (`apps/mobile/components/film-room/syncing-pill.tsx`), match player under the angle switcher | An angle switch not landed 200ms after the tap: "SYNCING ANGLE" (exact) or "SWITCHING ANGLE" (approximate) fades in over `instant`, stays at least 400ms and until the switch lands, then fades out over `fast` (the approximate note and the failure tag share its slot and never overlap it: the note appears only once the pill is gone, and a failed switch removes the pill at once, no fade, for the failure tag); while up, a 2px band of `on-media text2` sweeps its bottom edge (`duration.shimmer` 1400ms, linear, `translateX` only), paused in background. Hidden from screen readers (the segment's busy state carries it) | none | Shown and hidden in place, static full-width bar |
 | Angle segment press | Reactive | `AngleSwitcher` (`apps/mobile/components/film-room/angle-switcher.tsx`), match page plate and match player | Press scale 0.97 through `PressableScale`; the switching segment is selected and busy (`accessibilityState`) until the switch lands | `select` on a new angle only (none on the active one) | 0.85 opacity dip, haptic kept |

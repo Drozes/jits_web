@@ -56,6 +56,7 @@ describe("motion tokens", () => {
       tapMarkFill: 80,
       tapNudge: 50,
       angleDip: 80,
+      reelRingPulse: 600,
     });
     // A Moment may run up to about 2000ms (DESIGN.md, the three tiers).
     for (const ms of Object.values(moment)) expect(ms).toBeLessThanOrEqual(2000);

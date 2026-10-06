@@ -53,6 +53,12 @@ export const moment = {
   tapNudge: 50,
   /** Angle dip (match player): an approximate angle switch lands; black in, then out, this long each way. */
   angleDip: 80,
+  /**
+   * Reel ring pulse (specs/matches-tab 7.2, 10.5): the first unseen reel tile
+   * of a session, or a building tile landing as ready, scales 1.0 to 1.04 and
+   * back over this long, once. Skipped under Reduce Motion.
+   */
+  reelRingPulse: 600,
 } as const;
 
 export type MomentToken = keyof typeof moment;
