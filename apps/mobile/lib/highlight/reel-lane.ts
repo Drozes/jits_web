@@ -143,13 +143,16 @@ export interface FirstPageMerge {
  *   unseen-first reorders existing reels).
  * - Otherwise reels already on screen keep their relative order (with the
  *   fresh data: a watched reel loses its ring but does not move), and newly
- *   arrived reels enter at the front, unseen first among themselves. A reel
- *   gone from the first page's range is dropped.
- * - The previously loaded tail (reels past the first page) is kept only when
- *   the new first page is full AND its last item (server order) is already on
- *   screen, so the tail still continues where the page ends; the caller then
- *   keeps the old cursor. Otherwise the tail is dropped and the caller uses
- *   the new first cursor.
+ *   arrived reels enter at the front, unseen first among themselves.
+ * - On-screen reels missing from the new first page: when the page is full
+ *   AND its last item (the anchor, server order) is already on screen, they
+ *   stay in place (the on-screen list is not in server order, so position
+ *   cannot tell older from newer), except one strictly newer than the anchor
+ *   (both instants parse), which should have been in the page and is gone
+ *   (deleted or superseded). `keptTail` is true only when at least one was
+ *   kept; the caller then keeps the old cursor. Otherwise (a last page, or an
+ *   anchor not on screen) they are dropped and the caller uses the new first
+ *   cursor.
  */
 export function mergeFirstPage(current: readonly ReelItem[], firstPage: readonly ReelItem[], firstPageHasMore: boolean): FirstPageMerge {
   const page = dedupe(firstPage);
@@ -165,17 +168,16 @@ export function mergeFirstPage(current: readonly ReelItem[], firstPage: readonly
   // stays, in place: none can be lost past the old cursor. When the first
   // page is the last page, reels missing from it are gone (deletions clear).
   const anchorOnScreen = firstPageHasMore && anchor !== null && current.some((i) => i.highlightId === anchor.highlightId);
-  const pageMatches = new Set(page.map((i) => i.matchId));
   const anchorAt = anchor ? Date.parse(anchor.readyAt) : NaN;
   /**
-   * A missing on-screen reel is gone (dropped) when the page now holds
-   * another reel of its match (superseded: one item per match), or when it
-   * is strictly newer than the anchor so it should have been in the page
-   * (deleted). Time only ever drops, never keeps: unparseable or equal
-   * instants keep the reel, so no gap can come back.
+   * A missing on-screen reel is gone (dropped) only when it is strictly newer
+   * than the anchor, so it should have been in the page (deleted, or
+   * superseded by a re-render). Matching on the match id would be wrong: with
+   * the multi-angle gate off one match legally has a reel per angle. Time
+   * only ever drops, never keeps: unparseable or equal instants keep the
+   * reel, so no gap can come back.
    */
   const isGone = (old: ReelItem): boolean => {
-    if (pageMatches.has(old.matchId)) return true;
     const oldAt = Date.parse(old.readyAt);
     return Number.isFinite(oldAt) && Number.isFinite(anchorAt) && oldAt > anchorAt;
   };

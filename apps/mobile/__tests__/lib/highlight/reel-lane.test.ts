@@ -167,6 +167,18 @@ describe("ordering", () => {
     expect(out.keptTail).toBe(true);
   });
 
+  it("regression: two reels of one match (multi-angle gate off) are both kept across the page edge", () => {
+    // J and K share match mJ and sit next to each other.
+    const old = twenty().map((r) => (r.highlightId === "K" ? { ...r, matchId: "mJ" } : r));
+    // On screen: B..T. A new reel N pushes K just past the full first page N, B..J (anchor J).
+    const page = [reel("N", { matchId: "mN", readyAt: at(0) }), ...old.slice(1, 10)];
+    expect(page[page.length - 1].highlightId).toBe("J");
+    const out = mergeFirstPage(old.slice(1), page, true);
+    expect(ids(out.items)).toContain("K");
+    expect(out.items.filter((i) => i.matchId === "mJ")).toHaveLength(2);
+    expect(out.keptTail).toBe(true);
+  });
+
   it("delete probe: a reel newer than the anchor and missing from the page is dropped", () => {
     const old = twenty();
     // A was deleted: the full new first page is B..K.
