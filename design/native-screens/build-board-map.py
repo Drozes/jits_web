@@ -356,7 +356,7 @@ BOARDS = {
     "07-Setup-Who.dc.html": dict(seeds=SETUP, exclude=[TOS, WHERE]),
     "08-Setup-Where.dc.html": dict(seeds=SETUP, exclude=[TOS, WHO]),
     "Main.dc.html": dict(seeds=HOME, exclude=[
-        "components/dashboard/resume-match-card.tsx", "components/dashboard/new-highlight-card.tsx",
+        "components/dashboard/resume-match-card.tsx",
         "components/dashboard/practice-offer-card.tsx"]),
     "11-Home-Resume.dc.html": dict(seeds=HOME),
     "12-Arena-Offline.dc.html": dict(seeds=ARENA),

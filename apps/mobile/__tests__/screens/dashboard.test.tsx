@@ -5,12 +5,13 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockNavigate = jest.fn();
 
 // useFocusEffect runs its callback on mount (the first focus) and records it
 // so a test can simulate the tab regaining focus.
 const mockFocusCallbacks: (() => void)[] = [];
 jest.mock("expo-router", () => ({
-  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace, navigate: mockNavigate }),
   useFocusEffect: (cb: () => void) => {
     const R = require("react");
     R.useEffect(() => {
@@ -184,9 +185,13 @@ jest.mock("@jits/shared/api/queries", () => ({
 
 jest.mock("@jits/shared/types/composites", () => ({}), { virtual: true });
 
-// Highlight Reels phase 2 (spec 015 section 16.6.4): the "Your new highlight"
-// card's source, and cold-start push routing armed by Home.
+// The Highlights carousel's source (specs/matches-tab 7, via useReelLane), and
+// cold-start push routing armed by Home.
 const mockGetMyHighlights = jest.fn();
+const mockSignPosters = jest.fn();
+jest.mock("@jits/shared/api/poster-signing", () => ({
+  signPosterKeys: (...a: unknown[]) => mockSignPosters(...a),
+}));
 const mockMarkSeen = jest.fn();
 const mockLogEvent = jest.fn();
 jest.mock("@jits/shared/api/highlight-share", () => ({
@@ -205,7 +210,25 @@ jest.mock("expo-image", () => {
 });
 
 import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
-import { resetHighlightStore } from "@/lib/highlight/highlight-store";
+import { __setHighlightReadThrottleForTests, resetHighlightStore } from "@/lib/highlight/highlight-store";
+import { __resetSessionPulses } from "@/lib/highlight/reel-lane";
+
+/** A get_my_highlights page as the shared wrapper returns it. */
+function highlightsPage(items: unknown[], over: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    data: {
+      clipsEnabled: true,
+      shareEnabled: true,
+      items,
+      nextBefore: null,
+      nextBeforeId: null,
+      inFlight: [],
+      inFlightSupported: true,
+      ...over,
+    },
+  };
+}
 
 // The record line inside the Elo tile for mockSummary (5-2-1) and for zero.
 const RECORD = "5W · 2L · 1D";
@@ -241,6 +264,8 @@ let athleteSeq = 0;
 
 beforeEach(() => {
   resetHighlightStore();
+  __setHighlightReadThrottleForTests(0);
+  __resetSessionPulses();
   // Home's Resume card reads the app-wide open-match store (F10); a match
   // left there by the previous test must not show on this one's first frame.
   (
@@ -258,7 +283,8 @@ beforeEach(() => {
   queries.getGymDetailResult.mockResolvedValue({ ok: true, data: null });
   queries.getGymsWithSessionsResult.mockResolvedValue({ ok: true, data: [] });
   queries.getMyActiveMatch.mockResolvedValue({ ok: true, data: null });
-  mockGetMyHighlights.mockResolvedValue({ ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [] } });
+  mockGetMyHighlights.mockResolvedValue(highlightsPage([]));
+  mockSignPosters.mockImplementation(async (_c: unknown, keys: string[]) => keys.map((k) => `https://signed/${k}`));
   mockMarkSeen.mockResolvedValue({ ok: true, data: null });
   mockLogEvent.mockResolvedValue(undefined);
   mockAthlete.primary_gym_id = null;
@@ -318,6 +344,8 @@ describe("DashboardScreen", () => {
     ["a gym member", "g1"],
   ])("shows %s no Elo label and no Arena nudge card", async (_name, gymId) => {
     mockAthlete.primary_gym_id = gymId;
+    // Clips off: the Highlights carousel's own "Find a match" CTA tile is not the nudge card.
+    mockGetMyHighlights.mockResolvedValue(highlightsPage([], { clipsEnabled: false }));
     const { findByText, queryByText, queryByLabelText } = render(
       React.createElement(DashboardScreen),
     );
@@ -505,6 +533,7 @@ describe("DashboardScreen without the Arena nudge card", () => {
     ["offline", false],
     ["live", true],
   ])("shows no nudge copy while %s", async (_name, isLive) => {
+    mockGetMyHighlights.mockResolvedValue(highlightsPage([], { clipsEnabled: false }));
     act(() => {
       store.publishArenaState({ ...store.IDLE_ARENA_STATE, isLive });
     });
@@ -656,24 +685,30 @@ describe("DashboardScreen resume-match card", () => {
   });
 });
 
-describe("DashboardScreen new-highlight card (spec 015 section 16.6.4)", () => {
+// specs/matches-tab section 7 (owner round 2): ONE carousel titled
+// Highlights replaces the "Your new highlight" card. Own reels in phase 1.
+describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
   const store = require("@/lib/arena/arena-store") as typeof import("@/lib/arena/arena-store");
-  const reel = {
-    highlightId: "h1",
-    matchId: "m1",
-    matchVideoId: "v1",
-    version: 2,
-    durationS: 28.6,
-    posterPath: "m1/a/highlights/2.jpg",
-    readyAt: "2026-09-27T10:00:00Z",
-    opponentName: "Demo Red",
-    matchType: "ranked",
-    outcome: "win",
-    playedAt: "2026-09-27T09:00:00Z",
-    notifiedAt: "2026-09-27T10:00:01Z",
-    unseen: true,
-  };
-  const withReel = { ok: true, data: { clipsEnabled: true, shareEnabled: true, items: [reel] } };
+  function reel(id: string, over: Record<string, unknown> = {}) {
+    return {
+      highlightId: id,
+      matchId: `m-${id}`,
+      matchVideoId: `v-${id}`,
+      version: 2,
+      durationS: 28.4,
+      posterPath: `${id}.jpg`,
+      readyAt: "2026-10-06T10:00:00Z",
+      opponentName: "Demo Red",
+      matchType: "ranked",
+      outcome: "win",
+      playedAt: "2026-10-06T09:00:00Z",
+      notifiedAt: null,
+      unseen: false,
+      origin: null,
+      ...over,
+    };
+  }
+  const ZERO = { wins: 0, losses: 0, draws: 0, win_streak: 0, best_win_streak: 0 };
 
   afterEach(() => {
     store.__resetArenaStoreForTests();
@@ -684,81 +719,115 @@ describe("DashboardScreen new-highlight card (spec 015 section 16.6.4)", () => {
     await waitFor(() => expect(mockRouterReady).toHaveBeenCalled());
   });
 
-  it("shows nothing without an unseen reel", async () => {
-    const { queryByTestId } = render(React.createElement(DashboardScreen));
-    await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalledWith({}, { limit: 1, unseenOnly: true }));
-    expect(queryByTestId("new-highlight-card")).toBeNull();
-  });
-
-  it("stays hidden with clips disabled", async () => {
-    mockGetMyHighlights.mockResolvedValue({ ok: true, data: { clipsEnabled: false, shareEnabled: false, items: [reel] } });
-    const { queryByTestId } = render(React.createElement(DashboardScreen));
-    await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalled());
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(queryByTestId("new-highlight-card")).toBeNull();
-  });
-
-  it("sits after the Resume card and before the ELO tile, and leaves Resume as the one red CTA", async () => {
+  it("renders one Highlights carousel below Resume and above the greeting; the old card and 'Your reels' are gone", async () => {
     const queries = require("@jits/shared/api/queries") as QueryMocks;
     queries.getMyActiveMatch.mockResolvedValue({
       ok: true,
       data: { matchId: "99999999-9999-4999-8999-999999999999", status: "in_progress", opponentName: "Demo Red" },
     });
-    mockGetMyHighlights.mockResolvedValue(withReel);
+    mockGetMyHighlights.mockResolvedValue(highlightsPage([reel("h1", { unseen: true }), reel("h2")]));
     const utils = render(React.createElement(DashboardScreen));
-    const card = await utils.findByTestId("new-highlight-card");
-    const resume = await utils.findByLabelText("Resume your match");
+    await utils.findByTestId("reel-tile-ready:h1");
+    await utils.findByLabelText("Resume your match");
+
+    expect(utils.getAllByTestId("reel-carousel-home")).toHaveLength(1);
+    expect(utils.getByText("Highlights")).toBeTruthy();
+    expect(utils.queryByText(/Your reels/i)).toBeNull();
+    expect(utils.queryByTestId("new-highlight-card")).toBeNull();
+    expect(utils.queryByText("Your new highlight")).toBeNull();
 
     const order = utils.root
       .findAll(
         (n: { props: Record<string, unknown> }) =>
           n.props.accessibilityLabel === "Resume your match" ||
-          n.props.testID === "new-highlight-card" ||
-          n.props.children === mockAthlete.current_elo,
+          n.props.testID === "reel-carousel-home" ||
+          n.props.children === mockAthlete.display_name,
       )
       .map((n: { props: Record<string, unknown> }) =>
-        n.props.testID === "new-highlight-card"
-          ? "card"
-          : n.props.accessibilityLabel === "Resume your match"
-            ? "resume"
-            : "elo",
+        n.props.testID === "reel-carousel-home" ? "carousel" : n.props.accessibilityLabel === "Resume your match" ? "resume" : "greeting",
       )
       .filter((v: string, i: number, a: string[]) => a.indexOf(v) === i);
-    expect(order).toEqual(["resume", "card", "elo"]);
-
+    expect(order).toEqual(["resume", "carousel", "greeting"]);
+    // Resume keeps Home's one red CTA; the carousel draws none.
     expect(redCtas(utils)).toHaveLength(1);
-    expect(resume.props.className).toContain("bg-cta");
-    expect(card).toBeTruthy();
   });
 
-  it("Watch opens the viewer with source=home; dismiss marks seen and hides the card", async () => {
-    mockGetMyHighlights.mockResolvedValue(withReel);
+  it("opens the tapped reel through the lane seam with source=home and logs home_card_tapped", async () => {
+    mockGetMyHighlights.mockResolvedValue(highlightsPage([reel("h1", { unseen: true }), reel("h2")]));
     const utils = render(React.createElement(DashboardScreen));
-    await utils.findByTestId("new-highlight-card");
-    expect(mockPush).not.toHaveBeenCalled();
-
-    fireEvent.press(utils.getByText("Watch"));
-    expect(mockPush).toHaveBeenCalledWith("/highlight/h1?source=home");
-    expect(mockLogEvent).toHaveBeenCalledWith({}, "h1", "home_card_tapped", expect.objectContaining({ source: "home", platform: expect.any(String), app_version: null, runtime_version: expect.anything() }));
-
-    fireEvent.press(utils.getByLabelText("Dismiss"));
-    expect(utils.queryByTestId("new-highlight-card")).toBeNull();
-    expect(mockMarkSeen).toHaveBeenCalledWith({}, "h1", 2);
-    expect(mockLogEvent).toHaveBeenCalledWith({}, "h1", "home_card_dismissed", expect.objectContaining({ source: "home", platform: expect.any(String), app_version: null, runtime_version: expect.anything() }));
+    fireEvent.press(await utils.findByTestId("reel-tile-ready:h2"));
+    expect(mockPush).toHaveBeenCalledWith("/highlight/h2?source=home");
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      {},
+      "h2",
+      "home_card_tapped",
+      expect.objectContaining({ source: "home", surface: "carousel", position: 1, unseen: false, reel_source: "own" }),
+    );
   });
 
-  it("pull to refresh re-reads the reel", async () => {
+  it("zero matches: the C-HZ1 CTA tile (not red) and the C-Z2 ghost; the CTA switches to the Arena tab", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getDashboardSummary.mockResolvedValue({ ...mockSummary, stats: ZERO });
+    const utils = render(React.createElement(DashboardScreen));
+    const cta = await utils.findByLabelText("Get your first highlight. Opens the Arena tab");
+    expect(utils.getByLabelText("Your first highlight lands here")).toBeTruthy();
+    expect(cta.props.className ?? "").not.toMatch(/bg-cta/);
+    fireEvent.press(cta);
+    expect(mockNavigate).toHaveBeenCalledWith("/arena");
+  });
+
+  it("matches but no reels: the C-L2 CTA tile then the C-L5 ghost with the recording helper", async () => {
+    const utils = render(React.createElement(DashboardScreen));
+    expect(await utils.findByLabelText("Find a match. Opens the Arena tab")).toBeTruthy();
+    expect(utils.getByLabelText("Record your next match to get a highlight")).toBeTruthy();
+    expect(utils.getByText("Turn on Record from my phone at face-off.")).toBeTruthy();
+  });
+
+  it("hides the carousel with clips off", async () => {
+    mockGetMyHighlights.mockResolvedValue(highlightsPage([reel("h1")], { clipsEnabled: false }));
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByText(RECORD);
+    await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(utils.queryByTestId("reel-carousel-home")).toBeNull();
+    expect(utils.queryByText("Highlights")).toBeNull();
+  });
+
+  it("hides the carousel quietly when the read fails (no error on Home)", async () => {
+    mockGetMyHighlights.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    const { toast } = require("@/components/ui/toast") as { toast: { error: jest.Mock } };
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByText(RECORD);
+    await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(utils.queryByTestId("reel-carousel-home")).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("shows three skeleton tiles while the first read is in flight", async () => {
+    mockGetMyHighlights.mockReturnValue(new Promise(() => {}));
+    const utils = render(React.createElement(DashboardScreen));
+    const hidden = { includeHiddenElements: true };
+    expect(await utils.findByTestId("reel-tile-skeleton:2", hidden)).toBeTruthy();
+    expect(utils.queryByTestId("reel-tile-skeleton:3", hidden)).toBeNull();
+    await settleActiveMatchRead();
+  });
+
+  it("pull to refresh re-reads the lane", async () => {
     const utils = render(React.createElement(DashboardScreen));
     await waitFor(() => expect(mockGetMyHighlights).toHaveBeenCalledTimes(1));
-    mockGetMyHighlights.mockResolvedValue(withReel);
+    mockGetMyHighlights.mockResolvedValue(highlightsPage([reel("h9")]));
     const scroll = utils.UNSAFE_getByType(require("react-native").ScrollView);
     await act(async () => {
       scroll.props.refreshControl.props.onRefresh();
     });
-    await utils.findByTestId("new-highlight-card");
+    expect(await utils.findByTestId("reel-tile-ready:h9")).toBeTruthy();
   });
+
 });
 
 describe("DashboardScreen practice match offer", () => {
