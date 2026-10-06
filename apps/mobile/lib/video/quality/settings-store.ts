@@ -15,6 +15,10 @@ import { supabase } from "@/lib/supabase/client";
 export const PLAYBACK_SETTINGS_KEY = "video-playback:settings:v1";
 export const SETTINGS_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 export const SETTINGS_REFRESH_MS = 60 * 60 * 1000;
+/** A settings read that has not answered after this is given up (so `fetching` always clears). */
+export const SETTINGS_FETCH_TIMEOUT_MS = 5000;
+/** After a failed read, the next open may retry once this has passed (not a full hour). */
+export const SETTINGS_RETRY_MS = 60 * 1000;
 
 export type SettingsSource = "server" | "cache" | "builtin";
 
@@ -73,17 +77,29 @@ export function refreshPlaybackSettings(now = Date.now()): Promise<void> {
   if (fetching) return fetching;
   if (lastFetchAt !== null && now - lastFetchAt < SETTINGS_REFRESH_MS) return Promise.resolve();
   lastFetchAt = now;
-  fetching = getPlaybackSettings(supabase)
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<{ ok: false }>((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false }), SETTINGS_FETCH_TIMEOUT_MS);
+  });
+  const failed = () => {
+    // Retry on a later open after the short backoff, not in an hour.
+    lastFetchAt = now - SETTINGS_REFRESH_MS + SETTINGS_RETRY_MS;
+  };
+  fetching = Promise.race([getPlaybackSettings(supabase), timeout])
     .then((result) => {
-      if (!result.ok) return;
+      if (!result.ok) {
+        failed();
+        return;
+      }
       server = result.data;
       // Only a value this client can use is worth caching.
       if (!parsePlaybackSettings(result.data).valid) return;
       cache = { fetchedAt: Date.now(), value: result.data };
       void AsyncStorage.setItem(PLAYBACK_SETTINGS_KEY, JSON.stringify(cache)).catch(() => undefined);
     })
-    .catch(() => undefined)
+    .catch(() => failed())
     .finally(() => {
+      if (timer) clearTimeout(timer);
       fetching = null;
     });
   return fetching;

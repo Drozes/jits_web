@@ -201,6 +201,14 @@ describe("usePlaybackTelemetry adaptive quality", () => {
       msOn360: 4500,
       qualityLockedLow: true,
       qualitySwitchCount: 0,
+      // Review telemetry M1: a continuation has no start of its own, and the earlier step-down shows.
+      startFallback: null,
+      qualitySteppedDown: true,
+    });
+    expect(mockCaptureMessage.mock.calls[1][1].tags).toMatchObject({
+      "video.playback.resumed": "true",
+      "video.playback.stepdown": "stall",
+      "video.playback.rendition": "360",
     });
     // The continuation's stall reached the listener.
     expect(stalls).toEqual(["start", "end"]);

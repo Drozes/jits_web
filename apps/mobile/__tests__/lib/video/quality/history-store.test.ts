@@ -69,6 +69,16 @@ describe("playback history store", () => {
     expect(parseHistory(raw)).toBeNull();
   });
 
+  it("review L2: a stored list longer than the cap is cut to 20, newest first, on read", async () => {
+    const many = Array.from({ length: 30 }, (_, i) => entry(i));
+    await AsyncStorage.setItem(PLAYBACK_HISTORY_KEY, JSON.stringify({ v: 1, byKey: { wifi: many } }));
+    await hydratePlaybackHistory();
+    const wifi = getPlaybackHistory("wifi");
+    expect(wifi).toHaveLength(20);
+    expect(wifi[0].ts).toBe(29);
+    expect(wifi[19].ts).toBe(10);
+  });
+
   it("an entry recorded before the read landed stays on top", async () => {
     await AsyncStorage.setItem(PLAYBACK_HISTORY_KEY, JSON.stringify({ v: 1, byKey: { wifi: [entry(7)] } }));
     const pending = hydratePlaybackHistory();

@@ -18,6 +18,8 @@ import type { PlaybackSessionSummary } from "@/lib/video/playback-telemetry";
  * playback. A corrupt stored value is discarded and replaced.
  */
 export const PLAYBACK_HISTORY_KEY = "video-playback:history:v1";
+/** The most entries any key may hold (the settings range cap of `history.maxEntries`). */
+export const HISTORY_MAX_ENTRIES_CAP = 20;
 
 type ByKey = Partial<Record<NetworkKey, PlaybackHistoryEntry[]>>;
 
@@ -55,7 +57,11 @@ export function parseHistory(raw: string | null): ByKey | null {
     for (const [k, list] of Object.entries(v.byKey as Record<string, unknown>)) {
       if (!(NETWORK_KEYS as readonly string[]).includes(k) || !Array.isArray(list)) return null;
       if (!list.every(isEntry)) return null;
-      out[k as NetworkKey] = list;
+      // Bounded on read too: a stored list never grows past the cap.
+      out[k as NetworkKey] = (list as PlaybackHistoryEntry[])
+        .slice()
+        .sort((a, b) => b.ts - a.ts)
+        .slice(0, HISTORY_MAX_ENTRIES_CAP);
     }
     return out;
   } catch {
@@ -82,7 +88,7 @@ export function hydratePlaybackHistory(): Promise<void> {
         // Entries recorded before the read landed stay on top.
         const merged: ByKey = { ...(parsed ?? {}) };
         for (const [k, list] of Object.entries(byKey) as Array<[NetworkKey, PlaybackHistoryEntry[]]>) {
-          merged[k] = [...list, ...(merged[k] ?? [])];
+          merged[k] = [...list, ...(merged[k] ?? [])].slice(0, HISTORY_MAX_ENTRIES_CAP);
         }
         byKey = merged;
         hydrated = true;

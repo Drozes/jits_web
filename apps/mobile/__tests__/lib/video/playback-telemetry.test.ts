@@ -336,6 +336,7 @@ describe("reportPlaybackSession", () => {
         "video.playback.start_reason": "none",
         "video.playback.quality_pref": "none",
         "video.playback.stepdown": "none",
+        "video.playback.resumed": "false",
         "video.playback.network_key": "none",
         "video.playback.stalled": "no",
         "video.playback.startup_bucket": "lt1s",
@@ -674,6 +675,28 @@ describe("PlaybackSession adaptive quality", () => {
     s.playIntent(true, 0);
     reportPlaybackSession(s.summary(100, "unmount"));
     expect(mockCaptureMessage.mock.calls[0][1].tags["video.playback.rendition"]).toBe("unknown");
+  });
+});
+
+describe("PlaybackSession continuation (review telemetry M1)", () => {
+  it("a resumed session reports no start fallback, carries an earlier step-down and tags resumed", () => {
+    const s = new PlaybackSession(MATCH, 0, {
+      resumed: true,
+      sourceKind: "normalized",
+      wantPlay: true,
+      rendition: { served: "360", playbackProfile: null },
+    });
+    s.setQuality(QMETA);
+    s.qualityFlags({ lockedLow: false, capReached: false, steppedDown: true });
+    s.playing(true, 100);
+    const out = s.summary(5000, "unmount");
+    expect(out.startFallback).toBeNull();
+    expect(out.qualitySteppedDown).toBe(true);
+    reportPlaybackSession(out);
+    expect(mockCaptureMessage.mock.calls[0][1].tags).toMatchObject({
+      "video.playback.resumed": "true",
+      "video.playback.stepdown": "stall",
+    });
   });
 });
 

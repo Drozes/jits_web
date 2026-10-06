@@ -199,7 +199,8 @@ export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   startTarget: TargetRendition | null;
   startReason: StartReason | null;
   startRendition: ServedRendition | null;
-  startFallback: boolean;
+  /** Served start differs from the target; null on a continuation (it has no start of its own). */
+  startFallback: boolean | null;
   playbackProfile: string | null;
   finalRendition: ServedRendition | null;
   qualitySwitchCount: number;
@@ -218,6 +219,8 @@ export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   stallMsAfterStepDown: number | null;
   qualityLockedLow: boolean;
   qualityCapReached: boolean;
+  /** A stall-driven step-down happened in this screen session (this event or an earlier one). */
+  qualitySteppedDown: boolean;
   playerStartupMs: number | null;
 }
 
@@ -287,6 +290,7 @@ export class PlaybackSession {
   private beforeStepDown: { count: number; ms: number } | null = null;
   private lockedLow = false;
   private capReached = false;
+  private steppedDownInScreen = false;
   private onStall: ((event: { kind: "start" | "end"; at: number }) => void) | null = null;
 
   constructor(
@@ -383,9 +387,10 @@ export class PlaybackSession {
   }
 
   /** The controller's sticky screen-session state (relapse lock, cap). */
-  qualityFlags(flags: { lockedLow: boolean; capReached: boolean }): void {
+  qualityFlags(flags: { lockedLow: boolean; capReached: boolean; steppedDown?: boolean }): void {
     this.lockedLow = this.lockedLow || flags.lockedLow;
     this.capReached = this.capReached || flags.capReached;
+    this.steppedDownInScreen = this.steppedDownInScreen || flags.steppedDown === true;
   }
 
   setMeta(partial: Partial<PlaybackSessionMeta>): void {
@@ -661,6 +666,7 @@ export class PlaybackSession {
     | "stallMsAfterStepDown"
     | "qualityLockedLow"
     | "qualityCapReached"
+    | "qualitySteppedDown"
     | "playerStartupMs"
   > {
     const q = this.quality;
@@ -675,7 +681,7 @@ export class PlaybackSession {
       startTarget: q?.startTarget ?? null,
       startReason: q?.startReason ?? null,
       startRendition: this.startRendition,
-      startFallback: q != null && this.startRendition != null && this.startRendition !== q.startTarget,
+      startFallback: this.resumed ? null : q != null && this.startRendition != null && this.startRendition !== q.startTarget,
       playbackProfile: this.playbackProfile,
       finalRendition: this.currentRendition,
       qualitySwitchCount: this.qualitySwitchCount,
@@ -694,6 +700,7 @@ export class PlaybackSession {
       stallMsAfterStepDown: before ? this.stallMs - before.ms : null,
       qualityLockedLow: this.lockedLow,
       qualityCapReached: this.capReached,
+      qualitySteppedDown: this.steppedDownInScreen || before !== null,
       playerStartupMs: ttff !== null && signMs !== null ? Math.max(0, ttff - signMs) : null,
     };
   }
@@ -779,7 +786,9 @@ export function playbackTags(s: PlaybackSessionSummary): Record<string, string> 
     "video.playback.rendition_final": rendition(s.finalRendition),
     "video.playback.start_reason": (match && s.startReason) || "none",
     "video.playback.quality_pref": (match && s.qualityPreference) || "none",
-    "video.playback.stepdown": match && s.stallsBeforeStepDown !== null ? "stall" : "none",
+    "video.playback.stepdown": match && s.qualitySteppedDown ? "stall" : "none",
+    // Discover filters tags only: a continuation's start fields are not a startup.
+    "video.playback.resumed": s.resumed ? "true" : "false",
     "video.playback.network_key": (match && s.networkKey) || "none",
     "video.playback.stalled": s.stallCount > 0 ? "yes" : "no",
     "video.playback.startup_bucket": startupBucket(s.playerStartupMs),

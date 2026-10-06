@@ -31,7 +31,7 @@ export interface PlaybackTelemetry {
     from: TargetRendition,
     to: TargetRendition,
     reason: SwitchReason,
-    flags: { lockedLow: boolean; capReached: boolean },
+    flags: { lockedLow: boolean; capReached: boolean; steppedDown?: boolean },
   ) => void;
   /** The quality swap landed (first frame after the resume seek). */
   qualitySwitchLanded: () => void;
@@ -88,7 +88,7 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
   const wantPlayRef = React.useRef(false);
   const qualityRef = React.useRef<{ meta: PlaybackQualityMeta; settings: PlaybackSettings } | null>(null);
   const renditionRef = React.useRef<{ served: ServedRendition; playbackProfile: string | null } | null>(null);
-  const flagsRef = React.useRef({ lockedLow: false, capReached: false });
+  const flagsRef = React.useRef({ lockedLow: false, capReached: false, steppedDown: false });
   const stallListenersRef = React.useRef(new Set<(event: StallEvent) => void>());
   const emitStall = React.useCallback((event: StallEvent) => {
     for (const cb of stallListenersRef.current) {
@@ -228,11 +228,15 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
         sessionRef.current?.renditionAttached(served, playbackProfile, Date.now());
       },
       qualitySwitchStarted: (from, to, reason, flags) => {
-        flagsRef.current = { ...flags };
+        flagsRef.current = {
+          lockedLow: flags.lockedLow,
+          capReached: flags.capReached,
+          steppedDown: flagsRef.current.steppedDown || flags.steppedDown === true || reason !== "smooth",
+        };
         const s = sessionRef.current;
         if (!s) return;
         s.qualitySwitchStarted(from, to, reason, Date.now());
-        s.qualityFlags(flags);
+        s.qualityFlags(flagsRef.current);
       },
       qualitySwitchLanded: () => sessionRef.current?.qualitySwitchLanded(Date.now()),
       onStall: (cb) => {

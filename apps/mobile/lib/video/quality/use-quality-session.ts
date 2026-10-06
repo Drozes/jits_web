@@ -31,6 +31,17 @@ import { hydratePlaybackSettingsCache, refreshPlaybackSettings, resolvePlaybackS
 
 /** The longest a start waits for the stored preference, settings and history. */
 export const START_PREP_MS = 300;
+/** The stored values answered once (this app run). */
+let storesSettled = false;
+/** A start already gave up waiting for them once (a hung AsyncStorage). */
+let storesTimedOut = false;
+
+/** Tests only. */
+export function __resetQualityStartForTests(): void {
+  storesSettled = false;
+  storesTimedOut = false;
+}
+
 /** Ticks while a counted stall is open (time updates may pause during one). */
 const STALL_TICK_MS = 250;
 
@@ -52,11 +63,20 @@ export async function prepareQualityStart(now = () => Date.now()): Promise<Quali
     hydratePlaybackQualityPreference(),
     hydratePlaybackSettingsCache(),
     hydratePlaybackHistory(),
-  ]).catch(() => undefined);
+  ])
+    .catch(() => undefined)
+    .then(() => {
+      storesSettled = true;
+    });
+  // A storage that already hung past the cap once does not cost every later open the full wait.
+  const wait = storesTimedOut && !storesSettled ? 0 : START_PREP_MS;
   const capped = Promise.race([
     stores,
     new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, START_PREP_MS);
+      timer = setTimeout(() => {
+        if (!storesSettled) storesTimedOut = true;
+        resolve();
+      }, wait);
     }),
   ]);
   const [, network] = await Promise.all([capped, networkSnapshotForStart().catch(() => null)]);

@@ -10,7 +10,9 @@ import { BUILTIN_PLAYBACK_SETTINGS } from "@jits/shared/utils";
 import {
   PLAYBACK_SETTINGS_KEY,
   SETTINGS_CACHE_MAX_AGE_MS,
+  SETTINGS_FETCH_TIMEOUT_MS,
   SETTINGS_REFRESH_MS,
+  SETTINGS_RETRY_MS,
   __resetPlaybackSettingsStoreForTests,
   hydratePlaybackSettingsCache,
   refreshPlaybackSettings,
@@ -96,6 +98,28 @@ describe("playback settings store: refresh cadence", () => {
     await refreshPlaybackSettings(NOW + SETTINGS_REFRESH_MS - 1);
     expect(mockGetSettings).toHaveBeenCalledTimes(1);
     await refreshPlaybackSettings(NOW + SETTINGS_REFRESH_MS);
+    expect(mockGetSettings).toHaveBeenCalledTimes(2);
+  });
+
+  it("review: a hung read is given up after 5 s, so a later open can fetch again", async () => {
+    jest.useFakeTimers();
+    mockGetSettings.mockReturnValueOnce(new Promise(() => undefined));
+    const hung = refreshPlaybackSettings(NOW);
+    jest.advanceTimersByTime(SETTINGS_FETCH_TIMEOUT_MS);
+    await hung;
+    jest.useRealTimers();
+    mockGetSettings.mockResolvedValue({ ok: true, data: { version: 1, maxSwitchesPerSession: 3 } });
+    await refreshPlaybackSettings(NOW + SETTINGS_RETRY_MS);
+    expect(mockGetSettings).toHaveBeenCalledTimes(2);
+    expect(resolvePlaybackSettings(NOW).source).toBe("server");
+  });
+
+  it("review: a failed read retries after the 60 s backoff, not after an hour", async () => {
+    mockGetSettings.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "x" } });
+    await refreshPlaybackSettings(NOW);
+    await refreshPlaybackSettings(NOW + SETTINGS_RETRY_MS - 1);
+    expect(mockGetSettings).toHaveBeenCalledTimes(1);
+    await refreshPlaybackSettings(NOW + SETTINGS_RETRY_MS);
     expect(mockGetSettings).toHaveBeenCalledTimes(2);
   });
 
