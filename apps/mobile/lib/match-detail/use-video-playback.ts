@@ -666,6 +666,10 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   const markLoaded = React.useCallback(() => {
     const current = sourceRef.current;
     if (!current || loadedRef.current || settledGenRef.current !== current.generation) return;
+    // A newer angle switch (or restore) is still signing: this item is a
+    // superseded angle. It never loads, so it does not seek, play, report
+    // time, or move the point the new angle resumes at (review M1).
+    if (signingRef.current && seeksAtSettle(swapKindRef.current)) return;
     let ready = false;
     safely(() => {
       ready = player.status === "readyToPlay";
@@ -1181,6 +1185,10 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         setPhase("ready");
         return;
       }
+      // A superseded generation still in flight must not seek, play or land
+      // this swap while its sign is pending (review M1): only the generation
+      // this sign attaches is the switch's.
+      switchGenRef.current = null;
       void sign(true, { switched: true, holdFrame, rendition: target, quality: kind === "quality", kind });
     },
     [player, telemetry, attach, sign, dropQualitySwap, clearSwitchTimer],
@@ -1212,6 +1220,10 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       const inheritGate = superseding && prevGate != null && !prevGate.open && !prevGate.replaced;
       if (inheritGate) {
         prevGate.seq = seq;
+        // The superseded switch's parked source must never go out as this
+        // one (review M1): the gate replaces only once this switch's own
+        // source is parked or attached.
+        prevGate.pending = null;
       } else {
         gateRef.current = null;
         clearSwitchTimer("gate");

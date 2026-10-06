@@ -1627,9 +1627,62 @@ describe("useVideoPlayback angle switch phase 1 (jits-xfvd.16)", () => {
       await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/a.mp4" }));
     });
 
+    it("M1 (round 2): B's replace in flight, C's sign pending: B never lands C; only C lands", async () => {
+      let resolveC!: (v: unknown) => void;
+      signAll({ "vid-9": () => new Promise((r) => (resolveC = r)) });
+      const { result } = await open();
+      const swapB = deferReplace(idx());
+      act(() => result.current.switchAngle("vid-2", 20.5));
+      await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/b.mp4" }));
+      act(() => result.current.switchAngle("vid-9", 21));
+      await waitFor(() => expect(mockSign).toHaveBeenCalledWith({}, "vid-9", { rendition: "720" }));
+      await act(async () => swapB.resolve());
+      ready();
+      time(21);
+      time(21.5);
+      expect(mockTelemetry.switchLanded).not.toHaveBeenCalled();
+      expect(state(result)).toMatchObject({ phase: "pending", targetId: "vid-9" });
+      // B is never seeked or played as C, and its clock never moves C's resume point.
+      expect(player().seeks).not.toContain(21);
+      expect(player().playing).toBe(false);
+      expect(result.current.currentTimeNow()).toBe(21);
+      await act(async () => resolveC(playable("https://s/nine.mp4")));
+      expect(player().seeks.at(-1)).toBe(21);
+      expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/nine.mp4" });
+      await flush();
+      ready();
+      time(21.05);
+      expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+      expect(state(result)).toMatchObject({ phase: "landing", targetId: "vid-9" });
+    });
+
     describe("with fake timers", () => {
       beforeEach(() => jest.useFakeTimers());
       afterEach(() => jest.useRealTimers());
+
+      it("M1 (round 2): a gate handed to C while C's sign is pending never swaps in B", async () => {
+        let resolveC!: (v: unknown) => void;
+        signAll({ "vid-9": () => new Promise((r) => (resolveC = r)) });
+        const { result } = await open();
+        deferThumbnails(idx()); // the still never arrives: the 150 ms cap opens the gate
+        act(() => result.current.switchAngle("vid-2", 20.5));
+        await flush();
+        act(() => jest.advanceTimersByTime(50));
+        act(() => result.current.switchAngle("vid-9", 21));
+        await flush();
+        act(() => jest.advanceTimersByTime(HELD_FRAME_CAP_MS));
+        await flush();
+        expect(player().replaceAsync).not.toHaveBeenCalledWith({ uri: "https://s/b.mp4" });
+        expect(player().replaceAsync).toHaveBeenCalledTimes(1);
+        await act(async () => resolveC(playable("https://s/nine.mp4")));
+        expect(player().replaceAsync).toHaveBeenCalledTimes(2);
+        expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/nine.mp4" });
+        await flush();
+        ready();
+        time(21.05);
+        expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+        expect(state(result)).toMatchObject({ phase: "landing", seq: 2, targetId: "vid-9" });
+      });
 
       it("H2: paused-buffer stall, Play after the 3 s backstop already passed still plays", async () => {
         signAll();
