@@ -20,6 +20,11 @@ export interface MatchesListHeaderProps {
   onOpenOpponents: () => void;
   /** The cold-load placeholder, drawn under the chips (null once loaded). */
   skeleton?: React.ReactNode;
+  /**
+   * Zero matches (spec 10.2, board P-MT-10): no record strip and no chips
+   * (nothing to count or filter); only the carousel slot stays.
+   */
+  zero?: boolean;
 }
 
 /**
@@ -28,23 +33,25 @@ export interface MatchesListHeaderProps {
  * button, then the cold-load skeleton. The tab header itself (`TabHeader`)
  * sits outside the list so it never scrolls away.
  */
-export function MatchesListHeader({ record, carousel = null, filter, opponentName, onOutcome, onOpenOpponents, skeleton = null }: MatchesListHeaderProps) {
+export function MatchesListHeader({ record, carousel = null, filter, opponentName, onOutcome, onOpenOpponents, skeleton = null, zero = false }: MatchesListHeaderProps) {
   const p = usePalette();
   return (
     <View testID="matches-list-header">
-      <Text
-        testID="matches-record"
-        className="font-mono-medium"
-        style={[typeStep("caption"), { marginBottom: 18, letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}
-      >
-        {record}
-      </Text>
+      {zero ? null : (
+        <Text
+          testID="matches-record"
+          className="font-mono-medium"
+          style={[typeStep("caption"), { marginBottom: 18, letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}
+        >
+          {record}
+        </Text>
+      )}
       {carousel ? (
         <View testID="matches-carousel-slot" style={{ marginBottom: 18 }}>
           {carousel}
         </View>
       ) : null}
-      <FilterChips filter={filter} opponentName={opponentName} onOutcome={onOutcome} onOpenOpponents={onOpenOpponents} />
+      {zero ? null : <FilterChips filter={filter} opponentName={opponentName} onOutcome={onOutcome} onOpenOpponents={onOpenOpponents} />}
       {skeleton}
     </View>
   );

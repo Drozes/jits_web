@@ -10,7 +10,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 const mockRead = jest.fn();
 jest.mock("@jits/shared/api/invites", () => ({ readInvitesEnabled: (...a: unknown[]) => mockRead(...a) }));
 
-import { resetInvitesEnabledCache, useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
+import { resetInvitesEnabledCache, useInvitesEnabled, useInvitesFlagState } from "@/lib/invites/use-invites-enabled";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -43,4 +43,35 @@ it("a successful read is cached until sign-out resets it", async () => {
   const c = renderHook(() => useInvitesEnabled());
   await waitFor(() => expect(mockRead).toHaveBeenCalledTimes(2));
   await waitFor(() => expect(c.result.current).toBe(false));
+});
+
+describe("useInvitesFlagState (specs/matches-tab 10.2)", () => {
+  it("is unknown until a read succeeds, never off by default", async () => {
+    let resolve: (v: boolean | null) => void = () => undefined;
+    mockRead.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    const h = renderHook(() => useInvitesFlagState());
+    expect(h.result.current).toEqual({ enabled: false, known: false, state: "unknown" });
+    resolve(true);
+    await waitFor(() => expect(h.result.current).toEqual({ enabled: true, known: true, state: "on" }));
+  });
+
+  it("a failed read stays unknown (not off); a later read can still land", async () => {
+    mockRead.mockResolvedValueOnce(null);
+    const h = renderHook(() => useInvitesFlagState());
+    await waitFor(() => expect(mockRead).toHaveBeenCalledTimes(1));
+    expect(h.result.current.known).toBe(false);
+    h.unmount();
+    mockRead.mockResolvedValueOnce(false);
+    const again = renderHook(() => useInvitesFlagState());
+    await waitFor(() => expect(again.result.current).toEqual({ enabled: false, known: true, state: "off" }));
+  });
+
+  it("shares the cache with useInvitesEnabled (one read)", async () => {
+    mockRead.mockResolvedValue(true);
+    const a = renderHook(() => useInvitesEnabled());
+    await waitFor(() => expect(a.result.current).toBe(true));
+    const b = renderHook(() => useInvitesFlagState());
+    expect(b.result.current.state).toBe("on");
+    expect(mockRead).toHaveBeenCalledTimes(1);
+  });
 });

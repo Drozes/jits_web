@@ -67,6 +67,20 @@ jest.mock("@/lib/profile/use-profile-data", () => ({
     ],
   }),
 }));
+jest.mock("@/lib/highlight/use-highlight-flags", () => ({ useHighlightFlags: () => ({ clipsEnabled: mockClips(), shareEnabled: false }) }));
+let mockClipsOn = true;
+function mockClips() {
+  return mockClipsOn;
+}
+const mockFlagState = jest.fn();
+jest.mock("@/lib/invites/use-invites-enabled", () => ({ useInvitesFlagState: () => mockFlagState() }));
+jest.mock("@/lib/match-flow/use-my-active-match", () => ({ useMyActiveMatch: () => ({ match: null, refresh: jest.fn() }) }));
+jest.mock("@/lib/practice/use-has-ever-played", () => ({ useHasEverPlayed: () => false }));
+const mockCapture = jest.fn();
+jest.mock("@/lib/error-tracking/sentry", () => ({ captureMessage: (...a: unknown[]) => mockCapture(...a), addBreadcrumb: jest.fn() }));
+// The feed mounts a small window (4 rows) and grows it on layout and scroll,
+// which never happen in a test renderer: mount every row here.
+jest.mock("@/lib/matches/feed-list-tuning", () => ({ FEED_LIST_TUNING: { initialNumToRender: 100, windowSize: 21, removeClippedSubviews: false } }));
 const mockGetMyMatchLibrary = jest.fn();
 jest.mock("@jits/shared/api/film-room", () => ({
   getMyMatchLibrary: (...a: unknown[]) => mockGetMyMatchLibrary(...a),
@@ -80,7 +94,7 @@ function mockAthleteId() {
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import MatchesScreen from "@/app/(app)/(tabs)/matches/index";
-import { __resetSeenMatches, loadSeenMatches, markMatchSeen } from "@/lib/film-room/seen-store";
+import { __resetSeenMatches, isMatchSeen, loadSeenMatches, markMatchSeen } from "@/lib/film-room/seen-store";
 import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 import { libItem, libVideo } from "../support/film-fixtures";
 
@@ -104,25 +118,26 @@ function library() {
   ];
 }
 
-// Each test mounts the whole grid (about 0.8 s alone), and renderLoaded
-// waits up to 5 s for it. With the default 5 s per-test timeout the RUNNER's
-// timeout fired first under a loaded parallel run, failing a test whose
-// waitFor would still have passed. The per-test budget must exceed the
-// waits inside it.
-jest.setTimeout(20_000);
-
+/**
+ * Mounts the screen and waits for the first page deterministically: the
+ * mocked read's promise is awaited inside act(), so React commits the loaded
+ * list before the function returns, whatever the machine load. (The old
+ * waitFor-only version timed out about 1 in 10 full runs, jits-rvgx.) The
+ * waitFor after it is a backstop with a wide ceiling, inside the 30 s
+ * per-test budget set at the top of this file.
+ */
 async function renderLoaded(result: unknown = page(library())) {
   mockGetMyMatchLibrary.mockResolvedValue(result);
   const utils = render(<MatchesScreen />);
-  // The first page resolves on a microtask, but the whole grid mounts before
-  // the skeleton goes: under a full parallel run that can pass the 1 s
-  // waitFor default, so give it room.
-  await waitFor(() => expect(utils.queryByTestId("film-room-loading")).toBeNull(), { timeout: 5000 });
+  await act(async () => {
+    await Promise.all(mockGetMyMatchLibrary.mock.results.map((r) => r.value));
+  });
+  await waitFor(() => expect(utils.queryByTestId("matches-loading")).toBeNull(), { timeout: 15_000 });
   return utils;
 }
 
 function badgeOf(utils: ReturnType<typeof render>, matchId: string): string | null {
-  const card = utils.getByTestId(`film-card-${matchId}`);
+  const card = utils.getByTestId(`match-feed-card-${matchId}`);
   const badge = within(card).queryByTestId("film-card-badge");
   if (!badge) return null;
   const text = within(badge).UNSAFE_getByType(require("react-native").Text);
@@ -132,6 +147,8 @@ function badgeOf(utils: ReturnType<typeof render>, matchId: string): string | nu
 beforeEach(async () => {
   jest.clearAllMocks();
   mockSeq += 1;
+  mockClipsOn = true;
+  mockFlagState.mockReturnValue({ enabled: true, known: true, state: "on" });
   __resetSeenMatches();
   resetMatchUploadStore();
   await AsyncStorage.clear();
@@ -146,7 +163,9 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(mockTabHeader).toHaveBeenLastCalledWith({ title: "Matches" });
     expect(utils.getByTestId("tab-header")).toHaveTextContent("Matches");
     expect(utils.getByTestId("matches-record")).toHaveTextContent("24 MATCHES · 15W 7L 2D · 1526");
-    expect(utils.getByTestId("film-room-loading")).toBeTruthy();
+    expect(utils.getByTestId("matches-loading")).toBeTruthy();
+    // The feed skeleton is three full-width cards (spec 6.4, AC 2.12).
+    expect(utils.getAllByTestId("matches-skeleton-card")).toHaveLength(3);
     // A tab root: no back button, and no Film Room title any more.
     expect(utils.queryByLabelText("Go back")).toBeNull();
     expect(utils.queryByText("FILM ROOM")).toBeNull();
@@ -154,18 +173,30 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(utils.queryByTestId("matches-carousel-slot")).toBeNull();
   });
 
-  it("groups posters under a month heading and opens the match page", async () => {
+  it("lists full-width feed cards under a month heading; the meta row opens the match page and clears NEW", async () => {
     const utils = await renderLoaded();
     const month = NOW.toLocaleString("en-US", { month: "long" }).toUpperCase();
     expect(utils.getByText(`${month} ${NOW.getFullYear()}`)).toBeTruthy();
     expect(utils.getByText("5 MATCHES")).toBeTruthy();
-    const card = utils.getByTestId("film-card-m-new");
-    expect(card.props.accessibilityLabel).toMatch(/^Won vs M\. Park, [A-Z]{3} \d{2}, ▲ \+14 · 06:17, NEW$/);
-    fireEvent.press(card);
+    const meta = utils.getByTestId("film-card-m-new");
+    expect(meta.props.accessibilityLabel).toMatch(/^Open match vs M\. Park, new\. Won, plus 14, [A-Z][a-z]{2} \d{1,2}$/);
+    expect(isMatchSeen("m-new")).toBe(false);
+    fireEvent.press(meta);
     expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m-new");
+    expect(isMatchSeen("m-new")).toBe(true);
+    await waitFor(() => expect(badgeOf(utils, "m-new")).not.toBe("NEW"));
   });
 
-  it("shows every status: NEW, ANALYZING n/m, BREAKDOWN READY, FAILED, 2 ANGLES, UPLOADING %", async () => {
+  it("a playable card's media plays the selected video and clears NEW; one with nothing playable opens the match", async () => {
+    const utils = await renderLoaded();
+    fireEvent.press(utils.getByTestId("film-card-media-m-new"));
+    expect(mockPush).toHaveBeenLastCalledWith("/(app)/video/v-1");
+    expect(isMatchSeen("m-new")).toBe(true);
+    fireEvent.press(utils.getByTestId("film-card-media-m-failed"));
+    expect(mockPush).toHaveBeenLastCalledWith("/(app)/match-detail/m-failed");
+  });
+
+  it("shows one badge per card: NEW, ANALYZING n/m, BREAKDOWN READY, FAILED, UPLOADING %", async () => {
     markMatchSeen("m-ready");
     act(() => {
       setMatchUpload("m-up", { status: "uploading", progress: 0.64 });
@@ -175,16 +206,16 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(badgeOf(utils, "m-analyzing")).toBe("ANALYZING 3/7");
     expect(badgeOf(utils, "m-ready")).toBe("BREAKDOWN READY");
     expect(badgeOf(utils, "m-failed")).toBe("FAILED");
-    expect(within(utils.getByTestId("film-card-m-ready")).getByText("2 ANGLES")).toBeTruthy();
-    expect(within(utils.getByTestId("film-card-m-new")).queryByText("2 ANGLES")).toBeNull();
-    const uploading = utils.getByTestId("film-card-m-up");
-    expect(within(uploading).getByText("UPLOADING 64%")).toBeTruthy();
-    expect(within(uploading).getByTestId("film-card-progress").props.style).toMatchObject({ width: "64%" });
+    // One badge only: the angle count is not a second badge on the feed card.
+    expect(within(utils.getByTestId("match-feed-card-m-ready")).getAllByTestId("film-card-badge")).toHaveLength(1);
+    expect(within(utils.getByTestId("match-feed-card-m-ready")).queryByText("2 ANGLES")).toBeNull();
+    expect(badgeOf(utils, "m-up")).toBe("UPLOADING 64%");
+    expect(within(utils.getByTestId("match-feed-card-m-up")).getByTestId("film-card-progress").props.style).toMatchObject({ width: "64%" });
 
     act(() => {
       setMatchUpload("m-up", { progress: 0.9 });
     });
-    expect(within(utils.getByTestId("film-card-m-up")).getByText("UPLOADING 90%")).toBeTruthy();
+    expect(badgeOf(utils, "m-up")).toBe("UPLOADING 90%");
   });
 
   it("re-renders only the uploading poster on a progress tick", async () => {
@@ -192,13 +223,13 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
       setMatchUpload("m-up", { status: "uploading", progress: 0.1 });
     });
     const utils = await renderLoaded();
-    await waitFor(() => expect(within(utils.getByTestId("film-card-m-up")).getByText("UPLOADING 10%")).toBeTruthy());
+    await waitFor(() => expect(badgeOf(utils, "m-up")).toBe("UPLOADING 10%"));
     const cardStatus = require("@/lib/film-room/card-status");
     const spy = jest.spyOn(cardStatus, "deriveCardStatus");
     act(() => {
       setMatchUpload("m-up", { progress: 0.5 });
     });
-    expect(within(utils.getByTestId("film-card-m-up")).getByText("UPLOADING 50%")).toBeTruthy();
+    expect(badgeOf(utils, "m-up")).toBe("UPLOADING 50%");
     expect(spy.mock.calls.map((c) => (c[0] as { match_id: string }).match_id)).toEqual(["m-up"]);
     spy.mockClear();
     act(() => {
@@ -207,19 +238,58 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(spy).not.toHaveBeenCalled();
   });
 
-  it("marks a disputed match on its poster", async () => {
+  it("marks a disputed match in its meta row", async () => {
     const utils = await renderLoaded(page([libItem({ match_id: "m-d", status: "disputed" })]));
-    expect(within(utils.getByTestId("film-card-m-d")).getByTestId("film-card-disputed")).toBeTruthy();
+    expect(within(utils.getByTestId("film-card-m-d")).getByText("DISPUTED")).toBeTruthy();
   });
 
-  it("uses the signed still when there is one and the avatar plate otherwise", async () => {
+  it("uses the signed still when there is one and the two-athlete fallback otherwise", async () => {
     const utils = await renderLoaded();
-    const still = within(utils.getByTestId("film-card-m-new")).getByTestId("opening-still");
+    const still = within(utils.getByTestId("match-feed-card-m-new")).getByTestId("feed-poster");
     expect(still.props.source).toEqual({ uri: "https://signed/k.jpg", cacheKey: "film-still-k.jpg" });
-    const failed = utils.getByTestId("film-card-m-failed");
+    const failed = utils.getByTestId("match-feed-card-m-failed");
     expect(within(failed).getByTestId("opening-still-fallback")).toBeTruthy();
     expect(within(failed).getByText("FILM FAILED TO PROCESS")).toBeTruthy();
-    expect(within(utils.getByTestId("film-card-m-up")).getByText("NO FILM RECORDED")).toBeTruthy();
+    // No video rows at all: C-L7, and the first such card teaches C-L6 (the carousel slot is empty).
+    const noFilm = utils.getByTestId("match-feed-card-m-up");
+    expect(within(noFilm).getByText("NO FILM FOR THIS ONE")).toBeTruthy();
+    expect(within(noFilm).getByTestId("film-card-helper")).toHaveTextContent("Turn on Record from my phone at face-off.");
+  });
+
+  it("a zero-video card still uploading on this phone is skipped: the helper moves to the next C-L7 card", async () => {
+    act(() => {
+      setMatchUpload("nf-1", { status: "uploading", progress: 0.2 });
+    });
+    const utils = await renderLoaded(
+      page([
+        libItem({ match_id: "nf-1", completed_at: daysAgo(1), videos: [] }),
+        libItem({ match_id: "nf-2", completed_at: daysAgo(2), videos: [] }),
+        libItem({ match_id: "nf-3", completed_at: daysAgo(3), videos: [] }),
+        libItem({ match_id: "nf-4", completed_at: daysAgo(4), videos: [] }),
+      ]),
+    );
+    expect(within(utils.getByTestId("match-feed-card-nf-2")).getByTestId("film-card-helper")).toBeTruthy();
+    expect(utils.getAllByTestId("film-card-helper")).toHaveLength(1);
+    // The upload fails over to paused: still not C-L7. Cleared: nf-1 takes the helper back.
+    act(() => {
+      setMatchUpload("nf-1", { status: "paused" });
+    });
+    expect(within(utils.getByTestId("match-feed-card-nf-2")).getByTestId("film-card-helper")).toBeTruthy();
+  });
+
+  it("teaches the recording helper on the first no-film card only (AC 6.7)", async () => {
+    const utils = await renderLoaded(
+      page([
+        libItem({ match_id: "f", completed_at: daysAgo(0) }),
+        libItem({ match_id: "nf-1", completed_at: daysAgo(1), videos: [] }),
+        libItem({ match_id: "nf-2", completed_at: daysAgo(2), videos: [] }),
+        libItem({ match_id: "nf-3", completed_at: daysAgo(3), videos: [] }),
+        libItem({ match_id: "nf-4", completed_at: daysAgo(4), videos: [] }),
+      ]),
+    );
+    expect(utils.getAllByTestId("film-card-helper")).toHaveLength(1);
+    expect(within(utils.getByTestId("match-feed-card-nf-1")).getByTestId("film-card-helper")).toBeTruthy();
+    expect(utils.getAllByText("NO FILM FOR THIS ONE")).toHaveLength(4);
   });
 
   it("filters by result", async () => {
@@ -292,10 +362,61 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     expect(done.getByText("1 MATCH")).toBeTruthy();
   });
 
-  it("shows the empty state for an athlete with no matches", async () => {
+  it("zero matches: the first match hero replaces the feed, with no record strip or chips (AC 6.1)", async () => {
     const utils = await renderLoaded(page([]));
-    expect(utils.getByTestId("film-room-empty")).toBeTruthy();
-    expect(utils.getByText("NO FILM YET")).toBeTruthy();
+    expect(utils.getByTestId("matches-zero")).toBeTruthy();
+    expect(utils.queryByTestId("film-room-empty")).toBeNull();
+    expect(utils.queryByTestId("matches-record")).toBeNull();
+    expect(utils.queryByTestId("film-filter-all")).toBeNull();
+    expect(utils.getByText("Your first match will show up here")).toBeTruthy();
+    fireEvent.press(utils.getByTestId("matches-zero-arena"));
+    expect(mockPush).toHaveBeenCalledWith("/arena");
+    expect(mockCapture).toHaveBeenCalledWith("matches.empty_cta", { level: "info", tags: { surface: "matches", state: "zero", cta: "arena" } });
+    fireEvent.press(utils.getByTestId("matches-zero-invite"));
+    expect(mockPush).toHaveBeenCalledWith("/invite?from=matches");
+    expect(mockCapture).toHaveBeenCalledWith("matches.empty_cta", { level: "info", tags: { surface: "matches", state: "zero", cta: "invite" } });
+  });
+
+  it("zero matches with clips off uses the film copy (AC 6.11)", async () => {
+    mockClipsOn = false;
+    const utils = await renderLoaded(page([]));
+    expect(utils.getByText("Your first match lands here")).toBeTruthy();
+    expect(utils.queryByTestId("matches-zero-progress")).toBeNull();
+  });
+
+  it("zero matches while the invites flag is unknown: no secondary action yet (AC 6.2)", async () => {
+    mockFlagState.mockReturnValue({ enabled: false, known: false, state: "unknown" });
+    const utils = await renderLoaded(page([]));
+    expect(utils.queryByTestId("matches-zero-invite")).toBeNull();
+    expect(utils.queryByTestId("matches-zero-practice")).toBeNull();
+    expect(utils.getByTestId("matches-zero-secondary")).toBeTruthy();
+  });
+
+  it("low data: a next match ghost card follows the last card, and the first match and first win are tagged (AC 6.4, 6.5)", async () => {
+    const utils = await renderLoaded(
+      page([
+        libItem({ match_id: "c", completed_at: daysAgo(0), outcome: "win" }),
+        libItem({ match_id: "b", completed_at: daysAgo(2), outcome: "win" }),
+        libItem({ match_id: "a", completed_at: daysAgo(4), outcome: "loss", elo_delta: -9 }),
+      ]),
+    );
+    expect(utils.getByTestId("matches-next-ghost")).toBeTruthy();
+    expect(utils.getByText("Your next match goes here")).toBeTruthy();
+    expect(within(utils.getByTestId("film-card-a")).getByText("FIRST MATCH")).toBeTruthy();
+    expect(within(utils.getByTestId("film-card-b")).getByText("FIRST WIN")).toBeTruthy();
+    expect(within(utils.getByTestId("film-card-c")).queryByText("FIRST WIN")).toBeNull();
+    fireEvent.press(utils.getByTestId("matches-next-ghost-arena"));
+    expect(mockPush).toHaveBeenCalledWith("/arena");
+    expect(mockCapture).toHaveBeenCalledWith("matches.empty_cta", { level: "info", tags: { surface: "matches", state: "low_data", cta: "arena" } });
+    // A filter hides the ghost (it sells the next match, not a filtered view).
+    fireEvent.press(utils.getByTestId("film-filter-win"));
+    expect(utils.queryByTestId("matches-next-ghost")).toBeNull();
+  });
+
+  it("no next match ghost and no FIRST tags while more pages exist", async () => {
+    const utils = await renderLoaded(page([libItem({ match_id: "p1", completed_at: daysAgo(0) })], "cursor-1"));
+    expect(utils.queryByTestId("matches-next-ghost")).toBeNull();
+    expect(utils.queryByText("FIRST MATCH")).toBeNull();
   });
 
   it("keeps the cached list and toasts when a refresh fails (C-E2)", async () => {

@@ -1,12 +1,12 @@
 import { HOME_HREF, isRetiredRoute } from "./retired-routes";
 
+/** The Matches tab as a URL path (groups are not part of a URL). */
+const MATCHES_TAB_PATH = "/matches";
+
 /**
  * The retired Film Room screen (`/film-room`, also written with its groups as
  * `/(app)/film-room`), with or without a trailing slash.
  */
-/** The Matches tab as a URL path (groups are not part of a URL). */
-const MATCHES_TAB_PATH = "/matches";
-
 const FILM_ROOM_PATH = /^(\/\(app\))?\/film-room\/?$/;
 
 /**

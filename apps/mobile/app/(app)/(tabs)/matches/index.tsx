@@ -7,29 +7,35 @@ import { useRefetchOnUploadSettled } from "@/lib/profile/use-my-match-videos";
 import { useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
+import { videoHref } from "@/lib/film-room/href";
 import { useMatchLibrary } from "@/lib/film-room/use-match-library";
 import { useFilmRoomPhases } from "@/lib/film-room/use-film-room-phases";
-import { useSeenMatches } from "@/lib/film-room/seen-store";
+import { markMatchSeen, useSeenMatches } from "@/lib/film-room/seen-store";
 import { applyFilter, buildRows, NO_FILTER, opponentsOf, recordOf, type LibraryFilter, type LibraryRow } from "@/lib/film-room/rows";
 import { recordStrip } from "@/lib/film-room/format";
 import { usePalette } from "@/lib/theme/palette";
 import { useMatchesRefresh } from "@/lib/matches/use-matches-refresh";
+import { firstTags, isLowData, isZeroState, tagsFor } from "@/lib/matches/feed-states";
+import { useNoFilmHelperId } from "@/lib/matches/use-no-film-helper";
+import { FEED_LIST_TUNING } from "@/lib/matches/feed-list-tuning";
+import { useHighlightFlags } from "@/lib/highlight/use-highlight-flags";
 import { TabHeader } from "@/components/layout/tab-header";
 import { OpponentPicker } from "@/components/film-room/opponent-picker";
 import { FilmRoomEmpty, FilmRoomError, ListFooter, MonthHeader } from "@/components/film-room/film-room-states";
 import { MatchesListHeader } from "@/components/matches/matches-list-header";
-import { POSTER_GRID_LAYOUT, type MatchListLayout } from "@/components/matches/match-list-layout";
+import { FEED_LAYOUT, type MatchListLayout } from "@/components/matches/match-list-layout";
+import { MatchesZeroState } from "@/components/matches/matches-zero-state";
+import { NextMatchGhostCard } from "@/components/matches/next-match-ghost-card";
 
-/**
- * How the feed draws a match. Wave 2 swaps this for the full-width
- * `MatchFeedCard` layout (jits-a4fw.4); see `MatchListLayout`.
- */
-const LAYOUT: MatchListLayout = POSTER_GRID_LAYOUT;
+/** How the feed draws a match: one full-width `MatchFeedCard` per row (jits-a4fw.4). */
+const LAYOUT: MatchListLayout = FEED_LAYOUT;
 
 /**
  * The Matches tab (spec specs/matches-tab/spec.md section 6): every match
  * the athlete has fought, newest first, grouped by month, with result and
- * opponent filters. It replaced the pushed Film Room screen, whose list
+ * opponent filters, as full-width feed cards. Zero matches shows the first
+ * match hero, a short history (1 to 3) ends in the next match ghost card
+ * (spec 10.2, 10.3). It replaced the pushed Film Room screen, whose list
  * logic moved here unchanged. Pages through `get_my_match_library` via its
  * (next_before, next_before_id) cursor.
  *
@@ -70,14 +76,30 @@ export default function MatchesScreen() {
   const viewerPhoto = athlete?.profile_photo_url ?? null;
   // Stable props so memoized cards skip unrelated re-renders.
   const viewer = React.useMemo(() => ({ name: viewerName, photoUrl: viewerPhoto }), [viewerName, viewerPhoto]);
-  const open = React.useCallback((matchId: string) => router.push(matchDetailHref(matchId)), [router]);
+  // Either card target clears NEW (AC 2.15), as match detail does.
+  const open = React.useCallback((matchId: string) => {
+    markMatchSeen(matchId);
+    router.push(matchDetailHref(matchId));
+  }, [router]);
+  const play = React.useCallback((videoId: string, matchId: string) => {
+    markMatchSeen(matchId);
+    router.push(videoHref(videoId));
+  }, [router]);
+  const { clipsEnabled } = useHighlightFlags();
+  const tags = React.useMemo(() => firstTags(library.items, hasMore), [library.items, hasMore]);
+  // The carousel slot is empty until the carousel lands, so it never shows
+  // C-L6 yet; once it does, pass whether its tiles carry the helper.
+  const carouselShowsHelper = false;
+  const helperId = useNoFilmHelperId(visible, phases, carouselShowsHelper);
+  const zero = isZeroState({ loading: library.isLoading, error: library.error, items: library.items, filtered });
+  const lowData = isLowData({ items: library.items, hasMore, filtered });
 
   const renderRow = React.useCallback(
     ({ item: row }: { item: LibraryRow }) => {
       // The oldest loaded month may continue on the next page: no count yet.
       if (row.type === "month") return <MonthHeader label={row.label} count={row.last && hasMore ? null : row.count} />;
       return (
-        <View className="flex-row" style={{ gap: 16, marginBottom: 16 }}>
+        <View className="flex-row" style={{ gap: 16, marginBottom: 20 }}>
           {row.items.map((m) => (
             <React.Fragment key={m.match_id}>
               {LAYOUT.renderMatch(m, {
@@ -85,7 +107,10 @@ export default function MatchesScreen() {
                 viewerId,
                 seen: !seen.ready || seen.isSeen(m.match_id),
                 phase: phases[m.match_id] ?? null,
+                tags: tagsFor(tags, m.match_id),
+                noFilmHelper: m.match_id === helperId,
                 onOpen: open,
+                onPlay: play,
               })}
             </React.Fragment>
           ))}
@@ -93,7 +118,7 @@ export default function MatchesScreen() {
         </View>
       );
     },
-    [viewer, viewerId, seen, open, hasMore, phases],
+    [viewer, viewerId, seen, open, play, hasMore, phases, tags, helperId],
   );
 
   const header = (
@@ -106,11 +131,14 @@ export default function MatchesScreen() {
       onOutcome={(outcome) => setFilter((f) => ({ ...f, outcome }))}
       onOpenOpponents={() => setPickerOpen(true)}
       skeleton={library.isLoading ? <LAYOUT.Skeleton /> : null}
+      zero={zero}
     />
   );
 
   const empty = library.isLoading ? null : library.error ? (
     <FilmRoomError onRetry={library.refresh} />
+  ) : zero && athlete ? (
+    <MatchesZeroState athlete={athlete} viewer={viewer} clipsEnabled={clipsEnabled} />
   ) : (
     <FilmRoomEmpty
       filtered={filtered}
@@ -129,10 +157,16 @@ export default function MatchesScreen() {
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
         ListFooterComponent={
-          rows.length > 0 ? <ListFooter loadingMore={library.loadingMore} moreError={library.moreError} onRetry={library.loadMore} /> : null
+          rows.length > 0 ? (
+            <>
+              {lowData ? <NextMatchGhostCard viewer={viewer} /> : null}
+              <ListFooter loadingMore={library.loadingMore} moreError={library.moreError} onRetry={library.loadMore} />
+            </>
+          ) : null
         }
         onEndReached={library.hasMore && !library.moreError ? library.loadMore : undefined}
         onEndReachedThreshold={0.6}
+        {...FEED_LIST_TUNING}
         contentContainerStyle={{ paddingTop: 16, paddingHorizontal: 16, paddingBottom: 16 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={p.text3} />
