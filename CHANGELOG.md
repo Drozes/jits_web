@@ -2,12 +2,16 @@
 
 ## [Unreleased]
 
+## OTA "Matches tab + Home Highlights carousel" (runtime 0.5.0), 2026-10-06
+
+Production OTA group `be389c6c-e64e-4493-ac33-e54ca9fcf905` (iOS `01a11354-77c2-7af0-a023-c9b1ff3f7aff`, Android `01a11354-77c2-77fe-8a61-5c8e9d06e16e`) from jits_web `main` `db429e41` (merge "Merge development into main: Matches tab + Home Highlights carousel (jits-a4fw)", development at `16887d59`). JS-only, non-critical. Rollback target: `21ac992e-6b21-4784-82f4-9d05bc522667`. Needs jr_be `20261008200000` to `20261008200300` (B1 to B5), applied to prod 2026-10-06. Device QA on real hardware was not run before release (owner authorized); it is tracked as a post-release bead. Known follow-ups: jits-766g (delete the Film Room redirect after two OTAs), jits-fjt0 (tab_opened redirect telemetry), jits-a4fw.12 (non-own reel read path), jits-lp6t (flaky tests), jits-a4fw.11 (canvas sync).
+
 ### Mobile: Matches tab + Home Highlights carousel (epic jits-a4fw)
 
 Spec `specs/matches-tab/spec.md` (round 2, owner decisions 2026-10-06); boards P-MT-01 to P-MT-16 in `design/native-screens/proposals/2026-10-06-matches-tab/`. A fifth tab, Matches (Home, Arena, Matches, Rankings, Profile; lucide `Film` icon, no badge), replaces the pushed Film Room: the athlete's "Your highlights" reel carousel, the result and opponent filters and a full-width match feed, with first-class zero, low-data, in-flight and milestone states. Home's `NewHighlightCard` becomes ONE Highlights carousel (never a "Your reels" lane), every reel plays in a full-screen swipe viewer, and Profile drops its match history.
 
 **Release requirements**
-- **Backend first:** jr_be migrations `20261008200000` to `20261008200300` (branch `feat/matches-tab-backend`: B1 highlights cursor and in-flight reels, B3 `is_primary` in the library, B4 the `matches_reel_tapped` / `viewer_swiped` funnel steps, B5 the `matches` invite entry point) must be applied to prod before this ships. The client degrades gracefully without B1 to B4, but **B5 (jr_be-gpz) is required**: without it `create_invite` raises `invalid_entry_point` for the Matches zero state's Challenge a friend.
+- **Backend first:** jr_be migrations `20261008200000` to `20261008200300` (branch `feat/matches-tab-backend`: B1 highlights cursor and in-flight reels, B3 `is_primary` in the library, B4 the `matches_reel_tapped` / `viewer_swiped` funnel steps, B5 the `matches` invite entry point) must be applied to prod before this ships (applied by hand 2026-10-06, before the OTA). The client degrades gracefully without B1 to B4, but **B5 (jr_be-gpz) is required**: without it `create_invite` raises `invalid_entry_point` for the Matches zero state's Challenge a friend.
 - **JS-only OTA on runtime 0.5.0** (build 25): no native dependency, no `app.json` / `app.config` change. OTAs from `main` reach 0.5.0 installs only.
 - After the OTA: `/canvas-sync` redraws the affected "Current app" boards (spec section 19).
 
