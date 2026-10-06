@@ -748,6 +748,12 @@ describe("getMatchVideoPlaybackResult", () => {
       expect(r3.ok && r3.data).toMatchObject({ servedRendition: "360", sourceKind: "normalized" });
     });
 
+    it("an empty-string path counts as absent in `available`, like the path choice", async () => {
+      const m = rowWith({ normalized_path: "", storage_path: "m/a/1.mov", playback_360_path: "" });
+      const r = await getMatchVideoPlaybackResult(m.client, VID, { rendition: "360" });
+      expect(r.ok && r.data).toMatchObject({ servedRendition: "original", available: { "720": false, "360": false } });
+    });
+
     it("no path at all is still absence for either target", async () => {
       for (const rendition of ["720", "360"] as const) {
         const m = rowWith({ normalized_path: null, storage_path: null, playback_360_path: null });

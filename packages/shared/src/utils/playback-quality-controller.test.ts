@@ -174,8 +174,8 @@ describe("QualityController step-down", () => {
     expect(c.level).toBe("360");
     c.stallStarted(now + 10);
     expect(run(c, now + 200_000).d).toBeNull();
-    c.switchFailed(now);
-    expect(c.level).toBe("360");
+    c.switchFailed(now); // nothing new was served: back to 720 (review M1)
+    expect(c.level).toBe("720");
     expect(c.state.switches).toBe(1);
   });
 });
@@ -374,13 +374,63 @@ describe("QualityController angle changes", () => {
     expect(run(c, now + 5000).d).toBeNull();
   });
 
-  it("switchFailed keeps the level at d.to and the switch counted", () => {
+  it("switchFailed restores the served level (and target), the switch stays counted", () => {
     const c = make({ target: "360" });
+    c.sourceAttached("360", BOTH, now);
     const { d } = run(c, now + 60_000);
     c.switchIssued(d!, now);
-    c.switchFailed(now + 10);
     expect(c.level).toBe("720");
+    c.switchFailed(now + 10);
+    expect(c.level).toBe("360");
+    expect(c.target).toBe("360");
     expect(c.state).toMatchObject({ switches: 1, stepUps: 1 });
+  });
+
+  it("review M1: a failed step-down keeps 720 served; later stalls still step down, never a 360->720 step-up onto 720", () => {
+    const c = make();
+    c.sourceAttached("720", BOTH, now);
+    at(now + 5000);
+    c.stallStarted(now);
+    const { d } = run(c, now + 3000);
+    c.switchIssued(d!, now);
+    c.stallEnded(now);
+    c.switchFailed(now + 100);
+    expect(c.level).toBe("720");
+    // Smooth playback for 10 minutes: no "step-up" from a level that never served.
+    const up = run(c, now + 600_000);
+    expect(up.d).toBeNull();
+    // A new long stall steps down again.
+    c.stallStarted(now);
+    const again = run(c, now + 3000);
+    expect(again.d).toEqual({ kind: "step_down", from: "720", to: "360", reason: "stall_long" });
+  });
+
+  it("review H2: angleChanged clears an outstanding decision; a later step-up is possible", () => {
+    const c = make({ target: "360" });
+    c.sourceAttached("360", BOTH, now);
+    const { d } = run(c, now + 60_000);
+    c.switchIssued(d!, now);
+    // The angle switch lands while the quality swap never did.
+    c.angleChanged(BOTH, now + 100, "360");
+    expect(c.level).toBe("360");
+    expect(run(c, now + 200_000).d?.kind).toBe("step_up");
+  });
+
+  it("review L1: a landed quality swap clears the stall log", () => {
+    const s = settings((x) => (x.stepDown.stallCount = 2));
+    const c = make({ settings: s });
+    c.sourceAttached("720", BOTH, now);
+    at(now + 5000);
+    c.stallStarted(now);
+    c.stallEnded(now + 100);
+    // A step-up path is not needed: land a (failed-free) swap by issuing and landing a fake down/up pair.
+    c.switchIssued({ kind: "step_down", from: "720", to: "360", reason: "stall_repeat" }, now + 200);
+    c.switchLanded(BOTH, now + 400, "360");
+    c.switchIssued({ kind: "step_up", from: "360", to: "720", reason: "smooth" }, now + 500);
+    c.switchLanded(BOTH, now + 600, "720");
+    at(now + 20_000);
+    // One stall after the landing is not a repeat of the one before it.
+    expect(c.stallStarted(now)).toBeNull();
   });
 });
 

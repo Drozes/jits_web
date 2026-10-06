@@ -3271,7 +3271,7 @@ export async function getMatchVideoPlaybackResult(
         sourceKind: picked.served === "original" ? "original" : "normalized",
         target,
         servedRendition: picked.served,
-        available: { "720": data.normalized_path != null, "360": data.playback_360_path != null },
+        available: { "720": !!data.normalized_path, "360": !!data.playback_360_path },
         playbackProfile: data.playback_profile ?? null,
       },
     };

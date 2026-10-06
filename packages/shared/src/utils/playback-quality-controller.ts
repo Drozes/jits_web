@@ -74,6 +74,8 @@ export class QualityController {
   private condSet = false;
   private _level: TargetRendition;
   private _target: TargetRendition;
+  /** The rendition of the file last known on the player (the start target before any). */
+  private servedLevel: TargetRendition;
   /** The file on the player is the original (no slicer copy): no decisions. */
   private servingOriginal = false;
   /** A decision was issued and has not landed or failed. */
@@ -106,6 +108,7 @@ export class QualityController {
     this.active = opts.preference === "auto" && opts.settings.adaptive && opts.settings.maxSwitchesPerSession > 0;
     this._level = opts.target;
     this._target = opts.target;
+    this.servedLevel = opts.target;
     this.available = { ...opts.available };
     this.lastEventAt = opts.now;
     this.lastLandedAt = opts.now;
@@ -198,6 +201,8 @@ export class QualityController {
     this._level = d.to;
     this._target = d.to;
     this.outstanding = d;
+    // The swap's own wait is not a stall (telemetry closes it too): never decide on it again.
+    this.stallOpenAt = null;
     const s = this._state;
     s.switches += 1;
     if (d.kind === "step_down") {
@@ -226,7 +231,10 @@ export class QualityController {
   private follow(served: ServedRendition | undefined): void {
     if (served === undefined) return;
     this.servingOriginal = served === "original";
-    if (served === "720" || served === "360") this._level = served;
+    if (served === "720" || served === "360") {
+      this._level = served;
+      this.servedLevel = served;
+    }
   }
 
   switchLanded(available: Availability, now: number, served?: ServedRendition): void {
@@ -237,17 +245,28 @@ export class QualityController {
     this.follow(served);
     this.lastLandedAt = now;
     this.smoothAccrued = 0;
+    // Stalls of the file before the swap say nothing about the new one.
+    this.stallStarts = [];
     if (d?.kind === "step_up") this.lastStepUpLandedAt = now;
   }
 
-  /** The swap was superseded or errored: the level stays at `d.to`, the switch stays counted. */
+  /**
+   * The swap was superseded or errored: nothing new reached the screen, so
+   * the level (and the next sign's target) go back to the rendition still
+   * served (owner rule: level = served). The switch stays counted.
+   */
   switchFailed(now: number): void {
     this.accrue(now);
+    if (this.outstanding === null) return;
     this.outstanding = null;
+    this._level = this.servedLevel;
+    this._target = this.servedLevel;
   }
 
   angleChanged(available: Availability, now: number, served?: ServedRendition): void {
     this.accrue(now);
+    // An angle landing supersedes any quality swap still outstanding.
+    if (this.outstanding !== null) this.switchFailed(now);
     this.available = { ...available };
     this.follow(served);
     this.stallStarts = [];
