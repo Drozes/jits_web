@@ -42,6 +42,12 @@ export interface MatchLibraryVideo {
   chunks_completed: number;
   /** Signed poster URL (batch-signed per page), or null. */
   poster_url: string | null;
+  /**
+   * The match's elected primary angle (jr_be-pdf, B3). The parser always sets
+   * it (false when the backend predates B3 or the match has no election);
+   * optional in the type only so hand-built fixtures need not spell it.
+   */
+  is_primary?: boolean;
 }
 
 export interface MatchLibraryOpponent {
@@ -145,6 +151,7 @@ function toVideo(raw: RawRecord): Omit<MatchLibraryVideo, "poster_url"> | null {
     analysis_tier: str(raw.analysis_tier),
     chunk_count: num(raw.chunk_count),
     chunks_completed: num(raw.chunks_completed) ?? 0,
+    is_primary: raw.is_primary === true,
   };
 }
 

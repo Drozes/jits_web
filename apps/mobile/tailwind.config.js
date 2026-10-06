@@ -85,6 +85,9 @@ const cssVarColors = {
   // Arena heat only (tab-icon embers, afterglow edge). Fixed in both themes.
   "heat-orange": "var(--heat-orange)",
   "heat-red": "var(--heat-red)",
+  // Semantic alias of ink: the unwatched-reel ring (`border-unseen-ring`,
+  // specs/matches-tab). Same value as --text-primary in both themes; never red.
+  "unseen-ring": "var(--unseen-ring)",
 };
 
 // Light theme defaults. Mirrors `lightTokens` in `lib/tokens.ts`.
@@ -113,6 +116,8 @@ const lightVars = {
   "--attention-rule": "rgba(146,64,14,0.6)",
   "--heat-orange": "hsl(25, 95%, 53%)",
   "--heat-red": "#EC6A74",
+  // Semantic alias of --text-primary (unseen reel ring).
+  "--unseen-ring": "#0D0F14",
 };
 
 module.exports = {

@@ -30,6 +30,7 @@ const SOURCES: ReadonlySet<string> = new Set<HighlightShareSourceTag>([
   "profile",
   "match_detail",
   "summary",
+  "matches",
 ]);
 
 /** `?source=` as the viewer route reads it: unknown or missing -> `match_detail` (spec 16.6.2). */

@@ -24,6 +24,17 @@ Spec `specs/matches-tab/spec.md` sections 4, 6.1, 9 and 17. Owner decisions 2026
 - `FILM_ROOM_HREF` (`apps/mobile/lib/film-room/href.ts`).
 - Profile's Recent Matches list, highlights row and Film Room preview, with `components/profile/film-room-preview.tsx`, `highlights-row.tsx`, `highlight-tile.tsx` and their tests. `history-row-action.tsx` stays (athlete profile uses it); `useMyHighlights` stays until the reel lane replaces it.
 
+### Matches tab foundation: data, hooks and tokens (jits-a4fw.1)
+
+**Added**
+- `packages/shared/src/api/highlight-share.ts`: `getMyHighlights` takes `beforeId` (sent as `p_before_id` only when set, retried once without it on a backend that lacks it) and returns `nextBefore`, `nextBeforeId` (verbatim), `inFlight: InFlightReel[]` and `inFlightSupported` (jr_be-405, jr_be-cl1); `toInFlightReel`.
+- `packages/shared/src/api/film-room.ts`: library videos carry `is_primary` (false when absent; jr_be-pdf).
+- `HIGHLIGHT_SHARE_STEPS` gains `matches_reel_tapped` and `viewer_swiped` (jr_be-62n); `HIGHLIGHT_SHARE_SOURCES` and the viewer's `parseHighlightSource` gain `matches`.
+- `apps/mobile/lib/highlight/use-reel-lane.ts` (`useReelLane`, `fetchReelPage`) and `apps/mobile/lib/highlight/reel-lane.ts` (`ReelTileModel`, `buildLaneTiles`, cursor, ordering, ghost and Matches fallback rules); `apps/mobile/lib/highlight/swipe-hint.ts` (`reels:swipe-hint:v1`).
+- `apps/mobile/lib/film-room/card-media.ts` (`pickCardMedia`, `cropFor`) and `formatDuration` in `lib/film-room/format.ts`.
+- `apps/mobile/lib/milestones/milestone-store.ts`: `milestones:v1:<athleteId>`, `decideMilestone`, `claimMilestone`.
+- Token `unseen-ring` (alias of `ink`) in `lib/tokens.ts`, `tailwind.config.js`, `theme-provider.tsx`, `design/system/project/tokens.json`, Color.md and DESIGN.md; motion token `moment.reelRingPulse` (600 ms).
+
 ## OTA "AI move labels hidden" (runtime 0.5.0), 2026-10-06
 
 Production OTA group `7e1d3be8-905e-47f4-bb13-9b05fa41ce51` from jits_web `main` `a054b5a5` (release PR #66: #65). JS-only, non-critical. Rollback target: `ff7e974d-d271-4eca-a76a-1cb594723d91`. Server-side reel labels remain until jr_be-du1.10.

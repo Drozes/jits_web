@@ -33,8 +33,15 @@ type Read = Promise<Result<MyHighlights>>;
 const inFlight = new Map<string, Read>();
 const lastRead = new Map<string, { at: number; result: Result<MyHighlights> }>();
 
-export function readMyHighlights(opts: GetMyHighlightsOptions, { force = false }: { force?: boolean } = {}): Read {
-  const key = JSON.stringify([opts.limit ?? null, opts.before ?? null, opts.unseenOnly ?? null]);
+/**
+ * `owner` (the signed-in athlete id, when the caller knows it) is part of the
+ * dedupe key, so a read started for one account is never handed to another.
+ */
+export function readMyHighlights(
+  opts: GetMyHighlightsOptions,
+  { force = false, owner = null }: { force?: boolean; owner?: string | null } = {},
+): Read {
+  const key = JSON.stringify([owner, opts.limit ?? null, opts.before ?? null, opts.beforeId ?? null, opts.unseenOnly ?? null]);
   if (!force) {
     const running = inFlight.get(key);
     if (running) return running;
@@ -120,10 +127,24 @@ export function useForegroundEffect(onForeground: () => void): void {
   }, []);
 }
 
-/** Sign-out, and tests: forget cached reads (they belong to the old account). */
+const resetHooks = new Set<() => void>();
+
+/**
+ * Registers state that must be forgotten with the store (the reel lanes in
+ * `use-reel-lane.ts` register here, which avoids an import cycle).
+ */
+export function onHighlightStoreReset(cb: () => void): () => void {
+  resetHooks.add(cb);
+  return () => {
+    resetHooks.delete(cb);
+  };
+}
+
+/** Sign-out, and tests: forget cached reads and every registered lane (they belong to the old account). */
 export function resetHighlightStore(): void {
   inFlight.clear();
   lastRead.clear();
+  for (const cb of resetHooks) cb();
 }
 
 /** Test-only: suites that test refresh WIRING (not the dedupe) turn the throttle off. */

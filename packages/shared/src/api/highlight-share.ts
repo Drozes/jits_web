@@ -8,6 +8,7 @@ import {
 } from "../constants/highlights";
 import { mapPostgrestError, type DomainError, type Result } from "./errors";
 import { isStorageObjectMissing, MATCH_VIDEO_BUCKET } from "./queries";
+import { isMissingRpcError } from "./film-room";
 
 /**
  * Highlight reels phase 2: discovery and the share funnel (jr_be spec 015
@@ -51,11 +52,37 @@ export interface RawMyHighlightItem {
   origin?: string | null;
 }
 
-/** `get_my_highlights(p_limit, p_before, p_unseen_only)` */
+/**
+ * One entry of `get_my_highlights(...)`.in_flight (jr_be-cl1, B2): a reel of
+ * the caller's that is still being made. Additive; every key is read
+ * tolerantly (`phase` / `poster_key` are accepted as spellings of
+ * `reel_state` / `poster_path`).
+ */
+export interface RawInFlightReel {
+  match_id: string;
+  match_video_id?: string | null;
+  highlight_id?: string | null;
+  reel_state?: string | null;
+  phase?: string | null;
+  step?: number | null;
+  wait_deadline_at?: string | null;
+  server_now?: string | null;
+  opponent_name?: string | null;
+  played_at?: string | null;
+  poster_path?: string | null;
+  poster_key?: string | null;
+}
+
+/** `get_my_highlights(p_limit, p_before, p_unseen_only, p_before_id)` */
 export interface RawMyHighlights {
   clips_enabled: boolean;
   share_enabled: boolean;
   items: RawMyHighlightItem[];
+  /** B1 (jr_be-405): keyset cursor of the last item; absent on an older backend. */
+  next_before?: string | null;
+  next_before_id?: string | null;
+  /** B2 (jr_be-cl1): first page only; absent on an older backend. */
+  in_flight?: RawInFlightReel[] | null;
 }
 
 /** `get_highlight_detail(p_highlight_id)` */
@@ -125,10 +152,48 @@ export interface MyHighlightItem {
   origin: HighlightReadyOrigin | null;
 }
 
+/** Where an in-flight reel is: `waiting` for another angle, `planning` the cut, `rendering` it. */
+export type InFlightReelState = "waiting" | "planning" | "rendering";
+
+/** A reel still being made (B2), for the carousel's building tile. */
+export interface InFlightReel {
+  matchId: string;
+  /** Any visible angle of the match (opens match detail's Film status); null when not sent. */
+  matchVideoId: string | null;
+  /** The reel's id when the server sends one; null otherwise. */
+  highlightId: string | null;
+  reelState: InFlightReelState;
+  /** Two-step copy: 1 while waiting / planning, 2 while rendering. */
+  step: 1 | 2;
+  /** Only while `waiting`; null otherwise or when unknown. */
+  waitDeadlineAt: string | null;
+  /** Server clock at read time, for a countdown that does not trust the device clock. */
+  serverNow: string | null;
+  opponentName: string | null;
+  playedAt: string | null;
+  /** Poster storage key (sign before display), or null. */
+  posterPath: string | null;
+}
+
 export interface MyHighlights {
   clipsEnabled: boolean;
   shareEnabled: boolean;
   items: MyHighlightItem[];
+  /**
+   * Keyset cursor for the next page, verbatim from the server (B1). Null on
+   * the last page AND on a backend without B1; callers that need to page an
+   * older backend fall back to the last item's `readyAt` (time-only).
+   */
+  nextBefore: string | null;
+  nextBeforeId: string | null;
+  /** In-flight reels (B2); `[]` when the key is absent, on later pages, or with clips off. */
+  inFlight: InFlightReel[];
+  /**
+   * True when the server sent an `in_flight` array (a B2 backend). False on an
+   * older backend: the Matches tab then derives building tiles from library
+   * phases instead (spec 12.3).
+   */
+  inFlightSupported: boolean;
 }
 
 export interface HighlightCaptionContext {
@@ -163,6 +228,8 @@ export interface HighlightShareSource {
 export interface GetMyHighlightsOptions {
   limit?: number;
   before?: string;
+  /** `next_before_id` of the previous page; sent as `p_before_id` only when set (B1). */
+  beforeId?: string | null;
   unseenOnly?: boolean;
 }
 
@@ -223,6 +290,33 @@ export function toMyHighlightItem(raw: RawMyHighlightItem): MyHighlightItem {
   };
 }
 
+const IN_FLIGHT_STATES: ReadonlySet<string> = new Set<InFlightReelState>(["waiting", "planning", "rendering"]);
+
+/**
+ * One B2 entry, or null when it is unusable (no match id, or a state that is
+ * not in flight: a `ready` or `failed` reel never draws a building tile).
+ */
+export function toInFlightReel(raw: unknown): InFlightReel | null {
+  if (!isObject(raw)) return null;
+  const matchId = strOrNull(raw.match_id);
+  const state = strOrNull(raw.reel_state) ?? strOrNull(raw.phase);
+  if (!matchId || !state || !IN_FLIGHT_STATES.has(state)) return null;
+  const reelState = state as InFlightReelState;
+  const step: 1 | 2 = raw.step === 1 || raw.step === 2 ? raw.step : reelState === "rendering" ? 2 : 1;
+  return {
+    matchId,
+    matchVideoId: strOrNull(raw.match_video_id),
+    highlightId: strOrNull(raw.highlight_id),
+    reelState,
+    step,
+    waitDeadlineAt: reelState === "waiting" ? strOrNull(raw.wait_deadline_at) : null,
+    serverNow: strOrNull(raw.server_now),
+    opponentName: strOrNull(raw.opponent_name),
+    playedAt: strOrNull(raw.played_at),
+    posterPath: strOrNull(raw.poster_path) ?? strOrNull(raw.poster_key),
+  };
+}
+
 export function toHighlightDetail(raw: RawHighlightDetail): HighlightDetail {
   const c: Partial<RawHighlightDetail["caption"]> = isObject(raw.caption) ? raw.caption : {};
   return {
@@ -267,17 +361,29 @@ export async function getHighlightFlags(supabase: Client): Promise<Result<Highli
 /**
  * The caller's own ready reels, newest first (`get_my_highlights`). Omitted
  * options fall back to the SQL defaults (20, no cursor, all items).
+ *
+ * `beforeId` (B1 keyset tiebreak) is sent only when set. A backend without
+ * B1 answers a call carrying `p_before_id` with "function not found"; the
+ * read is then retried once without it (time-only cursor). The B1 cursor and
+ * the B2 `in_flight` array are read when present and default to null / `[]`.
  */
 export async function getMyHighlights(
   supabase: Client,
   opts: GetMyHighlightsOptions = {},
 ): Promise<Result<MyHighlights>> {
   try {
-    const { data, error } = await supabase.rpc("get_my_highlights", {
+    const base = {
       ...(opts.limit !== undefined ? { p_limit: opts.limit } : {}),
       ...(opts.before !== undefined ? { p_before: opts.before } : {}),
       ...(opts.unseenOnly !== undefined ? { p_unseen_only: opts.unseenOnly } : {}),
-    });
+    };
+    const withId = opts.beforeId ? { ...base, p_before_id: opts.beforeId } : null;
+    // `p_before_id` is newer than the generated types until `db:types` runs against B1.
+    const call = (args: Record<string, unknown>) => supabase.rpc("get_my_highlights", args as never);
+    let { data, error } = await call(withId ?? base);
+    if (error && withId && isMissingRpcError(error)) {
+      ({ data, error } = await call(base));
+    }
     if (error) return { ok: false, error: mapPostgrestError(error, "highlight_my_highlights") };
     if (!isObject(data)) return { ok: false, error: MALFORMED };
     const raw = data as Partial<RawMyHighlights>;
@@ -286,12 +392,20 @@ export async function getMyHighlights(
           .filter((item): item is RawMyHighlightItem => isObject(item) && typeof item.highlight_id === "string")
           .map(toMyHighlightItem)
       : [];
+    const inFlight = Array.isArray(raw.in_flight)
+      ? raw.in_flight.map(toInFlightReel).filter((r): r is InFlightReel => r !== null)
+      : [];
+    const nextBefore = strOrNull(raw.next_before);
     return {
       ok: true,
       data: {
         clipsEnabled: raw.clips_enabled === true,
         shareEnabled: raw.share_enabled === true,
         items,
+        nextBefore,
+        nextBeforeId: nextBefore ? strOrNull(raw.next_before_id) : null,
+        inFlight: raw.clips_enabled === true ? inFlight : [],
+        inFlightSupported: Array.isArray(raw.in_flight),
       },
     };
   } catch (err) {

@@ -234,6 +234,36 @@ describe("getMyMatchLibrary (rpc)", () => {
     expect(second.outcome).toBe("loss");
   });
 
+  it("reads is_primary per video (B3): true only when the key is true, false when absent or junk", async () => {
+    const m = mockClient({
+      rpc: () => ({
+        data: {
+          items: [
+            libItem({
+              videos: [
+                libVideo({ video_id: "v-a", is_primary: true }),
+                libVideo({ video_id: "v-b", uploaded_by: OPP, is_primary: false }),
+                libVideo({ video_id: "v-c", uploaded_by: OPP }),
+                libVideo({ video_id: "v-d", uploaded_by: OPP, is_primary: "true" }),
+              ],
+            }),
+          ],
+          next_before: null,
+          next_before_id: null,
+        },
+        error: null,
+      }),
+    });
+    const r = await getMyMatchLibrary(m.client, ME);
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.items[0].videos.map((v) => [v.video_id, v.is_primary])).toEqual([
+      ["v-a", true],
+      ["v-b", false],
+      ["v-c", false],
+      ["v-d", false],
+    ]);
+  });
+
   it("tolerates malformed payloads: no items, junk rows, bad outcome", async () => {
     const m = mockClient({
       rpc: () => ({

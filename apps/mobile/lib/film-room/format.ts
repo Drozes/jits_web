@@ -110,3 +110,19 @@ export function recordStrip(
   if (rating != null) parts.push(String(rating));
   return parts.join(" · ");
 }
+
+/**
+ * A video's length for the card's duration chip (specs/matches-tab 6.2):
+ * `m:ss` with unpadded minutes ("4:12", "0:31"), `h:mm:ss` past an hour
+ * ("1:02:05"). Rounded to the nearest second. Not `formatClock`, which
+ * zero-pads minutes ("04:12") for the match clock. Null for a missing,
+ * negative or non-finite length (the chip is then not drawn).
+ */
+export function formatDuration(seconds: number | null | undefined): string | null {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return null;
+  const total = Math.round(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = String(total % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
