@@ -1625,14 +1625,33 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
   /** Angle 1's time now (extrapolated from the tap) mapped onto angle 2. */
   const mappedNow = () => tapA - offsetS + ((Date.now() - tapAt) / 1000) * tapRate;
 
-  /** Angle 1 at `at` s, then a tap on angle 2. */
-  async function tapAngle2(utils: ReturnType<typeof render>, at = 42.6, rate = 1) {
-    timeOn(lastPlayer(), at);
+  /** The playing angle 1 the test keeps feeding time updates (null when paused or after LAND). */
+  let feedA: FakePlayer | null = null;
+
+  /** Angle 1 at `at` s, then a tap on angle 2. `playing`: angle 1 keeps reporting its time. */
+  async function tapAngle2(utils: ReturnType<typeof render>, at = 42.6, rate = 1, playing = true) {
+    const A = lastPlayer();
+    timeOn(A, at);
     tapAt = Date.now();
     tapA = at;
     tapRate = rate;
+    feedA = playing ? A : null;
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
     await flush();
+  }
+
+  /**
+   * Time passes; a playing angle 1 reports its time every 200 ms while it is
+   * the front (the engine extrapolates it only 250 ms past a sample).
+   */
+  async function play(ms: number) {
+    let left = ms;
+    while (left > 0) {
+      const step = Math.min(200, left);
+      await advance(step);
+      left -= step;
+      if (feedA && mockViewPropsById["video-player"]?.player === feedA) timeOn(feedA, tapA + ((Date.now() - tapAt) / 1000) * tapRate);
+    }
   }
 
   /** B is loaded and ready at its target; then its scheduled start, then in-step samples until LAND. */
@@ -1643,10 +1662,10 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     act(() => mockViewPropsById["video-player-incoming"].onFirstFrameRender());
     await flush();
     const waitMs = ((t0 - mappedNow()) / tapRate) * 1000 - 120;
-    await advance(Math.max(0, Math.ceil(waitMs)));
+    await play(Math.max(0, Math.ceil(waitMs)));
     expect(B.play).toHaveBeenCalled();
     for (let i = 0; i < 6 && mockViewPropsById["video-player"].player !== B; i++) {
-      await advance(i === 0 ? 220 : 100);
+      await play(i === 0 ? 220 : 100);
       timeOn(B, mappedNow());
     }
     expect(mockViewPropsById["video-player"].player).toBe(B);
@@ -1681,7 +1700,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     expect(mockViewMounts.count).toBe(2);
     expect(announce).toHaveBeenCalledWith("M. Park's angle.");
     // Settle: idle, the lock opens.
-    await advance(300);
+    await play(300);
     expect(utils.getByTestId("angle-vid-1").props.accessibilityState).toEqual({ selected: false });
   });
 
@@ -1701,10 +1720,10 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     act(() => mockViewPropsById["video-player-incoming"].onFirstFrameRender());
     seen();
     const t0 = B.seeks.at(-1)!;
-    await advance(Math.max(0, Math.ceil((t0 - mappedNow()) * 1000 - 120)));
+    await play(Math.max(0, Math.ceil((t0 - mappedNow()) * 1000 - 120)));
     seen();
     for (let i = 0; i < 6 && mockViewPropsById["video-player"].player !== B; i++) {
-      await advance(i === 0 ? 220 : 100);
+      await play(i === 0 ? 220 : 100);
       timeOn(B, mappedNow());
       seen();
     }
@@ -1715,7 +1734,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     // B's own time at LAND (the engine's tB), not the tap's translated 40.100.
     expect(routeT).toBeCloseTo(B.currentTime, 3);
     expect(Math.abs(routeT - 40.1)).toBeGreaterThan(0.5);
-    await advance(300);
+    await play(300);
     seen();
     expect(posterSeen.every((up) => !up)).toBe(true);
     expect(utils.queryByTestId("video-poster")).toBeNull();
@@ -1730,7 +1749,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     await tapAngle2(utils);
     // The pre-sign is still in flight: it is the one the switch waits on.
     expect(utils.getByTestId("angle-vid-2").props.accessibilityState).toEqual({ selected: true, busy: true });
-    await advance(250);
+    await play(250);
     expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Syncing angle");
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
     await act(async () => {
@@ -1743,8 +1762,8 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     expect(announce).toHaveBeenCalledTimes(1);
     expect(announce).toHaveBeenCalledWith("M. Park's angle.");
     // Its minimum time up, then its fade-out.
-    await advance(500);
-    await advance(500);
+    await play(500);
+    await play(500);
     expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
     utils.unmount();
     expect(mockCaptureMessage.mock.calls.at(-1)?.[1].extra).toMatchObject({ switchPillShownCount: 1, switchCount: 1, switchKeepWatchingCount: 1 });
@@ -1762,9 +1781,45 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     expect(utils.getByTestId("angle-vid-1").props.accessibilityState).toEqual({ selected: true });
     expect(utils.getByTestId("angle-vid-2").props.accessibilityState).toEqual({ selected: false });
     expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
-    await advance(500);
+    await play(500);
     expect(announce).toHaveBeenCalledTimes(1);
     expect(announce).toHaveBeenCalledWith("Could not load M. Park's angle. Tap it to try again.");
+  });
+
+  it("near the end of a shorter angle 2: it runs out while pending, lands at its edge (crossfade, no dip) and the transport shows Play", async () => {
+    const utils = await renderEngine();
+    await tapAngle2(utils, 42.6);
+    const B = incomingPlayer();
+    await waitFor(() => expect(B.seeks.length).toBeGreaterThan(0));
+    // Angle 2 ends at 41.5 s (2.5 s behind angle 1): only about a second is left past the tap.
+    readyOn(B, 41.5);
+    act(() => mockViewPropsById["video-player-incoming"].onFirstFrameRender());
+    await flush();
+    await play(Math.max(0, Math.ceil((B.seeks.at(-1)! - mappedNow()) * 1000 - 120)));
+    expect(B.play).toHaveBeenCalled();
+    expect(utils.getByLabelText("Pause")).toBeTruthy();
+    // It plays out to its end before it is in step (the native clock at the
+    // end, no time update in between).
+    act(() => {
+      B.currentTime = 41.5;
+      B.emit("playToEnd");
+    });
+    await flush();
+    expect(mockViewPropsById["video-player"].player).toBe(B);
+    expect(utils.queryByTestId("angle-view-dip", HIDDEN)).toBeNull();
+    // The route names angle 2's edge (the engine's end, within END_EPSILON_S 0.5 s of its duration).
+    expect(mockSetParams).toHaveBeenCalledTimes(1);
+    expect(mockSetParams.mock.calls[0][0]).toMatchObject({ id: "vid-2", approx: "0" });
+    const routeT = Number(mockSetParams.mock.calls[0][0].t);
+    expect(routeT).toBeGreaterThanOrEqual(41.5 - 0.5);
+    expect(routeT).toBeLessThanOrEqual(41.5);
+    // The clock is angle 2's: its own duration.
+    expect(utils.getByTestId("player-time")).toHaveTextContent(/ 00:41$/);
+    // Stopped at the edge: play intent off, like a front reaching its end.
+    expect(utils.getByLabelText("Play")).toBeTruthy();
+    expect(announce).toHaveBeenCalledWith("M. Park's angle.");
+    await play(300);
+    expect(utils.getByTestId("angle-vid-1").props.accessibilityState).toEqual({ selected: false });
   });
 
   it("an unsynced pair keeps watching as an approximate switch: Switching angle pill, lands once angle 2 starts, dip, route approx, note after landing", async () => {
@@ -1775,7 +1830,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     const B = incomingPlayer();
     await waitFor(() => expect(replacedUrls(B)).toEqual(["https://signed.example/vid-2.mp4"]));
     expect(A.pause).not.toHaveBeenCalled();
-    await advance(250);
+    await play(250);
     expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Switching angle");
     // Angle 1 still on screen and live; no note yet.
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
@@ -1788,8 +1843,8 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     expect(Number(mockSetParams.mock.calls[0][0].t)).toBeCloseTo(B.currentTime, 3);
     expect(announce).toHaveBeenCalledWith("M. Park's angle. Approximate sync.");
     // The note waits for the pill to go, then shows.
-    await advance(500);
-    await advance(500);
+    await play(500);
+    await play(500);
     expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
     expect(utils.getByTestId("player-approx-note")).toBeTruthy();
     utils.unmount();
@@ -1800,7 +1855,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     const utils = await renderEngine({ unsynced: true });
     timeOn(lastPlayer(), 12);
     fireEvent.press(utils.getByLabelText("Pause"));
-    await tapAngle2(utils, 12);
+    await tapAngle2(utils, 12, 1, false);
     const B = incomingPlayer();
     await waitFor(() => expect(B.seeks.length).toBeGreaterThan(0));
     expect(B.seeks.at(-1)).toBeCloseTo(12, 6);
@@ -1816,7 +1871,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     const utils = await renderEngine();
     timeOn(lastPlayer(), 42.6);
     fireEvent.press(utils.getByLabelText("Pause"));
-    await tapAngle2(utils);
+    await tapAngle2(utils, 42.6, 1, false);
     const B = incomingPlayer();
     await waitFor(() => expect(B.seeks.length).toBeGreaterThan(0));
     expect(B.seeks.at(-1)).toBeCloseTo(40.1, 6);
