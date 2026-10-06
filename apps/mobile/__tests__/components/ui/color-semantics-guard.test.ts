@@ -94,6 +94,7 @@ const RED_ALLOWED: Allow = {
   "components/athlete/head-to-head-card.tsx": { lines: 1, reason: "the head-to-head losses count (a negative)" },
   "components/auth/auth-form-field.tsx": { lines: 2, reason: "the error edge and error text (focus is ink-2 since WP2)" },
   "components/error-boundary.tsx": { lines: 1, reason: "the error message (a negative)" },
+  "components/highlight-viewer/reel-rail-button.tsx": { lines: 1, reason: "the reel viewer rail Share CTA fill (the page's one Signal Red CTA, own reels only)" },
   "components/film-room/film-room-states.tsx": { lines: 1, reason: "the state panel's text action" },
   "components/film-room/opening-still.tsx": { lines: 1, reason: "the red VS (brand chrome, Open decision 12)" },
   "components/film-room/poster-card.tsx": { lines: 4, reason: "the L outcome (a loss)" },

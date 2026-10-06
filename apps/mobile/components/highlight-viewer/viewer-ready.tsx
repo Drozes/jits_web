@@ -1,70 +1,72 @@
 import * as React from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import type { HighlightDetail, HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
-import { useMyHighlight } from "@/lib/highlight/use-my-highlight";
-import { useHighlightRating } from "@/lib/highlight/use-highlight-rating";
-import { track } from "@/lib/highlight-share";
-import { useViewerOpened } from "./use-viewer-opened";
-import { useViewerShare } from "./use-viewer-share";
+import { pageMeta } from "@/lib/highlight/reel-meta";
+import { ON_MEDIA } from "@/lib/theme/palette";
 import { ViewerFrame } from "./viewer-frame";
 import { ViewerMeta } from "./viewer-meta";
-import { ViewerActions } from "./viewer-actions";
+import { ViewerActions, showsSave } from "./viewer-actions";
 import { ViewerNoPlayback } from "./viewer-progress-state";
-import { useViewerRefresh } from "./use-viewer-refresh";
-import { ViewerImproveSheet } from "./viewer-improve-sheet";
-import { PreShareSheet } from "./pre-share-sheet";
-import { ShareSheetBody } from "./share-sheet-body";
+import { ViewerSavePermission } from "./viewer-save-permission";
+import { ViewerSheets } from "./viewer-sheets";
+import { ReelOverlay } from "./reel-overlay";
+import { ReelScrims } from "./reel-scrims";
+import { SwipeHint } from "./swipe-hint";
+import { useReelPage } from "./use-reel-page";
+import { VIEWER_COPY } from "./viewer-copy";
+import type { ReelBinding } from "./reel-binding";
 
 /**
- * The reel, following its progress (the phase-1 hook: realtime + 15 s
- * polling while it is moving, re-read on focus and foreground): the LIVE
- * render plays (kept playing while a new version is made, a new version is
- * swapped in place), then meta, the actions, the pre-share sheet and the
- * phase-1 "Improve this reel" sheet. Without a live version a calm state
- * shows until one lands.
+ * The reel, following its progress (realtime + 15 s polling while it is
+ * moving, re-read on focus and foreground): the LIVE render edge to edge on
+ * the page's pooled player (a new version swaps in place), the scrims, the
+ * bottom meta and the right rail (own reels only), the progress bar, and the
+ * share / improve sheets. Without a live version a calm state shows until one
+ * lands.
  */
-export function ViewerReady({ detail, source }: { detail: HighlightDetail; source: HighlightShareSourceTag }) {
-  const my = useMyHighlight(detail.matchVideoId);
-  useViewerRefresh(my.reload);
+export function ViewerReady({ detail, source, binding }: { detail: HighlightDetail; source: HighlightShareSourceTag; binding: ReelBinding }) {
+  const { my, vs, fb, improve, shareEnabled } = useReelPage(detail, source, binding);
   const progress = my.progress;
   const playback = progress?.playback ?? null;
-  const version = playback?.version ?? detail.version;
-  // Seen / viewer_opened only for a version actually on screen (not a stale detail read).
-  useViewerOpened(detail.highlightId, playback?.version ?? null, source);
-  const vs = useViewerShare(detail, playback?.durationS ?? null, source, playback?.version ?? null);
-  const fb = useHighlightRating(detail.highlightId, version, my.refresh);
-  const { openImprove } = fb;
-  const improve = React.useCallback(() => {
-    track(detail.highlightId, "improve_tapped", { source });
-    openImprove();
-  }, [detail.highlightId, openImprove, source]);
+  const meta = React.useMemo(() => pageMeta(detail, binding.item), [detail, binding.item]);
 
   if (!progress || !playback) {
-    return <ViewerNoPlayback progress={progress} error={my.progressError} onRetry={my.reload} />;
+    return <ViewerNoPlayback progress={progress} error={my.progressError} onRetry={my.reload} binding={binding} />;
   }
+  const canSaveToPhotos = vs.share.capabilities?.saveToPhotos ?? false;
+  const saveShown = showsSave({ canManage: binding.canManage, shareEnabled, canSaveToPhotos });
+  const top = binding.showHint ? (
+    <SwipeHint />
+  ) : binding.caughtUp ? (
+    <Text testID="viewer-caught-up" className="font-mono text-caption uppercase tracking-caps text-center tabular-nums" style={{ color: ON_MEDIA.text2 }}>
+      {VIEWER_COPY.caughtUp}
+    </Text>
+  ) : null;
   return (
-    <View className="flex-1 gap-3">
-      <ViewerFrame source={my.source} playbackFailed={my.playbackFailed} onPlayerError={my.onPlayerError} onRetry={my.reload} />
-      <View className="gap-3 px-4">
-        <ViewerMeta progress={progress} />
-        <ViewerActions
-          shareEnabled={detail.shareEnabled}
-          primaryPath={vs.share.activePath}
-          canSaveToPhotos={vs.share.capabilities?.saveToPhotos ?? false}
-          saving={vs.saving}
-          savePermissionDenied={vs.savePermissionDenied}
-          improveDisabled={progress.phase === "regenerating"}
-          onShare={vs.openSheet}
-          onSave={vs.save}
-          onImprove={improve}
-        />
-      </View>
-      {detail.shareEnabled ? (
-        <PreShareSheet open={vs.sheetOpen} onClosed={vs.onSheetClosed}>
-          <ShareSheetBody share={vs.share} onHandoff={vs.handoff} iosReels={vs.iosReels} onCopy={vs.copy} onDone={vs.closeSheet} />
-        </PreShareSheet>
-      ) : null}
-      {progress ? <ViewerImproveSheet fb={fb} progress={progress} /> : null}
+    <View className="flex-1">
+      <ViewerFrame binding={binding} source={my.source} playbackFailed={my.playbackFailed} onRetry={my.reload} />
+      <ReelScrims rail={binding.canManage} />
+      <ReelOverlay
+        pool={binding.pool}
+        index={binding.index}
+        top={top}
+        meta={<ViewerMeta progress={progress} meta={meta} />}
+        rail={
+          <ViewerActions
+            canManage={binding.canManage}
+            shareEnabled={shareEnabled}
+            primaryPath={vs.share.activePath}
+            canSaveToPhotos={canSaveToPhotos}
+            saving={vs.saving}
+            improveDisabled={progress.phase === "regenerating"}
+            onShare={vs.openSheet}
+            onSave={vs.save}
+            onImprove={improve}
+          />
+        }
+        below={saveShown && vs.savePermissionDenied ? <ViewerSavePermission /> : null}
+      />
+      <ViewerSheets canManage={binding.canManage} shareEnabled={shareEnabled} vs={vs} fb={fb} progress={progress} />
     </View>
   );
 }
