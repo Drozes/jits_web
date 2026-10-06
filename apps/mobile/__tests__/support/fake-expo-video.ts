@@ -17,6 +17,9 @@
  *   `play()` before it reports readyToPlay.
  * - `setNativeTime(i, t)`: the native clock moves without a seek (a new item
  *   starting at 0, or playback progress without a time update).
+ * - `buffering` (jits-a4fw.5 review B1): while true, `play()` only records
+ *   the intent and `playing` stays false (as on iOS and Android while the
+ *   item buffers) until `bufferEnd(i)`; a `pause()` before that cancels it.
  */
 import * as React from "react";
 import { Text } from "react-native";
@@ -42,6 +45,10 @@ export interface FakePlayer {
   pausedBufferStall: boolean;
   /** A readyPlayer that the paused-buffer stall held back (its duration). */
   heldReady: number | null;
+  /** Buffering: play() leaves `playing` false until bufferEnd(). */
+  buffering: boolean;
+  /** play() was called and not paused since (the native intent while buffering). */
+  wantsPlay: boolean;
   play: jest.Mock;
   pause: jest.Mock;
   replaceAsync: jest.Mock;
@@ -100,6 +107,8 @@ function createPlayer(): FakePlayer {
     preservesPitch: false,
     pausedBufferStall: false,
     heldReady: null,
+    buffering: false,
+    wantsPlay: false,
     get timeUpdateEventInterval() {
       return interval;
     },
@@ -122,6 +131,8 @@ function createPlayer(): FakePlayer {
       p.seeks.push(v);
     },
     play: jest.fn(() => {
+      p.wantsPlay = true;
+      if (p.buffering) return;
       p.playing = true;
       if (p.heldReady != null) {
         const duration = p.heldReady;
@@ -130,6 +141,7 @@ function createPlayer(): FakePlayer {
       }
     }),
     pause: jest.fn(() => {
+      p.wantsPlay = false;
       p.playing = false;
     }),
     replaceAsync: jest.fn((src: { uri: string }) => {
@@ -245,4 +257,14 @@ export function setNativeTime(i: number, t: number): void {
 
 export function tick(i: number, t: number): void {
   fakePlayers[i].emit("timeUpdate", { currentTime: t, bufferedPosition: t });
+}
+
+/** Player `i` finished buffering: it starts playing only if play() is still wanted. */
+export function bufferEnd(i: number): void {
+  const p = fakePlayers[i];
+  p.buffering = false;
+  if (p.wantsPlay) {
+    p.playing = true;
+    p.emit("playingChange", { isPlaying: true });
+  }
 }

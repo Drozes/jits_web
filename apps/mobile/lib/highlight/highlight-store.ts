@@ -2,6 +2,7 @@ import * as React from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { supabase } from "@/lib/supabase/client";
 import type { Result } from "@jits/shared/api/errors";
+import { runHighlightStoreResets } from "./reset-registry";
 import {
   getMyHighlights,
   type GetMyHighlightsOptions,
@@ -127,24 +128,18 @@ export function useForegroundEffect(onForeground: () => void): void {
   }, []);
 }
 
-const resetHooks = new Set<() => void>();
-
 /**
- * Registers state that must be forgotten with the store (the reel lanes in
- * `use-reel-lane.ts` register here, which avoids an import cycle).
+ * The ONE reset list (`reset-registry.ts`, dependency-free so pure stores can
+ * register without this module's Supabase import): the reel lanes
+ * (`use-reel-lane.ts`), the viewer's signed URLs and lane sessions.
  */
-export function onHighlightStoreReset(cb: () => void): () => void {
-  resetHooks.add(cb);
-  return () => {
-    resetHooks.delete(cb);
-  };
-}
+export { onHighlightStoreReset } from "./reset-registry";
 
-/** Sign-out, and tests: forget cached reads and every registered lane (they belong to the old account). */
+/** Sign-out, and tests: forget cached reads and every registered cache (they belong to the old account). */
 export function resetHighlightStore(): void {
   inFlight.clear();
   lastRead.clear();
-  for (const cb of resetHooks) cb();
+  runHighlightStoreResets();
 }
 
 /** Test-only: suites that test refresh WIRING (not the dedupe) turn the throttle off. */

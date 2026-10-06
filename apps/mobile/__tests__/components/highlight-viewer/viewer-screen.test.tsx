@@ -267,11 +267,12 @@ describe("viewer theme", () => {
 });
 
 describe("viewer states", () => {
-  it("loading: the empty poster frame, no actions, header + close", async () => {
+  it("loading: the empty poster frame, no actions, close and mute only on top (spec 8.2)", async () => {
     mockGetDetail.mockReturnValue(new Promise(() => undefined));
     const utils = await renderViewer();
     expect(utils.getByTestId("viewer-skeleton")).toBeTruthy();
-    expect(utils.getByRole("header")).toHaveTextContent("Your highlight");
+    expect(utils.queryByText("Your highlight")).toBeNull();
+    expect(utils.getByLabelText("Mute")).toBeTruthy();
     expect(utils.getByLabelText("Close")).toBeTruthy();
     expect(utils.queryByTestId("viewer-share")).toBeNull();
     expect(redCtas(utils)).toHaveLength(0);
@@ -306,7 +307,7 @@ describe("viewer states", () => {
     expect(utils.getByTestId("viewer-invalidated")).toHaveTextContent(
       "Your match video was replaced. A new reel will be made once it's analysed.",
     );
-    expect(utils.queryByText("Share to Instagram")).toBeNull();
+    expect(utils.queryByLabelText("Share to Instagram")).toBeNull();
     expect(mockMarkSeen).not.toHaveBeenCalled();
   });
 
@@ -339,7 +340,7 @@ describe("viewer states", () => {
     fireEvent(utils.getByTestId("viewer-frame"), "layout", { nativeEvent: { layout: { width: 390, height: 700 } } });
     await waitFor(() => expect(utils.getByTestId("highlight-player")).toBeTruthy());
     expect(utils.queryByTestId("viewer-making")).toBeNull();
-    expect(utils.getByTestId("viewer-meta")).toHaveTextContent("31s · Version 3");
+    expect(utils.getByTestId("viewer-meta")).toHaveTextContent("SEP 27 · 0:31");
     expect(mockMarkSeen).toHaveBeenCalledWith({}, "h1", 3);
     expect(utils.getByTestId("viewer-share")).toBeTruthy();
   });
@@ -438,16 +439,17 @@ describe("viewer states", () => {
     expect(utils.getByLabelText("Your highlight reel, 31 seconds")).toBeTruthy();
     expect(utils.queryByTestId("highlight-fullscreen")).toBeNull();
     const meta = utils.getByTestId("viewer-meta");
-    expect(meta).toHaveTextContent("31s · Version 2");
+    // Spec 8.2 (owner R2-2): the mono line is the match date and the duration.
+    expect(meta).toHaveTextContent("SEP 27 · 0:31");
     // The viewer's player: fullscreen disabled (no button), inline controls off.
     const video = utils.getByTestId("expo-video-view");
     expect(video.props.fullscreenOptions).toEqual({ enable: false });
     expect(video.props.nativeControls).toBe(false);
     expect(meta.props.className).toContain("font-mono");
-    expect(meta.props.style).toEqual({ fontVariant: ["tabular-nums"] });
-    expect(utils.getByText("Share to Instagram")).toBeTruthy();
-    expect(utils.getByText("Save to Photos")).toBeTruthy();
-    expect(utils.getByText("Improve this reel")).toBeTruthy();
+    expect(meta.props.style).toEqual(expect.objectContaining({ fontVariant: ["tabular-nums"] }));
+    expect(utils.getByLabelText("Share to Instagram")).toBeTruthy();
+    expect(utils.getByLabelText("Save to Photos")).toBeTruthy();
+    expect(utils.getByLabelText("Improve this reel")).toBeTruthy();
     expect(redCtas(utils)).toHaveLength(1);
     expect(redCtas(utils)[0].props.testID).toBe("viewer-share");
   });
@@ -481,7 +483,7 @@ describe("viewer states", () => {
     expect(mono.map((n: HostNode) => n.props.children)).toEqual(["3"]);
     expect(mono[0].props.style).toEqual({ fontVariant: ["tabular-nums"] });
     expect(utils.getByTestId("viewer-improve").props.accessibilityState).toEqual({ disabled: true, busy: false });
-    expect(utils.getByTestId("viewer-meta")).toHaveTextContent("31s · Version 2");
+    expect(utils.getByTestId("viewer-meta")).toHaveTextContent("SEP 27 · 0:31");
   });
 });
 
@@ -492,10 +494,10 @@ describe("share flag and primary CTA", () => {
     mockGetDetail.mockResolvedValue({ ok: true, data: detail({ shareEnabled: false }) });
     const utils = await renderViewer();
     await waitFor(() => expect(utils.getByTestId("highlight-player")).toBeTruthy());
-    expect(utils.queryByText("Share to Instagram")).toBeNull();
-    expect(utils.queryByText("Share reel")).toBeNull();
-    expect(utils.queryByText("Save to Photos")).toBeNull();
-    expect(utils.getByText("Improve this reel")).toBeTruthy();
+    expect(utils.queryByLabelText("Share to Instagram")).toBeNull();
+    expect(utils.queryByLabelText("Share reel")).toBeNull();
+    expect(utils.queryByLabelText("Save to Photos")).toBeNull();
+    expect(utils.getByLabelText("Improve this reel")).toBeTruthy();
     expect(redCtas(utils)).toHaveLength(0);
     expect(mockUseShare).toHaveBeenCalledWith(expect.objectContaining({ shareEnabled: false }));
   });
@@ -516,8 +518,8 @@ describe("share flag and primary CTA", () => {
   it("label follows primaryPath: share_sheet -> Share reel", async () => {
     mockShare = makeShare({ primaryPath: "share_sheet" });
     const utils = await renderViewer();
-    expect(utils.getByText("Share reel")).toBeTruthy();
-    expect(utils.queryByText("Share to Instagram")).toBeNull();
+    expect(utils.getByLabelText("Share reel")).toBeTruthy();
+    expect(utils.queryByLabelText("Share to Instagram")).toBeNull();
     expect(redCtas(utils)).toHaveLength(1);
   });
 
@@ -525,14 +527,14 @@ describe("share flag and primary CTA", () => {
     mockShare = makeShare({ primaryPath: null });
     const utils = await renderViewer();
     expect(utils.queryByTestId("viewer-share")).toBeNull();
-    expect(utils.getByText("Save to Photos")).toBeTruthy();
+    expect(utils.getByLabelText("Save to Photos")).toBeTruthy();
     expect(redCtas(utils)).toHaveLength(0);
   });
 
   it("Save absent when the build has no media-library module", async () => {
     mockShare = makeShare({ capabilities: { reels: false, shareSheet: true, saveToPhotos: false, clipboard: false, facebookAppIdConfigured: false }, primaryPath: "share_sheet" });
     const utils = await renderViewer();
-    expect(utils.queryByText("Save to Photos")).toBeNull();
+    expect(utils.queryByLabelText("Save to Photos")).toBeNull();
   });
 });
 
@@ -602,13 +604,13 @@ describe("actions", () => {
     fireEvent.press(utils.getByTestId("viewer-save"));
     await flush();
     expect(mockShare.saveToPhotos).toHaveBeenCalledTimes(1);
-    expect(utils.getByText("Saving…")).toBeTruthy();
+    expect(utils.getByLabelText("Saving…")).toBeTruthy();
     expect(utils.getByTestId("viewer-save-spinner")).toBeTruthy();
     fireEvent.press(utils.getByTestId("viewer-save"));
     expect(mockShare.saveToPhotos).toHaveBeenCalledTimes(1);
     await act(async () => finish({ ok: true }));
     await flush();
-    expect(utils.getByText("Save to Photos")).toBeTruthy();
+    expect(utils.getByLabelText("Save to Photos")).toBeTruthy();
     expect(mockToast.success).toHaveBeenCalledWith("Saved to Photos");
   });
 
@@ -624,7 +626,7 @@ describe("actions", () => {
     await flush();
     expect(mockToast.error).toHaveBeenCalledWith(copy);
     expect(mockToast.success).not.toHaveBeenCalled();
-    expect(utils.queryByTestId("viewer-save-permission")).toBeNull();
+    expect(utils.queryByTestId("viewer-open-settings")).toBeNull();
   });
 
   it("save outcome unavailable: silent", async () => {
@@ -636,18 +638,17 @@ describe("actions", () => {
     expect(mockToast.success).not.toHaveBeenCalled();
   });
 
-  it("save permission denied: inline Settings copy + Open Settings", async () => {
+  it("save permission denied: Settings (C-V9) on the rail opens the system settings", async () => {
     const spy = jest.spyOn(Linking, "openSettings").mockResolvedValue(undefined);
     mockShare = makeShare({ saveToPhotos: jest.fn(() => Promise.resolve({ ok: false, kind: "permission" })) });
     const utils = await renderViewer();
-    expect(utils.queryByTestId("viewer-save-permission")).toBeNull();
+    expect(utils.queryByTestId("viewer-open-settings")).toBeNull();
     fireEvent.press(utils.getByTestId("viewer-save"));
     await flush();
     expect(mockToast.error).not.toHaveBeenCalled();
-    expect(utils.getByTestId("viewer-save-permission")).toHaveTextContent(
-      "Allow ELO RATED to add to Photos in Settings to save your reel.Open Settings",
-    );
-    fireEvent.press(utils.getByText("Open Settings"));
+    const settings = utils.getByLabelText("Open Settings");
+    expect(settings.props.accessibilityHint).toBe("Allow ELO RATED to add to Photos in Settings to save your reel.");
+    fireEvent.press(settings);
     expect(spy).toHaveBeenCalledTimes(1);
     expect(redCtas(utils)).toHaveLength(1);
   });
@@ -777,8 +778,8 @@ describe("pre-share sheet", () => {
   it("the viewer's Share label follows the effective path too", async () => {
     mockShare = makeShare({ primaryPath: "reels", activePath: "share_sheet" });
     const utils = await renderViewer();
-    expect(utils.getByText("Share reel")).toBeTruthy();
-    expect(utils.queryByText("Share to Instagram")).toBeNull();
+    expect(utils.getByLabelText("Share reel")).toBeTruthy();
+    expect(utils.queryByLabelText("Share to Instagram")).toBeNull();
   });
 
   it("iOS Reels done (Instagram never came up): the caption is offered", async () => {

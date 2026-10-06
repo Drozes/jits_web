@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Mobile: full-screen shorts-style reel viewer and swipe pager (jits-a4fw.5)
+
+Spec `specs/matches-tab/spec.md` section 8 (owner decisions round 2, 2026-10-06). Every highlight reel now plays full screen, edge to edge, with actions overlaid; carousels open a vertical swipe pager over their lane. JS-only (no native dependency; OTA-eligible on runtime 0.5.0).
+
+**Added**
+- Entry API `openReelViewer({ items, startIndex, lane, loadMore? })` and the in-memory lane session store in `apps/mobile/lib/highlight/reel-viewer-session.ts`; the route `app/(app)/highlight/[id].tsx` opens the pager for `?lane=home|matches&session=<token>` and the single full-screen reel otherwise (push, bell, match detail, summary, cold start).
+- `apps/mobile/components/highlight-viewer/reel-pager.tsx` (+ `reel-pager-page.tsx`, `use-reel-pager.ts`): paging FlatList (one page per fling, 3-page window, `getItemLayout`, `initialScrollIndex`), active page from momentum end with an 80% viewability backup, prefetch of `i + 1` and `i + 2` (signed URL, progress reads cached 90 s, skipped when already loaded; posters load in the mounted neighbour page under their `highlight-poster:<path>` key, and the lane's poster stays up through the first frame), pagination near the end with no duplicates, a spinner page that pauses the last reel and no retry loop after a failed read, C-V2 at the end of a loaded lane from scroll offsets on iOS (the bounce) and Android (a drag that begins and ends clamped on the last reel), sheets suspend paging and pause; viewability is ignored during a gesture so each landing logs once.
+- Pool of exactly three expo-video players (`apps/mobile/lib/highlight/reel-player-pool.ts`, `use-reel-player-pool.ts`): slots by `index mod 3`, one slot re-pointed per swipe, playback driven by a per-slot intent (never `player.playing`, which is false while buffering), only the visible page plays and only while the app is active, the screen focused, no sheet open and the mute preference read; neighbours paused at 0 behind their poster, tap to pause, legacy non-9:16 assets `contain` over a blurred poster.
+- Signed-URL cache shared by prefetch and the page (`apps/mobile/lib/highlight/reel-prefetch.ts`; `useMyHighlight(..., { preferCached })`), page math (`reel-pager-math.ts`), page meta (`reel-meta.ts`), mute persisted under `reels:muted:v1` and the swipe hint flag `reels:swipe-hint:v1` (`reel-prefs.ts`, `use-swipe-hint.ts`).
+- Page chrome: react-native-svg scrims (`reel-scrims.tsx`: 120 pt top, 400 pt bottom, 96 pt right edge behind the rail), right rail (`reel-rail-button.tsx`, short labels Share / Save / Improve / Settings with full a11y labels; Settings appears when the Photos permission was refused), Close top left and mute toggle top right only (`reel-mute-button.tsx`), bottom meta with Open match or View profile (`viewer-meta.tsx`), 2 pt progress bar (`reel-progress-bar.tsx`), swipe hint C-V1 (`swipe-hint.tsx`, Motion registry row "Swipe hint").
+- Sign-out clears the viewer's signed URLs and lane sessions through the one reset list: `apps/mobile/lib/highlight/reset-registry.ts` (dependency-free) holds it, `highlight-store.ts` re-exports `onHighlightStoreReset` and runs it from `resetHighlightStore`, and the reel lanes (`use-reel-lane.ts`) register there too.
+- Not-yours rule (`canManageReel`): a reel that is not the athlete's shows no rail and no sheets and is not marked seen.
+- Telemetry: `viewer_opened` once per reel per session with `layout: "fullscreen"` and `swiped`; `viewer_swiped` per landing with `direction`, `index`, `prefetched`, `first_frame_ms`.
+
+**Changed**
+- `ViewerScreen` is the single-reel host of the same full-screen page (`viewer-page.tsx`, `viewer-ready.tsx`); the full-screen reel autoplays with sound unless muted last time.
+
 ### Mobile: Matches tab shell, Profile cleanup, Film Room retirement (jits-a4fw.3, .7, .8)
 
 Spec `specs/matches-tab/spec.md` sections 4, 6.1, 9 and 17. Owner decisions 2026-10-06: five tabs (Home, Arena, Matches, Rankings, Profile), Matches uses the lucide `Film` icon and has no badge, Profile keeps no "View all matches" link. Ships in the same OTA as the rest of the Matches tab epic so history always has an entry point.

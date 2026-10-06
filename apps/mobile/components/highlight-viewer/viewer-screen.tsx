@@ -1,77 +1,40 @@
 import * as React from "react";
 import { View } from "react-native";
-import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
-import { darkTokens } from "@/lib/tokens";
+import { ON_MEDIA } from "@/lib/theme/palette";
 import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
-import { HIGHLIGHT_ERROR_FALLBACK, highlightErrorCopy } from "@/lib/highlight/highlight-copy";
-import { useHighlightDetail } from "@/lib/highlight/use-highlight-detail";
+import { useReelPlayerPool } from "@/lib/highlight/use-reel-player-pool";
 import { ViewerHeader } from "./viewer-header";
-import { ViewerFrame } from "./viewer-frame";
-import { ViewerMessage } from "./viewer-states";
-import { ViewerReady } from "./viewer-ready";
-import { VIEWER_COPY } from "./viewer-copy";
-import { SHARE_COPY } from "@/lib/highlight-share";
+import { ViewerPage } from "./viewer-page";
+import type { ReelBinding } from "./reel-binding";
+import { useViewerClose } from "./use-viewer-close";
 
-const NOOP = () => undefined;
+/** The swipe pager, reached through the viewer screen module (the share guard allows the route only this import). */
+export { ReelPager } from "./reel-pager";
 
 /**
- * The full-screen 9:16 viewer for one of the athlete's own reels
- * (spec 015 section 16.6.2). A video surface: the dark "void" tokens in both
- * themes (`ForceDarkTheme`, like the match video player, so themed pieces
- * inside read dark too) and a light status bar. Loading shows the empty poster frame; a missing / foreign reel says
- * so with "Back"; a reel without a live version (video replaced) says a new
- * one is coming; anything else offers "Try again".
+ * The single-reel viewer (push, bell, match detail, summary, Profile, a cold
+ * start: any link without a pager session). Full screen, edge to edge like
+ * the pager's pages, no swipe. A video surface: the dark "void" tokens in
+ * both themes (`ForceDarkTheme`, like the match video player) and a light
+ * status bar. Always the athlete's own reel (`get_highlight_detail` reads
+ * only the caller's), so every owner action is offered.
  */
 export function ViewerScreen({ id, source }: { id: string | undefined; source: HighlightShareSourceTag }) {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { detail, error, loading, reload } = useHighlightDetail(id);
-  // A cold-start push has no back stack: land on Home instead.
-  const close = React.useCallback(() => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/");
-  }, [router]);
-
-  let body: React.ReactNode;
-  if (loading && !detail) {
-    body = <ViewerFrame source={null} playbackFailed={false} onPlayerError={NOOP} onRetry={NOOP} />;
-  } else if (error?.code === "HIGHLIGHT_NOT_FOUND") {
-    body = (
-      <ViewerMessage
-        testID="viewer-not-found"
-        message={highlightErrorCopy(error)}
-        action={{ testID: "viewer-back", label: VIEWER_COPY.back, variant: "secondary", onPress: close }}
-      />
-    );
-  } else if (!detail) {
-    body = (
-      <ViewerMessage
-        testID="viewer-error"
-        message={HIGHLIGHT_ERROR_FALLBACK}
-        action={{ testID: "viewer-retry", label: SHARE_COPY.tryAgain, variant: "primary", onPress: reload }}
-      />
-    );
-  } else if (!detail.clipsEnabled) {
-    // Clips are off: a calm paused state, no playback, nothing marked seen.
-    body = <ViewerMessage testID="viewer-paused" message={VIEWER_COPY.paused} />;
-  } else {
-    // Every other state (including no live version yet) follows progress.
-    body = <ViewerReady detail={detail} source={source} />;
-  }
-
+  const close = useViewerClose();
+  const pool = useReelPlayerPool();
+  React.useEffect(() => pool.setActive(0, 1), [pool]);
+  const binding = React.useMemo<ReelBinding>(
+    () => ({ pool, index: 0, active: true, canManage: true, swiped: false, prefetched: false }),
+    [pool],
+  );
   return (
-    <ForceDarkTheme style={{ backgroundColor: darkTokens.bgPrimary }}>
+    <ForceDarkTheme style={{ backgroundColor: ON_MEDIA.black }}>
       <StatusBar style="light" />
-      <View
-        testID="highlight-viewer"
-        className="flex-1"
-        style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 8 }}
-      >
+      <View testID="highlight-viewer" className="flex-1">
+        <ViewerPage id={id} source={source} binding={binding} onClose={close} />
         <ViewerHeader onClose={close} />
-        {body}
       </View>
     </ForceDarkTheme>
   );

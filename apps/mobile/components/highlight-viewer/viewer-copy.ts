@@ -12,6 +12,21 @@ export const VIEWER_COPY = {
   cannotPlay: "We couldn't play this reel right now.",
   making: "Your reel is being made. It will play here as soon as it's ready.",
   noHighlight: "No highlight for this video.",
+  /** C-V1 (specs/matches-tab section 11). */
+  swipeHint: "Swipe up for the next one",
+  /** C-V2. */
+  caughtUp: "You're all caught up",
+  openMatch: "Open match",
+  /** C-V5. */
+  viewProfile: "View profile",
+  /** Short visible rail labels (C-V6 to C-V8); a11y labels stay the full strings. */
+  railShare: "Share",
+  railSave: "Save",
+  railImprove: "Improve",
+  /** C-V9: the Photos permission fallback's button. */
+  settings: "Settings",
+  mute: "Mute",
+  unmute: "Unmute",
 } as const;
 
 /** `progress` is a 0..1 fraction (or null before the first byte): whole percent. */
