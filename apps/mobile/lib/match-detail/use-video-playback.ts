@@ -204,7 +204,15 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   /** The generation an angle switch or a quality swap loaded, until its first frame shows. */
   const switchGenRef = React.useRef<number | null>(null);
   /** What the in-flight swap is (telemetry and the controller treat them apart). */
-  const swapKindRef = React.useRef<"angle" | "quality" | null>(null);
+  const swapKindRef = React.useRef<"angle" | "quality" | "restore" | null>(null);
+  /**
+   * The quality swap in flight, from its start to its landing, failure or
+   * supersession (review H1, H2): the file it replaces, so a failed sign
+   * puts that one back instead of failing playback.
+   */
+  const qualityPendingRef = React.useRef<{ prev: MatchVideoPlayback | null; holdFrame: boolean } | null>(null);
+  /** The signed source on (or going to) the player. */
+  const currentDataRef = React.useRef<MatchVideoPlayback | null>(null);
   /** The served rendition and availability of the file on (or going to) the player. */
   const servedRef = React.useRef<ReturnType<typeof servedOf> | null>(null);
   /**
@@ -303,6 +311,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         ...(holdFrame ? { holdFrame: true } : null),
       };
       sourceRef.current = nextSource;
+      currentDataRef.current = data;
       setSource(nextSource);
       telemetry.sourceAttached(data.sourceKind ?? "original");
       const served = servedOf(data);
@@ -317,12 +326,34 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
 
   /** The in-flight quality swap will not land (superseded, failed or errored). */
   const dropQualitySwap = React.useCallback(() => {
-    if (swapKindRef.current === "quality" && switchGenRef.current != null) quality.failed();
+    const pending = qualityPendingRef.current;
+    qualityPendingRef.current = null;
+    if (pending) quality.failed();
     if (swapKindRef.current === "quality") swapKindRef.current = null;
   }, [quality]);
 
+  /**
+   * A quality swap's sign failed: put the file it was replacing back, at the
+   * exact position behind the held frame, play intent and speed untouched.
+   * Playback never fails over a lighter copy that could not be signed.
+   */
+  const restoreAfterQualityFailure = React.useCallback(
+    (prev: MatchVideoPlayback, holdFrame: boolean) => {
+      const epoch = ++epochRef.current;
+      signingRef.current = false;
+      swapKindRef.current = "restore";
+      switchGenRef.current = epoch;
+      attach(prev, epoch, holdFrame);
+      setPhase("ready");
+    },
+    [attach],
+  );
+
   const sign = React.useCallback(
-    async (silent: boolean, opts: { switched?: boolean; holdFrame?: boolean; rendition?: TargetRendition } = {}) => {
+    async (
+      silent: boolean,
+      opts: { switched?: boolean; holdFrame?: boolean; rendition?: TargetRendition; quality?: boolean } = {},
+    ) => {
       const target = activeIdRef.current;
       if (!target) {
         telemetry.signOutcome("absent");
@@ -339,6 +370,16 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       if (epoch !== epochRef.current) return;
       signingRef.current = false;
       const next = phaseFor(result);
+      if (opts.quality && !(next === "ready" && result.ok && result.data)) {
+        // A failed quality swap is not a failed video (review H1).
+        const pending = qualityPendingRef.current;
+        dropQualitySwap();
+        switchGenRef.current = null;
+        if (pending?.prev) {
+          restoreAfterQualityFailure(pending.prev, pending.holdFrame);
+          return;
+        }
+      }
       telemetry.signOutcome(next === "ready" ? "ok" : next === "loading" ? "pending" : next);
       if (next === "ready" && result.ok && result.data) {
         signedRef.current.set(`${target}:${rendition}`, { data: result.data, at: Date.now() });
@@ -350,7 +391,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       }
       setPhase(next);
     },
-    [telemetry, attach, quality, dropQualitySwap],
+    [telemetry, attach, quality, dropQualitySwap, restoreAfterQualityFailure],
   );
 
   React.useEffect(() => {
@@ -375,6 +416,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     telemetry.setMeta({ videoId: id ?? null });
     switchGenRef.current = null;
     swapKindRef.current = null;
+    qualityPendingRef.current = null;
     switchSeekLandedRef.current = true;
     // A fresh open: a new start selection (and controller) for it.
     void quality.begin();
@@ -462,6 +504,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     if (at) {
       seekIssuedGenRef.current = current.generation;
       holdRef.current = { at, left: SEEK_HOLD_MAX_UPDATES };
+      // The controller sees the seek hold BEFORE telemetry closes any open stall (review M3).
+      feed();
       telemetry.expectWait();
       setPositionS(at);
       safely(() => {
@@ -491,12 +535,13 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         swapKindRef.current = null;
         const served = servedRef.current;
         if (kind === "quality") {
+          qualityPendingRef.current = null;
           // Not an angle switch: its own latency, and the level follows the served file.
           telemetry.qualitySwitchLanded();
           if (served) quality.landed(served.served, served.available);
           // Other angles were pre-signed at the old rendition.
           presignRef.current(presignIdsRef.current);
-        } else {
+        } else if (kind === "angle") {
           telemetry.switchLanded();
           if (served) quality.angleChanged(served.served, served.available);
         }
@@ -639,8 +684,9 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
   // The athlete's play/pause intent drives the player once an item is loaded.
   React.useEffect(() => {
     playingRef.current = playing;
-    telemetry.playIntent(playing);
+    // The controller sees the pause BEFORE telemetry closes an open stall (review M3).
     feed();
+    telemetry.playIntent(playing);
     if (!loadedRef.current) return;
     if (playing) startPlayback();
     else safely(() => player.pause());
@@ -668,11 +714,12 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         resumeAtRef.current = clamped > 0 ? clamped : null;
         progressBaseRef.current = clamped;
       }
+      // The controller sees the seek BEFORE telemetry closes an open stall (review M3).
+      feed();
       telemetry.seekRequested();
       safely(() => {
         player.currentTime = clamped;
       });
-      feed();
     },
     [player, telemetry, feed],
   );
@@ -734,6 +781,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
       // Hold the outgoing frame only if one is up (else the poster stays).
       const current = sourceRef.current;
       const holdFrame = current != null && (frameGenRef.current === current.generation || current.holdFrame === true);
+      if (kind === "quality") qualityPendingRef.current = { prev: currentDataRef.current, holdFrame };
       activeIdRef.current = nextId;
       setActiveId(nextId);
       // The new file resumes exactly here; play intent and speed carry over
@@ -773,7 +821,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         setPhase("ready");
         return;
       }
-      void sign(true, { switched: true, holdFrame, rendition: target });
+      void sign(true, { switched: true, holdFrame, rendition: target, quality: kind === "quality" });
     },
     [player, telemetry, attach, sign, dropQualitySwap],
   );

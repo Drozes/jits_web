@@ -822,6 +822,84 @@ describe("useVideoPlayback adaptive quality", () => {
     );
   });
 
+  it("review H1 (RV1): a failed 360 sign keeps the 720 playing and a later decision is still possible", async () => {
+    signCopies({ "vid-1": BOTH });
+    const base = mockSign.getMockImplementation()!;
+    mockSign.mockImplementation((c: unknown, vid: string, o: { rendition: string }) =>
+      o.rendition === "360" ? Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "down" } }) : base(c, vid, o),
+    );
+    const { result } = await open();
+    act(() => result.current.setRate(1.5));
+    longStall(10.25);
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledTimes(1);
+    // The 720 file goes back in at the exact spot behind the held frame.
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenCalledTimes(2));
+    expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-1.720.mp4" });
+    expect(result.current.phase).toBe("ready");
+    expect(result.current.source?.holdFrame).toBe(true);
+    expect(mockTelemetry.signOutcome).not.toHaveBeenCalledWith("failed");
+    ready();
+    expect(player().seeks.at(-1)).toBe(10.25);
+    expect(player().playbackRate).toBe(1.5);
+    expect(result.current.playing).toBe(true);
+    time(10.3);
+    expect(result.current.stateLabel).toBe("loaded");
+    // Not stuck: after the cooldown, another long stall decides again.
+    clock += 5000;
+    time(10.6);
+    longStall(10.7);
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledTimes(2);
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenLastCalledWith("720", "360", expect.stringMatching(/^stall_/), expect.anything());
+  });
+
+  it("review H2 (RV2): an angle switch while the 360 sign is pending does not leave the controller stuck", async () => {
+    signCopies({ "vid-1": BOTH, "vid-2": BOTH });
+    const base = mockSign.getMockImplementation()!;
+    mockSign.mockImplementation((c: unknown, vid: string, o: { rendition: string }) =>
+      vid === "vid-1" && o.rendition === "360" ? new Promise(() => undefined) : base(c, vid, o),
+    );
+    const { result } = await open();
+    longStall(10.25);
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledTimes(1);
+    act(() => result.current.switchAngle("vid-2", 12));
+    await waitFor(() => expect(player().replaceAsync).toHaveBeenLastCalledWith({ uri: "https://s/vid-2.360.mp4" }));
+    ready();
+    time(12.05);
+    expect(mockTelemetry.switchLanded).toHaveBeenCalledTimes(1);
+    for (let t = 0; t < 800 && mockTelemetry.qualitySwitchStarted.mock.calls.length < 2; t += 1) {
+      clock += 250;
+      time(12.3 + t * 0.25);
+    }
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenLastCalledWith("360", "720", "smooth", expect.anything());
+  });
+
+  it("review M3: pausing during a long stall never steps down (telemetry closes the stall on pause)", async () => {
+    signCopies({ "vid-1": BOTH });
+    mockTelemetry.playIntent.mockImplementation((want: boolean) => {
+      if (!want) mockStallListeners.forEach((cb) => cb({ kind: "end", at: clock }));
+    });
+    const { result } = await open();
+    stall("start");
+    clock += 1500;
+    act(() => result.current.toggle());
+    expect(result.current.playing).toBe(false);
+    expect(mockTelemetry.qualitySwitchStarted).not.toHaveBeenCalled();
+    mockTelemetry.playIntent.mockImplementation(() => undefined);
+  });
+
+  it("review M3: seeking during a long stall never steps down (telemetry closes the stall on seek)", async () => {
+    signCopies({ "vid-1": BOTH });
+    mockTelemetry.seekRequested.mockImplementation(() => {
+      mockStallListeners.forEach((cb) => cb({ kind: "end", at: clock }));
+    });
+    const { result } = await open();
+    stall("start");
+    clock += 1500;
+    act(() => result.current.seek(50));
+    expect(mockTelemetry.qualitySwitchStarted).not.toHaveBeenCalled();
+    mockTelemetry.seekRequested.mockImplementation(() => undefined);
+  });
+
   it("a 3G start at 360 steps up after 30 s smooth once the phone is on Wi-Fi", async () => {
     signCopies({ "vid-1": BOTH });
     const net = require("@/lib/video/quality/network-store");

@@ -415,6 +415,45 @@ describe("useMultiAnglePlayback adaptive quality (same policy as the single play
     expect(fakePlayers[P.ref].playing).toBe(true);
   });
 
+  it("review M2: a failed 360 re-sign keeps every slot on its old file (not dead) and playback goes on", async () => {
+    signCopies({});
+    const base = mockSign.getMockImplementation()!;
+    mockSign.mockImplementation((c: unknown, id: string, o: { rendition: string }) =>
+      o.rendition === "360" ? Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "down" } }) : base(c, id, o),
+    );
+    const { result } = await openAt((id) => `https://s/${id}.720.mp4`);
+    act(() => tick(P.ref, 10));
+    clock += 5000;
+    act(() => tick(P.ref, 15));
+    stall("start");
+    clock += 1000;
+    act(() => tick(P.ref, 15.05));
+    expect(mockTelemetry.qualitySwitchStarted).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.angles.every((a) => a.switchable)).toBe(true));
+    expect(result.current.phase).toBe("ready");
+    expect(result.current.heldFrame).toBeNull();
+    expect(mockTelemetry.qualitySwitchLanded).not.toHaveBeenCalled();
+    // No player got a new URL; the visible one plays on.
+    expect(fakePlayers[P.ref].replaceAsync).toHaveBeenCalledTimes(1);
+    expect(fakePlayers[P.ref].playing).toBe(true);
+  });
+
+  it("review M3: pausing during a long stall never steps down", async () => {
+    signCopies({});
+    mockTelemetry.playIntent.mockImplementation((want: boolean) => {
+      if (!want) mockStallListeners.forEach((cb) => cb({ kind: "end", at: clock }));
+    });
+    const { result } = await openAt((id) => `https://s/${id}.720.mp4`);
+    act(() => tick(P.ref, 10));
+    clock += 5000;
+    act(() => tick(P.ref, 15));
+    stall("start");
+    clock += 1500;
+    act(() => result.current.toggle());
+    expect(mockTelemetry.qualitySwitchStarted).not.toHaveBeenCalled();
+    mockTelemetry.playIntent.mockImplementation(() => undefined);
+  });
+
   it("a switch to an original-only angle makes the controller inert there", async () => {
     signCopies({ opp: NONE });
     const { result } = await openAt((id) => `https://s/${id}.720.mp4`);

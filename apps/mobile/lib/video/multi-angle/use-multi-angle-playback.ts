@@ -403,6 +403,16 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
       const next = phaseFor(result);
       if (opts.entry) telemetry.signOutcome(next === "ready" ? "ok" : next === "loading" ? "pending" : next);
       if (next !== "ready" || !result.ok || !result.data) {
+        if (opts.quality && slot.data) {
+          // A failed quality re-sign is not a dead angle (review M2): the old
+          // file is still on this player, so it stays in use.
+          slot.loaded = true;
+          slot.landAt = null;
+          if (qualitySwapRef.current?.slot === i) failQualityRef.current();
+          setLoadedTick((n) => n + 1);
+          if (visibleRef.current) applyPlan(planFor(visibleRef.current));
+          return;
+        }
         if (opts.quality && qualitySwapRef.current?.slot === i) failQualityRef.current();
         if (opts.entry) setPhase(next);
         else {
@@ -432,7 +442,7 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
         if (gen === slot.generation) onSlotErrorRef.current(i, e instanceof Error ? e.message : String(e));
       }
     },
-    [players, telemetry, quality],
+    [players, telemetry, quality, applyPlan, planFor],
   );
 
   const onSlotErrorRef = React.useRef<(i: number, message: string | null) => void>(() => undefined);
@@ -659,8 +669,9 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
     (next: boolean) => {
       playingRef.current = next;
       setPlayingState(next);
-      telemetry.playIntent(next);
+      // The controller sees the pause BEFORE telemetry closes an open stall (review M3).
       quality.feed();
+      telemetry.playIntent(next);
       if (visibleRef.current) applyPlan(planFor(visibleRef.current));
     },
     [telemetry, applyPlan, planFor, quality],
@@ -697,8 +708,8 @@ export function useMultiAnglePlayback(input: MultiAngleInput): MultiAnglePlaybac
       positionRefS.current = t;
       setPositionS(t);
       holdRef.current = { at: t, left: SEEK_HOLD_MAX_UPDATES };
-      telemetry.seekRequested();
       quality.feed();
+      telemetry.seekRequested();
       const now = Date.now();
       slotsRef.current.forEach((s, i) => {
         if (!s.angleId || !s.loaded) return;
