@@ -487,6 +487,26 @@ describe("ReelPager", () => {
     }
   });
 
+  it("a lane poster that fails to load (expired URL, nothing cached) falls back to the page's own poster", async () => {
+    mockSign.mockImplementation((_s: unknown, p: { storagePath: string; version: number }) =>
+      Promise.resolve({ ok: true, data: { url: `https://signed/${p.storagePath}`, posterUrl: "https://resigned/poster.jpg" as string | null, version: p.version, durationS: 28 } }),
+    );
+    const utils = await open(session([reel(1), reel(2)], 0));
+    const page = () => utils.getByTestId("reel-page-0");
+    const host = () => page().findAll((n: { props: { testID?: string } }) => n.props.testID === "highlight-poster" && typeof (n as unknown as { type: unknown }).type === "string");
+    expect(host()[0].props.source.uri).toBe("https://signed/p1.jpg");
+    await act(async () => host()[0].props.onError?.({ error: "expired" }));
+    await flush();
+    expect(host()[0].props.source).toEqual({ uri: "https://resigned/poster.jpg", cacheKey: "highlight-poster:v1.jpg" });
+  });
+
+  it("measures the page at its exact (fractional) height, unrounded", async () => {
+    const utils = render(<ReelPager session={session([reel(1), reel(2)], 1)} />);
+    fireEvent(utils.getByTestId("reel-pager"), "layout", { nativeEvent: { layout: { width: 392.7, height: 850.9 } } });
+    await flush();
+    expect(list(utils).props.getItemLayout(null, 1)).toEqual({ length: 850.9, offset: 850.9, index: 1 });
+  });
+
   it("waiting on the loading page: the reel it delivers gets its viewer_swiped once it lands", async () => {
     let resolve!: (v: ReelItem[]) => void;
     const loadMore = jest.fn(() => new Promise<ReelItem[]>((r) => (resolve = r)));

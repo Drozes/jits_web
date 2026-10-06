@@ -115,21 +115,23 @@ export interface CaughtUpInput {
   endOffsetY: number;
 }
 
-/** Offsets within this of the last page's offset count as "at the end" (Android clamps there). */
-const AT_END_PT = 1;
+/** Tolerance for "did not move down" (back toward the previous reel), pt. */
+const NO_BACK_PT = 1;
 
 /**
  * Whether a drag was an attempt to go past the last reel (C-V2), from scroll
  * offsets only. iOS reports the bounce: the drag ends more than 48 pt past
  * the last page. Android clamps the offset at the end (and the native
  * ScrollView owns the touch, so JS touch events are unreliable): a drag that
- * both began and ended resting on the last page, within 1 pt, is the attempt.
+ * began resting on the last page and did not move back toward the previous
+ * one is the attempt. Pages are laid out at the exact (fractional) height,
+ * so the last page is found by rounding, never by exact equality.
  */
 export function isCaughtUpAttempt(i: CaughtUpInput): boolean {
   if (i.lastIndex < 0 || i.active !== i.lastIndex) return false;
-  const lastOffset = i.lastIndex * i.pageHeight;
   if (i.platform === "android") {
-    return Math.abs(i.beginOffsetY - lastOffset) <= AT_END_PT && Math.abs(i.endOffsetY - lastOffset) <= AT_END_PT;
+    const beganOnLast = pageIndexFromOffset(i.beginOffsetY, i.pageHeight, i.lastIndex + 1) === i.lastIndex;
+    return beganOnLast && i.endOffsetY >= i.beginOffsetY - NO_BACK_PT;
   }
-  return i.endOffsetY - lastOffset > CAUGHT_UP_OVERSCROLL_PT;
+  return i.endOffsetY - i.lastIndex * i.pageHeight > CAUGHT_UP_OVERSCROLL_PT;
 }

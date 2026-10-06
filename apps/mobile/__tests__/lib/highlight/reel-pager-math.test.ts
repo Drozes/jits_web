@@ -39,6 +39,19 @@ describe("page math", () => {
   });
 });
 
+describe("unrounded page heights stay aligned", () => {
+  it("page n sits at exactly n * h (no per-page drift), and every page offset maps back to its page", () => {
+    const h = 850.9;
+    for (let n = 0; n <= 40; n++) {
+      expect(pageLayout(h, n).offset).toBe(n * h);
+      expect(pageLayout(h, n).length).toBe(h);
+      expect(pageIndexFromOffset(n * h, h, 41)).toBe(n);
+    }
+    // A rounded height would be 0.1 off per page: 4 pt by page 40, visible as a sliver.
+    expect(Math.abs(pageLayout(Math.round(h), 40).offset - pageLayout(h, 40).offset)).toBeGreaterThan(3);
+  });
+});
+
 describe("pool assignment (index mod 3)", () => {
   it("serves previous, current and next, each on its own slot", () => {
     expect(poolAssignment(0, 5)).toEqual([0, 1, null]);
@@ -109,6 +122,19 @@ describe("C-V2 attempt detection from offsets (both platforms)", () => {
     expect(isCaughtUpAttempt({ ...base, platform: "android", beginOffsetY: 3 * 800, endOffsetY: last })).toBe(false);
     expect(isCaughtUpAttempt({ ...base, platform: "android", beginOffsetY: last, endOffsetY: last, active: 2 })).toBe(false);
   });
+  it("fractional page heights (Android dp, e.g. 850.9) and a long lane (last index 30)", () => {
+    const h = 850.9;
+    const big = { active: 30, lastIndex: 30, pageHeight: h };
+    const lastOffset = 30 * h; // 25527 exactly, no drift
+    // The native snap may report the clamped offset a fraction off the computed one.
+    expect(isCaughtUpAttempt({ ...big, platform: "android", beginOffsetY: lastOffset - 0.4, endOffsetY: lastOffset - 0.4 })).toBe(true);
+    expect(isCaughtUpAttempt({ ...big, platform: "android", beginOffsetY: Math.round(lastOffset), endOffsetY: Math.round(lastOffset) })).toBe(true);
+    // Moving back toward reel 29 is not an attempt; starting on reel 29 is not either.
+    expect(isCaughtUpAttempt({ ...big, platform: "android", beginOffsetY: lastOffset, endOffsetY: lastOffset - 40 })).toBe(false);
+    expect(isCaughtUpAttempt({ ...big, platform: "android", beginOffsetY: 29 * h, endOffsetY: 29 * h + 300 })).toBe(false);
+    expect(isCaughtUpAttempt({ ...big, platform: "ios", beginOffsetY: lastOffset, endOffsetY: lastOffset + 60 })).toBe(true);
+  });
+
   it("never on an empty lane", () => {
     expect(isCaughtUpAttempt({ platform: "ios", active: 0, lastIndex: -1, pageHeight: 800, beginOffsetY: 0, endOffsetY: 500 })).toBe(false);
   });

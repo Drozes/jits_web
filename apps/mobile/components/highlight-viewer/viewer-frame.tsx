@@ -37,9 +37,13 @@ export function ViewerFrame({ binding, source, playbackFailed, onRetry }: Viewer
   }, []);
   // The lane's poster wins whenever there is one: the same image stays up from
   // the loading page through the player's first frame (no flash when the
-  // page's own signed source arrives with a different URL).
-  const poster: ReelPoster | null = binding?.poster?.url
-    ? binding.poster
+  // page's own signed source arrives with a different URL). If it fails to
+  // load (an expired lane URL, nothing cached), the page's own poster takes over.
+  const [laneFailed, setLaneFailed] = React.useState(false);
+  const onPosterError = React.useCallback(() => setLaneFailed(true), []);
+  const lane = binding?.poster?.url && !laneFailed ? binding.poster : null;
+  const poster: ReelPoster | null = lane
+    ? lane
     : source
       ? { url: source.posterUrl, path: source.posterPath }
       : (binding?.poster ?? null);
@@ -54,9 +58,9 @@ export function ViewerFrame({ binding, source, playbackFailed, onRetry }: Viewer
       />
     );
   } else if (source && binding) {
-    body = <ReelVideo pool={binding.pool} index={binding.index} durationS={source.durationS} poster={poster ?? { url: null, path: null }} />;
+    body = <ReelVideo pool={binding.pool} index={binding.index} durationS={source.durationS} poster={poster ?? { url: null, path: null }} onPosterError={lane ? onPosterError : undefined} />;
   } else if (poster?.url) {
-    body = <ReelPosterImage poster={poster} />;
+    body = <ReelPosterImage poster={poster} onError={lane ? onPosterError : undefined} />;
   } else if (size) {
     body = <ViewerSkeleton frameStyle={fitFrame(size.w, size.h)} />;
   }

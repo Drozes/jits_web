@@ -1,34 +1,14 @@
 import * as React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { VideoView } from "expo-video";
-import { Image } from "expo-image";
 import { Play } from "lucide-react-native";
 import { darkTokens } from "@/lib/tokens";
 import { playerLabel } from "@/lib/highlight/highlight-copy";
 import { useReelSlot, useSlotFirstFrame } from "@/lib/highlight/use-reel-player-pool";
+import { ReelPosterImage, type ReelPoster } from "./reel-poster";
 import type { ReelPoolController } from "@/lib/highlight/reel-player-pool";
 
-export interface ReelPoster {
-  url: string | null;
-  path: string | null;
-}
-
-/** The signed 9:16 cover (`cover`), cached as `highlight-poster:<posterPath>`; `blur` for the legacy pillarbox. */
-export function ReelPosterImage({ poster, blur = false }: { poster: ReelPoster; blur?: boolean }) {
-  if (!poster.url) return null;
-  // Keyed by the render-unique storage path, shared with the match-detail card: a re-signed URL reuses it.
-  const source = { uri: poster.url, cacheKey: poster.path ? `highlight-poster:${poster.path}` : undefined };
-  return (
-    <Image
-      testID={blur ? "highlight-poster-blur" : "highlight-poster"}
-      source={source}
-      style={StyleSheet.absoluteFill}
-      contentFit="cover"
-      blurRadius={blur ? 24 : undefined}
-      pointerEvents="none"
-    />
-  );
-}
+export { ReelPosterImage, type ReelPoster } from "./reel-poster";
 
 const CENTER = { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" } as const;
 
@@ -39,7 +19,14 @@ const CENTER = { ...StyleSheet.absoluteFillObject, alignItems: "center", justify
  * played and a frame is up (swapped instantly). A tap toggles pause / play;
  * paused shows a still 64 pt play glyph. No native controls, fullscreen or PiP.
  */
-export function ReelVideo({ pool, index, durationS, poster }: { pool: ReelPoolController; index: number; durationS: number; poster: ReelPoster }) {
+export function ReelVideo({ pool, index, durationS, poster, onPosterError }: {
+  pool: ReelPoolController;
+  index: number;
+  durationS: number;
+  poster: ReelPoster;
+  /** The (lane) poster failed to load: the frame falls back to the page's own. */
+  onPosterError?: () => void;
+}) {
   const snap = useReelSlot(pool, index);
   const onFirstFrame = useSlotFirstFrame(pool, snap.slot);
   const contain = snap.fit === "contain";
@@ -66,7 +53,7 @@ export function ReelVideo({ pool, index, durationS, poster }: { pool: ReelPoolCo
             onFirstFrameRender={onFirstFrame}
           />
         ) : null}
-        {snap.covered ? <ReelPosterImage poster={poster} /> : null}
+        {snap.covered ? <ReelPosterImage poster={poster} onError={onPosterError} /> : null}
         {snap.paused ? (
           <View testID="reel-paused" pointerEvents="none" style={CENTER}>
             <Play size={64} color={darkTokens.textPrimary} style={{ opacity: 0.8 }} />

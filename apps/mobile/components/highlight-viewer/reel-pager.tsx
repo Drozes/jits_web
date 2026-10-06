@@ -23,7 +23,7 @@ export function ReelPager({ session }: { session: ReelViewerSession }) {
   const close = useViewerClose();
   const [height, setHeight] = React.useState(0);
   const p = useReelPager(session, height);
-  const onLayout = React.useCallback((e: LayoutChangeEvent) => setHeight(Math.round(e.nativeEvent.layout.height)), []);
+  const onLayout = React.useCallback((e: LayoutChangeEvent) => setHeight(e.nativeEvent.layout.height), []);
   const listRef = React.useRef<FlatList<ReelItem>>(null);
   useKeepPageOnResize(listRef, height, p.active);
   const getItemLayout = React.useCallback((_: unknown, index: number) => pageLayout(height, index), [height]);
