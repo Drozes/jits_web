@@ -110,6 +110,10 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   const details = useMatchDetail(source?.matchId ?? undefined);
   // The note's start time: an approximate switch landing restarts its 5 s.
   const [approxAt, setApproxAt] = React.useState<number | null>(approximate ? Date.now() : null);
+  // A note that follows a switch landing is already spoken by the landing
+  // announcement: only the note of an open with ?approx=1 is a live region
+  // (otherwise Android reads it twice).
+  const [approxLive, setApproxLive] = React.useState(approximate);
   // The Syncing pill is on screen (including its fade-out). The note waits
   // for it to go, so the two never overlap in their shared slot, and its 5 s
   // start when it appears (P-AS-01/04).
@@ -118,6 +122,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   React.useEffect(() => {
     if (!noteQueued || pillUp) return;
     setNoteQueued(false);
+    setApproxLive(false);
     setApproxAt(Date.now());
   }, [noteQueued, pillUp]);
   const showApprox = approxAt != null && sw.phase !== "pending" && !pillUp;
@@ -138,6 +143,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   React.useEffect(() => {
     if (approxEntryRef.current === entryId) return;
     approxEntryRef.current = entryId;
+    setApproxLive(approximate);
     setApproxAt(approximate ? Date.now() : null);
   }, [entryId, approximate]);
   const entryAngle = view?.videos.find((v) => v.id === entryId);
@@ -166,8 +172,11 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
   // While a switch is pending, the bottom cluster stays on the outgoing angle
   // as it was at the tap (contract 4.5); it swaps to the new angle's live
   // values in one render at landing. The transport stays live.
-  const snapshotRef = React.useRef<ChromeSnapshot | null>(null);
-  const frozen = sw.phase === "pending" ? snapshotRef.current : null;
+  const [snapshot, setSnapshot] = React.useState<ChromeSnapshot | null>(null);
+  // The route's `approx` for each angle this screen switched to, so a restore
+  // to a superseded switch's angle puts back what the route said for it.
+  const approxByIdRef = React.useRef<Record<string, "0" | "1">>({});
+  const frozen = sw.phase === "pending" ? snapshot : null;
   const chromeId = frozen ? frozen.id : activeId;
   const chromePositionS = frozen ? frozen.positionS : positionS;
   const chromeDuration = frozen ? frozen.durationS : duration;
@@ -184,16 +193,23 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
 
   const angleOf = (videoId: string | null | undefined) => view?.videos.find((v) => v.id === videoId);
   const opponentName = view?.opponent?.display_name;
-  const failureTag = useSwitchFeedback(sw, {
+  const failureTag = useSwitchFeedback(sw, phase === "failed", {
     headingOf: (videoId) => angleHeading(angleOf(videoId), opponentName),
     refOf: (videoId) => angleRef(angleOf(videoId), opponentName),
     onApproximateLanding: () => setNoteQueued(true),
     onRestore: (restoreId) => {
       // The hook returned to the previous angle without touching the route:
-      // put the route back on it (contract 3.5, 4.6).
-      const snap = snapshotRef.current;
-      const same = snap != null && snap.id === restoreId;
-      router.setParams({ id: restoreId, t: (same ? snap.fromT : positionS).toFixed(3), approx: same ? snap.approx : "0" });
+      // put the route back on it (contract 3.5, 4.6). After a superseded
+      // switch (A to B pending, then C fails) the angle returned to is B, not
+      // the tap snapshot's A: take a fresh snapshot of B at the restore time,
+      // so the frozen chrome and the route both say B.
+      let snap = snapshot;
+      if (!snap || snap.id !== restoreId) {
+        const t = playback.currentTimeNow();
+        snap = { id: restoreId, positionS: t, durationS: duration, fromT: t, approx: approxByIdRef.current[restoreId] ?? "0" };
+        setSnapshot(snap);
+      }
+      router.setParams({ id: restoreId, t: snap.fromT.toFixed(3), approx: snap.approx });
     },
   });
   const onPillShown = React.useCallback(() => {
@@ -272,8 +288,9 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                   // A switch superseding a pending one keeps the first
                   // snapshot: the outgoing angle is still what is on screen.
                   if (sw.phase !== "pending") {
-                    snapshotRef.current = { id: activeId, positionS, durationS: duration, fromT, approx: approximate ? "1" : "0" };
+                    setSnapshot({ id: activeId, positionS, durationS: duration, fromT, approx: approximate ? "1" : "0" });
                   }
+                  approxByIdRef.current[other] = exact ? "0" : "1";
                   playback.switchAngle(other, moved.t, { approximate: !exact });
                   // The note shows when an approximate switch lands, not at the tap.
                   setApproxAt(null);
@@ -295,7 +312,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
                 </Text>
               </View>
             ) : showApprox ? (
-              <View testID="player-approx-note" accessibilityLiveRegion="polite">
+              <View testID="player-approx-note" accessibilityLiveRegion={approxLive ? "polite" : "none"}>
                 <Text className="font-mono-medium" style={[typeStep("micro"), { letterSpacing: TRACKING.caps, color: ON_MEDIA.text2, backgroundColor: ON_MEDIA.badge, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 2 }, TABULAR]}>
                   Angles aren't synced; position is approximate
                 </Text>
@@ -360,6 +377,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
  */
 function useSwitchFeedback(
   sw: SwitchState,
+  playbackFailed: boolean,
   on: {
     headingOf: (videoId: string | null) => string;
     refOf: (videoId: string) => string;
@@ -392,13 +410,16 @@ function useSwitchFeedback(
   const failed = sw.failed;
   React.useEffect(() => {
     if (!failed || failedSeqRef.current === failed.seq) return;
+    // The restore failed too: the retry panel replaces the player, so the
+    // tag is neither shown nor spoken.
+    if (playbackFailed) return;
     failedSeqRef.current = failed.seq;
     const until = failed.at + FAILURE_TAG_MS;
     if (until <= Date.now()) return;
     const text = couldNotLoadAngle(onRef.current.refOf(failed.targetId));
     AccessibilityInfo.announceForAccessibility(text);
     setTag({ seq: failed.seq, text, until });
-  }, [failed]);
+  }, [failed, playbackFailed]);
 
   React.useEffect(() => {
     if (!tag) return;
@@ -406,5 +427,5 @@ function useSwitchFeedback(
     return () => clearTimeout(timer);
   }, [tag]);
 
-  return tag && failed?.seq === tag.seq ? tag.text : null;
+  return tag && failed?.seq === tag.seq && !playbackFailed ? tag.text : null;
 }

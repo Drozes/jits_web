@@ -15,7 +15,8 @@ export const SYNCING_PILL_MIN_MS = 400;
 const BAND_FRACTION = 0.4;
 
 export interface SyncingPillProps {
-  switchState: Pick<SwitchState, "phase" | "seq" | "startedAt" | "approximate" | "restoring">;
+  /** `failed` is optional (contract 4.2 has no field for it): a failure of this seq removes the pill at once. */
+  switchState: Pick<SwitchState, "phase" | "seq" | "startedAt" | "approximate" | "restoring"> & Partial<Pick<SwitchState, "failed">>;
   /** From useReduceMotion() at the screen (a prop for testability). */
   reduceMotion: boolean;
   /** Called once per switch (seq) the pill is shown for (the screen counts it in telemetry). */
@@ -46,7 +47,9 @@ export interface SyncingPillProps {
  * intrinsic size; the screen places it.
  */
 export function SyncingPill({ switchState, reduceMotion, onShown, onVisibleChange, testID = "syncing-pill" }: SyncingPillProps) {
-  const { phase, seq, startedAt, approximate, restoring } = switchState;
+  const { phase, seq, startedAt, approximate, restoring, failed } = switchState;
+  // This switch failed: with a restore, or without one (no angle to return to).
+  const failedNow = restoring || failed?.seq === seq;
   const eligible = phase === "pending" && !restoring;
   const [visible, setVisible] = React.useState(false);
   const [rendered, setRendered] = React.useState(false);
@@ -111,11 +114,11 @@ export function SyncingPill({ switchState, reduceMotion, onShown, onVisibleChang
   // A failed switch (the restore starts): gone at once, the failure tag
   // takes the slot from the moment of failure (P-AS-05).
   React.useEffect(() => {
-    if (!restoring || !rendered) return;
+    if (!failedNow || !rendered) return;
     opacity.value = 0;
     setVisible(false);
     setRendered(false);
-  }, [restoring, rendered, opacity]);
+  }, [failedNow, rendered, opacity]);
 
   const onVisibleChangeRef = React.useRef(onVisibleChange);
   onVisibleChangeRef.current = onVisibleChange;

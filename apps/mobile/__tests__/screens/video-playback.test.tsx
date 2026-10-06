@@ -172,6 +172,8 @@ jest.mock("expo-image", () => {
  * recorded with its options.
  */
 let mockSwitchState: Record<string, unknown> | null = null;
+/** Other members of the hook's result to override (for example `phase`). */
+let mockPlaybackPatch: Record<string, unknown> | null = null;
 const mockSwitchCalls: unknown[][] = [];
 jest.mock("@/lib/match-detail/use-video-playback", () => {
   const actual = jest.requireActual("@/lib/match-detail/use-video-playback");
@@ -183,7 +185,7 @@ jest.mock("@/lib/match-detail/use-video-playback", () => {
         mockSwitchCalls.push(args);
         real.switchAngle(...args);
       };
-      return { ...real, switchAngle, ...(mockSwitchState ? { switchState: mockSwitchState } : {}) };
+      return { ...real, switchAngle, ...(mockSwitchState ? { switchState: mockSwitchState } : {}), ...(mockPlaybackPatch ?? {}) };
     },
   };
 });
@@ -278,6 +280,7 @@ beforeEach(() => {
   mockApprox = undefined;
   mockSwitchState = null;
   mockSwitchCalls.length = 0;
+  mockPlaybackPatch = null;
   // The route follows setParams, like expo-router (tests rerender to apply it).
   mockSetParams.mockImplementation((p: { id?: string }) => {
     if (p.id) mockId = p.id;
@@ -1282,6 +1285,86 @@ describe("one slot under the switcher: pill, note and failure tag never overlap 
     expect(announce).toHaveBeenCalledTimes(1);
     setSwitch(utils, { phase: "landing", seq: 1, restoring: true, fromId: "vid-2", targetId: "vid-1", startedAt: Date.now(), landedAt: Date.now(), failed });
     expect(announce).toHaveBeenCalledTimes(1);
+    expect(utils.getByTestId("player-switch-failed")).toBeTruthy();
+  });
+});
+
+describe("angle switch review fixes (jits-xfvd.16)", () => {
+  const HIDDEN = { includeHiddenElements: true } as const;
+  let announce: jest.SpyInstance;
+  beforeEach(() => {
+    announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
+  });
+  afterEach(() => announce.mockRestore());
+
+  const VID3 = { id: "vid-3", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, recording_type: "timekeeper", angle_label: "Jo Cruz's recording", playability: "playable", has_analysis: false };
+
+  async function renderAngles(extra: Record<string, unknown>[] = []) {
+    mockGetVideoAnalysis.mockImplementation((_c: unknown, vid: string) => Promise.resolve(vid === "vid-1" ? ANALYSIS : { ok: true, data: null }));
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(playableInMatch());
+    mockUseMatchDetail.mockImplementation((id: string | undefined) =>
+      id === MATCH ? detailView(2, extra) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
+    );
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(lastPlayer()?.replaceAsync).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    ready(400);
+    await waitFor(() => expect(utils.getByTestId("angle-switcher")).toBeTruthy());
+    await waitFor(() => expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy());
+    await act(async () => undefined);
+    return utils;
+  }
+
+  it("(3) the note after a landing is not a live region; the note of an open with ?approx=1 is", async () => {
+    mockApprox = "1";
+    const utils = await renderAngles();
+    expect(utils.getByTestId("player-approx-note").props.accessibilityLiveRegion).toBe("polite");
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ approximate: true }));
+    setSwitch(utils, landedOn2({ approximate: true }));
+    await waitFor(() => expect(utils.getByTestId("player-approx-note")).toBeTruthy());
+    expect(utils.getByTestId("player-approx-note").props.accessibilityLiveRegion).toBe("none");
+    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it("(6) a restore to a superseded switch's angle snapshots that angle: route and frozen chrome say B", async () => {
+    const utils = await renderAngles([VID3]);
+    statusAt(42.6);
+    // A (vid-1) to B (vid-2), approximate (no offsets).
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ approximate: true }));
+    // While B is pending, chrome is A's (4 moments); then C supersedes and fails.
+    expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy();
+    fireEvent.press(utils.getByTestId("angle-vid-3"));
+    setSwitch(utils, { ...pendingTo2(), seq: 2, fromId: "vid-2", targetId: "vid-3" });
+    mockSetParams.mockClear();
+    const failed = { seq: 2, targetId: "vid-3", at: Date.now() };
+    setSwitch(utils, { phase: "pending", seq: 2, restoring: true, fromId: "vid-3", targetId: "vid-2", startedAt: Date.now(), failed });
+    expect(mockSetParams).toHaveBeenCalledTimes(1);
+    // B's route, with B's own approx; its time is the restore time on B.
+    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "42.600", approx: "1" });
+    // Frozen chrome is now B's (no breakdown), not A's 4 moments.
+    expect(utils.queryByText(/KEY MOMENT/)).toBeNull();
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
+    expect(utils.getByTestId("player-switch-failed")).toHaveTextContent("Could not load J. Cruz's angle. Tap it to try again.");
+  });
+
+  it("(7) no failure tag and no announcement once playback itself failed (retry panel)", async () => {
+    const utils = await renderAngles();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2());
+    mockPlaybackPatch = { phase: "failed" };
+    setSwitch(utils, { phase: "idle", seq: 1, fromId: "vid-1", targetId: "vid-2", failed: { seq: 1, targetId: "vid-2", at: Date.now() } });
+    expect(utils.queryByTestId("player-switch-failed")).toBeNull();
+    expect(announce).not.toHaveBeenCalled();
+  });
+
+  it("(7) a failed switch with no angle to return to removes the pill at once", async () => {
+    const utils = await renderAngles();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ startedAt: Date.now() - 1000 }));
+    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toBeTruthy(), { timeout: 4000 });
+    setSwitch(utils, { phase: "idle", seq: 1, fromId: null, targetId: "vid-2", failed: { seq: 1, targetId: "vid-2", at: Date.now() } });
+    expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
     expect(utils.getByTestId("player-switch-failed")).toBeTruthy();
   });
 });

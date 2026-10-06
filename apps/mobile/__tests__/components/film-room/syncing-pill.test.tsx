@@ -147,6 +147,15 @@ describe("SyncingPill", () => {
     expect(s.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
   });
 
+  it("a failed switch with no restore (no angle to return to) removes it at once too", () => {
+    const start = pending();
+    const s = render(pill(start));
+    advance(SYNCING_PILL_DELAY_MS);
+    expect(s.getByTestId("syncing-pill", HIDDEN)).toBeTruthy();
+    s.rerender(<SyncingPill switchState={{ ...start, phase: "idle", failed: { seq: 1, targetId: "b", at: Date.now() } }} reduceMotion={false} />);
+    expect(s.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
+  });
+
   it("is not shown for a restore after a failure", () => {
     const s = render(pill(pending({ restoring: true })));
     advance(1000);

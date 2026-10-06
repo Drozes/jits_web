@@ -72,6 +72,25 @@ describe("useAngleAnalyses", () => {
     expect(result.current.analysisFor(undefined)).toBeNull();
   });
 
+  it("retries a failed read on the next change of the list", async () => {
+    const { result, rerender } = renderHook(({ ids }: { ids: string[] }) => useAngleAnalyses(ids), { initialProps: { ids: ["a", "b"] } });
+    await act(async () => {
+      pending.a({ ok: false, error: { code: "UNKNOWN" } });
+      pending.b({ ok: true, data: analysis("B") });
+    });
+    expect(result.current.stateFor("a")).toBe("error");
+    // A switch reorders the list (the angle on screen first): a is read again, b is not.
+    rerender({ ids: ["b", "a"] });
+    expect(mockGetVideoAnalysis).toHaveBeenCalledTimes(3);
+    expect(mockGetVideoAnalysis.mock.calls[2][1]).toBe("a");
+    await act(async () => {
+      pending.a({ ok: true, data: analysis("A") });
+    });
+    expect(result.current.analysisFor("a")).toMatchObject({ summary: "A" });
+    rerender({ ids: ["a", "b"] });
+    expect(mockGetVideoAnalysis).toHaveBeenCalledTimes(3);
+  });
+
   it("reads nothing for an empty list", () => {
     renderHook(() => useAngleAnalyses([]));
     expect(mockGetVideoAnalysis).not.toHaveBeenCalled();

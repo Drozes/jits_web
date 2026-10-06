@@ -53,6 +53,9 @@ export function useAngleAnalyses(videoIds: string[]): {
       void (async () => {
         const result = await getVideoAnalysis(supabase, id);
         if (!mountedRef.current) return;
+        // A failed read is retried by the next change of the list (a switch
+        // reorders it, the angle on screen first).
+        if (!result.ok) requestedRef.current.delete(id);
         const entry: Entry = !result.ok
           ? { state: "error", analysis: null }
           : { state: result.data ? "ready" : "none", analysis: result.data };
