@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { supabase } from "@/lib/supabase/client";
 import {
   getHighlightProgress,
@@ -85,15 +84,16 @@ async function livePlayback(matchVideoId: string): Promise<HighlightPlayback | n
 }
 
 /**
- * Warms a page that is not on screen yet: its poster image and its signed
- * playback URL (one progress read, one sign, both cached). Resolves the
+ * Warms a page that is not on screen yet: its signed playback URL (one
+ * progress read, one sign, both cached). Posters are not prefetched here:
+ * `Image.prefetch` cannot take the `highlight-poster:<posterPath>` cache key
+ * the page renders with, so it would warm a different cache entry; the next
+ * page is mounted by the pager's render window and loads its poster itself. Resolves the
  * source the page's player can preload, with its signing time (null when the
  * reel has no live render or a call failed; the page then signs when it
- * mounts, as it would without prefetch). The poster is fetched by the same
- * URL the page renders (`ReelPosterImage` uses no custom cache key).
+ * mounts, as it would without prefetch).
  */
 export function prefetchReel(item: ReelItem): Promise<PrefetchedReel | null> {
-  if (item.posterUrl) void Promise.resolve(Image.prefetch?.(item.posterUrl)).catch(() => undefined);
   const running = prefetching.get(item.matchVideoId);
   if (running) return running;
   const run = livePlayback(item.matchVideoId)

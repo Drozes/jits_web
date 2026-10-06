@@ -92,20 +92,24 @@ describe("prefetch and pagination", () => {
   });
 });
 
-describe("C-V2 attempt detection (both platforms)", () => {
+describe("C-V2 attempt detection from offsets (both platforms)", () => {
   const base = { active: 4, lastIndex: 4, pageHeight: 800 };
-  it("iOS: the bounce past the last page by more than 48 pt", () => {
-    expect(isCaughtUpAttempt({ ...base, platform: "ios", endOffsetY: 4 * 800 + 60 })).toBe(true);
-    expect(isCaughtUpAttempt({ ...base, platform: "ios", endOffsetY: 4 * 800 + 30 })).toBe(false);
-    expect(isCaughtUpAttempt({ ...base, platform: "ios", endOffsetY: 4 * 800 + 60, active: 3 })).toBe(false);
+  const last = 4 * 800;
+  it("iOS: the drag ends in the bounce, more than 48 pt past the last page", () => {
+    expect(isCaughtUpAttempt({ ...base, platform: "ios", beginOffsetY: last, endOffsetY: last + 60 })).toBe(true);
+    expect(isCaughtUpAttempt({ ...base, platform: "ios", beginOffsetY: last, endOffsetY: last + 30 })).toBe(false);
+    expect(isCaughtUpAttempt({ ...base, platform: "ios", beginOffsetY: last, endOffsetY: last + 60, active: 3 })).toBe(false);
   });
-  it("Android: the offset clamps, so the finger's travel up decides", () => {
-    expect(isCaughtUpAttempt({ ...base, platform: "android", endOffsetY: 4 * 800, touchDeltaY: 80 })).toBe(true);
-    expect(isCaughtUpAttempt({ ...base, platform: "android", endOffsetY: 4 * 800, touchDeltaY: 20 })).toBe(false);
-    expect(isCaughtUpAttempt({ ...base, platform: "android", touchDeltaY: -120 })).toBe(false);
-    expect(isCaughtUpAttempt({ ...base, platform: "android", touchDeltaY: 120, active: 2 })).toBe(false);
+  it("Android: the offset clamps, so a drag that began and ended on the last page (within 1 pt) is the attempt", () => {
+    expect(isCaughtUpAttempt({ ...base, platform: "android", beginOffsetY: last, endOffsetY: last })).toBe(true);
+    expect(isCaughtUpAttempt({ ...base, platform: "android", beginOffsetY: last + 0.5, endOffsetY: last - 0.5 })).toBe(true);
+    // A drag back toward the previous reel moved the offset.
+    expect(isCaughtUpAttempt({ ...base, platform: "android", beginOffsetY: last, endOffsetY: last - 120 })).toBe(false);
+    // Arriving at the last page from the one before is a swipe, not an attempt.
+    expect(isCaughtUpAttempt({ ...base, platform: "android", beginOffsetY: 3 * 800, endOffsetY: last })).toBe(false);
+    expect(isCaughtUpAttempt({ ...base, platform: "android", beginOffsetY: last, endOffsetY: last, active: 2 })).toBe(false);
   });
   it("never on an empty lane", () => {
-    expect(isCaughtUpAttempt({ platform: "ios", active: 0, lastIndex: -1, pageHeight: 800, endOffsetY: 500 })).toBe(false);
+    expect(isCaughtUpAttempt({ platform: "ios", active: 0, lastIndex: -1, pageHeight: 800, beginOffsetY: 0, endOffsetY: 500 })).toBe(false);
   });
 });

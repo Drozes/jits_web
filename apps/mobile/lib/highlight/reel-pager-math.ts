@@ -109,19 +109,27 @@ export interface CaughtUpInput {
   active: number;
   lastIndex: number;
   pageHeight: number;
-  /** iOS: the content offset when the drag ended (it overscrolls into the bounce). */
-  endOffsetY?: number;
-  /** Android: finger travel up the screen in pt (start pageY minus end pageY); the offset clamps there. */
-  touchDeltaY?: number;
+  /** The content offset when the drag began. */
+  beginOffsetY: number;
+  /** The content offset when the drag ended. */
+  endOffsetY: number;
 }
 
+/** Offsets within this of the last page's offset count as "at the end" (Android clamps there). */
+const AT_END_PT = 1;
+
 /**
- * Whether a drag was an attempt to go past the last reel (C-V2). iOS reports
- * the bounce in the content offset; Android clamps the offset at the end, so
- * the finger's travel decides there.
+ * Whether a drag was an attempt to go past the last reel (C-V2), from scroll
+ * offsets only. iOS reports the bounce: the drag ends more than 48 pt past
+ * the last page. Android clamps the offset at the end (and the native
+ * ScrollView owns the touch, so JS touch events are unreliable): a drag that
+ * both began and ended resting on the last page, within 1 pt, is the attempt.
  */
 export function isCaughtUpAttempt(i: CaughtUpInput): boolean {
   if (i.lastIndex < 0 || i.active !== i.lastIndex) return false;
-  if (i.platform === "android") return (i.touchDeltaY ?? 0) > CAUGHT_UP_OVERSCROLL_PT;
-  return (i.endOffsetY ?? 0) - i.lastIndex * i.pageHeight > CAUGHT_UP_OVERSCROLL_PT;
+  const lastOffset = i.lastIndex * i.pageHeight;
+  if (i.platform === "android") {
+    return Math.abs(i.beginOffsetY - lastOffset) <= AT_END_PT && Math.abs(i.endOffsetY - lastOffset) <= AT_END_PT;
+  }
+  return i.endOffsetY - lastOffset > CAUGHT_UP_OVERSCROLL_PT;
 }

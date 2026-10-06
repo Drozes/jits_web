@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Platform, type GestureResponderEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ViewToken } from "react-native";
+import { Platform, type NativeScrollEvent, type NativeSyntheticEvent, type ViewToken } from "react-native";
 import type { ReelItem } from "@/lib/highlight/reel-types";
 import { laneSource, type ReelViewerSession } from "@/lib/highlight/reel-viewer-session";
 import {
@@ -78,7 +78,9 @@ export function useReelPager(session: ReelViewerSession, pageHeight: number) {
     failedAt: null as number | null,
     height: pageHeight,
     gesture: false,
-    touchY: null as number | null,
+    beginY: 0,
+    /** Landed on the loading page; its reel's viewer_swiped is logged once the page delivers it. */
+    footerFrom: null as number | null,
     fallback: null as ReturnType<typeof setTimeout> | null,
   }).current;
   s.items = items;
@@ -94,7 +96,8 @@ export function useReelPager(session: ReelViewerSession, pageHeight: number) {
     s.swiped.add(index);
     hint.dismiss();
     const item = s.items[index];
-    // The loading page after the last reel: nothing plays, nothing to log.
+    s.footerFrom = item ? null : from;
+    // The loading page after the last reel: nothing plays, nothing to log yet.
     if (item) swipe.landed({ highlightId: item.highlightId, index, direction: index > from ? "next" : "previous" });
     setActive(index);
   };
@@ -114,15 +117,16 @@ export function useReelPager(session: ReelViewerSession, pageHeight: number) {
         const hit = viewableItems.find((v) => v.isViewable && typeof v.index === "number");
         if (hit && typeof hit.index === "number") handlers.land(hit.index);
       },
-      onScrollBeginDrag: () => {
+      onScrollBeginDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
         clearFallback();
         s.gesture = true;
+        s.beginY = e.nativeEvent.contentOffset.y;
       },
       onScrollEndDrag: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
         const y = e.nativeEvent.contentOffset.y;
-        if (s.exhausted && Platform.OS !== "android") {
-          const hitEnd = isCaughtUpAttempt({ platform: Platform.OS, active: s.active, lastIndex: s.items.length - 1, pageHeight: s.height, endOffsetY: y });
-          if (hitEnd) setCaughtUp(true);
+        if (s.exhausted) {
+          const end = { platform: Platform.OS, active: s.active, lastIndex: s.items.length - 1, pageHeight: s.height };
+          if (isCaughtUpAttempt({ ...end, beginOffsetY: s.beginY, endOffsetY: y })) setCaughtUp(true);
         }
         clearFallback();
         s.fallback = setTimeout(() => {
@@ -136,21 +140,19 @@ export function useReelPager(session: ReelViewerSession, pageHeight: number) {
         s.gesture = false;
         landAt(e.nativeEvent.contentOffset.y);
       },
-      onTouchStart: (e: GestureResponderEvent) => {
-        s.touchY = e.nativeEvent.pageY;
-      },
-      onTouchEnd: (e: GestureResponderEvent) => {
-        const start = s.touchY;
-        s.touchY = null;
-        if (Platform.OS !== "android" || start == null || !s.exhausted) return;
-        const hitEnd = isCaughtUpAttempt({ platform: "android", active: s.active, lastIndex: s.items.length - 1, pageHeight: s.height, touchDeltaY: start - e.nativeEvent.pageY });
-        if (hitEnd) setCaughtUp(true);
-      },
     };
   });
   React.useEffect(() => () => {
     if (s.fallback) clearTimeout(s.fallback);
   }, [s]);
+
+  // The athlete waited on the loading page and it delivered: that landing is a reel now.
+  React.useEffect(() => {
+    const item = s.footerFrom === null ? undefined : s.items[s.active];
+    if (!item || s.footerFrom === null) return;
+    swipe.landed({ highlightId: item.highlightId, index: s.active, direction: "next" });
+    s.footerFrom = null;
+  }, [items, s, swipe]);
 
   React.useEffect(() => {
     if (!caughtUp) return;

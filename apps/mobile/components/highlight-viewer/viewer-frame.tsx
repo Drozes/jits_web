@@ -35,7 +35,14 @@ export function ViewerFrame({ binding, source, playbackFailed, onRetry }: Viewer
     const { width, height } = e.nativeEvent.layout;
     setSize((prev) => (prev && prev.w === width && prev.h === height ? prev : { w: width, h: height }));
   }, []);
-  const poster: ReelPoster | null = source ? { url: source.posterUrl, path: source.posterPath } : (binding?.poster ?? null);
+  // The lane's poster wins whenever there is one: the same image stays up from
+  // the loading page through the player's first frame (no flash when the
+  // page's own signed source arrives with a different URL).
+  const poster: ReelPoster | null = binding?.poster?.url
+    ? binding.poster
+    : source
+      ? { url: source.posterUrl, path: source.posterPath }
+      : (binding?.poster ?? null);
 
   let body: React.ReactNode = null;
   if (playbackFailed) {

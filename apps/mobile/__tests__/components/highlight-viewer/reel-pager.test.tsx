@@ -75,9 +75,10 @@ const mockRefresh = jest.fn();
 jest.mock("@jits/shared/hooks/use-highlight-progress", () => ({
   useHighlightProgress: (_s: unknown, mv: string | null) => ({ data: mv ? mockProgressFor(mv) : null, loading: false, error: null, refresh: mockRefresh }),
 }));
-const mockSign = jest.fn((_s: unknown, p: { storagePath: string; version: number }) =>
-  Promise.resolve({ ok: true, data: { url: `https://signed/${p.storagePath}`, posterUrl: null, version: p.version, durationS: 28 } }),
-);
+function mockSignDefault(_s: unknown, p: { storagePath: string; version: number }) {
+  return Promise.resolve({ ok: true, data: { url: `https://signed/${p.storagePath}`, posterUrl: null as string | null, version: p.version, durationS: 28 } });
+}
+const mockSign = jest.fn(mockSignDefault);
 const mockGetProgress = jest.fn((_s: unknown, mv: string) => Promise.resolve({ ok: true, data: mockProgressFor(mv) }));
 jest.mock("@jits/shared/api/highlights", () => ({
   signHighlightPlayback: (...a: unknown[]) => mockSign(...(a as [unknown, { storagePath: string; version: number }])),
@@ -194,6 +195,7 @@ function pool() {
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  mockSign.mockImplementation(mockSignDefault);
   resetFakeVideo();
   resetReelPrefetch();
   __resetReelSessionsForTests();
@@ -217,11 +219,12 @@ describe("ReelPager", () => {
     expect(pool()[2].playing).toBe(false);
   });
 
-  it("prefetches i + 1 and i + 2 (signed, posters), nothing further, and preloads the next reel paused", async () => {
+  it("prefetches i + 1 and i + 2 (signed), nothing further, and preloads the next reel paused", async () => {
     await open(session([reel(1), reel(2), reel(3), reel(4), reel(5)], 1));
     const mvs = mockGetProgress.mock.calls.map((c) => c[1]).sort();
     expect(mvs).toEqual(["v3", "v4"]);
-    expect(mockImagePrefetch.mock.calls.map((c) => (c as unknown[])[0]).sort()).toEqual(["https://signed/p3.jpg", "https://signed/p4.jpg"]);
+    // Posters render under the `highlight-poster:<path>` key, which Image.prefetch cannot target.
+    expect(mockImagePrefetch).not.toHaveBeenCalled();
     expect(pool()[2].replaceAsync).toHaveBeenCalledWith("https://signed/v3.mp4");
     expect(pool()[2].playing).toBe(false);
   });
@@ -367,6 +370,7 @@ describe("ReelPager", () => {
     await AsyncStorage.setItem(REEL_SWIPE_HINT_KEY, "1");
     const utils = await open(session([reel(1), reel(2)], 1));
     await act(async () => {
+      list(utils).props.onScrollBeginDrag({ nativeEvent: { contentOffset: { y: H } } });
       list(utils).props.onScrollEndDrag({ nativeEvent: { contentOffset: { y: H + 60 } } });
     });
     await flush();
@@ -451,22 +455,52 @@ describe("ReelPager", () => {
     expect(steps("viewer_swiped")).toHaveLength(0);
   });
 
-  it("Android: the offset clamps at the end, so a finger drag up on the last reel shows C-V2", async () => {
+  it("Android: a drag that begins and ends clamped on the last reel shows C-V2 (offsets only)", async () => {
     const original = Platform.OS;
     Object.defineProperty(Platform, "OS", { value: "android", configurable: true });
     try {
       await AsyncStorage.setItem(REEL_SWIPE_HINT_KEY, "1");
       const utils = await open(session([reel(1), reel(2)], 1));
+      // A real upward swipe: the native ScrollView owns the touch and the offset stays clamped.
       await act(async () => {
-        list(utils).props.onTouchStart({ nativeEvent: { pageY: 600 } });
-        list(utils).props.onScrollEndDrag({ nativeEvent: { contentOffset: { y: H } } });
-        list(utils).props.onTouchEnd({ nativeEvent: { pageY: 480 } });
+        list(utils).props.onScrollBeginDrag({ nativeEvent: { contentOffset: { y: H } } });
+        list(utils).props.onScrollEndDrag({ nativeEvent: { contentOffset: { y: H }, velocity: { y: 1.2 } } });
       });
       await flush();
       expect(utils.getByText("You're all caught up")).toBeTruthy();
     } finally {
       Object.defineProperty(Platform, "OS", { value: original, configurable: true });
     }
+  });
+
+  it("the lane's poster stays the image (same URL and cache key) when the page's own source arrives", async () => {
+    // The page's sign returns a different poster URL than the lane's.
+    mockSign.mockImplementation((_s: unknown, p: { storagePath: string; version: number }) =>
+      Promise.resolve({ ok: true, data: { url: `https://signed/${p.storagePath}`, posterUrl: "https://resigned/poster.jpg" as string | null, version: p.version, durationS: 28 } }),
+    );
+    const utils = await open(session([reel(1), reel(2)], 0));
+    const posters = utils.UNSAFE_root.findAll((n: { props: { testID?: string } }) => n.props.testID === "highlight-poster" && typeof (n as unknown as { type: unknown }).type === "string");
+    expect(utils.getByTestId("highlight-player")).toBeTruthy();
+    expect(posters.length).toBeGreaterThan(0);
+    for (const p of posters) {
+      expect(p.props.source).toEqual({ uri: "https://signed/p1.jpg", cacheKey: "highlight-poster:p1.jpg" });
+    }
+  });
+
+  it("waiting on the loading page: the reel it delivers gets its viewer_swiped once it lands", async () => {
+    let resolve!: (v: ReelItem[]) => void;
+    const loadMore = jest.fn(() => new Promise<ReelItem[]>((r) => (resolve = r)));
+    const utils = await open(session([reel(1), reel(2)], 1, loadMore));
+    await act(async () => list(utils).props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { y: 2 * H } } }));
+    expect(steps("viewer_swiped")).toHaveLength(0);
+    await act(async () => resolve([reel(3)]));
+    await flush();
+    // The landing is pending for its first frame; the next landing flushes it.
+    await swipeTo(utils, 1);
+    const swiped = steps("viewer_swiped");
+    expect(swiped[0][0]).toBe("h3");
+    expect(swiped[0][2]).toMatchObject({ direction: "next", index: 2 });
+    expect(swiped.filter((c) => c[0] === "h3")).toHaveLength(1);
   });
 
   it("Close goes back to the opening surface", async () => {

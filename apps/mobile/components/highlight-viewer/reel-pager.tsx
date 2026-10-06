@@ -64,8 +64,6 @@ export function ReelPager({ session }: { session: ReelViewerSession }) {
             onScrollEndDrag={p.onScrollEndDrag}
             onMomentumScrollBegin={p.onMomentumScrollBegin}
             onMomentumScrollEnd={p.onMomentumScrollEnd}
-            onTouchStart={p.onTouchStart}
-            onTouchEnd={p.onTouchEnd}
             onViewableItemsChanged={p.onViewableItemsChanged}
             viewabilityConfig={REEL_VIEWABILITY}
             scrollEnabled={!p.modalOpen}

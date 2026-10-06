@@ -61,5 +61,5 @@ export function useSwipeTelemetry(pool: ReelPoolController, source: HighlightSha
     },
     [pool, flush],
   );
-  return { landed };
+  return React.useMemo(() => ({ landed }), [landed]);
 }
