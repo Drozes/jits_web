@@ -1532,6 +1532,20 @@
         "packages/shared/src/utils/shared.ts"
       ]
     },
+    "62-Settings-Video.dc.html": {
+      "title": "Settings: video (playback quality)",
+      "sources": [
+        "apps/mobile/app/(app)/_layout.tsx",
+        "apps/mobile/app/(app)/settings/_layout.tsx",
+        "apps/mobile/app/(app)/settings/video.tsx",
+        "apps/mobile/components/layout/app-header.tsx",
+        "apps/mobile/components/layout/header-live-dot.tsx",
+        "apps/mobile/components/layout/page-container.tsx",
+        "apps/mobile/components/ui/elo-system/plate.tsx",
+        "apps/mobile/components/ui/elo-system/selection.tsx",
+        "apps/mobile/components/ui/state-pressable.tsx"
+      ]
+    },
     "50-Invite-Challenge.dc.html": {
       "title": "Invite & challenge: QR, code, share (invites on)",
       "sources": [
@@ -1895,7 +1909,6 @@
     "apps/mobile/app/(app)/settings/admin/metrics.tsx",
     "apps/mobile/app/(app)/settings/admin/no-match.tsx",
     "apps/mobile/app/(app)/settings/realtime-test.tsx",
-    "apps/mobile/app/(app)/settings/video.tsx",
     "apps/mobile/app/+native-intent.tsx",
     "apps/mobile/app/index.tsx",
     "apps/mobile/components/admin/member-gym-owner-section.tsx",

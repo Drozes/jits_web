@@ -1,5 +1,5 @@
 import * as React from "react";
-import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor, within } from "@testing-library/react-native";
 
 // ---- mocks ----
 
@@ -155,6 +155,43 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchVideoPlaybackResult: jest.fn(),
 }));
 
+// Timing is the screen's (pill delay, minimum, fade timers), not the animation runtime's.
+jest.mock("react-native-reanimated", () => require("react-native-reanimated/mock"));
+
+// The held still is an expo-image of a native thumbnail.
+jest.mock("expo-image", () => {
+  const R = require("react");
+  const RN = require("react-native");
+  return { Image: (props: { testID?: string }) => R.createElement(RN.View, { testID: props.testID }) };
+});
+
+/**
+ * The real playback hook drives the player; slice B1 (jits-xfvd.16) drives
+ * its `switchState`. The screen's switch UI is tested here by setting
+ * `mockSwitchState` (null: the hook's own), and every `switchAngle` call is
+ * recorded with its options.
+ */
+let mockSwitchState: Record<string, unknown> | null = null;
+/** Other members of the hook's result to override (for example `phase`). */
+let mockPlaybackPatch: Record<string, unknown> | null = null;
+const mockSwitchCalls: unknown[][] = [];
+jest.mock("@/lib/match-detail/use-video-playback", () => {
+  const actual = jest.requireActual("@/lib/match-detail/use-video-playback");
+  return {
+    ...actual,
+    useVideoPlayback: (...a: unknown[]) => {
+      const real = actual.useVideoPlayback(...a);
+      const switchAngle = (...args: unknown[]) => {
+        mockSwitchCalls.push(args);
+        real.switchAngle(...args);
+      };
+      return { ...real, switchAngle, ...(mockSwitchState ? { switchState: mockSwitchState } : {}), ...(mockPlaybackPatch ?? {}) };
+    },
+  };
+});
+
+import { AccessibilityInfo } from "react-native";
+import { IDLE_SWITCH_STATE } from "@/lib/match-detail/use-video-playback";
 import MatchVideoScreen from "@/app/(app)/video/[id]";
 
 interface QueryMocks {
@@ -241,6 +278,9 @@ beforeEach(() => {
   mockId = "vid-1";
   mockT = undefined;
   mockApprox = undefined;
+  mockSwitchState = null;
+  mockSwitchCalls.length = 0;
+  mockPlaybackPatch = null;
   // The route follows setParams, like expo-router (tests rerender to apply it).
   mockSetParams.mockImplementation((p: { id?: string }) => {
     if (p.id) mockId = p.id;
@@ -621,6 +661,22 @@ function statusAt(seconds: number) {
   timeTo(seconds);
 }
 
+/** Put the hook's switchState at `patch` (on top of idle) and re-render. */
+function setSwitch(utils: ReturnType<typeof render>, patch: Record<string, unknown> | null) {
+  mockSwitchState = patch ? { ...IDLE_SWITCH_STATE, ...patch } : null;
+  act(() => utils.rerender(React.createElement(MatchVideoScreen)));
+}
+
+/** The switch to vid-2 started at the tap, still loading. */
+function pendingTo2(extra: Record<string, unknown> = {}) {
+  return { phase: "pending", seq: 1, fromId: "vid-1", targetId: "vid-2", startedAt: Date.now(), ...extra };
+}
+
+/** The same switch, landed. */
+function landedOn2(extra: Record<string, unknown> = {}) {
+  return { ...pendingTo2(), phase: "landing", landedAt: Date.now(), ...extra };
+}
+
 describe("MatchVideoScreen Film Room controls", () => {
   it("starts at ?t= by seeking on the first load", async () => {
     mockT = "27";
@@ -750,6 +806,10 @@ describe("MatchVideoScreen Film Room controls", () => {
     statusAt(42.6);
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
     expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "40.100", approx: "1" });
+    expect(mockSwitchCalls.at(-1)).toEqual(["vid-2", 40.1, { approximate: true }]);
+    // The note says so when the switch lands (jits-xfvd.16), not at the tap.
+    expect(utils.queryByTestId("player-approx-note")).toBeNull();
+    setSwitch(utils, landedOn2({ approximate: true }));
     expect(utils.getByTestId("player-approx-note")).toBeTruthy();
   });
 
@@ -880,6 +940,10 @@ describe("angle switch in place (multi-angle P0)", () => {
     expect(lastPlayer().playbackRate).toBe(0.5);
     expect(utils.getByLabelText("Playback speed, 0.5x")).toBeTruthy();
     expect(utils.getByLabelText("M. PARK'S ANGLE").props.accessibilityState).toMatchObject({ selected: true });
+    // Not landed yet: the clock stays on the outgoing angle at the tap.
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
+    // The new item reaches the target: landed, the clock swaps in one render.
+    timeTo(40.137);
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:40 / 06:40");
     expect(utils.queryByTestId("player-approx-note")).toBeNull();
   });
@@ -895,8 +959,8 @@ describe("angle switch in place (multi-angle P0)", () => {
     expect(lastPlayer().seeks.at(-1)).toBe(12);
     expect(lastPlayer().play).not.toHaveBeenCalled();
     expect(utils.getByLabelText("Play")).toBeTruthy();
-    // Unsynced: the note says so.
-    expect(utils.getByTestId("player-approx-note")).toBeTruthy();
+    // Unsynced: the switch is flagged approximate (the note shows at landing).
+    expect(mockSwitchCalls.at(-1)).toEqual(["vid-2", 12, { approximate: true }]);
   });
 
   it("holds the outgoing frame instead of flashing the new angle's poster", async () => {
@@ -986,5 +1050,413 @@ describe("route id changes after a switch (review m4)", () => {
     expect(lastPlayer().seeks.at(-1)).toBe(15);
     expect(utils.getByTestId("player-approx-note")).toBeTruthy();
     expect(mockPlayers).toHaveLength(1);
+  });
+});
+
+describe("angle switch phase 1 UI (jits-xfvd.16)", () => {
+  const HIDDEN = { includeHiddenElements: true } as const;
+  let announce: jest.SpyInstance;
+  beforeEach(() => {
+    announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
+  });
+  afterEach(() => announce.mockRestore());
+
+  /** Two angles, audio-synced; only vid-1 has a breakdown (4 key moments). */
+  async function renderSynced() {
+    mockGetVideoAnalysis.mockImplementation((_c: unknown, vid: string) => Promise.resolve(vid === "vid-1" ? ANALYSIS : { ok: true, data: null }));
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(playableInMatch());
+    mockUseMatchDetail.mockImplementation((id: string | undefined) =>
+      id === MATCH ? detailView(2, [], AUDIO_SYNC) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
+    );
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(lastPlayer()?.replaceAsync).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    ready(400);
+    await waitFor(() => expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy());
+    await waitFor(() => expect(mockGetVideoAnalysis).toHaveBeenCalledTimes(2));
+    await act(async () => undefined);
+    return utils;
+  }
+
+  it("reads every playable angle's breakdown up front, once each", async () => {
+    const utils = await renderSynced();
+    const ids = mockGetVideoAnalysis.mock.calls.map((c) => c[1]);
+    expect(ids.sort()).toEqual(["vid-1", "vid-2"]);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, landedOn2());
+    await act(async () => undefined);
+    expect(mockGetVideoAnalysis).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes the sync verdict to switchAngle and marks the tapped segment busy while pending", async () => {
+    const utils = await renderSynced();
+    statusAt(42.6);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    expect(mockSwitchCalls.at(-1)).toEqual(["vid-2", expect.closeTo(40.1, 6), { approximate: false }]);
+    setSwitch(utils, pendingTo2());
+    expect(utils.getByLabelText("M. PARK'S ANGLE").props.accessibilityState).toEqual({ selected: true, busy: true });
+    expect(utils.getByTestId("angle-vid-1").props.accessibilityState).toEqual({ selected: false });
+    setSwitch(utils, landedOn2());
+    expect(utils.getByLabelText("M. PARK'S ANGLE").props.accessibilityState).toEqual({ selected: true });
+  });
+
+  it("holds the outgoing angle's chrome while pending and swaps it in one render at landing", async () => {
+    const utils = await renderSynced();
+    statusAt(42.6);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2());
+    // The clock, the moments and the chips stay on vid-1 at the tap.
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
+    expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy();
+    expect(utils.getByTestId("moment-chip-0")).toBeTruthy();
+    setSwitch(utils, landedOn2());
+    // vid-2's own values: its translated time and no breakdown.
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:40 / 06:40");
+    expect(utils.queryByText(/KEY MOMENT/)).toBeNull();
+    expect(utils.queryByTestId("moment-chip-0")).toBeNull();
+  });
+
+  it("draws the held still while pending, over the video, and nothing at idle", async () => {
+    const utils = await renderSynced();
+    expect(utils.queryByTestId("switch-overlay", HIDDEN)).toBeNull();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ heldFrame: { width: 1920, height: 1080 } }));
+    expect(utils.getByTestId("switch-overlay-hold", HIDDEN)).toBeTruthy();
+    setSwitch(utils, { ...landedOn2(), phase: "idle" });
+    expect(utils.queryByTestId("switch-overlay", HIDDEN)).toBeNull();
+  });
+
+  it("shows the Syncing pill for a switch still pending after 200 ms, hidden from screen readers", async () => {
+    const utils = await renderSynced();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ startedAt: Date.now() - 1000 }));
+    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Syncing angle"), { timeout: 4000 });
+    expect(utils.queryByTestId("syncing-pill")).toBeNull();
+  });
+
+  it("announces a landing once (none at the tap) and starts the approximate note there", async () => {
+    const utils = await renderSynced();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ approximate: true }));
+    expect(announce).not.toHaveBeenCalled();
+    expect(utils.queryByTestId("player-approx-note")).toBeNull();
+    setSwitch(utils, landedOn2({ approximate: true }));
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith("M. Park's angle. Approximate sync.");
+    expect(utils.getByTestId("player-approx-note")).toBeTruthy();
+    // The same landing re-rendered and settling to idle say nothing more.
+    setSwitch(utils, landedOn2({ approximate: true }));
+    setSwitch(utils, { ...landedOn2({ approximate: true }), phase: "idle" });
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(utils.getByTestId("player-approx-note")).toBeTruthy();
+  });
+
+  it("an exact landing announces the angle alone, with no note", async () => {
+    const utils = await renderSynced();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, landedOn2());
+    expect(announce).toHaveBeenCalledWith("M. Park's angle.");
+    expect(utils.queryByTestId("player-approx-note")).toBeNull();
+  });
+
+  it("a failed switch puts the route back, shows the failure tag and announces it once", async () => {
+    const utils = await renderSynced();
+    statusAt(42.6);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2());
+    mockSetParams.mockClear();
+    // The tag's 4 s on a driven clock.
+    jest.useFakeTimers();
+    try {
+      const failed = { seq: 1, targetId: "vid-2", at: Date.now() };
+      const restoring = { phase: "pending", seq: 1, restoring: true, fromId: "vid-2", targetId: "vid-1", startedAt: Date.now(), failed };
+      setSwitch(utils, restoring);
+      expect(mockSetParams).toHaveBeenCalledTimes(1);
+      expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-1", t: "42.600", approx: "0" });
+      expect(utils.getByTestId("player-switch-failed")).toHaveTextContent("Could not load M. Park's angle. Tap it to try again.");
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(announce).toHaveBeenCalledWith("Could not load M. Park's angle. Tap it to try again.");
+      // A restore is not a switch: no busy segment, and its landing is silent.
+      expect(utils.getByLabelText("M. PARK'S ANGLE").props.accessibilityState).toEqual({ selected: true });
+      setSwitch(utils, { ...restoring, phase: "landing", landedAt: Date.now() });
+      setSwitch(utils, { ...restoring, phase: "idle", restoring: false });
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(mockSetParams).toHaveBeenCalledTimes(1);
+      // The tag goes FAILURE_TAG_MS (4 s) after the failure.
+      act(() => {
+        jest.advanceTimersByTime(3999);
+      });
+      expect(utils.getByTestId("player-switch-failed")).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(utils.queryByTestId("player-switch-failed")).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("the next switch clears the failure tag at once", async () => {
+    const utils = await renderSynced();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    const failed = { seq: 1, targetId: "vid-2", at: Date.now() };
+    setSwitch(utils, { phase: "idle", seq: 1, fromId: "vid-2", targetId: "vid-1", failed });
+    expect(utils.getByTestId("player-switch-failed")).toBeTruthy();
+    setSwitch(utils, { ...pendingTo2(), seq: 2 });
+    expect(utils.queryByTestId("player-switch-failed")).toBeNull();
+  });
+});
+
+describe("one slot under the switcher: pill, note and failure tag never overlap (P-AS-01/04/05)", () => {
+  const HIDDEN = { includeHiddenElements: true } as const;
+  let announce: jest.SpyInstance;
+  beforeEach(() => {
+    announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
+  });
+  afterEach(() => announce.mockRestore());
+
+  async function renderTwo() {
+    mockGetVideoAnalysis.mockResolvedValue({ ok: true, data: null });
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(playableInMatch());
+    mockUseMatchDetail.mockImplementation((id: string | undefined) =>
+      id === MATCH ? detailView(2) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
+    );
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(lastPlayer()?.replaceAsync).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    ready(400);
+    await waitFor(() => expect(utils.getByTestId("angle-switcher")).toBeTruthy());
+    await act(async () => undefined);
+    return utils;
+  }
+
+  it("puts the pill, the note and the tag in one slot at insets.top + 112", async () => {
+    mockApprox = "1";
+    const utils = await renderTwo();
+    const slot = utils.getByTestId("player-switch-slot");
+    expect(slot).toHaveStyle({ top: 112 });
+    expect(within(slot).getByTestId("player-approx-note")).toBeTruthy();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ startedAt: Date.now() - 1000 }));
+    await waitFor(() => expect(within(utils.getByTestId("player-switch-slot")).getByTestId("syncing-pill", HIDDEN)).toBeTruthy(), { timeout: 4000 });
+  });
+
+  it("holds the approximate note until the pill has faded out, then shows it for 5 s", async () => {
+    const utils = await renderTwo();
+    // The pill's delay, minimum and fade, and the note's 5 s, on a driven clock.
+    jest.useFakeTimers();
+    try {
+      const tick = (ms: number) => act(() => {
+        jest.advanceTimersByTime(ms);
+      });
+      fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+      setSwitch(utils, pendingTo2({ approximate: true }));
+      tick(200);
+      expect(utils.getByTestId("syncing-pill", HIDDEN)).toBeTruthy();
+      tick(100);
+      setSwitch(utils, landedOn2({ approximate: true }));
+      expect(announce).toHaveBeenCalledWith("M. Park's angle. Approximate sync.");
+      // Landed, but the pill is still up (its 400 ms minimum, then its 240 ms fade): no note yet.
+      tick(299);
+      expect(utils.getByTestId("syncing-pill", HIDDEN)).toBeTruthy();
+      expect(utils.queryByTestId("player-approx-note")).toBeNull();
+      tick(1);
+      tick(239);
+      expect(utils.getByTestId("syncing-pill", HIDDEN)).toBeTruthy();
+      expect(utils.queryByTestId("player-approx-note")).toBeNull();
+      tick(1);
+      tick(0);
+      expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
+      expect(utils.getByTestId("player-approx-note")).toBeTruthy();
+      // Its 5 s start when it appears, not at the landing.
+      tick(4999);
+      expect(utils.getByTestId("player-approx-note")).toBeTruthy();
+      tick(1);
+      expect(utils.queryByTestId("player-approx-note")).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("a failure removes the pill at once and shows the tag from the moment of failure", async () => {
+    const utils = await renderTwo();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ startedAt: Date.now() - 1000 }));
+    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toBeTruthy(), { timeout: 4000 });
+    const failed = { seq: 1, targetId: "vid-2", at: Date.now() };
+    setSwitch(utils, { phase: "pending", seq: 1, restoring: true, fromId: "vid-2", targetId: "vid-1", startedAt: Date.now(), failed });
+    expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
+    expect(utils.getByTestId("player-switch-failed")).toHaveTextContent("Could not load M. Park's angle. Tap it to try again.");
+    // Announced at the failure, not at the restore landing.
+    expect(announce).toHaveBeenCalledTimes(1);
+    setSwitch(utils, { phase: "landing", seq: 1, restoring: true, fromId: "vid-2", targetId: "vid-1", startedAt: Date.now(), landedAt: Date.now(), failed });
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(utils.getByTestId("player-switch-failed")).toBeTruthy();
+  });
+});
+
+describe("angle switch review fixes (jits-xfvd.16)", () => {
+  const HIDDEN = { includeHiddenElements: true } as const;
+  let announce: jest.SpyInstance;
+  beforeEach(() => {
+    announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
+  });
+  afterEach(() => announce.mockRestore());
+
+  const VID3 = { id: "vid-3", uploaded_by: "tk-1", uploaded_by_name: "Jo Cruz", is_mine: false, recording_type: "timekeeper", angle_label: "Jo Cruz's recording", playability: "playable", has_analysis: false };
+
+  async function renderAngles(extra: Record<string, unknown>[] = []) {
+    mockGetVideoAnalysis.mockImplementation((_c: unknown, vid: string) => Promise.resolve(vid === "vid-1" ? ANALYSIS : { ok: true, data: null }));
+    queries().getMatchVideoPlaybackResult.mockResolvedValue(playableInMatch());
+    mockUseMatchDetail.mockImplementation((id: string | undefined) =>
+      id === MATCH ? detailView(2, extra) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
+    );
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(lastPlayer()?.replaceAsync).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    ready(400);
+    await waitFor(() => expect(utils.getByTestId("angle-switcher")).toBeTruthy());
+    await waitFor(() => expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy());
+    await act(async () => undefined);
+    return utils;
+  }
+
+  it("(3) the note after a landing is not a live region; the note of an open with ?approx=1 is", async () => {
+    mockApprox = "1";
+    const utils = await renderAngles();
+    expect(utils.getByTestId("player-approx-note").props.accessibilityLiveRegion).toBe("polite");
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ approximate: true }));
+    setSwitch(utils, landedOn2({ approximate: true }));
+    await waitFor(() => expect(utils.getByTestId("player-approx-note")).toBeTruthy());
+    expect(utils.getByTestId("player-approx-note").props.accessibilityLiveRegion).toBe("none");
+    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it("(6) a restore to a superseded switch's angle snapshots that angle: route and frozen chrome say B", async () => {
+    const utils = await renderAngles([VID3]);
+    statusAt(42.6);
+    // A (vid-1) to B (vid-2), approximate (no offsets).
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ approximate: true }));
+    // While B is pending, chrome is A's (4 moments); then C supersedes and fails.
+    expect(utils.getByText("4 KEY MOMENTS")).toBeTruthy();
+    fireEvent.press(utils.getByTestId("angle-vid-3"));
+    setSwitch(utils, { ...pendingTo2(), seq: 2, fromId: "vid-2", targetId: "vid-3" });
+    mockSetParams.mockClear();
+    const failed = { seq: 2, targetId: "vid-3", at: Date.now() };
+    setSwitch(utils, { phase: "pending", seq: 2, restoring: true, fromId: "vid-3", targetId: "vid-2", startedAt: Date.now(), failed });
+    expect(mockSetParams).toHaveBeenCalledTimes(1);
+    // B's route, with B's own approx; its time is the restore time on B.
+    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "42.600", approx: "1" });
+    // Frozen chrome is now B's (no breakdown), not A's 4 moments.
+    expect(utils.queryByText(/KEY MOMENT/)).toBeNull();
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
+    expect(utils.getByTestId("player-switch-failed")).toHaveTextContent("Could not load J. Cruz's angle. Tap it to try again.");
+  });
+
+  it("(7) no failure tag and no announcement once playback itself failed (retry panel)", async () => {
+    const utils = await renderAngles();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2());
+    mockPlaybackPatch = { phase: "failed" };
+    setSwitch(utils, { phase: "idle", seq: 1, fromId: "vid-1", targetId: "vid-2", failed: { seq: 1, targetId: "vid-2", at: Date.now() } });
+    expect(utils.queryByTestId("player-switch-failed")).toBeNull();
+    expect(announce).not.toHaveBeenCalled();
+  });
+
+  it("(7) a failed switch with no angle to return to removes the pill at once", async () => {
+    const utils = await renderAngles();
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    setSwitch(utils, pendingTo2({ startedAt: Date.now() - 1000 }));
+    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toBeTruthy(), { timeout: 4000 });
+    setSwitch(utils, { phase: "idle", seq: 1, fromId: null, targetId: "vid-2", failed: { seq: 1, targetId: "vid-2", at: Date.now() } });
+    expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
+    expect(utils.getByTestId("player-switch-failed")).toBeTruthy();
+  });
+});
+
+describe("angle switch UI on the real engine (jits-xfvd.16)", () => {
+  const HIDDEN = { includeHiddenElements: true } as const;
+  let announce: jest.SpyInstance;
+  beforeEach(() => {
+    announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility").mockImplementation(() => undefined);
+  });
+  afterEach(() => announce.mockRestore());
+
+  /** vid-1 signs at once; vid-2's sign answers with `vid2` (every call). */
+  async function renderEngine(vid2: () => Promise<unknown>) {
+    mockSwitchState = null;
+    queries().getMatchVideoPlaybackResult.mockImplementation((_c: unknown, vid: string) =>
+      vid === "vid-2" ? vid2() : Promise.resolve(playableInMatch("https://signed.example/vid-1.mp4")),
+    );
+    mockUseMatchDetail.mockImplementation((id: string | undefined) =>
+      id === MATCH ? detailView(2, [], AUDIO_SYNC) : { state: "loading", data: null, error: null, refreshing: false, refetch: jest.fn() },
+    );
+    mockGetVideoAnalysis.mockResolvedValue({ ok: true, data: null });
+    const utils = render(React.createElement(MatchVideoScreen));
+    await waitFor(() => expect(lastPlayer()?.replaceAsync).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    ready(400);
+    await waitFor(() => expect(utils.getByTestId("angle-switcher")).toBeTruthy());
+    await act(async () => undefined);
+    return utils;
+  }
+
+  it("a slow sign shows the Syncing pill, then the switch lands and it goes", async () => {
+    let release: (v: unknown) => void = () => undefined;
+    const slow = new Promise((resolve) => {
+      release = resolve;
+    });
+    const utils = await renderEngine(() => slow);
+    statusAt(42.6);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    expect(utils.getByTestId("angle-vid-2").props.accessibilityState).toEqual({ selected: true, busy: true });
+    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Syncing angle"), { timeout: 4000 });
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
+    await act(async () => {
+      release(playableInMatch("https://signed.example/vid-2.mp4"));
+    });
+    await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(2));
+    ready(400);
+    timeTo(40.1);
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:40 / 06:40");
+    expect(utils.getByTestId("angle-vid-2").props.accessibilityState).toEqual({ selected: true });
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith("M. Park's angle.");
+    // (The pill's minimum and fade after landing are timed in the slot tests.)
+    // The pill is counted once in the session's telemetry.
+    utils.unmount();
+    expect(mockCaptureMessage.mock.calls.at(-1)?.[1].extra).toMatchObject({ switchPillShownCount: 1, switchCount: 1 });
+  });
+
+  it("a sign failure returns to the angle it left, resets the route, shows the tag and speaks once", async () => {
+    const utils = await renderEngine(() => Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "connection failure" } }));
+    statusAt(42.6);
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    expect(mockSetParams).toHaveBeenCalledWith({ id: "vid-2", t: "40.100", approx: "0" });
+    await waitFor(() => expect(utils.getByTestId("player-switch-failed")).toHaveTextContent("Could not load M. Park's angle. Tap it to try again."));
+    expect(mockSetParams).toHaveBeenLastCalledWith({ id: "vid-1", t: "42.600", approx: "0" });
+    expect(utils.getByTestId("angle-vid-1").props.accessibilityState).toMatchObject({ selected: true });
+    expect(utils.queryByTestId("syncing-pill", HIDDEN)).toBeNull();
+    // The restore lands without a second announcement.
+    await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(2));
+    ready(400);
+    timeTo(42.6);
+    await act(async () => undefined);
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith("Could not load M. Park's angle. Tap it to try again.");
+  });
+
+  it("a paused switch lands on the first frame after the seek", async () => {
+    const utils = await renderEngine(() => Promise.resolve(playableInMatch("https://signed.example/vid-2.mp4")));
+    statusAt(42.6);
+    fireEvent.press(utils.getByLabelText("Pause"));
+    fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
+    await waitFor(() => expect(lastPlayer().replaceAsync).toHaveBeenCalledTimes(2));
+    ready(400);
+    expect(lastPlayer().playing).toBe(false);
+    // Pending until a frame of the new item is drawn: the clock stays at the tap.
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
+    act(() => mockViewProps.current!.onFirstFrameRender());
+    expect(utils.getByTestId("player-time")).toHaveTextContent("00:40 / 06:40");
+    expect(utils.getByLabelText("Play")).toBeTruthy();
+    expect(announce).toHaveBeenCalledWith("M. Park's angle.");
   });
 });

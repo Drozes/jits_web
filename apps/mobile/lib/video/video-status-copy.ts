@@ -243,6 +243,34 @@ export function formatCountdown(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/**
+ * Angle switch in the match player (jits-xfvd.16, owner-approved
+ * 2026-10-06). The Syncing pill says one of these while a switch has not
+ * landed: `SYNCING_ANGLE` for an exact-synced angle, `SWITCHING_ANGLE` for an
+ * approximate one (clock-only or unsynced). Sentence case here; the pill
+ * renders them in mono caps. Never with an ellipsis.
+ */
+export const SYNCING_ANGLE = "Syncing angle";
+export const SWITCHING_ANGLE = "Switching angle";
+
+/**
+ * The tag (and its one announcement) after a switch failed and the player
+ * returned to the previous angle. `label` is the angle as it reads
+ * mid-sentence ("M. Park's angle", "your angle").
+ */
+export function couldNotLoadAngle(label: string): string {
+  return `Could not load ${label}. Tap it to try again.`;
+}
+
+/**
+ * Announced once when an angle switch lands (deck 10: state changes only;
+ * nothing at the tap). `label` is the angle as a heading ("M. Park's angle",
+ * "Your angle"). Same wording as the multi-angle player's.
+ */
+export function switchAnnouncement(label: string, approximate: boolean): string {
+  return approximate ? `${label}. Approximate sync.` : `${label}.`;
+}
+
 function strings(obj: Record<string, unknown>): string[] {
   return Object.values(obj).filter((v): v is string => typeof v === "string");
 }
@@ -251,5 +279,7 @@ function strings(obj: Record<string, unknown>): string[] {
 export const ALL_STATIC_COPY: readonly string[] = [
   BEST_ANGLE,
   TIMEKEEPER_TITLE_FALLBACK,
+  SYNCING_ANGLE,
+  SWITCHING_ANGLE,
   ...[PLATE_TITLE, PHASE_TAG, PHASE_COPY, TIMEKEEPER_PHASE_COPY, ANGLE_LABEL, ROW_TAG, ROW_HELPER, STRIP_COPY, COMPACT_COPY, HERO_CAPTION, CARD_CAPTION, CARD_BADGE].flatMap(strings),
 ];

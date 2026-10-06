@@ -54,8 +54,16 @@ export interface PlaybackTelemetry {
   syncResidual: (errorS: number) => void;
   /** Multi-angle: a standby kept warm by the decoder cap or demoted on a decoder error. */
   decoderCap: (reason: string) => void;
-  /** The switched-to angle showed its first frame. */
+  /** The switch landed (tap to landing is the switch latency, jits-xfvd.16). */
   switchLanded: () => void;
+  /** A landed switch still had its held still up at the landing. */
+  switchHeldStill: () => void;
+  /** The Syncing pill became visible for a switch (once per switch seq). */
+  switchPillShown: () => void;
+  /** A switch failed (its angle could not be loaded; the previous one is restored). */
+  switchFailed: () => void;
+  /** A pending switch was replaced by another before it landed. */
+  switchSuperseded: () => void;
   error: (message: string | null | undefined) => void;
 }
 
@@ -218,6 +226,10 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
       syncResidual: (errorS) => sessionRef.current?.syncResidual(errorS),
       decoderCap: (reason) => sessionRef.current?.decoderCap(reason),
       switchLanded: () => sessionRef.current?.switchLanded(Date.now()),
+      switchHeldStill: () => sessionRef.current?.switchHeldStill(),
+      switchPillShown: () => sessionRef.current?.switchPillShown(),
+      switchFailed: () => sessionRef.current?.switchFailed(),
+      switchSuperseded: () => sessionRef.current?.switchSuperseded(),
       error: (message) => sessionRef.current?.error(message),
       setQuality: (meta, settings) => {
         // A new start selection (a new video on this screen): no flags carry over from the last one.

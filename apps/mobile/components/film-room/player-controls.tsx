@@ -4,6 +4,7 @@ import { StatePressable } from "@/components/ui/state-pressable";
 import { Pause, Play, RotateCcw, RotateCw } from "lucide-react-native";
 import { formatClock, type KeyMoment } from "@jits/shared/utils";
 import { ON_MEDIA } from "@/lib/theme/palette";
+import { filmChipLabelStyle, filmChipStyle } from "@/components/film-room/film-chip";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 
 /** Playback speeds the speed button cycles through (slow motion for study). */
@@ -106,9 +107,9 @@ export function MomentChips({ moments, currentT, onJump }: { moments: KeyMoment[
             accessibilityLabel={`Jump to ${formatClock(m.t)}, ${m.label}`}
             accessibilityState={{ selected: on }}
             onPress={() => onJump(m.t)}
-            style={{ height: 44, paddingHorizontal: 12, borderRadius: 2, borderWidth: 1, justifyContent: "center", borderColor: on ? ON_MEDIA.text : ON_MEDIA.strong, backgroundColor: on ? ON_MEDIA.text : ON_MEDIA.tag }}
+            style={filmChipStyle(on)}
           >
-            <Text className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING.caps, color: on ? ON_MEDIA.ink : ON_MEDIA.white }, TABULAR]}>
+            <Text className="font-mono-bold" style={[filmChipLabelStyle(on), TABULAR]}>
               {label}
             </Text>
           </StatePressable>

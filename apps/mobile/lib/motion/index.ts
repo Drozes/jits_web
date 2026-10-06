@@ -11,7 +11,7 @@
  * - `moment`: named durations of single Moments, ms: `goFade` 700,
  *   `confettiFall` 1800, `confettiFadeDelay` 1200, `confettiFade` 600,
  *   `slamIn` 520, `slamInFade` 300, `riseInDelay` 500, `riseIn` 400,
- *   `tapMarkFill` 80, `tapNudge` 50.
+ *   `tapMarkFill` 80, `tapNudge` 50, `angleDip` 80.
  * - `easing`: `{ brandOut, outCubic, inQuad, linear }`, Reanimated easings
  *   for `withTiming`.
  * - `BRAND_EASE_OUT_CURVE`: `[0.22, 1, 0.36, 1]`, the brand curve as a tuple.
