@@ -142,6 +142,11 @@ describe("TabHeader (Arena, Profile)", () => {
       expect(buttons(UNSAFE_root)).toHaveLength(1);
     },
   );
+
+  it("tags the title for the match-loop harness's tab proof (tab-header-title-<tab>)", () => {
+    const { getByTestId } = render(<TabHeader title="Matches" />);
+    expect(getByTestId("tab-header-title-matches").props.accessibilityRole).toBe("header");
+  });
 });
 
 describe("AppHeader (pushed screens, decision Q1)", () => {

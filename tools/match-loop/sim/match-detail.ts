@@ -13,8 +13,9 @@
  *   - history rows labelled "Open match vs <name>" (Pressables), and the
  *     Matches tab's posters `film-card-<matchId>` (the tab replaced the
  *     Film Room and Profile's Recent Matches and Film Room preview, spec
- *     specs/matches-tab/spec.md); its "All" result chip `film-filter-all`
- *     proves the tab root is showing.
+ *     specs/matches-tab/spec.md); its header title
+ *     `tab-header-title-matches` proves the tab root is showing (the result
+ *     chips are hidden on a zero-match account).
  * Selectors take the testID OR the label, never a container testID.
  */
 import type { AXElement, Idb, Query } from "./idb";
@@ -31,7 +32,9 @@ type ProvenTab = "Home" | "Matches" | "Profile";
 /** An element only that tab's root renders. */
 const TAB_PROOF: Record<ProvenTab, Query> = {
   Home: { label: "Me", type: "Button" },
-  Matches: { id: "film-filter-all" },
+  // The TabHeader title: present in every Matches state (zero, low data,
+  // loading, error), unlike the result chips, which a zero-match account hides.
+  Matches: { id: "tab-header-title-matches" },
   Profile: { label: /^(share profile|view detailed stats)$/i, type: "Button" },
 };
 
