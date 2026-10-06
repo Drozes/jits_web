@@ -103,4 +103,15 @@ describe("SwitchOverlay", () => {
     expect(s.queryByTestId("switch-overlay", HIDDEN)).toBeNull();
     expect(mockWithTiming).not.toHaveBeenCalled();
   });
+
+  it("draws nothing for a keep-watching switch: the outgoing angle stays live (jits-xfvd.19)", () => {
+    const s = render(overlay({ ...state(), mode: "keep_watching" }));
+    expect(s.queryByTestId("switch-overlay", HIDDEN)).toBeNull();
+    s.rerender(overlay({ ...state({ phase: "landing" }), mode: "keep_watching" }));
+    expect(s.queryByTestId("switch-overlay", HIDDEN)).toBeNull();
+    expect(mockWithTiming).not.toHaveBeenCalled();
+    // In_place keeps the phase-1 still.
+    s.rerender(overlay({ ...state(), mode: "in_place" }));
+    expect(s.getByTestId("switch-overlay-hold", HIDDEN)).toBeTruthy();
+  });
 });
