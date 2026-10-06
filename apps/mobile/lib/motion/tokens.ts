@@ -51,6 +51,8 @@ export const moment = {
   tapMarkFill: 80,
   /** "The tap": each mark's micro-nudge out (it settles over the rest of the stagger). */
   tapNudge: 50,
+  /** Angle dip (match player): an approximate angle switch lands; black in, then out, this long each way. */
+  angleDip: 80,
 } as const;
 
 export type MomentToken = keyof typeof moment;

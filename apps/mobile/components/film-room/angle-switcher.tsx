@@ -1,6 +1,8 @@
 import * as React from "react";
-import { Text, View } from "react-native";
-import { StatePressable } from "@/components/ui/state-pressable";
+import { ScrollView, Text, View } from "react-native";
+import { PressableScale } from "@/components/ui/pressable-scale";
+import { filmChipLabelStyle, filmChipStyle } from "@/components/film-room/film-chip";
+import { haptics } from "@/lib/motion";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
 import { shortName } from "@/lib/film-room/format";
@@ -81,66 +83,115 @@ interface AngleSwitcherProps {
    * switcher always agree; computed from the angles when absent (player).
    */
   bestId?: string | null;
+  /**
+   * The angle that is selected and still switching (the player passes
+   * `switchState.targetId` while a switch is pending and not restoring). It
+   * keeps the selected surface and adds `busy` to its accessibility state;
+   * the Syncing pill carries the progress, so nothing else is drawn.
+   */
+  busyId?: string | null;
 }
 
 /**
  * Two-segment switch between the athletes' recordings of one match. Renders
  * nothing with fewer than two angles.
+ *
+ * Over video (`film`) the angles are the key moment chips (`film-chip.ts`):
+ * separate outlined chips sized to their labels, the selected one inverted.
+ * On the match page (`plate`) they stay two theme-colored segments.
+ *
+ * Each segment is a `PressableScale` (press-in 0.97, the Reduce Motion
+ * opacity dip). Pressing an angle that is not active fires the `select`
+ * haptic once, then `onSelect`; pressing the active one does nothing (no
+ * haptic, no call), as the tab vocabulary says.
  */
-export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate", bestId }: AngleSwitcherProps) {
+export function AngleSwitcher({ angles: all, activeId, opponentName, onSelect, variant = "plate", bestId, busyId }: AngleSwitcherProps) {
   const p = usePalette();
   const angles = switchableAngles(all, activeId);
   if (angles.length < 2) return null;
   const best = bestId !== undefined ? bestId : bestAngleId(angles);
-  // Over video the segments keep the on-film colors; on the page they follow
-  // the theme. The active segment inverts (ink fill, page-colored label).
-  const c =
-    variant === "film"
-      ? { on: ON_MEDIA.text, onLabel: ON_MEDIA.ink, border: ON_MEDIA.strong, fill: ON_MEDIA.tag, label: ON_MEDIA.white, sub: ON_MEDIA.text2 }
-      : { on: p.text, onLabel: p.bg, border: p.strong, fill: p.secondaryBg, label: p.text, sub: p.text2 };
-  return (
-    <View
-      testID="angle-switcher"
-      accessibilityRole="tablist"
-      accessibilityLabel="Camera angle"
-      className="flex-row"
-      style={{ gap: 8 }}
-    >
-      {angles.map((a) => {
-        const on = a.id === activeId;
-        const label = angleName(a, opponentName);
-        const isBest = a.id === best;
-        const a11y = isBest ? `${angleA11yLabel(a, opponentName)}, ${BEST_ANGLE}` : angleA11yLabel(a, opponentName);
-        return (
-          <StatePressable
-            dim
-            key={a.id}
-            testID={`angle-${a.id}`}
-            accessibilityRole="tab"
-            accessibilityLabel={a11y}
-            accessibilityState={{ selected: on }}
-            onPress={() => onSelect(a.id)}
-            className="flex-1 items-center justify-center"
-            style={{
-              height: 44,
-              borderRadius: 2,
-              borderWidth: 1,
-              borderColor: on ? c.on : c.border,
-              backgroundColor: on ? c.on : c.fill,
-            }}
-          >
-            <Text numberOfLines={1} className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING.caps, color: on ? c.onLabel : c.label }, TABULAR]}>
-              {label}
-            </Text>
-            {isBest ? (
-              // Deck 13: a small tag under the label, in the chip's own ink.
-              <Text testID={`angle-best-${a.id}`} numberOfLines={1} className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: on ? c.onLabel : c.sub }, TABULAR]}>
+  const film = variant === "film";
+  // On the page the segments follow the theme; the active one inverts.
+  const c = { on: p.text, onLabel: p.bg, border: p.strong, fill: p.secondaryBg, label: p.text, sub: p.text2 };
+  const chips = angles.map((a) => {
+    const on = a.id === activeId;
+    const label = angleName(a, opponentName);
+    const isBest = a.id === best;
+    const a11y = isBest ? `${angleA11yLabel(a, opponentName)}, ${BEST_ANGLE}` : angleA11yLabel(a, opponentName);
+    const common = {
+      testID: `angle-${a.id}`,
+      accessibilityRole: "tab" as const,
+      accessibilityLabel: a11y,
+      accessibilityState: on && a.id === busyId ? { selected: true, busy: true } : { selected: on },
+      onPress: () => {
+        if (on) return;
+        void haptics.select();
+        onSelect(a.id);
+      },
+    };
+    if (film) {
+      // Over video: the key moment chip (film-chip.ts), sized to its label,
+      // with the Best angle tag inset beside the label.
+      return (
+        <PressableScale key={a.id} {...common} style={[filmChipStyle(on), { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+          <Text numberOfLines={1} className="font-mono-bold" style={[filmChipLabelStyle(on), TABULAR]}>
+            {label}
+          </Text>
+          {isBest ? (
+            // Unselected, the tag sits on its own ON_MEDIA.badge ground so it
+            // holds 4.5:1 over a bright frame (jits-tn2h); selected, it is
+            // outlined in the chip's own ink.
+            <View
+              testID={`angle-best-tag-${a.id}`}
+              style={{ paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, borderWidth: 1, borderColor: on ? ON_MEDIA.ink : ON_MEDIA.badge, backgroundColor: on ? "transparent" : ON_MEDIA.badge }}
+            >
+              <Text testID={`angle-best-${a.id}`} numberOfLines={1} className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: on ? ON_MEDIA.ink : ON_MEDIA.text }, TABULAR]}>
                 {BEST_ANGLE.toUpperCase()}
               </Text>
-            ) : null}
-          </StatePressable>
-        );
-      })}
+            </View>
+          ) : null}
+        </PressableScale>
+      );
+    }
+    return (
+      <PressableScale
+        key={a.id}
+        {...common}
+        className="flex-1 items-center justify-center"
+        style={{ height: 44, borderRadius: 2, borderWidth: 1, borderColor: on ? c.on : c.border, backgroundColor: on ? c.on : c.fill }}
+      >
+        <Text numberOfLines={1} className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING.caps, color: on ? c.onLabel : c.label }, TABULAR]}>
+          {label}
+        </Text>
+        {isBest ? (
+          // Deck 13: a small tag under the label, in the chip's own ink.
+          <Text testID={`angle-best-${a.id}`} numberOfLines={1} className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: on ? c.onLabel : c.sub }, TABULAR]}>
+            {BEST_ANGLE.toUpperCase()}
+          </Text>
+        ) : null}
+      </PressableScale>
+    );
+  });
+  if (film) {
+    // Like the key moment row: separate chips, scrolling sideways when they
+    // do not fit, bleeding to the screen edge.
+    return (
+      <ScrollView
+        testID="angle-switcher"
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        accessibilityRole="tablist"
+        accessibilityLabel="Camera angle"
+        contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
+        style={{ marginHorizontal: -16, flexGrow: 0 }}
+      >
+        {chips}
+      </ScrollView>
+    );
+  }
+  return (
+    <View testID="angle-switcher" accessibilityRole="tablist" accessibilityLabel="Camera angle" className="flex-row" style={{ gap: 8 }}>
+      {chips}
     </View>
   );
 }

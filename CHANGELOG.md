@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Match player: angle switch phase 1 (jits-xfvd.16, jits-tn2h)
+
+JS-only on mobile (OTA on runtime 0.5.0; no native module, no dependency change: `expo-image`, Reanimated and `expo-haptics` are already linked). Contract: `research/2026-10-multi-angle-playback/06-angle-switch-phase1-contract.md`; design: canvas page "Proposed (Oct 6 angle switch)". No video bytes are preloaded (pre-sign only, as before).
+
+**Added**
+- `useVideoPlayback` exposes `switchState` (pending, landing, idle; held still; failure and restore) and `switchAngle(id, t, { approximate })`. An angle switch now seeks and plays when the swap settles, lands within 0.25 s of the target (or on the first frame after the seek when paused), captures a native still of the outgoing frame before the swap, and on a failed sign, replace or player error returns to the angle it left at the tap moment.
+- `apps/mobile/components/film-room/switch-overlay.tsx`: the held still over the player while the next angle loads; it crossfades out over 240 ms on an exact landing, dips through black (`moment.angleDip`, 80 ms each way) on an approximate one, and cuts under Reduce Motion.
+- `apps/mobile/components/film-room/syncing-pill.tsx`: "SYNCING ANGLE" / "SWITCHING ANGLE" for a switch not landed after 200 ms, up at least 400 ms, with a 2 px sync bar on the UI thread (static under Reduce Motion, paused in background), hidden from screen readers.
+- `apps/mobile/lib/film-room/use-angle-analyses.ts`: every playable angle's breakdown is read up front, so the player's chrome swaps in one render at landing.
+- `apps/mobile/components/film-room/film-chip.ts`: the outlined chip over film shared by the key moment chips and the player's angle switcher.
+- Copy (`lib/video/video-status-copy.ts`): `Syncing angle`, `Switching angle`, `Could not load {label}. Tap it to try again.`, and the landing announcement. Motion token `moment.angleDip` and five Motion registry rows (DESIGN.md and `design/system/project/Motion.md`).
+- Playback telemetry: `switchHeldStillCount`, `switchPillShownCount`, `switchFailedCount`, `switchSupersededCount`; `switchLatencyMs` now means tap to landing.
+
+**Changed**
+- The player's angle switcher draws the key moment chips (separate outlined chips, the selected one inverted) in a sideways-scrolling row; the match page keeps its segments. Segments press to 0.97 (`PressableScale`), buzz `select` on a new angle only, and the switching segment is selected and busy for screen readers.
+- While a switch is pending, the caption, seek bar, clock, moment count and chips stay on the outgoing angle as it was at the tap; one announcement at landing, none at the tap. The approximate note shows after an approximate landing, once the Syncing pill is gone, in the one slot at `insets.top + 112` it shares with the pill and the failure tag.
+
+**Fixed**
+- No black frame or frame 0 of the next angle on a switch: the outgoing frame is held until the new one is at the target.
+- The Best angle tag on an unselected angle sits on its own `ON_MEDIA.badge` ground and holds 4.5:1 over a bright frame (jits-tn2h; it was about 3.3:1).
+
 ## OTA "Adaptive playback quality" (runtime 0.5.0), 2026-10-06
 
 Production OTA group `aaa9bb67-bdee-4269-ae29-d26eb024ba29` from jits_web `main` `335a2335` (release PR #59: #58, #57, #53). JS-only, non-critical. Rollback target: `cc8974cd-0d94-450c-ad70-a53817cda20d`. Needs jr_be `20261008100400_playback_client_settings.sql`, applied to prod 2026-10-06 (the client falls back to built-in defaults if the RPC is unavailable). The multi-angle player ships inert behind a dev-only flag. Known follow-ups: on-device check of adaptive switching (spec 8.2 item 11), jits-xfvd.13 (multi-angle held frame on device), jits-p08f (db:types regen), jits-qcuw (recorder test flake).

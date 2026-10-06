@@ -149,6 +149,50 @@ describe("usePlaybackTelemetry", () => {
     hook.unmount();
     expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
   });
+
+  it("forwards the angle switch phase 1 counters (jits-xfvd.16), fresh in a continuation", async () => {
+    const { player, hook } = setup();
+    act(() => {
+      const t = hook.result.current;
+      t.playIntent(true);
+      t.sourceAttached("normalized");
+      player.emit("playingChange", { isPlaying: true });
+      // Superseded, then the second lands with its still up and the pill shown.
+      t.switchStarted();
+      t.switchSuperseded();
+      t.switchStarted();
+      t.switchPillShown();
+      now += 400;
+      t.switchLanded();
+      t.switchHeldStill();
+      // A third fails (its previous angle comes back).
+      t.switchStarted();
+      t.switchFailed();
+    });
+    act(() => appStateHandler!("background"));
+    expect(extra(0)).toMatchObject({
+      switchCount: 3,
+      switchLatencyMs: 400,
+      switchHeldStillCount: 1,
+      switchPillShownCount: 1,
+      switchFailedCount: 1,
+      switchSupersededCount: 1,
+    });
+    act(() => appStateHandler!("active"));
+    await act(async () => undefined);
+    act(() => {
+      player.emit("playingChange", { isPlaying: true });
+      now += 1000;
+    });
+    hook.unmount();
+    expect(extra(1)).toMatchObject({
+      resumed: true,
+      switchHeldStillCount: 0,
+      switchPillShownCount: 0,
+      switchFailedCount: 0,
+      switchSupersededCount: 0,
+    });
+  });
 });
 
 describe("usePlaybackTelemetry adaptive quality", () => {

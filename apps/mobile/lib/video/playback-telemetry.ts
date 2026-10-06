@@ -58,11 +58,23 @@ import { ResidualStats } from "./multi-angle/sync-controller";
  *                       keeps the screen, the player and this session (it used
  *                       to remount all three), so one viewing of a match is
  *                       one event however many angles were watched.
- *   switchLatencyMs     median, over the switches whose new angle showed a
- *                       frame, of tap -> first frame of the new angle (the
- *                       view's onFirstFrameRender for the new item, or the
- *                       first playback progress on it). Null with none.
+ *   switchLatencyMs     median, over the switches that landed, of tap ->
+ *                       landing (jits-xfvd.16). A single-player switch lands
+ *                       when the new item reports a time within 0.25 s of
+ *                       the resume target while playing, or, paused, when
+ *                       the view draws its first frame after the resume
+ *                       seek (or 350 ms after the post-seek readyToPlay
+ *                       with no frame event). A restore after a failed
+ *                       switch is not a landing. Null with none.
  *   switchLatencyMaxMs  the slowest of those switches.
+ *   switchHeldStillCount  single player: landed switches whose held still
+ *                       of the outgoing frame was still up at the landing.
+ *   switchPillShownCount  single player: switches slow enough to show the
+ *                       Syncing pill (once per switch).
+ *   switchFailedCount   single player: switches whose angle could not be
+ *                       loaded (the previous angle was restored).
+ *   switchSupersededCount  single player: switches replaced by another
+ *                       switch before they landed.
  *   switchSwapCount / switchSeekCount / switchDipCount
  *                       multi-angle player: how each switch happened (an
  *                       opacity swap to a hot angle, an exact seek behind a
@@ -185,6 +197,10 @@ export interface PlaybackSessionSummary extends PlaybackSessionMeta {
   switchSwapCount: number;
   switchSeekCount: number;
   switchDipCount: number;
+  switchHeldStillCount: number;
+  switchPillShownCount: number;
+  switchFailedCount: number;
+  switchSupersededCount: number;
   syncResidualP50Ms: number | null;
   syncResidualP95Ms: number | null;
   syncSamples: number;
@@ -271,6 +287,10 @@ export class PlaybackSession {
   private switchAt: number | null = null;
   private switchLatencies: number[] = [];
   private switchModes: Record<SwitchMode, number> = { swap: 0, seek: 0, dip: 0 };
+  private switchHeldStillCount = 0;
+  private switchPillShownCount = 0;
+  private switchFailedCount = 0;
+  private switchSupersededCount = 0;
   private residuals = new ResidualStats();
   private decoderCapEvents = 0;
   private decoderCapReasons = new Set<string>();
@@ -472,11 +492,32 @@ export class PlaybackSession {
     this.expectSwap(now);
   }
 
-  /** The switched-to angle showed its first frame. Only the latest switch counts. */
+  /** The switch landed (see `switchLatencyMs`). Only the latest switch counts. */
   switchLanded(now: number): void {
     if (this.switchAt == null) return;
     this.switchLatencies.push(Math.max(0, now - this.switchAt));
     this.switchAt = null;
+  }
+
+  /** A landed switch still had its held still up at the landing. */
+  switchHeldStill(): void {
+    this.switchHeldStillCount += 1;
+  }
+
+  /** The Syncing pill showed for a switch (once per switch). */
+  switchPillShown(): void {
+    this.switchPillShownCount += 1;
+  }
+
+  /** A switch failed; it will never land, so it has no latency. */
+  switchFailed(): void {
+    this.switchFailedCount += 1;
+    this.switchAt = null;
+  }
+
+  /** A pending switch was replaced by another before it landed. */
+  switchSuperseded(): void {
+    this.switchSupersededCount += 1;
   }
 
   /** One smoothed sync error sample of a lock-stepped angle (seconds). */
@@ -624,6 +665,10 @@ export class PlaybackSession {
       switchSwapCount: this.switchModes.swap,
       switchSeekCount: this.switchModes.seek,
       switchDipCount: this.switchModes.dip,
+      switchHeldStillCount: this.switchHeldStillCount,
+      switchPillShownCount: this.switchPillShownCount,
+      switchFailedCount: this.switchFailedCount,
+      switchSupersededCount: this.switchSupersededCount,
       syncResidualP50Ms: this.residuals.percentile(50),
       syncResidualP95Ms: this.residuals.percentile(95),
       syncSamples: this.residuals.count,
