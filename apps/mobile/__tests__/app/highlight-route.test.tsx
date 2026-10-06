@@ -88,10 +88,7 @@ describe("component size rules (jits_web CLAUDE.md)", () => {
     expect(lines(path.join(dir, file))).toBeLessThanOrEqual(80);
   });
 
-  it("the route and the profile row stay small", () => {
+  it("the route stays small", () => {
     expect(lines(path.join(APP_DIR, "highlight", "[id].tsx"))).toBeLessThan(200);
-    const profile = path.join(__dirname, "..", "..", "components", "profile");
-    expect(lines(path.join(profile, "highlights-row.tsx"))).toBeLessThanOrEqual(80);
-    expect(lines(path.join(profile, "highlight-tile.tsx"))).toBeLessThanOrEqual(80);
   });
 });

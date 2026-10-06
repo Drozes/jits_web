@@ -36,6 +36,19 @@ jest.mock("@/components/ui/skeleton", () => {
   return { SkeletonProvider: Pass, SkeletonBlock: () => R.createElement(RN.View) };
 });
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// The shared tab header (Live Chip and bell) is covered by its own suites;
+// here it only has to be the one the screen draws, titled Matches.
+const mockTabHeader = jest.fn();
+jest.mock("@/components/layout/tab-header", () => ({
+  TabHeader: (props: { title: string }) => {
+    mockTabHeader(props);
+    const R = require("react");
+    const RN = require("react-native");
+    return R.createElement(RN.Text, { testID: "tab-header", accessibilityRole: "header" }, props.title);
+  },
+}));
+const mockToastError = jest.fn();
+jest.mock("@/components/ui/toast", () => ({ toast: { error: (...a: unknown[]) => mockToastError(...a), success: jest.fn() } }));
 jest.mock("@/lib/theme/use-theme", () => ({
   useResolvedColorScheme: () => "light",
   useThemedTokens: () => ({ accentCta: "#E63946", textSecondary: "#4B5563" }),
@@ -66,7 +79,7 @@ function mockAthleteId() {
 }
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import FilmRoomScreen from "@/app/(app)/film-room";
+import MatchesScreen from "@/app/(app)/(tabs)/matches/index";
 import { __resetSeenMatches, loadSeenMatches, markMatchSeen } from "@/lib/film-room/seen-store";
 import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 import { libItem, libVideo } from "../support/film-fixtures";
@@ -100,7 +113,7 @@ jest.setTimeout(20_000);
 
 async function renderLoaded(result: unknown = page(library())) {
   mockGetMyMatchLibrary.mockResolvedValue(result);
-  const utils = render(<FilmRoomScreen />);
+  const utils = render(<MatchesScreen />);
   // The first page resolves on a microtask, but the whole grid mounts before
   // the skeleton goes: under a full parallel run that can pass the 1 s
   // waitFor default, so give it room.
@@ -126,14 +139,19 @@ beforeEach(async () => {
   await loadSeenMatches();
 });
 
-describe("FilmRoomScreen", () => {
-  it("shows the header, the record strip and a skeleton while the first page loads", () => {
+describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section 6)", () => {
+  it("shows the Matches tab header, the record strip and a skeleton while the first page loads", () => {
     mockGetMyMatchLibrary.mockReturnValue(new Promise(() => undefined));
-    const utils = render(<FilmRoomScreen />);
-    expect(utils.getByText("FILM ROOM")).toBeTruthy();
-    expect(utils.getByTestId("film-room-record")).toHaveTextContent("24 MATCHES · 15W 7L 2D · 1526");
+    const utils = render(<MatchesScreen />);
+    expect(mockTabHeader).toHaveBeenLastCalledWith({ title: "Matches" });
+    expect(utils.getByTestId("tab-header")).toHaveTextContent("Matches");
+    expect(utils.getByTestId("matches-record")).toHaveTextContent("24 MATCHES · 15W 7L 2D · 1526");
     expect(utils.getByTestId("film-room-loading")).toBeTruthy();
-    expect(utils.getByLabelText("Go back")).toBeTruthy();
+    // A tab root: no back button, and no Film Room title any more.
+    expect(utils.queryByLabelText("Go back")).toBeNull();
+    expect(utils.queryByText("FILM ROOM")).toBeNull();
+    // The carousel slot stays empty until the carousel lands (jits-a4fw.4).
+    expect(utils.queryByTestId("matches-carousel-slot")).toBeNull();
   });
 
   it("groups posters under a month heading and opens the match page", async () => {
@@ -256,7 +274,7 @@ describe("FilmRoomScreen", () => {
     mockGetMyMatchLibrary
       .mockResolvedValueOnce(page([libItem({ match_id: "p1", completed_at: daysAgo(1) })], "cursor-1"))
       .mockResolvedValueOnce(page([libItem({ match_id: "p2", completed_at: daysAgo(40) })], null));
-    const utils = render(<FilmRoomScreen />);
+    const utils = render(<MatchesScreen />);
     await waitFor(() => expect(utils.getByTestId("film-card-p1")).toBeTruthy());
     const list = utils.UNSAFE_root.find((n: HostNode) => typeof n.props.onEndReached === "function");
     await act(async () => {
@@ -280,9 +298,76 @@ describe("FilmRoomScreen", () => {
     expect(utils.getByText("NO FILM YET")).toBeTruthy();
   });
 
+  it("keeps the cached list and toasts when a refresh fails (C-E2)", async () => {
+    const utils = await renderLoaded();
+    mockGetMyMatchLibrary.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    const list = utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0];
+    await act(async () => {
+      list.props.refreshControl.props.onRefresh();
+    });
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith("Couldn't refresh your matches"));
+    expect(utils.getByTestId("film-card-m-new")).toBeTruthy();
+    expect(utils.queryByTestId("film-room-error")).toBeNull();
+  });
+
+  it("a background revalidate (an upload settling) keeps the spinner off and never toasts, even when it fails", async () => {
+    act(() => {
+      setMatchUpload("m-new", { status: "uploading", progress: 0.5 });
+    });
+    const utils = await renderLoaded();
+    let fail: (v: unknown) => void = () => undefined;
+    mockGetMyMatchLibrary.mockReturnValue(new Promise((r) => (fail = r)));
+    const calls = mockGetMyMatchLibrary.mock.calls.length;
+    act(() => {
+      setMatchUpload("m-new", { status: "uploaded", videoId: "v-9", progress: 1 });
+    });
+    await waitFor(() => expect(mockGetMyMatchLibrary.mock.calls.length).toBeGreaterThan(calls));
+    const control = () => utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0].props.refreshControl;
+    expect(control().props.refreshing).toBe(false);
+    await act(async () => {
+      fail({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    });
+    expect(control().props.refreshing).toBe(false);
+    expect(mockToastError).not.toHaveBeenCalled();
+    expect(utils.getByTestId("film-card-m-new")).toBeTruthy();
+  });
+
+  it("pull to refresh re-reads the first page", async () => {
+    const utils = await renderLoaded();
+    const calls = mockGetMyMatchLibrary.mock.calls.length;
+    const list = utils.UNSAFE_root.findAll((n: HostNode) => n.props.refreshControl != null)[0];
+    await act(async () => {
+      list.props.refreshControl.props.onRefresh();
+    });
+    await waitFor(() => expect(mockGetMyMatchLibrary.mock.calls.length).toBeGreaterThan(calls));
+    expect(mockGetMyMatchLibrary).toHaveBeenLastCalledWith({}, mockAthleteId(), { limit: 20 });
+  });
+
+  it("offers a whole-row retry when loading more fails, and the retry loads the page", async () => {
+    mockGetMyMatchLibrary
+      .mockResolvedValueOnce(page([libItem({ match_id: "p1", completed_at: daysAgo(1) })], "cursor-1"))
+      .mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "offline" } })
+      .mockResolvedValueOnce(page([libItem({ match_id: "p2", completed_at: daysAgo(40) })], null));
+    const utils = render(<MatchesScreen />);
+    await waitFor(() => expect(utils.getByTestId("film-card-p1")).toBeTruthy());
+    const list = utils.UNSAFE_root.find((n: HostNode) => typeof n.props.onEndReached === "function");
+    await act(async () => {
+      list.props.onEndReached();
+    });
+    const retry = await waitFor(() => utils.getByTestId("film-room-more-retry"));
+    expect(retry).toHaveTextContent("COULDN'T LOAD MORE. TAP TO RETRY");
+    await act(async () => {
+      fireEvent.press(retry);
+    });
+    await waitFor(() => expect(utils.getByTestId("film-card-p2")).toBeTruthy());
+    expect(utils.queryByTestId("film-room-more-retry")).toBeNull();
+  });
+
   it("shows a retryable error when the first page fails", async () => {
     const utils = await renderLoaded({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
     expect(utils.getByTestId("film-room-error")).toBeTruthy();
+    // A cold load failure is the panel, never the C-E2 toast.
+    expect(mockToastError).not.toHaveBeenCalled();
     mockGetMyMatchLibrary.mockResolvedValue(page(library()));
     await act(async () => {
       fireEvent.press(utils.getByLabelText("Try again"));
@@ -296,6 +381,11 @@ describe("FilmRoomScreen", () => {
     const root = path.join(__dirname, "../..");
     const files = [
       "app/(app)/film-room.tsx",
+      "app/(app)/(tabs)/matches/index.tsx",
+      "app/(app)/(tabs)/matches/_layout.tsx",
+      ...(fs.readdirSync(path.join(root, "components/matches")) as string[])
+        .filter((f) => /\.tsx?$/.test(f))
+        .map((f) => `components/matches/${f}`),
       "app/(app)/video/[id].tsx",
       "app/(app)/match-detail/[matchId].tsx",
       // Recursive: the multi-angle player's components live in a subfolder.
@@ -307,7 +397,6 @@ describe("FilmRoomScreen", () => {
       "components/match-detail/film-angles.tsx",
       "components/match-detail/match-hero.tsx",
       "components/match-detail/match-verdict.tsx",
-      "components/profile/film-room-preview.tsx",
     ];
     for (const f of files) {
       expect(fs.readFileSync(path.join(root, f), "utf8")).not.toContain("—");

@@ -40,7 +40,8 @@ describe("Help & Support copy", () => {
   it("no longer promises a footage download (there is no download UI)", () => {
     const text = allText();
     expect(text).not.toMatch(/download/i);
-    expect(text).toMatch(/Film Room/);
+    expect(text).toMatch(/in the Matches tab, where you can watch them back/);
+    expect(text).not.toMatch(/Film Room/);
   });
 
   it("does not imply casual matches exist, and does not mention a rematch", () => {

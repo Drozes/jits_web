@@ -53,6 +53,18 @@ describe("rows", () => {
     expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
   });
 
+  it("puts one match per row for the full-width feed (perRow 1)", () => {
+    const rows = buildRows([sep(27), sep(24), aug(30)], 1);
+    expect(rows.map((r) => (r.type === "month" ? `${r.label}:${r.count}` : r.items.map((i) => i.match_id).join("+")))).toEqual([
+      "SEPTEMBER 2026:2",
+      "s27",
+      "s24",
+      "AUGUST 2026:1",
+      "a30",
+    ]);
+    expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
+  });
+
   it("filters by outcome and opponent", () => {
     const items = [
       sep(27, { outcome: "win" }),

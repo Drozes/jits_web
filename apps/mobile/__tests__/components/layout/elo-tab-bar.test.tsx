@@ -53,6 +53,8 @@ import {
 } from "@/components/layout/elo-tab-bar";
 import { haptics } from "@/lib/motion/haptics";
 import { __setReduceMotionForTests } from "@/lib/motion";
+import { TRACKING, typeStep } from "@/lib/typography";
+import { loadFontMetrics, measureLine, resolveFromNodeModules } from "../../support/ttf-advance";
 
 type Screen = { name: string; title: string; hidden?: boolean };
 
@@ -93,15 +95,18 @@ function buildProps(
   } as unknown as BottomTabBarProps;
 }
 
-// The shipped bar, at its target 4-up. The bar itself is count-agnostic: its
-// columns are flex-1 and the list comes off the navigator, so adding Arena
-// changed nothing in the component.
+// The shipped bar, 5-up since the Matches tab (spec specs/matches-tab/spec.md
+// 4.1). The bar itself is count-agnostic: its columns are flex-1 and the list
+// comes off the navigator, so adding Arena and then Matches changed nothing in
+// the component.
 const CURRENT_TABS: Screen[] = [
   { name: "(home)", title: "Home" },
   { name: "arena", title: "Arena" },
+  { name: "matches", title: "Matches" },
   { name: "leaderboard", title: "Rankings" },
   { name: "profile", title: "Profile" },
 ];
+const CURRENT_LABELS = CURRENT_TABS.map((t) => t.title);
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -119,12 +124,7 @@ describe("EloTabBar", () => {
     );
     const buttons = getAllByRole("button");
     expect(buttons).toHaveLength(CURRENT_TABS.length);
-    expect(buttons.map((b) => b.props.accessibilityLabel)).toEqual([
-      "Home",
-      "Arena",
-      "Rankings",
-      "Profile",
-    ]);
+    expect(buttons.map((b) => b.props.accessibilityLabel)).toEqual(["Home", "Arena", "Matches", "Rankings", "Profile"]);
   });
 
   it("renders no gym tabs", () => {
@@ -172,6 +172,62 @@ describe("EloTabBar", () => {
     );
     expect(getAllByRole("button")).toHaveLength(CURRENT_TABS.length);
     expect(queryByLabelText("Secret")).toBeNull();
+  });
+});
+
+describe("EloTabBar at five tabs (spec specs/matches-tab/spec.md 4.1, AC 1.3)", () => {
+  // The label is DM Sans Bold (font-heading) at text-micro, uppercase, with
+  // tracking-caps-l. Measured from the font file's own advance widths, so a
+  // longer label, a bigger size token or a wider tracking fails here first.
+  const font = loadFontMetrics(resolveFromNodeModules("@expo-google-fonts/dm-sans/700Bold/DMSans_700Bold.ttf"));
+  const labelWidth = (label: string) =>
+    measureLine(font, label.toUpperCase(), typeStep("micro").fontSize, TRACKING["caps-l"]);
+
+  it("draws every label with the measured style (font-heading, text-micro, caps, tracking-caps-l)", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    for (const title of CURRENT_LABELS) {
+      const classes = String(u.getByText(title).props.className).split(/\s+/);
+      for (const token of ["font-heading", "text-micro", "uppercase", "tracking-caps-l"]) {
+        expect(classes).toContain(token);
+      }
+    }
+  });
+
+  it("caps every label at 1.15x Dynamic Type, and the widest still fits at that size", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    for (const title of CURRENT_LABELS) {
+      expect(u.getByText(title).props.maxFontSizeMultiplier).toBe(1.15);
+    }
+    // Font size and tracking both scale with the multiplier.
+    const column = 375 / CURRENT_TABS.length;
+    const overflow = CURRENT_LABELS.filter((title) => labelWidth(title) * 1.15 > column);
+    expect(overflow).toEqual([]);
+  });
+
+  it.each([375, 390])("fits every label on one line in a %i pt wide bar, with 4 pt to spare each side", (screenWidth) => {
+    const column = screenWidth / CURRENT_TABS.length;
+    // Keyed by label so a failure names the tab that overflows.
+    const overflow = CURRENT_LABELS.filter((title) => labelWidth(title) > column - 8);
+    expect(overflow).toEqual([]);
+  });
+
+  it("measures a sane width (the font parser is reading real advances)", () => {
+    // Guards the measurement itself: an all-zero or garbage read would pass
+    // the fit test above vacuously.
+    expect(labelWidth("Rankings")).toBeGreaterThan(50);
+    expect(labelWidth("MMMMMMMM")).toBeGreaterThan(75);
+  });
+
+  it("gives the Matches tab no badge mark", () => {
+    const u = render(React.createElement(EloTabBar, { ...buildProps(CURRENT_TABS), badges: { arena: { kind: "count", count: 2 } } }));
+    expect(u.queryByTestId(/^tab-badge-.*matches$/)).toBeNull();
+    expect(u.getByLabelText("Matches").props.accessibilityValue?.text).toBeUndefined();
+  });
+
+  it("navigates to the Matches tab", () => {
+    const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
+    fireEvent.press(u.getByLabelText("Matches"));
+    expect(mockNavigate).toHaveBeenCalledWith("matches", undefined);
   });
 });
 
@@ -262,12 +318,7 @@ describe("EloTabBar badges (jits-dq85.9)", () => {
       arena: { kind: "count", count: 3 },
       profile: { kind: "ring", label: "Something" },
     });
-    expect(u.getAllByRole("button").map((b) => b.props.accessibilityLabel)).toEqual([
-      "Home",
-      "Arena",
-      "Rankings",
-      "Profile",
-    ]);
+    expect(u.getAllByRole("button").map((b) => b.props.accessibilityLabel)).toEqual(CURRENT_LABELS);
     // Only the badged tabs carry a badge.
     expect(u.queryByTestId("tab-badge-count-(home)")).toBeNull();
     expect(u.getByTestId("tab-badge-ring-profile")).toBeTruthy();

@@ -39,6 +39,11 @@ export interface MatchLibrary {
   isValidating: boolean;
   /** First-page error with nothing on screen yet. */
   error: Error | null;
+  /**
+   * A first-page refresh failed while an earlier page is still on screen
+   * (stale-while-revalidate kept it): the Matches tab toasts C-E2.
+   */
+  refreshError: Error | null;
   hasMore: boolean;
   loadingMore: boolean;
   /** The last "load more" failed; the footer offers a retry. */
@@ -159,6 +164,7 @@ export function useMatchLibrary(athleteId: string | undefined): MatchLibrary {
     isLoading: first.isLoading && first.data === undefined,
     isValidating: first.isValidating,
     error: first.data === undefined ? first.error : null,
+    refreshError: first.data === undefined ? null : first.error,
     hasMore: !!(stale ? firstCursor : next),
     loadingMore,
     moreError,

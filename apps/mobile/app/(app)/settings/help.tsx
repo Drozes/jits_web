@@ -23,7 +23,7 @@ import { Plate } from "@/components/ui/elo-system";
  *  - ELO: 1000 for everyone, +50 phantom per IBJJF division gap for the
  *    expected score only, submission or draw, draws cost both and the
  *    favorite more (`record_match_result`, `calculate_elo_stakes`);
- *  - footage: no download UI, recorded matches are in the Film Room.
+ *  - footage: no download UI, recorded matches are in the Matches tab (C-H1).
  */
 type HelpSection = {
   title: string;
@@ -54,7 +54,7 @@ const HELP_SECTIONS: HelpSection[] = [
   {
     title: "Match Footage & Privacy",
     paragraphs: [
-      "You own your match footage. Your recorded matches are in the Film Room on your profile, where you can watch them back. Server-side retention on the free tier may be limited; access to your own data is not.",
+      "You own your match footage. Your recorded matches are in the Matches tab, where you can watch them back. Server-side retention on the free tier may be limited; access to your own data is not.",
       "Your profile and rating are public on the global ladder.",
     ],
   },

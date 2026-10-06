@@ -50,13 +50,14 @@ jest.mock("expo-router", () => {
 jest.mock("lucide-react-native", () => {
   const R = require("react");
   const RN = require("react-native");
-  const stub = () => R.createElement(RN.View, {});
+  // Each icon renders a View tagged with its lucide name, so a test can tell
+  // which icon a tab draws.
   return new Proxy(
     {},
     {
       get: (_t: Record<string, unknown>, prop: string) => {
         if (prop === "__esModule") return true;
-        return stub;
+        return (p: Record<string, unknown>) => R.createElement(RN.View, { testID: `lucide-${prop}`, ...p });
       },
     },
   );
@@ -98,11 +99,12 @@ beforeEach(() => {
   mockUseManagedGyms.mockClear();
 });
 
-// The shipped 4-up, in bar order. Registration and route file stay in lockstep:
+// The shipped 5-up, in bar order (Matches added 2026-10-06, spec
+// specs/matches-tab/spec.md 4.1). Registration and route file stay in lockstep:
 // expo-router silently drops a Screen whose route file is missing, so a name
 // here with no directory under (tabs) renders no column rather than crashing.
 // The on-disk assertion below is what catches that direction.
-const EXPECTED_TABS = ["(home)", "arena", "leaderboard", "profile"];
+const EXPECTED_TABS = ["(home)", "arena", "matches", "leaderboard", "profile"];
 
 describe("(tabs)/_layout", () => {
   it("registers exactly the shipped tabs, in bar order", () => {
@@ -197,6 +199,36 @@ describe("(tabs)/_layout", () => {
     expect(mockEloTabBar).toHaveBeenLastCalledWith(
       expect.objectContaining({ badges: { arena: null } }),
     );
+  });
+
+  it("labels the five tabs Home, Arena, Matches, Rankings, Profile (AC 1.1)", () => {
+    render(React.createElement(TabsLayout));
+    expect(capturedScreens.map((s) => s.options.title)).toEqual(["Home", "Arena", "Matches", "Rankings", "Profile"]);
+  });
+
+  it("draws the Matches tab with the lucide Film icon, in the tab's color and size", () => {
+    render(React.createElement(TabsLayout));
+    const matches = capturedScreens.find((s) => s.name === "matches")!;
+    const icon = (matches.options.tabBarIcon as (p: unknown) => React.ReactElement)({ focused: false, color: "#7A8794", size: 18 });
+    const { getByTestId } = render(icon);
+    expect(getByTestId("lucide-Film").props).toMatchObject({ color: "#7A8794", size: 18 });
+  });
+
+  it("gives the Matches tab no badge: the Arena's is the only tab badge (PM9)", () => {
+    render(React.createElement(TabsLayout));
+    const matches = capturedScreens.find((s) => s.name === "matches")!;
+    expect(matches.options.tabBarBadge).toBeUndefined();
+    mockArenaState = { incomingCount: 3, isLive: true, hasConfirm: true, incomingKnown: true };
+    const barProps = { state: { routes: [], index: 0 }, descriptors: {}, navigation: {} };
+    render(capturedTabBar.current!(barProps) as React.ReactElement);
+    const props = mockEloTabBar.mock.calls[mockEloTabBar.mock.calls.length - 1][0] as { badges: Record<string, unknown>; live: Record<string, unknown> };
+    expect(Object.keys(props.badges)).toEqual(["arena"]);
+    expect(Object.keys(props.live)).toEqual(["arena"]);
+  });
+
+  it("has a matches route directory with an index screen and a layout", () => {
+    const dir = fs.readdirSync(path.join(TABS_DIR, "matches")).sort();
+    expect(dir).toEqual(["_layout.tsx", "index.tsx"]);
   });
 
   it("draws the Arena tab with the Arena icon fed by the bar's signals", () => {

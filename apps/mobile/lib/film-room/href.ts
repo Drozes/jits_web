@@ -1,5 +1,10 @@
-/** Route of the Film Room library (`app/(app)/film-room.tsx`). */
-export const FILM_ROOM_HREF = "/(app)/film-room";
+/**
+ * Route of the Matches tab (`app/(app)/(tabs)/matches/`), the athlete's whole
+ * match history. It replaced the pushed Film Room screen (spec
+ * specs/matches-tab/spec.md PM2); `app/(app)/film-room.tsx` is now only a
+ * redirect here.
+ */
+export const MATCHES_TAB_HREF = "/(app)/(tabs)/matches";
 
 /**
  * Route of the player (`app/(app)/video/[id].tsx`), optionally starting at

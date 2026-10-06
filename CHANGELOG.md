@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Mobile: Matches tab shell, Profile cleanup, Film Room retirement (jits-a4fw.3, .7, .8)
+
+Spec `specs/matches-tab/spec.md` sections 4, 6.1, 9 and 17. Owner decisions 2026-10-06: five tabs (Home, Arena, Matches, Rankings, Profile), Matches uses the lucide `Film` icon and has no badge, Profile keeps no "View all matches" link. Ships in the same OTA as the rest of the Matches tab epic so history always has an entry point.
+
+**Added**
+- `apps/mobile/app/(app)/(tabs)/matches/index.tsx` and `_layout.tsx`: the Matches tab, third in the bar. `TabHeader` "Matches" (Live Chip and bell), the record strip, the result chips and opponent picker, month headers and the paged match list moved from the Film Room unchanged (`useMatchLibrary`, `useFilmRoomPhases`, the seen store, upload-settled and refocus refetches), pull to refresh, skeleton, error, filter-empty and load-more retry. The pull spinner follows only the athlete's own pull (`usePullToRefresh`), never background revalidates. A pull that fails while a page is cached keeps the list and toasts "Couldn't refresh your matches" (C-E2, `apps/mobile/lib/matches/use-matches-refresh.ts`); background revalidate failures stay quiet.
+- `apps/mobile/components/matches/match-list-layout.tsx` (`MatchListLayout`, `RenderMatch`, `MatchRenderContext`, `POSTER_GRID_LAYOUT`) and `matches-list-header.tsx` (`MatchesListHeader` with a `carousel` slot): the seams the feed card and the reel carousel drop into (jits-a4fw.4).
+- `MATCHES_TAB_HREF` in `apps/mobile/lib/film-room/href.ts`; `refreshError` on `useMatchLibrary`; `buildRows(items, perRow)` takes 1 or 2 per row.
+- Deep links: `resolveSystemPath` rewrites `/film-room` (and `/(app)/film-room`) to `/matches` before navigation; `matches` is a tab root for `openHref`.
+
+**Changed**
+- `apps/mobile/app/(app)/film-room.tsx` now sends the athlete to the Matches tab on focus: `router.dismissTo` when the stack can dismiss (never a `<Redirect>`, which would mount a second tab bar), else `router.replace`. Its Stack.Screen stays. Delete both after two OTA releases (jits-766g).
+- Tab bar labels are capped at 1.15x Dynamic Type so all five stay on one line.
+- Match-loop harness (E17): `openFromMatches(matchId)` (Matches tab, pull to refresh, `film-card-<matchId>`) replaces `openFromProfile` and `openFromPastVideos`; `Matches` joins the tab labels.
+- The match page's back fallback (`components/match-detail/match-hero.tsx`) goes to the Matches tab.
+- Help, footage answer: "Your recorded matches are in the Matches tab, where you can watch them back." (C-H1).
+- Profile: pull to refresh and refocus re-read the profile only; the cold-load skeleton drops its Recent Matches rows.
+
+**Removed**
+- `FILM_ROOM_HREF` (`apps/mobile/lib/film-room/href.ts`).
+- Profile's Recent Matches list, highlights row and Film Room preview, with `components/profile/film-room-preview.tsx`, `highlights-row.tsx`, `highlight-tile.tsx` and their tests. `history-row-action.tsx` stays (athlete profile uses it); `useMyHighlights` stays until the reel lane replaces it.
+
 ## OTA "AI move labels hidden" (runtime 0.5.0), 2026-10-06
 
 Production OTA group `7e1d3be8-905e-47f4-bb13-9b05fa41ce51` from jits_web `main` `a054b5a5` (release PR #66: #65). JS-only, non-critical. Rollback target: `ff7e974d-d271-4eca-a76a-1cb594723d91`. Server-side reel labels remain until jr_be-du1.10.

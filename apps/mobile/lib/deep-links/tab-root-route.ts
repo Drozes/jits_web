@@ -1,5 +1,5 @@
 /**
- * Opening a tab root (`/`, `/arena`, `/leaderboard`, `/profile`) from outside
+ * Opening a tab root (`/`, `/arena`, `/matches`, `/leaderboard`, `/profile`) from outside
  * the tab bar without mounting a second copy of it.
  *
  * `router.push('/arena?challenge=<id>')` (the challenge push deep link, AC-A8)
@@ -26,7 +26,7 @@ import { useEffect } from "react";
 import { useSegments, type Router } from "expo-router";
 
 /** The first path segment of every tab root ("" is Home). */
-const TAB_ROOT_PATHS = new Set(["", "arena", "leaderboard", "profile"]);
+const TAB_ROOT_PATHS = new Set(["", "arena", "matches", "leaderboard", "profile"]);
 
 /** True for an href that opens a tab root (query and hash ignored). */
 export function isTabRootHref(href: string): boolean {

@@ -60,7 +60,7 @@ export class Screens {
 
   // --- global ---------------------------------------------------------------
 
-  async tab(name: "Home" | "Arena" | "Rankings" | "Profile"): Promise<void> {
+  async tab(name: "Home" | "Arena" | "Matches" | "Rankings" | "Profile"): Promise<void> {
     await this.idb.dismissLogBox();
     await this.idb.tapQ({ label: name, type: "Button" }, 15_000);
   }

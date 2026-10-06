@@ -49,7 +49,7 @@ interface PosterCardProps {
   status: CardStatus;
   viewer: StillAthlete;
   onPress: () => void;
-  /** Profile preview tiles keep the harness id `past-video-row-<matchId>`. */
+  /** Defaults to `film-card-<matchId>`, which the match-loop harness taps on the Matches tab. */
   testID?: string;
   /** Overrides the composed label (the Profile preview keeps the harness copy). */
   accessibilityLabel?: string;

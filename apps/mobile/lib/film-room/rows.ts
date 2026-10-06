@@ -41,10 +41,11 @@ export type LibraryRow =
 
 /**
  * Flatten newest-first items into FlatList rows: a month heading, then the
- * month's posters two per row. Input order is kept (it is already newest
- * first), so a month split across pages still reads as one group.
+ * month's matches `perRow` per row (two posters in the grid, one full-width
+ * feed card). Input order is kept (it is already newest first), so a month
+ * split across pages still reads as one group.
  */
-export function buildRows(items: MatchLibraryItem[]): LibraryRow[] {
+export function buildRows(items: MatchLibraryItem[], perRow: 1 | 2 = 2): LibraryRow[] {
   const rows: LibraryRow[] = [];
   let i = 0;
   while (i < items.length) {
@@ -52,8 +53,8 @@ export function buildRows(items: MatchLibraryItem[]): LibraryRow[] {
     let j = i;
     while (j < items.length && monthOf(items[j].completed_at).key === month.key) j += 1;
     rows.push({ type: "month", key: `m:${month.key}:${i}`, label: month.label, count: j - i, last: j >= items.length });
-    for (let k = i; k < j; k += 2) {
-      const pair = (k + 1 < j ? [items[k], items[k + 1]] : [items[k]]) as
+    for (let k = i; k < j; k += perRow) {
+      const pair = (perRow === 2 && k + 1 < j ? [items[k], items[k + 1]] : [items[k]]) as
         | [MatchLibraryItem]
         | [MatchLibraryItem, MatchLibraryItem];
       rows.push({ type: "pair", key: `p:${items[k].match_id}`, items: pair });

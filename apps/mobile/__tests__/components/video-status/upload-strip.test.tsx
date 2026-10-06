@@ -141,6 +141,18 @@ describe("UploadStripSlot", () => {
     expect(tabs.queryByTestId("upload-strip")).toBeNull();
   });
 
+  it("shows on the Matches tab like every other tab: the bar's copy only (AC 2.14)", () => {
+    act(() => {
+      setMatchUpload("m1", { status: "uploading", progress: 0.3 });
+    });
+    mockSegments = ["(app)", "(tabs)", "matches"];
+    const bar = render(<UploadStripSlot placement="tabs" />);
+    expect(bar.getByText("UPLOADING MATCH VIDEO")).toBeTruthy();
+    expect(bar.getByText("30%")).toBeTruthy();
+    const stack = render(<UploadStripSlot placement="stack" />);
+    expect(stack.queryByTestId("upload-strip")).toBeNull();
+  });
+
   it("says 'Match video uploaded' for 4 s after the job lands, then hides", () => {
     jest.useFakeTimers();
     try {
@@ -210,7 +222,7 @@ describe("UploadStripSlot", () => {
     act(() => {
       setMatchUpload("m1", { status: "uploading", progress: 0.1 });
     });
-    mockSegments = ["(app)", "film-room"];
+    mockSegments = ["(app)", "settings"];
     const s = render(
       <StackStripFrame>
         <InsetProbe />

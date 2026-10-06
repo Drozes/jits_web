@@ -64,23 +64,18 @@ jest.mock("@/lib/profile/use-profile-data", () => ({
     onRefresh: mockProfileRefetch,
   }),
 }));
-const mockVideosRefetch = jest.fn();
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
-jest.mock("@/lib/profile/use-my-match-videos", () => ({
-  // The real upload-settled refetch, driven by the real upload store below.
-  useRefetchOnUploadSettled: jest.requireActual("@/lib/profile/use-my-match-videos")
-    .useRefetchOnUploadSettled,
-}));
-// The Film Room preview reads the first library page; its refetch is the
-// "videos" reload this suite tracks.
+// Profile no longer reads the match library or the highlights (spec
+// specs/matches-tab/spec.md section 9): these record any call that comes back.
+const mockUseMatchLibraryFirstPage = jest.fn();
+const mockUseMatchLibrary = jest.fn();
 jest.mock("@/lib/film-room/use-match-library", () => ({
-  useMatchLibraryFirstPage: () => ({
-    data: { items: [], next_before: null, next_before_id: null, source: "rpc" },
-    isLoading: false,
-    isValidating: false,
-    error: null,
-    refetch: mockVideosRefetch,
-  }),
+  useMatchLibraryFirstPage: (...a: unknown[]) => mockUseMatchLibraryFirstPage(...a),
+  useMatchLibrary: (...a: unknown[]) => mockUseMatchLibrary(...a),
+}));
+const mockUseMyHighlights = jest.fn();
+jest.mock("@/lib/highlight/use-my-highlights", () => ({
+  useMyHighlights: (...a: unknown[]) => mockUseMyHighlights(...a),
 }));
 function mockStub(testID: string) {
   const R = require("react");
@@ -90,27 +85,6 @@ function mockStub(testID: string) {
 jest.mock("@/components/profile/profile-header", () => ({ ProfileHeader: mockStub("profile-header") }));
 jest.mock("@/components/profile/profile-quick-stats", () => ({ ProfileQuickStats: mockStub("quick-stats") }));
 jest.mock("@/components/profile/account-section", () => ({ AccountSection: mockStub("account") }));
-jest.mock("@/components/profile/film-room-preview", () => ({ FilmRoomPreview: mockStub("film-room-preview") }));
-const mockHighlightsRefetch = jest.fn();
-const mockMarkSeenLocally = jest.fn();
-const mockHighlightsRow = jest.fn();
-jest.mock("@/lib/highlight/use-my-highlights", () => ({
-  useMyHighlights: (athleteId: string | undefined) => ({
-    athleteId,
-    items: [{ highlightId: "h1" }],
-    clipsEnabled: true,
-    refetch: mockHighlightsRefetch,
-    markSeenLocally: mockMarkSeenLocally,
-  }),
-}));
-jest.mock("@/components/profile/highlights-row", () => ({
-  HighlightsRow: (props: Record<string, unknown>) => {
-    mockHighlightsRow(props);
-    const R = require("react");
-    const RN = require("react-native");
-    return R.createElement(RN.View, { testID: "highlights-row" });
-  },
-}));
 jest.mock("@/components/notifications/notification-bell", () => ({
   NotificationBell: mockStub("notification-bell"),
 }));
@@ -130,7 +104,6 @@ import {
   __resetArenaStoreForTests,
   publishArenaState,
 } from "@/lib/arena/arena-store";
-import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -147,52 +120,22 @@ afterEach(() => {
 // Focus refetches are throttled to one per 30s; tests move this clock.
 let mockNow = 1_000_000;
 
-describe("Profile recent matches and refresh", () => {
-  it("opens the match detail screen from a recent match row", () => {
-    mockHistory.push({
-      match_id: "m-7",
-      opponent_display_name: "Demo Red",
-      completed_at: "2026-09-24T12:00:00.000Z",
-      match_type: "ranked",
-      elo_delta: -8,
-    });
-    const { getByLabelText } = render(<ProfileScreen />);
-
-    fireEvent.press(getByLabelText("Open match vs Demo Red"));
-    expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m-7");
-  });
-
-  it("staggers the recent-match rows in on the first load only (Adding Flare list enter)", () => {
-    mockHistory.push(
-      { match_id: "m-1", opponent_display_name: "A", completed_at: "2026-09-24T12:00:00.000Z", match_type: "ranked", elo_delta: 5 },
-      { match_id: "m-2", opponent_display_name: "B", completed_at: "2026-09-23T12:00:00.000Z", match_type: "ranked", elo_delta: -5 },
-    );
-    const withEntering = (root: HostNode) =>
-      root.findAll((n: HostNode) => typeof n.type === "string" && n.props.entering != null);
-    const view = render(<ProfileScreen />);
-    expect(withEntering(view.UNSAFE_root)).toHaveLength(2);
-
-    // A refetch re-render keeps the rows still.
-    view.rerender(<ProfileScreen />);
-    expect(withEntering(view.UNSAFE_root)).toHaveLength(0);
-    expect(view.getByLabelText("Open match vs A")).toBeTruthy();
-  });
-
-  it("refetches profile and videos when the tab regains focus, not on the first focus", () => {
+describe("Profile refresh", () => {
+  it("re-reads the profile only when the tab regains focus, not on the first focus", () => {
     render(<ProfileScreen />);
     expect(mockProfileRefetch).not.toHaveBeenCalled();
-    expect(mockVideosRefetch).not.toHaveBeenCalled();
 
     mockNow += 31_000;
     act(() => {
       mockFocusCallbacks.forEach((cb) => cb());
     });
     expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
-    expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
-    expect(mockHighlightsRefetch).toHaveBeenCalledTimes(1);
+    expect(mockUseMatchLibraryFirstPage).not.toHaveBeenCalled();
+    expect(mockUseMatchLibrary).not.toHaveBeenCalled();
+    expect(mockUseMyHighlights).not.toHaveBeenCalled();
   });
 
-  it("pull-to-refresh reloads the videos list too", () => {
+  it("pull-to-refresh re-reads the profile only", () => {
     const { UNSAFE_root } = render(<ProfileScreen />);
     const scroll = UNSAFE_root.find(
       (n: HostNode) => typeof n.props.refreshControl === "object" && n.props.refreshControl != null,
@@ -201,58 +144,65 @@ describe("Profile recent matches and refresh", () => {
       scroll.props.refreshControl.props.onRefresh();
     });
     expect(mockProfileRefetch).toHaveBeenCalledTimes(1);
-    expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
-    expect(mockHighlightsRefetch).toHaveBeenCalledTimes(1);
-  });
-
-  it("renders the Highlights row between Recent Matches and the Film Room preview", () => {
-    const utils = render(<ProfileScreen />);
-    const ids = utils.UNSAFE_root.findAll(
-      (n: HostNode) => typeof n.type === "string" && typeof n.props.testID === "string",
-    ).map((n: HostNode) => n.props.testID as string);
-    expect(utils.getByText("Recent Matches")).toBeTruthy();
-    expect(ids.indexOf("highlights-row")).toBeGreaterThan(-1);
-    expect(ids.indexOf("highlights-row")).toBeLessThan(ids.indexOf("film-room-preview"));
-    expect(ids.indexOf("quick-stats")).toBeLessThan(ids.indexOf("highlights-row"));
-    expect(mockHighlightsRow).toHaveBeenLastCalledWith({
-      items: [{ highlightId: "h1" }],
-      clipsEnabled: true,
-      onOpen: mockMarkSeenLocally,
-    });
+    expect(mockUseMatchLibraryFirstPage).not.toHaveBeenCalled();
+    expect(mockUseMyHighlights).not.toHaveBeenCalled();
   });
 });
 
-describe("Film Room preview after an upload lands", () => {
-  it("refetches the videos once when a history match's upload settles after the refocus", () => {
-    resetMatchUploadStore();
+describe("Profile cleanup (spec specs/matches-tab/spec.md section 9, AC 5.1 to 5.3)", () => {
+  function testIds(root: HostNode): string[] {
+    return root
+      .findAll((n: HostNode) => typeof n.type === "string" && typeof n.props.testID === "string")
+      .map((n: HostNode) => n.props.testID as string);
+  }
+
+  it("shows no Recent Matches list, no highlights row and no Film Room preview, even with history", () => {
     mockHistory.push({
-      match_id: "m-9",
-      opponent_display_name: "Demo Blue",
-      completed_at: "2026-09-26T12:00:00.000Z",
+      match_id: "m-7",
+      opponent_display_name: "Demo Red",
+      completed_at: "2026-09-24T12:00:00.000Z",
       match_type: "ranked",
-      elo_delta: 12,
+      elo_delta: -8,
     });
-    act(() => {
-      setMatchUpload("m-9", { status: "uploading", progress: 0.2 });
-    });
-    render(<ProfileScreen />);
-    expect(mockVideosRefetch).not.toHaveBeenCalled();
+    const utils = render(<ProfileScreen />);
+    expect(utils.queryByText(/Recent Matches/i)).toBeNull();
+    expect(utils.queryByText(/No Matches Yet/i)).toBeNull();
+    expect(utils.queryByLabelText("Open match vs Demo Red")).toBeNull();
+    expect(utils.queryByText(/Film Room/i)).toBeNull();
+    expect(utils.queryByText(/Highlights/i)).toBeNull();
+    const ids = testIds(utils.UNSAFE_root);
+    expect(ids).not.toContain("film-room-preview");
+    expect(ids).not.toContain("highlights-row");
+    expect(ids.some((id) => id.startsWith("highlight-tile"))).toBe(false);
+  });
 
-    act(() => {
-      setMatchUpload("m-9", { progress: 0.9 });
-    });
-    expect(mockVideosRefetch).not.toHaveBeenCalled();
+  it("has no link to the match history (no View all matches, PM1)", () => {
+    const utils = render(<ProfileScreen />);
+    expect(utils.queryByText(/matches/i)).toBeNull();
+    expect(utils.queryByLabelText(/matches|film room/i)).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
 
-    act(() => {
-      setMatchUpload("m-9", { status: "uploaded", videoId: "v-1", progress: 1 });
-    });
-    expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
-    // Neither the profile refetch nor a later store write re-fires it.
-    expect(mockProfileRefetch).not.toHaveBeenCalled();
-    act(() => {
-      setMatchUpload("m-9", { progress: 1 });
-    });
-    expect(mockVideosRefetch).toHaveBeenCalledTimes(1);
+  it("keeps header, Share profile, quick stats, View Detailed Stats, account and the version footer, in order", () => {
+    const utils = render(<ProfileScreen />);
+    const ids = testIds(utils.UNSAFE_root);
+    expect(ids.indexOf("profile-header")).toBeGreaterThan(-1);
+    expect(ids.indexOf("profile-header")).toBeLessThan(ids.indexOf("share-sheet"));
+    expect(ids.indexOf("share-sheet")).toBeLessThan(ids.indexOf("quick-stats"));
+    expect(ids.indexOf("quick-stats")).toBeLessThan(ids.indexOf("account"));
+    expect(utils.getByText("View Detailed Stats")).toBeTruthy();
+    expect(utils.getByText("ELO RATED Beta")).toBeTruthy();
+    fireEvent.press(utils.getByText("View Detailed Stats"));
+    expect(mockPush).toHaveBeenCalledWith("/(app)/profile/stats");
+  });
+
+  it("no longer imports the retired Profile history pieces", () => {
+    const fs = require("fs") as typeof import("fs");
+    const path = require("path") as typeof import("path");
+    const src = fs.readFileSync(path.join(__dirname, "../../app/(app)/(tabs)/profile/index.tsx"), "utf8");
+    for (const gone of ["film-room-preview", "highlights-row", "use-my-highlights", "use-match-library", "useRefetchOnUploadSettled", "Recent Matches"]) {
+      expect(src).not.toContain(gone);
+    }
   });
 });
 
@@ -270,12 +220,6 @@ describe("Profile tab", () => {
     ).map((n: HostNode) => n.props.testID as string);
     expect(ids.indexOf("header-status-chip")).toBeGreaterThan(-1);
     expect(ids.indexOf("header-status-chip")).toBeLessThan(ids.indexOf("notification-bell"));
-  });
-
-  it("shows the Film Room preview in place of Past Match Videos", () => {
-    const { getByTestId, queryByText } = render(<ProfileScreen />);
-    expect(getByTestId("film-room-preview")).toBeTruthy();
-    expect(queryByText("Past Match Videos")).toBeNull();
   });
 
   it("offers Share profile in the body, wired to the same share sheet", () => {

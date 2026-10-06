@@ -77,6 +77,20 @@ describe("useMatchLibrary", () => {
     expect(result.current.items).toEqual([]);
   });
 
+  it("reports a failed refresh as refreshError while the cached page stays", async () => {
+    const id = nextId();
+    mockGetMyMatchLibrary
+      .mockResolvedValueOnce(page(["a"], null))
+      .mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "offline" } });
+    const { result } = renderHook(() => useMatchLibrary(id));
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    expect(result.current.refreshError).toBeNull();
+    act(() => result.current.refresh());
+    await waitFor(() => expect(result.current.refreshError?.message).toBe("offline"));
+    expect(result.current.error).toBeNull();
+    expect(result.current.items.map((i) => i.match_id)).toEqual(["a"]);
+  });
+
   it("refresh drops later pages and re-reads the first", async () => {
     const id = nextId();
     mockGetMyMatchLibrary
