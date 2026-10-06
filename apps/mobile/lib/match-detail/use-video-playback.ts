@@ -1,6 +1,6 @@
 import * as React from "react";
 import { AppState } from "react-native";
-import { useVideoPlayer, type VideoPlayer } from "expo-video";
+import { useVideoPlayer, type VideoPlayer, type VideoThumbnail } from "expo-video";
 import { supabase } from "@/lib/supabase/client";
 import {
   getMatchVideoPlaybackResult,
@@ -52,6 +52,71 @@ export interface PlaybackSource {
   holdFrame?: boolean;
 }
 
+/**
+ * Angle switch phase 1 contract (jits-xfvd.16,
+ * research/2026-10-multi-angle-playback/06-angle-switch-phase1-contract.md).
+ * The base branch only declares these; slice B1 implements them.
+ */
+/** Phases of ONE angle switch. A quality swap never leaves "idle". */
+export type SwitchPhase = "idle" | "pending" | "landing";
+
+export interface SwitchFailure {
+  /** The seq of the switch that failed. */
+  seq: number;
+  /** The angle that could not be loaded. */
+  targetId: string;
+  /** Date.now() when the failure was decided. */
+  at: number;
+}
+
+export interface SwitchState {
+  phase: SwitchPhase;
+  /** Increments on every accepted switchAngle call (never on a quality swap). 0 before the first switch. */
+  seq: number;
+  /** The angle that was on screen when this switch started (for a superseding switch: the previous switch's target). */
+  fromId: string | null;
+  /** The angle being switched to. On a restore after a failure: the angle being returned to. */
+  targetId: string | null;
+  /** Date.now() at the switchAngle call (the tap). Null when idle and nothing has happened yet. */
+  startedAt: number | null;
+  /** The caller said the target is not exact-synced (clock-only or unsynced). Drives copy and transition. */
+  approximate: boolean;
+  /** True while returning to fromId after a failed switch. */
+  restoring: boolean;
+  /** Native still of the outgoing frame, or null. */
+  heldFrame: VideoThumbnail | null;
+  /** Date.now() when this switch landed. Null until then. */
+  landedAt: number | null;
+  /** The most recent failed switch, until the next switchAngle call or an outside navigation. */
+  failed: SwitchFailure | null;
+}
+
+/** A switch lands when the new item's time is within this of the resume target. */
+export const LAND_TOLERANCE_S = 0.25;
+/** timeUpdateEventInterval while a switch is pending (restored to 0.25 at idle). */
+export const SWITCH_TIME_UPDATE_S = 0.1;
+/** Longest wait for the held still before replaceAsync is issued anyway. */
+export const HELD_FRAME_CAP_MS = 150;
+/** A pending switch drops its held still after this long (the pill stays). */
+export const SWITCH_HOLD_CAP_MS = 4000;
+/** "landing" lasts this long, then the state returns to "idle" and heldFrame clears. */
+export const SWITCH_SETTLE_MS = 300;
+/** Paused, no frame event after the post-seek readyToPlay: land after this. */
+export const PAUSED_LAND_FALLBACK_MS = 350;
+
+export const IDLE_SWITCH_STATE: SwitchState = {
+  phase: "idle",
+  seq: 0,
+  fromId: null,
+  targetId: null,
+  startedAt: null,
+  approximate: false,
+  restoring: false,
+  heldFrame: null,
+  landedAt: null,
+  failed: null,
+};
+
 export interface VideoPlayback {
   /**
    * The angle on screen. Starts as the route's id and moves with
@@ -68,7 +133,9 @@ export interface VideoPlayback {
    * new angle's URL (pre-signed when `presign` got to it) into the same
    * player, and holds the outgoing frame instead of the poster.
    */
-  switchAngle: (nextId: string, atSeconds: number) => void;
+  switchAngle: (nextId: string, atSeconds: number, opts?: { approximate?: boolean }) => void;
+  /** The current angle switch (jits-xfvd.16). Idle on the base branch; slice B1 drives it. */
+  switchState: SwitchState;
   /** Sign these angles now (best effort) so a switch to one skips the round trip. */
   presign: (ids: string[]) => void;
   /**
@@ -835,7 +902,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     // Angle switches keep the session's rendition. A pending quality swap is
     // dropped FIRST, so the new angle signs at the level still served, never
     // at a superseded decision's rendition (review R2-M1).
-    (nextId: string, atSeconds: number) => {
+    (nextId: string, atSeconds: number, _opts?: { approximate?: boolean }) => {
       if (!nextId || nextId === activeIdRef.current) return;
       dropQualitySwap();
       swapSource(nextId, atSeconds, quality.currentTarget(), "angle");
@@ -909,5 +976,6 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     frameShown: source != null && (frameGen === source.generation || source.holdFrame === true),
     onFirstFrameRender,
     telemetry,
+    switchState: IDLE_SWITCH_STATE,
   };
 }
