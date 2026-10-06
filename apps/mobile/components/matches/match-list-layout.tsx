@@ -1,9 +1,9 @@
 import * as React from "react";
 import type { MatchLibraryItem } from "@jits/shared/api/film-room";
 import type { CardPhase } from "@/lib/film-room/card-status";
-import { LibraryPoster } from "@/components/film-room/library-poster";
-import { FilmRoomSkeleton } from "@/components/film-room/film-room-states";
 import type { StillAthlete } from "@/components/film-room/opening-still";
+import { MatchFeedCard } from "./match-feed-card";
+import { MatchFeedSkeleton } from "./match-feed-skeleton";
 
 /** What the Matches tab hands every match it renders. */
 export interface MatchRenderContext {
@@ -14,8 +14,14 @@ export interface MatchRenderContext {
   seen: boolean;
   /** The server's Film status phase for a recent match (`useFilmRoomPhases`). */
   phase: CardPhase | null;
-  /** Stable across renders; pushes match detail (the card may push the player itself). */
+  /** FIRST MATCH / FIRST WIN for this match (a stable array). */
+  tags: readonly string[];
+  /** This match's card teaches the recording helper (C-L6). */
+  noFilmHelper: boolean;
+  /** Stable across renders; opens match detail and marks the match seen. */
   onOpen: (matchId: string) => void;
+  /** Stable across renders; plays a video and marks the match seen. */
+  onPlay: (videoId: string, matchId: string) => void;
 }
 
 /** Renders one match of the feed (a memoised component). The screen keys it by match id. */
@@ -23,9 +29,7 @@ export type RenderMatch = (item: MatchLibraryItem, ctx: MatchRenderContext) => R
 
 /**
  * How the Matches tab draws its list: matches per row, one match, and the
- * cold-load placeholder. The seam for the feed card (jits-a4fw.4): swap the
- * screen's layout for `{ perRow: 1, renderMatch: (item, ctx) => <MatchFeedCard .../>,
- * Skeleton: FeedSkeleton }` and nothing else in the screen changes.
+ * cold-load placeholder.
  */
 export interface MatchListLayout {
   perRow: 1 | 2;
@@ -34,19 +38,12 @@ export interface MatchListLayout {
 }
 
 /**
- * Today's layout, carried from the Film Room: two 3:4 posters per row and
- * the poster grid skeleton. Replaced by the full-width feed card in wave 2.
+ * The feed (specs/matches-tab 6.2, jits-a4fw.4): one full-width
+ * `MatchFeedCard` per row and a three-card skeleton. It replaced the Film
+ * Room's two-up 3:4 poster grid.
  */
-export const POSTER_GRID_LAYOUT: MatchListLayout = {
-  perRow: 2,
-  renderMatch: (item, ctx) => (
-    <LibraryPoster
-      item={item}
-      viewer={ctx.viewer}
-      seen={ctx.seen}
-      onOpen={ctx.onOpen}
-      phase={ctx.phase}
-    />
-  ),
-  Skeleton: FilmRoomSkeleton,
+export const FEED_LAYOUT: MatchListLayout = {
+  perRow: 1,
+  renderMatch: (item, ctx) => <MatchFeedCard item={item} {...ctx} />,
+  Skeleton: MatchFeedSkeleton,
 };
