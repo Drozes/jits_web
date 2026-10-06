@@ -1,4 +1,4 @@
-# Matches tab and Home reel carousel: copy deck (PROPOSED, FOR OWNER REVIEW; reviewed 2026-10-06)
+# Matches tab and Home reel carousel: copy deck (ROUND 2 DRAFT, NOT YET REPUBLISHED; round 1 reviewed 2026-10-06)
 
 Every user-facing string on the `P-MT-*` boards, by board and state. Source: `specs/matches-tab/spec.md`
 section 11 (ids `C-*`), the Oct 4 video status deck for badge strings (`lib/video/video-status-copy.ts`
@@ -71,13 +71,16 @@ Card badges (one per card, deck priority, board 03 top to bottom):
 
 | Id | Where | String |
 |---|---|---|
-| C-HM1 | Lane title (MetaTag) | `Your reels` |
-| C-HM2 | See all tile (more than 10 reels) | `See all` |
+| C-HM3 | Carousel title (MetaTag), one neutral title for the one mixed carousel (R2-1) | `Highlights` |
+| C-HM1 | RETIRED (R2-1): must not appear anywhere in the app | ~~`Your reels`~~ |
+| C-HM2 | See all tile (more than 10 own reels) | `See all` |
 | shipped | Welcome tag | `Welcome back` (zero matches: `Welcome`) |
 | shipped | Activity | `Recent Activity`, toggle `All` / `Me`, rows `{A} defeated {B} by submission`, `{A} drew with {B}`, time `Today`, `Yesterday`, `2d ago` |
 | shipped | Resume card (board 06) | `Match in progress`, tag `In progress`, `vs {name}. Pick up where you left off.`, `Resume match →` |
-| board 07 | Future lane titles | `Elo reels`, `Friend reels`, `Athletes you might follow`; chip `Future, not in phase 1`; card button `Follow` |
-| board 07 | Gate notes (annotation, not shipped copy) | `Gate: Terms v2 live (jr_be-dd4.5) and a spec 016 amendment for in-app reads. Epic jr_be-o7c.`; `Gate: footage consent decision jr_be-17f (every clip shows two athletes). Epic jr_be-tjx.`; `Gate: a follows table, RLS and a suggestions RPC, after jr_be-17f. Epic jr_be-293.` |
+| C-S1 / C-S2 / C-S3 | Source chips on non-own tiles (future; own reels carry none) | `FRIEND` (a11y `, from a friend`), `NEARBY` (a11y `, nearby`), `ELO RATED` (a11y `, from ELO RATED`) |
+| spec 5 | Caption under a source tile | the subject athlete's short name (e.g. `S. Whitfield`) |
+| board 07 | Annotation labels (not shipped copy) | `Future sources, same carousel`; chip `Future, not in phase 1`; `Athletes you might follow` with card button `Follow` |
+| board 07 | Gate notes (annotation, not shipped copy) | Friend: `Gate: footage consent decision jr_be-17f (every clip shows two athletes). Epic jr_be-tjx.`; Nearby: `Gate: jr_be-17f plus location consent (the shipped location permission, boards 57 and 58). Epic jr_be-880.`; ELO RATED: `Gate: Terms v2 live (jr_be-dd4.5) and a spec 016 amendment for in-app reads. Epic jr_be-o7c.`; follow: `Not a carousel source (people, not reels); placement decided in jr_be-293. Gate: a follows table, RLS and a suggestions RPC, after jr_be-17f.` |
 
 ## Reel tiles and in-flight (boards 02, 05, 14)
 
@@ -95,10 +98,20 @@ Card badges (one per card, deck priority, board 03 top to bottom):
 
 | Id | Where | String |
 |---|---|---|
-| shipped | Header | Close, `Your highlight` |
-| shipped | Meta | `28s · Version 1` |
-| shipped | Actions | `Share to Instagram`, `Save to Photos`, `Improve this reel` |
-| C-V1 (spec 8, AC 4.6) | Swipe hint, once per install, only when the lane has 2+ pages | `Swipe up for the next one` |
+Round 2: full-screen pages (spec 8). The shipped header title `Your highlight` is gone from the page.
+
+| Id | Where | String |
+|---|---|---|
+| C-V4 | a11y, close (top left) | `Close` |
+| C-V3 | a11y, mute toggle (top right) | `Mute` / `Unmute` |
+| no id yet | Rail labels, mono caps, own reels only | `Share`, `Save`, `Improve` |
+| shipped | Rail a11y labels | `Share to Instagram` (or `Share reel`), `Save to Photos`, `Improve this reel` |
+| spec 8.2 | Bottom meta, own reel | `vs {opp}`; `{shortDate} · {m:ss}` (e.g. `OCT 04 · 0:28`); link `Open match` |
+| spec 8.6 | Bottom meta, not your reel (future) | `{athlete short name}` plus source tag (`FRIEND`, `NEARBY`, `ELO RATED`); `SEP 30 · 0:31` |
+| C-V5 | Link, not your reel and not your match | `View profile` |
+| C-V1 | Swipe hint, once per install, only when the carousel has 2+ pages | `Swipe up for the next one` |
+| C-V2 | Swipe past the last reel of a fully loaded list, 2 s | `You're all caught up` |
+| a11y | Video surface | `Your highlight vs {opp}, {s} seconds, playing. Tap to pause` |
 
 ## Profile (board 09)
 
@@ -115,7 +128,8 @@ All strings are the shipped Profile board's: `Share profile`, `Friends`, `Matche
 | C-Z1 | Ghost match card | `Your first match will show up here` |
 | C-Z3 | Progress line | `0 of 1 matches to your first highlight` |
 | C-Z4 | Primary CTA, red (Matches only) | `Find a match in the Arena` |
-| C-Z5 | Secondary text button (practice eligible) | `Try a practice match` |
+| C-Z7 | Secondary text button when `invites_enabled` is true (PM13), UserPlus icon, pushes `/invite?from=matches` (board 50) | `Challenge a friend` (a11y `Challenge a friend to a match. Opens an invite with a QR code and link.`) |
+| C-Z5 | Secondary when `invites_enabled` is false, while `shouldOfferPracticeMatch` (empty while the flag is unknown) | `Try a practice match` |
 | C-Z6 | Helper | `Turn on Record from my phone at face-off and we cut your best moments into a highlight.` |
 | C-HZ1 | Home CTA tile (secondary, Swords) | `Get your first highlight` |
 | shipped | Practice offer (Home, holds the red) | `Try a practice match`, tag `Practice`, `Walk through a real Arena match against a practice bot. No rating, nobody else sees it, about a minute.`, `Start practice`, `Not now` |
@@ -146,6 +160,7 @@ All strings are the shipped Profile board's: `Share profile`, `Friends`, `Matche
 | C-Z2b | Ghost match card, clips off | `Your first match lands here` |
 | C-L6 | Helper, clips off (replaces C-Z6, spec 10.7) | `Turn on Record from my phone at face-off.` |
 | C-Z3 | Omitted with clips off | |
+| C-Z7 | Secondary, unchanged with clips off (C-Z5 when invites are off) | `Challenge a friend` |
 
 ## Help (not drawn)
 

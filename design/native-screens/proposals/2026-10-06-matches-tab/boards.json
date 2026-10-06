@@ -25,27 +25,27 @@
   },
   {
     "file": "P-MT-05-Home-Default.dc.html",
-    "title": "Proposed: Home, Your reels lane first (phase 1, replaces the NEW HIGHLIGHT card)",
+    "title": "Proposed: Home, one Highlights carousel first (phase 1 holds your own reels; replaces the NEW HIGHLIGHT card)",
     "w": 390,
     "h": 1136
   },
   {
     "file": "P-MT-06-Home-Resume.dc.html",
-    "title": "Proposed: Home with a lost live match (Resume above Your reels)",
+    "title": "Proposed: Home with a lost live match (Resume above the Highlights carousel)",
     "w": 390,
     "h": 1234
   },
   {
     "file": "P-MT-07-Home-Future-Lanes.dc.html",
-    "title": "Proposed: Home, future lanes (annotated, gated, not in phase 1)",
+    "title": "Proposed: Home, future sources in the one Highlights carousel (greyed, gated, not in phase 1)",
     "w": 390,
-    "h": 2094
+    "h": 1762
   },
   {
     "file": "P-MT-08-Reel-Viewer.dc.html",
-    "title": "Proposed: Reel viewer, vertical swipe pager (wraps board 34)",
+    "title": "Proposed: Reel viewer, full-screen vertical pager (edge-to-edge 9:16 pages, right action rail)",
     "w": 390,
-    "h": 2057
+    "h": 3877
   },
   {
     "file": "P-MT-09-Profile-Clean.dc.html",
@@ -55,9 +55,9 @@
   },
   {
     "file": "P-MT-10-Zero-Matches.dc.html",
-    "title": "Proposed: Zero matches, Matches tab (first match hero)",
+    "title": "Proposed: Zero matches, Matches tab (first match hero, Challenge a friend)",
     "w": 390,
-    "h": 956
+    "h": 1212
   },
   {
     "file": "P-MT-11-Zero-Home.dc.html",
@@ -81,24 +81,24 @@
     "file": "P-MT-14-Reel-Tiles-In-Flight.dc.html",
     "title": "Proposed: Reel tile kinds and the in-flight reveal",
     "w": 390,
-    "h": 2310
+    "h": 2343
   },
   {
     "file": "P-MT-15-Milestones.dc.html",
     "title": "Proposed: Milestones (first match, first win, first highlight)",
     "w": 390,
-    "h": 2330
+    "h": 2363
   },
   {
     "file": "P-MT-16-Clips-Off.dc.html",
     "title": "Proposed: Highlights flag off (both carousels hidden)",
     "w": 390,
-    "h": 1961
+    "h": 2001
   },
   {
     "file": "P-MT-00-Map.dc.html",
-    "title": "Proposed: Matches tab map (what changed, decisions, lanes and gates, open questions)",
+    "title": "Proposed: Matches tab map (what changed, decisions, carousel sources and gates, open questions)",
     "w": 1440,
-    "h": 1772
+    "h": 2018
   }
 ]
