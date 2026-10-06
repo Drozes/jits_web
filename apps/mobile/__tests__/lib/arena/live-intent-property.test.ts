@@ -44,8 +44,8 @@
  * LIVE_PROPERTY_BASE, or one sequence with LIVE_PROPERTY_SEED) and the fixed
  * regression ranges from review round 4 (base 777_000, where seed 777102
  * found R1) and round 6 (base 31_337_000, where 31337299 found F1), plus the
-pinned seeds from jits-smgb (a stale decline after this phone's own go-live).
-LIVE_PROPERTY_SEQUENCES sets the random run's length.
+ * pinned seeds from jits-smgb (a stale decline after this phone's own go-live).
+ * LIVE_PROPERTY_SEQUENCES sets the random run's length.
  *
  * Covered by targeted suites instead of here: the location ladder's rungs and
  * its sheets (instant-go-live.test.tsx), the cold-start first frame
