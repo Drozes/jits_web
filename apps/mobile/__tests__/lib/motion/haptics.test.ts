@@ -47,6 +47,7 @@ describe("haptics vocabulary", () => {
     ["countdownTick", { impact: ["heavy"], notify: [], select: 0 }],
     ["countdownGo", { impact: [], notify: ["success"], select: 0 }],
     ["tapTick", { impact: ["light"], notify: [], select: 0 }],
+    ["reelRevealed", { impact: [], notify: ["success"], select: 0 }],
     ["timeWarning", { impact: ["medium"], notify: [], select: 0 }],
   ] as const)("%s fires exactly one mapped haptic", (event, expected) => {
     expect(callsFor(() => haptics[event]())).toEqual(expected);

@@ -67,6 +67,12 @@ export const haptics = {
    * tapped: no haptic on a loss).
    */
   tapTick: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)),
+  /**
+   * A reel that was building landed as ready while its carousel is on screen
+   * (the reveal, specs/matches-tab 10.5). Success notification, once per
+   * landing (never for the once-per-session pulse of an unseen tile).
+   */
+  reelRevealed: () => safe(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)),
   /** Timer has crossed the low-time-remaining threshold (e.g. 10s). Medium impact. */
   timeWarning: () => safe(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)),
 } as const;

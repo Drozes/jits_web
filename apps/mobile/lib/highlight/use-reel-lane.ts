@@ -49,6 +49,21 @@ const EMPTY: LaneState = { items: [], inFlight: [], inFlightSupported: false, cl
 const lanes = new Map<string, LaneState>();
 const laneListeners = new Set<() => void>();
 
+/**
+ * When each read result first resolved on this device. The shared read store
+ * hands back the SAME result object for a throttled or deduped read, so a
+ * cached result keeps its original landing time (the countdown baseline).
+ */
+const resultReceivedAt = new WeakMap<object, number>();
+function receivedAtOf(result: object): number {
+  let at = resultReceivedAt.get(result);
+  if (at == null) {
+    at = Date.now();
+    resultReceivedAt.set(result, at);
+  }
+  return at;
+}
+
 function seenKey(highlightId: string, version: number): string {
   return `${highlightId}:${version}`;
 }
@@ -83,8 +98,12 @@ function toItems(raw: MyHighlightItem[], urls: Map<string, string | null>, viewe
   });
 }
 
-function toBuilding(raw: InFlightReel[], urls: Map<string, string | null>): BuildingReel[] {
-  return raw.map((r) => ({ ...r, posterUrl: r.posterPath ? (urls.get(r.posterPath) ?? null) : null }));
+function toBuilding(raw: InFlightReel[], urls: Map<string, string | null>, receivedAt?: number): BuildingReel[] {
+  return raw.map((r) => ({
+    ...r,
+    posterUrl: r.posterPath ? (urls.get(r.posterPath) ?? null) : null,
+    ...(receivedAt != null ? { receivedAt } : {}),
+  }));
 }
 
 export interface ReelPage {
@@ -235,6 +254,7 @@ export function useReelLane(
       setPending(true);
       void (async () => {
         const res = await readMyHighlights({ limit: REEL_LANE_PAGE_SIZE }, { force, owner: athleteId });
+        const receivedAt = receivedAtOf(res);
         if (id !== seq.current) return;
         if (!res.ok) {
           setError(res.error);
@@ -256,7 +276,7 @@ export function useReelLane(
         const merged = mergeFirstPage(prev.items, toItems(page.items, urls, athleteId), firstCursor !== null);
         commit({
           items: reuseReels(prev.items, merged.items),
-          inFlight: toBuilding(page.inFlight, urls),
+          inFlight: toBuilding(page.inFlight, urls, receivedAt),
           inFlightSupported: page.inFlightSupported,
           clipsEnabled: true,
           // The old tail continues where the new first page ends: keep the deeper cursor.
@@ -264,6 +284,8 @@ export function useReelLane(
           loaded: true,
         });
         setError(null);
+        // A good first read also clears a failed load-more, so paging can resume.
+        setLoadMoreError(null);
         setPending(false);
       })().catch((err: unknown) => {
         if (id !== seq.current || !alive.current) return;

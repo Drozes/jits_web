@@ -316,7 +316,9 @@ def resume_card():
 
 
 def new_highlight_card():
-    # dashboard/new-highlight-card.tsx + lib/highlight/discovery.ts DISCOVERY_COPY. Plate flex-row gap-3 (10.5);
+    # STALE: draws the retired Home "Your new highlight" card (deleted in jits-a4fw.6; Home now shows the
+    # Highlights carousel, components/reels/). Kept until the next /canvas-sync redraws the Home boards.
+    # Was: Plate flex-row gap-3 (10.5);
     # poster 54x96 rounded-xs bg-surface-4; right gap-2 (7); dismiss w-6 h-6 (21) X 14 ink-3; Watch py-2 px-4 (7 / 14)
     poster = (f'<a href="34-Highlight-Viewer.dc.html" aria-label="Watch your highlight vs Dana Okafor" style="width: 54px; '
               f'height: 96px; flex-shrink: 0; border-radius: 2px; overflow: hidden; background: {S4}; display: flex; '
