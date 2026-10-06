@@ -60,6 +60,8 @@ export interface PlaybackTelemetry {
   switchHeldStill: () => void;
   /** The Syncing pill became visible for a switch (once per switch seq). */
   switchPillShown: () => void;
+  /** A chip tap ignored by the angle lock (jits-xfvd.19). Base branch: no-op; K1 counts it. */
+  switchTapIgnored: () => void;
   /** A switch failed (its angle could not be loaded; the previous one is restored). */
   switchFailed: () => void;
   /** A pending switch was replaced by another before it landed. */
@@ -228,6 +230,7 @@ export function usePlaybackTelemetry(player: VideoPlayer, initialMeta: PlaybackS
       switchLanded: () => sessionRef.current?.switchLanded(Date.now()),
       switchHeldStill: () => sessionRef.current?.switchHeldStill(),
       switchPillShown: () => sessionRef.current?.switchPillShown(),
+      switchTapIgnored: () => {},
       switchFailed: () => sessionRef.current?.switchFailed(),
       switchSuperseded: () => sessionRef.current?.switchSuperseded(),
       error: (message) => sessionRef.current?.error(message),

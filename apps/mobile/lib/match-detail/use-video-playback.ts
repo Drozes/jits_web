@@ -92,7 +92,18 @@ export interface SwitchState {
   landedAt: number | null;
   /** The most recent failed switch, until the next switchAngle call or an outside navigation. */
   failed: SwitchFailure | null;
+  /** How this switch runs; null when idle before any switch (jits-xfvd.19). */
+  mode: SwitchMode | null;
+  /** keep_watching: the slot the outgoing angle plays in; null for in_place. */
+  fromSlot: 0 | 1 | null;
+  /** keep_watching: the slot the new angle loads in; null for in_place. */
+  incomingSlot: 0 | 1 | null;
+  /** keep_watching: the lead chosen at load (ms of wall time); null otherwise. */
+  leadMs: number | null;
 }
+
+/** How an angle switch runs (jits-xfvd.19 contract 07). Base branch: always in_place. */
+export type SwitchMode = "keep_watching" | "in_place";
 
 /** A switch lands when the new item's time is within this of the resume target. */
 export const LAND_TOLERANCE_S = 0.25;
@@ -118,6 +129,10 @@ export const IDLE_SWITCH_STATE: SwitchState = {
   heldFrame: null,
   landedAt: null,
   failed: null,
+  mode: null,
+  fromSlot: null,
+  incomingSlot: null,
+  leadMs: null,
 };
 
 export interface VideoPlayback {
@@ -136,7 +151,17 @@ export interface VideoPlayback {
    * new angle's URL (pre-signed when `presign` got to it) into the same
    * player, and holds the outgoing frame instead of the poster.
    */
-  switchAngle: (nextId: string, atSeconds: number, opts?: { approximate?: boolean }) => void;
+  switchAngle: (
+    nextId: string,
+    atSeconds: number,
+    opts?: { approximate?: boolean; offsets?: { fromMs: number | null; toMs: number | null } },
+  ) => void;
+  /** Both slot players, fixed for the screen's life (jits-xfvd.19). Base branch: the one player twice. */
+  players: readonly [VideoPlayer, VideoPlayer];
+  /** The slot on screen (jits-xfvd.19). Base branch: always 0. */
+  frontSlot: 0 | 1;
+  /** Wire each slot's VideoView onFirstFrameRender to this (jits-xfvd.19). */
+  onSlotFirstFrame: (slot: 0 | 1) => void;
   /** The current angle switch (jits-xfvd.16): its phase, held still, landing and failure. */
   switchState: SwitchState;
   /** Sign these angles now (best effort) so a switch to one skips the round trip. */
@@ -1206,7 +1231,7 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     // Angle switches keep the session's rendition. A pending quality swap is
     // dropped FIRST, so the new angle signs at the level still served, never
     // at a superseded decision's rendition (review R2-M1).
-    (nextId: string, atSeconds: number, opts?: { approximate?: boolean }) => {
+    (nextId: string, atSeconds: number, opts?: { approximate?: boolean; offsets?: { fromMs: number | null; toMs: number | null } }) => {
       if (!nextId || nextId === activeIdRef.current) return;
       dropQualitySwap();
       const prev = switchStateRef.current;
@@ -1254,6 +1279,10 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
         heldFrame: superseding ? prev.heldFrame : null,
         landedAt: null,
         failed: null,
+        mode: "in_place",
+        fromSlot: null,
+        incomingSlot: null,
+        leadMs: null,
       });
       setUpdateInterval(SWITCH_TIME_UPDATE_S);
       if (!superseding && frameUp) {
@@ -1404,5 +1433,8 @@ export function useVideoPlayback(id: string | undefined, startSeconds?: number |
     onFirstFrameRender,
     telemetry,
     switchState,
+    players: [player, player] as const,
+    frontSlot: 0,
+    onSlotFirstFrame: () => onFirstFrameRender(),
   };
 }
