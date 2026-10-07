@@ -6,14 +6,25 @@ import type { BreakdownPhase } from "@/lib/match-detail/use-match-film";
 import { isNoMatch } from "@jits/shared/utils";
 import { NoMatchBreakdown } from "./no-match-breakdown";
 
-function Heading({ tier }: { tier: string | null }) {
+/** Heading for admins and founders (`showLabels`): unchanged since the AI breakdown shipped. */
+export const BREAKDOWN_HEADING_ADMIN = "AI BREAKDOWN";
+/** Heading for everyone else: no "AI" while move labels are hidden (spec jr_be 017 B1). */
+export const BREAKDOWN_HEADING = "BREAKDOWN";
+export const BREAKDOWN_A11Y_ADMIN = "AI breakdown";
+export const BREAKDOWN_A11Y = "Breakdown";
+
+/**
+ * The plate heading. The analysis tier (STANDARD / PREMIUM) is an internal
+ * detail, so its badge is shown to admins only (spec jr_be 017 B2).
+ */
+function Heading({ tier, showLabels }: { tier: string | null; showLabels: boolean }) {
   const p = usePalette();
   return (
     <View className="flex-row items-center justify-between">
       <Text accessibilityRole="header" className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-xl"], color: p.text }, TABULAR]}>
-        AI BREAKDOWN
+        {showLabels ? BREAKDOWN_HEADING_ADMIN : BREAKDOWN_HEADING}
       </Text>
-      {tier ? (
+      {showLabels && tier ? (
         <View style={{ height: 18, paddingHorizontal: 6, borderRadius: 2, borderWidth: 1, borderColor: p.strong, justifyContent: "center" }}>
           {/* The tier is a label, not a waiting state: ink steps only, never amber (WP2, R3 FR-2). */}
           <Text className="font-mono-bold" style={[typeStep("micro"), { letterSpacing: TRACKING["caps-l"], color: tier === "premium" ? p.text : p.text2 }, TABULAR]}>
@@ -89,10 +100,10 @@ export function AiBreakdown({ phase, onRetry, showLabels }: { phase: BreakdownPh
   return (
     <View
       testID="ai-breakdown"
-      accessibilityLabel="AI breakdown"
+      accessibilityLabel={showLabels ? BREAKDOWN_A11Y_ADMIN : BREAKDOWN_A11Y}
       style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: 3, padding: 14, gap: 10 }}
     >
-      <Heading tier={tier} />
+      <Heading tier={tier} showLabels={showLabels} />
       {body}
     </View>
   );
