@@ -1,7 +1,7 @@
 # design/system: repo mirror of the ELO RATED Design System
 
 This folder is the repo copy of the live Design System artifact **"ELO RATED Design System"**:
-https://claude.ai/artifact/NkvxzxKo3R7acP5j6aRTTe (mirrored at version `1790970770-1f18`, 2026-10-02).
+https://claude.ai/artifact/NkvxzxKo3R7acP5j6aRTTe (mirrored at version `1791327666-0a8a`, 2026-10-06).
 
 `project/` is a byte-for-byte mirror of the artifact's `project/` tree: the brand book (`project/README.md`), the further sections (`Color.md`, `Typography.md`, `Layout.md`, `Motion.md`, `Accessibility.md`, `Components.md`, `Conformance.md`, `Legacy.md`), `tokens.json`, the nine font files, the 20 component cards plus the cover (`components/<Name>/README.md` and `preview.html`), the asset files (`assets/Logos`, `assets/Icons`; the artifact stores the images as uploads, recorded by id in `design-system.json`) and the index `design-system.json`. The root `DESIGN.md` carries the same brand book and sections as one document.
 

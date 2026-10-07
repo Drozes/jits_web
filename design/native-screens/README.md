@@ -12,7 +12,7 @@ replacement. The canvas policy lives in `~/code/EloRated/CLAUDE.md` section 5, a
 
 The canvas has two pages.
 
-- **Current app** (58 boards, dark mode, 390 px wide). A faithful drawing of the shipped
+- **Current app** (62 boards, dark mode, 390 px wide). A faithful drawing of the shipped
   `apps/mobile` code and nothing else: literal copy, the real tokens from `apps/mobile/lib/tokens.ts`,
   NativeWind sizes at 14 px per rem, and a fixed set of sample data. Each board is one screen in one
   state (for example "Arena: offline (Go Live)" or "Match 7: verdict summary"); a few boards show an
@@ -97,7 +97,7 @@ Shape:
   `lib/cn.ts`, plus everything they import that is drawn (their import closure). Root-layout overlays
   that only show in one state (the JS splash, the offline banner, the OTA update UI, the error boundary,
   toasts) are left out of `global` and mapped to the boards that draw them (01, 48). A global hit marks
-  all 58 boards; `/canvas-sync` then checks which boards actually render differently before redrawing.
+  all 62 boards; `/canvas-sync` then checks which boards actually render differently before redrawing.
   The UI kit (`components/ui/**`, including `elo-system`) is not global: each kit file is mapped to the
   boards that import it.
 - `boards`: for each of the 57 Current app boards, the repo-relative paths and globs that feed it.
