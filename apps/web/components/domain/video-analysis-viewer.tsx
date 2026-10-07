@@ -222,7 +222,7 @@ export function VideoAnalysisViewer({ videoId, videoSrc, title }: VideoAnalysisV
         </div>
 
         {/* Progress / chunk strip */}
-        <ChunkStrip progress={progress.data} loading={progress.loading} />
+        <ChunkStrip progress={progress.data} loading={progress.loading} showLabels={showLabels} />
 
         {/* Latest error message — if any */}
         {progress.data?.latest_error_message && (
@@ -257,9 +257,12 @@ export function VideoAnalysisViewer({ videoId, videoSrc, title }: VideoAnalysisV
 function ChunkStrip({
   progress,
   loading,
+  showLabels,
 }: {
   progress: VideoProgress | null;
   loading: boolean;
+  /** Admins and founders only: the analysis tier is an internal detail (spec jr_be 017 B2). */
+  showLabels: boolean;
 }) {
   if (loading && !progress) {
     return <div className="h-6 w-full animate-pulse rounded bg-muted" />;
@@ -290,7 +293,7 @@ function ChunkStrip({
           {progress.chunks_completed}/{progress.chunk_count ?? "?"} chunks done
           {progress.failed_chunk_count > 0 ? ` • ${progress.failed_chunk_count} failed` : ""}
         </span>
-        <span>{progress.requested_tier}</span>
+        {showLabels && progress.requested_tier ? <span>{progress.requested_tier}</span> : null}
       </div>
     </div>
   );

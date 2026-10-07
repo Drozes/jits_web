@@ -211,3 +211,36 @@ describe("VideoAnalysisViewer AI label gate (jits-xfvd.18)", () => {
     expect(r.queryByTestId("analysis-neutral")).toBeNull();
   });
 });
+
+describe("VideoAnalysisViewer chunk strip tier (jits-xfvd.21)", () => {
+  function chunked(tier: string) {
+    mockProgressData = {
+      status: "analyzing",
+      chunk_count: 2,
+      chunks: [
+        { chunk_id: "c1", idx: 0, start_s: 0, end_s: 60, status: "analyzed" },
+        { chunk_id: "c2", idx: 1, start_s: 60, end_s: 120, status: "analyzing" },
+      ],
+      chunks_completed: 1,
+      failed_chunk_count: 0,
+      requested_tier: tier,
+      latest_error_message: null,
+    };
+    mockSigned.mockResolvedValue({ ok: true, data: "https://x/v.mp4" });
+    return render(<VideoAnalysisViewer videoId="vid-9" />);
+  }
+
+  it.each(["standard", "premium"])("non-admin: the chunk count and no %s tier word", async (tier) => {
+    mockShowLabels = false;
+    const r = chunked(tier);
+    await waitFor(() => expect(r.getByText(/1\/2 chunks done/)).toBeInTheDocument());
+    expect(r.container.textContent ?? "").not.toMatch(/standard|premium/i);
+  });
+
+  it.each(["standard", "premium"])("admin: the %s tier stays in the strip", async (tier) => {
+    mockShowLabels = true;
+    const r = chunked(tier);
+    await waitFor(() => expect(r.getByText(/1\/2 chunks done/)).toBeInTheDocument());
+    expect(r.getByText(tier)).toBeInTheDocument();
+  });
+});

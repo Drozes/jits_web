@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Mobile and web: breakdown heading without "AI", tier badge admin-only (jits-xfvd.21)
+
+AI move wording stays hidden from non-admins until label accuracy reaches about 95% (owner decision 2026-10-07; jr_be spec `specs/017-ai-label-removal/spec.md` section B, backend counterpart jr_be-du1.10). Admins and founders (`useShowAnalysisLabels` / `canSeeAnalysisLabels`) see exactly what they saw before. JS-only (OTA-eligible).
+
+**Changed**
+- `apps/mobile/components/match-detail/ai-breakdown.tsx`: the plate heading reads `BREAKDOWN` (accessibility label "Breakdown") for non-admins in every phase, and the `STANDARD` / `PREMIUM` tier badge renders only for admins, who keep `AI BREAKDOWN` / "AI breakdown". New exported constants `BREAKDOWN_HEADING`, `BREAKDOWN_HEADING_ADMIN`, `BREAKDOWN_A11Y`, `BREAKDOWN_A11Y_ADMIN`. `testID="ai-breakdown"`, the file and `AiBreakdown` keep their names; `NoMatchBreakdown` and the `ANALYZING n/m` status words are unchanged.
+- `apps/web/components/domain/video-analysis-viewer.tsx`: `ChunkStrip` takes `showLabels` and prints `requested_tier` to admins only; everyone else sees the chunk count alone.
+
+**Added**
+- `apps/mobile/__tests__/components/match-detail/ai-breakdown.test.tsx`: non-admin heading, accessibility label, no `AI` word and no tier word in every phase; admin heading and badge for both tiers. `apps/mobile/__tests__/screens/match-detail.test.tsx` and `apps/web/components/domain/video-analysis-viewer.test.tsx` gain admin and non-admin cases.
+
 ## OTA "Matches tab + Home Highlights carousel" (runtime 0.5.0), 2026-10-06
 
 Production OTA group `be389c6c-e64e-4493-ac33-e54ca9fcf905` (iOS `01a11354-77c2-7af0-a023-c9b1ff3f7aff`, Android `01a11354-77c2-77fe-8a61-5c8e9d06e16e`) from jits_web `main` `db429e41` (merge "Merge development into main: Matches tab + Home Highlights carousel (jits-a4fw)", development at `16887d59`). JS-only, non-critical. Rollback target: `21ac992e-6b21-4784-82f4-9d05bc522667`. Needs jr_be `20261008200000` to `20261008200300` (B1 to B5), applied to prod 2026-10-06. Device QA on real hardware was not run before release (owner authorized); it is tracked as a post-release bead. Known follow-ups: jits-766g (delete the Film Room redirect after two OTAs), jits-fjt0 (tab_opened redirect telemetry), jits-a4fw.12 (non-own reel read path), jits-lp6t (flaky tests), jits-a4fw.11 (canvas sync).

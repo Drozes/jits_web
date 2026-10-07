@@ -493,6 +493,11 @@ describe("MatchDetailScreen (Film Room match page)", () => {
       expect(utils.getByLabelText("Play from 03:20, finish")).toBeTruthy();
       expect(utils.getByText("FINISH")).toBeTruthy();
       expect(utils.queryByTestId("technique-tags")).toBeNull();
+      // jits-xfvd.21: the plate heading drops "AI" and the tier badge is admin-only.
+      expect(utils.getByText("BREAKDOWN")).toBeTruthy();
+      expect(utils.queryByText("AI BREAKDOWN")).toBeNull();
+      expect(utils.getByTestId("ai-breakdown").props.accessibilityLabel).toBe("Breakdown");
+      expect(utils.queryByText("PREMIUM")).toBeNull();
       for (const word of AI_WORDS) {
         expect(utils.queryAllByText(word, { includeHiddenElements: true })).toHaveLength(0);
         expect(utils.queryAllByLabelText(word, { includeHiddenElements: true })).toHaveLength(0);
@@ -510,6 +515,9 @@ describe("MatchDetailScreen (Film Room match page)", () => {
       expect(utils.getByLabelText("Play from 00:27, Takedown")).toBeTruthy();
       expect(within(utils.getByTestId("technique-tags")).getByText("RNC")).toBeTruthy();
       expect(utils.queryByText("Analysis complete.")).toBeNull();
+      expect(utils.getByText("AI BREAKDOWN")).toBeTruthy();
+      expect(utils.getByTestId("ai-breakdown").props.accessibilityLabel).toBe("AI breakdown");
+      expect(utils.getByText("PREMIUM")).toBeTruthy();
     });
 
     it("a member sees the finish named by the RECORDED submission, never an AI fallback label (review L1)", async () => {
