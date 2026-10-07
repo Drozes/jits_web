@@ -56,7 +56,7 @@ const CURRENT_HOLD_S = 10;
  * Either way every angle chip is LOCKED from the tap until the switch lands
  * and settles or is abandoned: the tapped chip is selected and busy, the
  * others disabled and dimmed, and their taps are only counted in telemetry.
- * "Syncing angle" shows after 200 ms (`SyncingPill`).
+ * "Stitching angle" shows after 200 ms (`SyncingPill`).
  *
  * `useVideoPlayback` signs a 1-hour URL (normalized MP4 preferred), re-signs
  * silently once when the player errors and resumes where it was. The player is

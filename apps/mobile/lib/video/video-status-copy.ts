@@ -250,7 +250,7 @@ export function formatCountdown(ms: number): string {
  * approximate one (clock-only or unsynced). Sentence case here; the pill
  * renders them in mono caps. Never with an ellipsis.
  */
-export const SYNCING_ANGLE = "Syncing angle";
+export const SYNCING_ANGLE = "Stitching angle";
 export const SWITCHING_ANGLE = "Switching angle";
 
 /**

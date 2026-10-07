@@ -1315,7 +1315,7 @@ describe("angle switch phase 1 UI (jits-xfvd.16)", () => {
     const utils = await renderSynced();
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
     setSwitch(utils, pendingTo2({ startedAt: Date.now() - 1000 }));
-    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Syncing angle"), { timeout: 4000 });
+    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Stitching angle"), { timeout: 4000 });
     expect(utils.queryByTestId("syncing-pill")).toBeNull();
   });
 
@@ -1750,7 +1750,7 @@ describe("keep-watching switch on the real engine (jits-xfvd.19)", () => {
     // The pre-sign is still in flight: it is the one the switch waits on.
     expect(utils.getByTestId("angle-vid-2").props.accessibilityState).toEqual({ selected: true, busy: true });
     await play(250);
-    expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Syncing angle");
+    expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Stitching angle");
     expect(utils.getByTestId("player-time")).toHaveTextContent("00:42 / 06:40");
     await act(async () => {
       release(playableInMatch("https://signed.example/vid-2.mp4"));
@@ -2085,7 +2085,7 @@ describe("keep-watching angle switch UI (jits-xfvd.19)", () => {
     const { utils } = await renderKeepWatching();
     fireEvent.press(utils.getByLabelText("M. PARK'S ANGLE"));
     setSwitch(utils, pendingTo2({ ...KW, startedAt: Date.now() - 1000 }));
-    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Syncing angle"), { timeout: 4000 });
+    await waitFor(() => expect(utils.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Stitching angle"), { timeout: 4000 });
     const failed = { seq: 1, targetId: "vid-2", at: Date.now() };
     setSwitch(utils, { ...pendingTo2(KW), phase: "idle", failed });
     expect(utils.getByTestId("player-switch-failed")).toHaveTextContent("Could not load M. Park's angle. Tap it to try again.");
