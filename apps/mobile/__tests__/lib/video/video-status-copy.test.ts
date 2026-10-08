@@ -68,7 +68,7 @@ describe("video-status-copy", () => {
   });
 
   it("says the owner-approved angle switch copy, with no ellipsis (jits-xfvd.16)", () => {
-    expect(SYNCING_ANGLE).toBe("Syncing angle");
+    expect(SYNCING_ANGLE).toBe("Stitching angle");
     expect(SWITCHING_ANGLE).toBe("Switching angle");
     expect(couldNotLoadAngle("M. Park's angle")).toBe("Could not load M. Park's angle. Tap it to try again.");
     expect(couldNotLoadAngle("your angle")).toBe("Could not load your angle. Tap it to try again.");

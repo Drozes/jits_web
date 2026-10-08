@@ -71,7 +71,7 @@ describe("SyncingPill", () => {
     const start = pending();
     const s = render(pill(start, { onShown }));
     advance(SYNCING_PILL_DELAY_MS);
-    expect(s.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Syncing angle");
+    expect(s.getByTestId("syncing-pill", HIDDEN)).toHaveTextContent("Stitching angle");
     expect(onShown).toHaveBeenCalledTimes(1);
     // Lands 50 ms after showing: still up until 400 ms have passed.
     advance(50);
