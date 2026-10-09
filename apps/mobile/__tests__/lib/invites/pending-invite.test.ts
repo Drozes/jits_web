@@ -51,10 +51,17 @@ describe("parsePendingInvite", () => {
 
 describe("save / load / clear", () => {
   it("keeps the first touch when the same link is opened again", async () => {
-    await savePendingInvite(makePendingInvite({ token: TOKEN }, "universal_link", T0)!);
-    await savePendingInvite(makePendingInvite({ token: TOKEN }, "universal_link", new Date("2026-10-02T00:00:00Z"))!);
-    const loaded = await loadPendingInvite(new Date("2026-10-02T00:00:01Z"));
-    expect(loaded?.first_touch_at).toBe(T0.toISOString());
+    // The save reads the stored record against the real clock: pin it inside
+    // the record's window, or the test starts failing once T0 has expired.
+    jest.useFakeTimers({ now: new Date("2026-10-02T00:00:00Z") });
+    try {
+      await savePendingInvite(makePendingInvite({ token: TOKEN }, "universal_link", T0)!);
+      await savePendingInvite(makePendingInvite({ token: TOKEN }, "universal_link", new Date("2026-10-02T00:00:00Z"))!);
+      const loaded = await loadPendingInvite(new Date("2026-10-02T00:00:01Z"));
+      expect(loaded?.first_touch_at).toBe(T0.toISOString());
+    } finally {
+      jest.useRealTimers();
+    }
   });
   it("a different invite replaces the older one", async () => {
     await savePendingInvite(makePendingInvite({ token: TOKEN }, "universal_link", T0)!);
