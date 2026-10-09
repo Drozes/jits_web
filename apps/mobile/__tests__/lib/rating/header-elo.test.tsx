@@ -7,10 +7,15 @@
  *   on the focused tab root only, never on mount, a same-value refetch or a
  *   rating already watched on the verdict; the delta holds about 4s, then
  *   goes. Reduce Motion: landed value at once, the delta shown then removed.
+ * - Review fixes: the same from -> to later rolls again (in-memory epochs),
+ *   the verdict's watched slot is consumed once, a draw's delta is amber,
+ *   the rating sizes itself for Dynamic Type up to 1.3x, and the sheet closes
+ *   when the tab loses focus or the athlete signs out.
  */
 import * as React from "react";
 import { AccessibilityInfo } from "react-native";
-import { act, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 const mockAuth: { athlete: { id: string; current_elo: number; highest_elo: number; primary_gym_id: null } | null } = {
   athlete: { id: "a1", current_elo: 1498, highest_elo: 1540, primary_gym_id: null },
@@ -23,7 +28,16 @@ jest.mock("@/lib/navigation/use-screen-focused", () => ({
   useScreenFocused: () => mockFocused,
 }));
 jest.mock("@/components/layout/your-numbers-sheet", () => ({
-  YourNumbersSheet: () => null,
+  YourNumbersSheet: ({ open }: { open: boolean }) => {
+    const R = require("react");
+    const RN = require("react-native");
+    return R.createElement(RN.View, { testID: open ? "sheet-open" : "sheet-closing" });
+  },
+}));
+let mockFontScale = 1;
+jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
+  __esModule: true,
+  default: () => ({ width: 375, height: 812, scale: 3, fontScale: mockFontScale }),
 }));
 
 import { HeaderElo } from "@/components/layout/header-elo";
@@ -33,8 +47,12 @@ import { __setReduceMotionForTests } from "@/lib/motion";
 import {
   HEADER_DELTA_HOLD_MS,
   HEADER_ELO_MAX_FONT_SCALE,
-  __resetWatchedRatingForTests,
+  __resetHeaderEloForTests,
   headerDeltaFits,
+  headerDeltaTone,
+  headerEloScale,
+  lastVerdictOutcome,
+  noteVerdictOutcome,
   headerDeltaWidth,
   headerEloAnnouncement,
   headerEloLabel,
@@ -59,8 +77,9 @@ beforeEach(() => {
   jest.useFakeTimers();
   __setReduceMotionForTests(false);
   __resetPlayedMomentsForTests();
-  __resetWatchedRatingForTests();
+  __resetHeaderEloForTests();
   mockFocused = true;
+  mockFontScale = 1;
   mockAuth.athlete = { id: "a1", current_elo: 1498, highest_elo: 1540, primary_gym_id: null };
 });
 afterEach(() => {
@@ -102,17 +121,18 @@ describe("the width budget (375pt and 390pt phones)", () => {
 describe("copy", () => {
   it("labels the rating and announces a result once", () => {
     expect(headerEloLabel(1512)).toBe("Your rating 1512");
-    expect(headerEloAnnouncement(1512, 14)).toBe("Your rating 1512, up 14 last match.");
-    expect(headerEloAnnouncement(1489, -9)).toBe("Your rating 1489, down 9 last match.");
+    // Not "last match": the bar cannot tell a match from another change (review C7).
+    expect(headerEloAnnouncement(1512, 14)).toBe("Your rating 1512, up 14.");
+    expect(headerEloAnnouncement(1489, -9)).toBe("Your rating 1489, down 9.");
   });
 });
 
 describe("headerEloTransition", () => {
   it("is a change from a known rating only", () => {
-    expect(headerEloTransition("a1", 1498, 1512)).toEqual({ from: 1498, to: 1512, delta: 14, key: "header-elo:a1:1498->1512" });
-    expect(headerEloTransition("a1", 1512, 1512)).toBeNull();
-    expect(headerEloTransition("a1", undefined, 1512)).toBeNull();
-    expect(headerEloTransition("a1", 1498.5, 1512)).toBeNull();
+    expect(headerEloTransition("a1", 1498, 1512, 3)).toEqual({ from: 1498, to: 1512, delta: 14, key: "header-elo:a1:3" });
+    expect(headerEloTransition("a1", 1512, 1512, 3)).toBeNull();
+    expect(headerEloTransition("a1", undefined, 1512, 3)).toBeNull();
+    expect(headerEloTransition("a1", 1498.5, 1512, 3)).toBeNull();
   });
 });
 
@@ -137,7 +157,7 @@ describe("HeaderElo post-match moment", () => {
     expect(utils.getByText("▲ +14")).toBeTruthy();
     expect(utils.getByTestId("header-elo")).toHaveProp("accessibilityLabel", "Your rating 1512");
     expect(announce).toHaveBeenCalledTimes(1);
-    expect(announce).toHaveBeenCalledWith("Your rating 1512, up 14 last match.");
+    expect(announce).toHaveBeenCalledWith("Your rating 1512, up 14.");
     act(() => {
       jest.advanceTimersByTime(HEADER_DELTA_HOLD_MS);
     });
@@ -247,5 +267,97 @@ describe("HeaderElo post-match moment", () => {
     const { queryByTestId } = render(header());
     expect(queryByTestId("header-elo")).toBeNull();
     expect(queryByTestId("header-elo-rule")).toBeNull();
+  });
+
+  it("rolls the same from -> to again later (no persisted key suppresses it, review C3)", () => {
+    const utils = render(header());
+    for (const [rating, expectRoll] of [[1512, true], [1498, true], [1512, true]] as const) {
+      setRating(rating);
+      utils.rerender(header());
+      expect(!!utils.queryByTestId("header-elo-delta")).toBe(expectRoll);
+      act(() => {
+        jest.advanceTimersByTime(LAND);
+      });
+      act(() => {
+        jest.advanceTimersByTime(HEADER_DELTA_HOLD_MS);
+      });
+    }
+  });
+
+  it("consumes the verdict's watched slot once: a later return to that rating rolls", () => {
+    const utils = render(header());
+    noteRatingWatched("a1", 1512);
+    setRating(1512);
+    utils.rerender(header());
+    expect(utils.queryByTestId("header-elo-delta")).toBeNull();
+    setRating(1498);
+    utils.rerender(header());
+    act(() => {
+      jest.advanceTimersByTime(LAND + 1);
+    });
+    act(() => {
+      jest.advanceTimersByTime(HEADER_DELTA_HOLD_MS);
+    });
+    setRating(1512);
+    utils.rerender(header());
+    expect(utils.queryByTestId("header-elo-delta")).toBeTruthy();
+  });
+
+  it("a negative delta is amber after a draw verdict, red when the outcome is unknown (review C2)", () => {
+    const color = (utils: ReturnType<typeof render>) =>
+      (StyleSheet.flatten(utils.getByTestId("header-elo-delta-text", { includeHiddenElements: true }).props.style) as { color?: string }).color;
+    const loss = render(header());
+    setRating(1489);
+    loss.rerender(header());
+    const red = color(loss);
+    loss.unmount();
+
+    noteVerdictOutcome("a1", "m1", "draw");
+    const draw = render(header());
+    setRating(1480);
+    draw.rerender(header());
+    const amber = color(draw);
+    expect(amber).not.toBe(red);
+    expect(lastVerdictOutcome("a1")).toBe("draw");
+    expect(headerDeltaTone(-2, "draw")).toBe("draw");
+    expect(headerDeltaTone(-2, null)).toBe("loss");
+    expect(headerDeltaTone(-2, "loss")).toBe("loss");
+    expect(headerDeltaTone(14, "draw")).toBe("win");
+  });
+
+  it("sizes the rating for Dynamic Type itself, up to 1.3x, with OS scaling off (review D2)", () => {
+    expect(headerEloScale(0.8)).toBe(1);
+    expect(headerEloScale(1.15)).toBe(1.15);
+    expect(headerEloScale(3.1)).toBe(1.3);
+    for (const [fs, size] of [[1, 16], [1.2, 19.2], [3.1, 20.8]] as const) {
+      mockFontScale = fs;
+      const utils = render(header());
+      const value = utils.getByTestId("header-elo-value");
+      expect(value.props.allowFontScaling).toBe(false);
+      expect((StyleSheet.flatten(value.props.style) as { fontSize: number }).fontSize).toBeCloseTo(size);
+      utils.unmount();
+    }
+  });
+
+  it("closes the sheet when its tab loses focus (e.g. a challenge pushes the match, review C4)", () => {
+    const utils = render(header());
+    fireEvent.press(utils.getByTestId("header-elo"));
+    expect(utils.getByTestId("sheet-open")).toBeTruthy();
+    mockFocused = false;
+    utils.rerender(header());
+    // Still mounted so it can dismiss itself; no longer open.
+    expect(utils.queryByTestId("sheet-open")).toBeNull();
+    expect(utils.getByTestId("sheet-closing")).toBeTruthy();
+  });
+
+  it("drops the sheet when the athlete signs out (review C8)", () => {
+    const utils = render(header());
+    fireEvent.press(utils.getByTestId("header-elo"));
+    mockAuth.athlete = null;
+    utils.rerender(header());
+    mockAuth.athlete = { id: "a1", current_elo: 1498, highest_elo: 1540, primary_gym_id: null };
+    utils.rerender(header());
+    expect(utils.queryByTestId("sheet-open")).toBeNull();
+    expect(utils.queryByTestId("sheet-closing")).toBeNull();
   });
 });

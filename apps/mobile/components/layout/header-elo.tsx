@@ -12,7 +12,7 @@
 import * as React from "react";
 import { AccessibilityInfo, Pressable, Text, View, useWindowDimensions } from "react-native";
 import Animated, { FadeOut } from "react-native-reanimated";
-import { DeltaChip, RollingNumber, usePlayOnce } from "@/components/ui/elo-system";
+import { DeltaChip, RollingNumber } from "@/components/ui/elo-system";
 import { useAuth } from "@/lib/auth/hooks";
 import { duration, useReduceMotion } from "@/lib/motion";
 import { useScreenFocused } from "@/lib/navigation/use-screen-focused";
@@ -20,10 +20,13 @@ import {
   HEADER_DELTA_GAP,
   HEADER_DELTA_HOLD_MS,
   HEADER_DELTA_STEP,
-  HEADER_ELO_MAX_FONT_SCALE,
+  claimHeaderMoment,
   headerDeltaFits,
+  headerDeltaTone,
   headerEloAnnouncement,
   headerEloLabel,
+  headerEloScale,
+  lastVerdictOutcome,
   useHeaderEloMoment,
   type HeaderEloMoment,
 } from "@/lib/rating/header-elo";
@@ -40,8 +43,19 @@ const PRESS_PAD_X = 6;
 const JOIN_GAP = 10;
 const RULE_HEIGHT = 16;
 
-const RATING_STYLE = { ...typeStep("subhead"), ...TABULAR };
+const RATING_STEP = typeStep("subhead");
+const DELTA_STEP = typeStep(HEADER_DELTA_STEP);
 const RATING_CLASS = "font-mono-bold text-ink";
+
+/**
+ * A text step at the header's own Dynamic Type scale. The header sizes its
+ * rating and delta itself, with OS scaling off, like the status chip: relying
+ * on `maxFontSizeMultiplier` left the rating at 1x on device (jits-1ez5
+ * review D2) while the chip grew.
+ */
+function scaled(step: { fontSize: number; lineHeight: number }, scale: number) {
+  return { fontSize: step.fontSize * scale, lineHeight: Math.round(step.lineHeight * scale) };
+}
 
 interface HeaderEloProps {
   /** The row width the status chip leaves unused (`HeaderStatusChip` `onSpareWidth`). */
@@ -51,6 +65,8 @@ interface HeaderEloProps {
 export function HeaderElo({ spareWidth }: HeaderEloProps) {
   const { athlete } = useAuth();
   const focused = useScreenFocused();
+  const { fontScale } = useWindowDimensions();
+  const scale = headerEloScale(fontScale);
   const rating = athlete?.current_elo;
   const moment = useHeaderEloMoment(athlete?.id, rating ?? undefined, focused);
   const [sheetOpen, setSheetOpen] = React.useState(false);
@@ -62,7 +78,24 @@ export function HeaderElo({ spareWidth }: HeaderEloProps) {
     setSheetMounted(false);
   }, []);
 
+  // The tab lost focus with the sheet up (accepting a challenge pushes the
+  // match): close it, so it never sits over the next screen. The sheet's own
+  // guard dismisses only what it presented.
+  React.useEffect(() => {
+    if (!focused && sheetOpen) setSheetOpen(false);
+  }, [focused, sheetOpen]);
+
+  // Signed out (or switching athlete): nothing of the old sheet survives.
+  const hasAthlete = athlete != null;
+  React.useEffect(() => {
+    if (hasAthlete) return;
+    setSheetOpen(false);
+    setSheetMounted(false);
+  }, [hasAthlete]);
+
   if (!athlete || rating == null) return null;
+
+  const ratingStyle = { ...scaled(RATING_STEP, scale), ...TABULAR };
 
   return (
     <>
@@ -86,29 +119,31 @@ export function HeaderElo({ spareWidth }: HeaderEloProps) {
         {/* The digits centred in the 44pt row; the delta on their baseline. */}
         <View className="flex-row items-baseline">
           {moment ? (
-            // Keyed on the transition: a new result is a new mount, one roll each.
-            <HeaderEloRoll key={moment.key} moment={moment} rating={rating} spareWidth={spareWidth} />
+            // Keyed on the change: a new result is a new mount, one roll each.
+            <HeaderEloRoll
+              key={moment.key}
+              athleteId={athlete.id}
+              moment={moment}
+              rating={rating}
+              spareWidth={spareWidth}
+              scale={scale}
+              ratingStyle={ratingStyle}
+            />
           ) : (
-            <RatingText rating={rating} />
+            <Text
+              testID="header-elo-value"
+              numberOfLines={1}
+              allowFontScaling={false}
+              className={RATING_CLASS}
+              style={ratingStyle}
+            >
+              {rating}
+            </Text>
           )}
         </View>
       </Pressable>
       {sheetMounted ? <YourNumbersSheet athlete={athlete} open={sheetOpen} onClosed={onSheetClosed} /> : null}
     </>
-  );
-}
-
-function RatingText({ rating }: { rating: number }) {
-  return (
-    <Text
-      testID="header-elo-value"
-      numberOfLines={1}
-      maxFontSizeMultiplier={HEADER_ELO_MAX_FONT_SCALE}
-      className={RATING_CLASS}
-      style={RATING_STYLE}
-    >
-      {rating}
-    </Text>
   );
 }
 
@@ -118,22 +153,30 @@ function RatingText({ rating }: { rating: number }) {
  * The delta shows only if it fits beside the chip as the row stands when the
  * moment starts; otherwise the moment is the roll alone. Reduce Motion: the
  * landed value at once, the delta shown and then removed in place. No haptic.
+ * A negative delta is amber when the last verdict the athlete saw was a draw.
  */
 function HeaderEloRoll({
+  athleteId,
   moment,
   rating,
   spareWidth,
+  scale,
+  ratingStyle,
 }: {
+  athleteId: string;
   moment: HeaderEloMoment;
   rating: number;
   spareWidth: number | null;
+  scale: number;
+  ratingStyle: { fontSize: number; lineHeight: number };
 }) {
-  const play = usePlayOnce(moment.key, true);
+  // Decided on mount: the first header to claim this change plays it.
+  const [play] = React.useState(() => claimHeaderMoment(moment.key));
   const reduceMotion = useReduceMotion();
   const p = usePalette();
-  const { fontScale } = useWindowDimensions();
   // Decided once, on mount: the delta's own width must not re-decide it.
-  const [withDelta] = React.useState(() => play && headerDeltaFits(moment.delta, fontScale, spareWidth));
+  const [withDelta] = React.useState(() => play && headerDeltaFits(moment.delta, scale, spareWidth));
+  const [tone] = React.useState(() => headerDeltaTone(moment.delta, lastVerdictOutcome(athleteId)));
   const [phase, setPhase] = React.useState<"rolling" | "shown" | "gone">(withDelta ? "rolling" : "gone");
 
   const onLanded = React.useCallback(() => {
@@ -147,6 +190,8 @@ function HeaderEloRoll({
     return () => clearTimeout(id);
   }, [phase]);
 
+  const color = tone === "win" ? p.win : tone === "draw" ? p.amber : p.loss;
+
   return (
     <>
       <RollingNumber
@@ -156,9 +201,10 @@ function HeaderEloRoll({
         play={play}
         onLanded={play ? onLanded : undefined}
         className={RATING_CLASS}
-        style={RATING_STYLE}
-        maxFontScale={HEADER_ELO_MAX_FONT_SCALE}
-        staticTextProps={{ numberOfLines: 1, maxFontSizeMultiplier: HEADER_ELO_MAX_FONT_SCALE }}
+        style={ratingStyle}
+        // Already sized for Dynamic Type above: the digits must not scale again.
+        maxFontScale={1}
+        staticTextProps={{ numberOfLines: 1, allowFontScaling: false }}
       />
       {phase !== "gone" ? (
         <Animated.View
@@ -167,12 +213,13 @@ function HeaderEloRoll({
           style={{ marginLeft: HEADER_DELTA_GAP }}
         >
           <DeltaChip
+            testID="header-elo-delta-text"
             delta={moment.delta}
-            color={moment.delta > 0 ? p.win : p.loss}
+            color={color}
             shown={phase === "shown"}
             animate={play}
-            style={typeStep(HEADER_DELTA_STEP)}
-            maxFontSizeMultiplier={HEADER_ELO_MAX_FONT_SCALE}
+            style={scaled(DELTA_STEP, scale)}
+            allowFontScaling={false}
           />
         </Animated.View>
       ) : null}

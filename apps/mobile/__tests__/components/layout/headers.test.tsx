@@ -155,6 +155,15 @@ describe("BrandHeader (every tab root)", () => {
     expect(wordmark.props.accessibilityElementsHidden).toBe(true);
   });
 
+  it("keeps the 16pt gutter on both sides (the side safe area when wider), as TabHeader had", () => {
+    const { UNSAFE_root } = render(<BrandHeader title="Arena" onArena />);
+    const bar = UNSAFE_root.find(
+      (n: HostNode) => typeof n.type === "string" && typeof n.props.className === "string" && n.props.className.includes("bg-surface-2"),
+    );
+    expect(bar.props.style).toMatchObject({ paddingLeft: 16, paddingRight: 16, height: 56 });
+    expect(bar.props.className).not.toContain("px-4");
+  });
+
   it("the rating is one button: label, hint and a 44pt tall target that opens Your numbers", () => {
     const { getByTestId, queryByTestId } = render(<BrandHeader title="Home" />);
     const rating = getByTestId("header-elo");
@@ -175,7 +184,9 @@ describe("BrandHeader (every tab root)", () => {
     );
     expect(wordmark.props.maxFontSizeMultiplier).toBe(BRAND_WORDMARK_MAX_FONT_SCALE);
     expect(HEADER_ELO_MAX_FONT_SCALE).toBe(CHIP_MAX_FONT_SCALE);
-    expect(getByTestId("header-elo-value").props.maxFontSizeMultiplier).toBe(HEADER_ELO_MAX_FONT_SCALE);
+    // The rating sizes itself from the text scale (capped there), OS scaling off;
+    // header-elo.test.tsx covers 1x, 1.2x and AX sizes.
+    expect(getByTestId("header-elo-value").props.allowFontScaling).toBe(false);
     expect(getByTestId("header-elo-value").props.numberOfLines).toBe(1);
   });
 

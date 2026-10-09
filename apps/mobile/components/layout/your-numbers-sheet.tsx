@@ -2,19 +2,23 @@
  * Your numbers (jits-1ez5.2): tapping the header rating opens this sheet, not
  * a push, so a live chip or a countdown is never left behind. The rating
  * large with the last match's delta, the rating line over the last 20
- * matches (peak as a dashed hairline), global rank with the derived top %,
- * the record, peak and this month. No streak. "View full stats" pushes
- * Profile's stats.
+ * matches (peak as a dashed hairline when it is near the line), global rank
+ * with the derived top %, the record, peak and this month. No streak. "View
+ * full stats" pushes Profile's stats.
  *
  * Data: the dashboard summary through the cache entry Home shares
- * (`useDashboardSummary`), "this month" from the profile query
- * (`useProfileData`, shared with Profile and Matches) and the rating history.
- * The sheet is mounted only while open, so all three are read on open.
+ * (`useDashboardSummary`) and the rating history, which draws the sparkline
+ * and sums "this month" (`sumEloThisMonth`, the same sum Profile shows). The
+ * sheet is mounted only while open, so both are read on open.
+ *
+ * Accessibility text sizes: the content scrolls inside a sheet that never
+ * grows past the top safe area, and the fixed-shape values cap at 1.3x.
  */
 import * as React from "react";
-import { Text, View, type LayoutChangeEvent } from "react-native";
+import { Text, View, useWindowDimensions, type LayoutChangeEvent } from "react-native";
 import { useRouter } from "expo-router";
-import { BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BottomSheetModal, BottomSheetScrollView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 import Svg, { Line, Polyline, Rect } from "react-native-svg";
 import { getEloHistory, type AthleteGuardRow } from "@jits/shared/api/queries";
 import type { EloHistoryRow } from "@jits/shared/types/composites";
@@ -23,14 +27,19 @@ import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
 import { SkeletonBlock, SkeletonProvider } from "@/components/ui/skeleton";
 import { useCachedResource } from "@/lib/cache/use-cached-resource";
 import { useDashboardSummary } from "@/lib/dashboard/use-dashboard-summary";
-import { useProfileData } from "@/lib/profile/use-profile-data";
 import {
+  SPARK_MATCHES,
+  deltaTone,
+  eloThisMonthFromHistory,
   lastMatchDelta,
   monthStartLabel,
+  peakLegend,
   peakNote,
   rankCell,
   recordCell,
   sparkPoints,
+  sparkRange,
+  type MatchOutcome,
 } from "@/lib/rating/your-numbers";
 import { supabase } from "@/lib/supabase/client";
 import { usePalette, type Palette } from "@/lib/theme/palette";
@@ -44,9 +53,16 @@ const SPARK_HEIGHT = 64;
 /** Room above and below the line so the end mark and stroke never clip. */
 const SPARK_PAD = 4;
 const SPARK_END_MARK = 6;
+/**
+ * Dynamic Type cap for the fixed-shape parts (the hero, the cell values,
+ * labels and notes): they grow to the chip's 1.3x and no further, so a cell
+ * never breaks a number apart. The body copy scales fully.
+ */
+const SHEET_MAX_FONT_SCALE = 1.3;
 
-function deltaColor(delta: number, p: Palette): string {
-  return delta > 0 ? p.win : delta < 0 ? p.loss : p.text;
+function deltaColor(delta: number, p: Palette, outcome?: MatchOutcome | null): string {
+  const tone = deltaTone(delta, outcome);
+  return tone === "win" ? p.win : tone === "draw" ? p.amber : tone === "loss" ? p.loss : p.text;
 }
 
 const renderBackdrop = (props: BottomSheetBackdropProps) => <SheetBackdrop {...props} />;
@@ -54,7 +70,7 @@ const renderBackdrop = (props: BottomSheetBackdropProps) => <SheetBackdrop {...p
 interface YourNumbersSheetProps {
   athlete: AthleteGuardRow;
   open: boolean;
-  /** The sheet closed (swipe, backdrop or a link); the parent unmounts it. */
+  /** The sheet closed (swipe, backdrop, a link or its tab losing focus); the parent unmounts it. */
   onClosed: () => void;
 }
 
@@ -62,6 +78,8 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
   const ref = React.useRef<BottomSheetModal | null>(null);
   const chrome = useSheetChrome();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
   // Only dismiss() a sheet this component presented that has not closed
   // itself (notification-panel.tsx), or gorhom sticks in DISMISSING.
@@ -90,14 +108,18 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
     <BottomSheetModal
       ref={ref}
       enableDynamicSizing
+      // At accessibility text sizes the content is taller than the screen:
+      // the sheet stops below the top safe area and its content scrolls.
+      maxDynamicContentSize={height - insets.top}
+      topInset={insets.top}
       enablePanDownToClose
       onChange={onChange}
       accessible={false}
       backdropComponent={renderBackdrop}
       {...chrome}
     >
-      <BottomSheetView>
-        <View testID={YOUR_NUMBERS_SHEET_TEST_ID} className="gap-5 px-4 pb-8 pt-2">
+      <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}>
+        <View testID={YOUR_NUMBERS_SHEET_TEST_ID} className="gap-5 px-4 pt-2">
           <Text accessibilityRole="header" className="font-heading text-callout uppercase tracking-caps-l text-ink">
             Your numbers
           </Text>
@@ -110,7 +132,7 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
             onPress={openStats}
           />
         </View>
-      </BottomSheetView>
+      </BottomSheetScrollView>
     </BottomSheetModal>
   );
 }
@@ -119,7 +141,7 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
 export function YourNumbersBody({ athlete }: { athlete: AthleteGuardRow }) {
   const p = usePalette();
   const dashboard = useDashboardSummary(athlete.id, { quiet: true });
-  const profile = useProfileData(athlete.id, athlete.primary_gym_id, { quiet: true });
+  // `get_elo_history` takes no row limit; the sparkline draws the newest 20.
   const history = useCachedResource<EloHistoryRow[]>(
     `elo-history:${athlete.id}`,
     async () => getEloHistory(supabase, athlete.id),
@@ -128,8 +150,19 @@ export function YourNumbersBody({ athlete }: { athlete: AthleteGuardRow }) {
 
   const current = athlete.current_elo;
   const summary = dashboard.data?.summary ?? null;
-  const delta = lastMatchDelta(summary);
-  const unranked = summary !== null && (summary.stats?.total_matches ?? 0) === 0;
+  const last = lastMatchDelta(summary);
+  const totalMatches = summary?.stats?.total_matches ?? 0;
+  const unranked = summary !== null && totalMatches === 0;
+  // `getEloHistory` answers a failed read with no rows: an athlete with
+  // matches and no history is a failed read, never "no change this month".
+  const historyFailed =
+    history.error !== null || (history.data !== undefined && history.data.length === 0 && totalMatches > 0);
+  const historyRows = !historyFailed && history.data ? history.data : null;
+  const thisMonth: MonthValue = history.isLoading && !history.data
+    ? { kind: "loading" }
+    : historyFailed || !historyRows
+      ? { kind: "unavailable" }
+      : { kind: "value", delta: eloThisMonthFromHistory(historyRows) };
 
   return (
     <View className="gap-5">
@@ -137,25 +170,30 @@ export function YourNumbersBody({ athlete }: { athlete: AthleteGuardRow }) {
         testID="your-numbers-hero"
         accessible
         accessibilityLabel={
-          delta !== null && delta !== 0 ? `Rating ${current}, ${spokenDelta(delta)} last match` : `Rating ${current}`
+          last !== null && last.delta !== 0
+            ? `Rating ${current}, ${spokenDelta(last.delta)} last match`
+            : `Rating ${current}`
         }
-        className="flex-row items-baseline gap-3"
+        // Wraps instead of clipping at large text sizes.
+        className="flex-row flex-wrap items-baseline"
+        style={{ columnGap: 12 }}
       >
-        <Mono size="display-44" weight="bold" tracking="numeral" maxFontSizeMultiplier={1.3}>
+        <Mono size="display-44" weight="bold" tracking="numeral" maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}>
           {current}
         </Mono>
-        {delta !== null && delta !== 0 ? (
-          <>
+        {last !== null && last.delta !== 0 ? (
+          <View className="flex-row items-baseline" style={{ columnGap: 12 }}>
             <DeltaChip
               testID="your-numbers-last-delta"
-              delta={delta}
-              color={deltaColor(delta, p)}
+              delta={last.delta}
+              color={deltaColor(last.delta, p, last.outcome)}
               shown
               animate={false}
               style={typeStep("subhead")}
+              maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}
             />
-            <Label>Last match</Label>
-          </>
+            <Label maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}>Last match</Label>
+          </View>
         ) : null}
       </View>
 
@@ -163,12 +201,20 @@ export function YourNumbersBody({ athlete }: { athlete: AthleteGuardRow }) {
         <Text testID="your-numbers-first-match" className="font-body text-body text-ink-2">
           Your first match sets your rank.
         </Text>
-      ) : history.data && history.data.length > 0 ? (
-        <Sparkline points={sparkPoints(history.data, current)} peak={Math.max(athlete.highest_elo, current)} />
-      ) : history.isLoading ? (
+      ) : historyRows && historyRows.length > 0 ? (
+        <Sparkline
+          points={sparkPoints(historyRows, current)}
+          matches={Math.min(historyRows.length, SPARK_MATCHES)}
+          peak={Math.max(athlete.highest_elo, current)}
+        />
+      ) : history.isLoading && !history.data ? (
         <SkeletonProvider>
           <SkeletonBlock height={SPARK_HEIGHT} radius="xs" />
         </SkeletonProvider>
+      ) : historyFailed ? (
+        <Text testID="your-numbers-history-unavailable" className="font-body text-body text-ink-2">
+          Your rating history is unavailable right now.
+        </Text>
       ) : null}
 
       {dashboard.isLoading && !summary ? (
@@ -179,20 +225,28 @@ export function YourNumbersBody({ athlete }: { athlete: AthleteGuardRow }) {
           <Button variant="ghost" label="Try again" height={44} onPress={dashboard.refresh} className="self-start" />
         </View>
       ) : (
-        <Cells athlete={athlete} summary={summary} eloThisMonth={profile.isLoading ? null : profile.eloThisMonth} />
+        <Cells athlete={athlete} summary={summary} thisMonth={thisMonth} />
       )}
     </View>
   );
 }
 
+type MonthValue = { kind: "loading" } | { kind: "unavailable" } | { kind: "value"; delta: number };
+
+function monthA11y(m: MonthValue): string {
+  if (m.kind === "loading") return "This month: loading";
+  if (m.kind === "unavailable") return "This month: unavailable";
+  return `This month: ${spokenDelta(m.delta)}`;
+}
+
 function Cells({
   athlete,
   summary,
-  eloThisMonth,
+  thisMonth,
 }: {
   athlete: AthleteGuardRow;
   summary: NonNullable<ReturnType<typeof useDashboardSummary>["data"]>["summary"];
-  eloThisMonth: number | null;
+  thisMonth: MonthValue;
 }) {
   const p = usePalette();
   const rank = rankCell(summary);
@@ -204,36 +258,44 @@ function Cells({
       <Cell testID="your-numbers-rank" label="Global rank" a11y={rank ? rank.label : "Global rank: Unranked"}>
         {rank ? (
           <>
-            <Text className="font-mono-bold text-subhead text-ink tabular-nums">
+            <Value>
               {rank.value} <Text className="font-mono text-small text-ink-2 tabular-nums">{rank.of}</Text>
-            </Text>
+            </Value>
             {rank.top ? <Note>{rank.top}</Note> : null}
           </>
         ) : (
-          <Text className="font-mono-bold text-subhead text-ink tabular-nums">Unranked</Text>
+          <Value>Unranked</Value>
         )}
       </Cell>
       <Cell testID="your-numbers-record" label="Record" a11y={`${record.label}, ${record.matches}`}>
-        <Text className="font-mono-bold text-subhead text-ink tabular-nums">{record.value}</Text>
+        {/* One line, shrinking to fit: never one token per line. */}
+        <Value fit>{record.value}</Value>
         <Note>{record.matches}</Note>
       </Cell>
       <Cell testID="your-numbers-peak" label="Peak" a11y={`Peak ${peak}, ${peakNote(peak, athlete.current_elo)}`}>
-        <Text className="font-mono-bold text-subhead text-ink tabular-nums">{peak}</Text>
+        <Value>{peak}</Value>
         <Note>{peakNote(peak, athlete.current_elo)}</Note>
       </Cell>
-      <Cell
-        testID="your-numbers-month"
-        label="This month"
-        a11y={eloThisMonth === null ? "This month: loading" : `This month: ${spokenDelta(eloThisMonth)}`}
-      >
-        {eloThisMonth === null ? (
+      <Cell testID="your-numbers-month" label="This month" a11y={monthA11y(thisMonth)}>
+        {thisMonth.kind === "loading" ? (
           <SkeletonProvider>
             <SkeletonBlock width={56} height={18} radius="xs" />
           </SkeletonProvider>
-        ) : eloThisMonth === 0 ? (
-          <Text className="font-mono-bold text-subhead text-ink tabular-nums">0</Text>
+        ) : thisMonth.kind === "unavailable" ? (
+          <Text testID="your-numbers-month-unavailable" className="font-body text-body text-ink-2" maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}>
+            Unavailable
+          </Text>
+        ) : thisMonth.delta === 0 ? (
+          <Value>0</Value>
         ) : (
-          <DeltaChip delta={eloThisMonth} color={deltaColor(eloThisMonth, p)} shown animate={false} style={typeStep("subhead")} />
+          <DeltaChip
+            delta={thisMonth.delta}
+            color={deltaColor(thisMonth.delta, p)}
+            shown
+            animate={false}
+            style={typeStep("subhead")}
+            maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}
+          />
         )}
         <Note>{monthStartLabel()}</Note>
       </Cell>
@@ -255,14 +317,35 @@ function Cell({
 }) {
   return (
     <View testID={testID} accessible accessibilityLabel={a11y} className="w-1/2 gap-1 pr-3">
-      <Label>{label}</Label>
+      <Label maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}>{label}</Label>
       {children}
     </View>
   );
 }
 
+function Value({ children, fit = false }: { children: React.ReactNode; fit?: boolean }) {
+  return (
+    <Text
+      maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}
+      numberOfLines={fit ? 1 : undefined}
+      adjustsFontSizeToFit={fit}
+      minimumFontScale={fit ? 0.6 : undefined}
+      className="font-mono-bold text-subhead text-ink tabular-nums"
+    >
+      {children}
+    </Text>
+  );
+}
+
 function Note({ children }: { children: React.ReactNode }) {
-  return <Text className="font-mono text-micro text-ink-3 uppercase tracking-caps tabular-nums">{children}</Text>;
+  return (
+    <Text
+      maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}
+      className="font-mono text-micro text-ink-3 uppercase tracking-caps tabular-nums"
+    >
+      {children}
+    </Text>
+  );
 }
 
 function CellsSkeleton() {
@@ -280,8 +363,11 @@ function CellsSkeleton() {
   );
 }
 
-/** The rating over the last matches, the peak as a dashed hairline, a square at now. */
-function Sparkline({ points, peak }: { points: number[]; peak: number }) {
+/**
+ * The rating over the last matches ending at now (a square), with the peak
+ * as a dashed hairline when it is near the line (`sparkRange`).
+ */
+function Sparkline({ points, matches, peak }: { points: number[]; matches: number; peak: number }) {
   const tokens = useThemedTokens();
   const [width, setWidth] = React.useState(0);
   const onLayout = React.useCallback((e: LayoutChangeEvent) => {
@@ -290,8 +376,7 @@ function Sparkline({ points, peak }: { points: number[]; peak: number }) {
   }, []);
   if (points.length < 2) return null;
 
-  const lo = Math.min(...points);
-  const hi = Math.max(peak, ...points);
+  const { lo, hi, showPeak } = sparkRange(points, peak);
   const span = hi - lo || 1;
   const inner = SPARK_HEIGHT - SPARK_PAD * 2;
   const y = (v: number) => SPARK_PAD + (1 - (v - lo) / span) * inner;
@@ -299,27 +384,32 @@ function Sparkline({ points, peak }: { points: number[]; peak: number }) {
   const x = (i: number) => 1 + (i / (points.length - 1)) * (right - 1);
   const coords = points.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const end = points[points.length - 1];
-  const matches = points.length - 1;
+  const label = `Rating over your last ${matches} ${matches === 1 ? "match" : "matches"}, from ${points[0]} to ${end}. Peak ${peak}`;
 
   return (
     <View testID="your-numbers-sparkline" className="gap-1">
-      <View onLayout={onLayout} style={{ height: SPARK_HEIGHT }}>
+      {/* The Svg's own label never reaches VoiceOver: the wrapper carries it. */}
+      <View
+        testID="your-numbers-sparkline-chart"
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={label}
+        onLayout={onLayout}
+        style={{ height: SPARK_HEIGHT }}
+      >
         {width > 0 ? (
-          <Svg
-            width={width}
-            height={SPARK_HEIGHT}
-            accessibilityRole="image"
-            accessibilityLabel={`Rating over your last ${matches} matches, from ${points[0]} to ${end}. Peak ${peak}`}
-          >
-            <Line
-              x1={0}
-              x2={width}
-              y1={y(peak)}
-              y2={y(peak)}
-              stroke={tokens.borderHairlineStrong}
-              strokeWidth={1}
-              strokeDasharray="3 3"
-            />
+          <Svg width={width} height={SPARK_HEIGHT}>
+            {showPeak ? (
+              <Line
+                x1={0}
+                x2={width}
+                y1={y(peak)}
+                y2={y(peak)}
+                stroke={tokens.borderHairlineStrong}
+                strokeWidth={1}
+                strokeDasharray="3 3"
+              />
+            ) : null}
             <Polyline
               points={coords}
               fill="none"
@@ -338,9 +428,15 @@ function Sparkline({ points, peak }: { points: number[]; peak: number }) {
           </Svg>
         ) : null}
       </View>
-      <View className="flex-row justify-between" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+      {/* Wraps at large text sizes instead of running the notes together. */}
+      <View
+        className="flex-row flex-wrap justify-between"
+        style={{ columnGap: 12 }}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
         <Note>{`${matches} ${matches === 1 ? "match" : "matches"} ago`}</Note>
-        <Note>Peak dashed</Note>
+        <Note>{peakLegend(peak, showPeak)}</Note>
         <Note>Now</Note>
       </View>
     </View>

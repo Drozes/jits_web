@@ -34,7 +34,7 @@ import { useFilmStatus } from "@/lib/video/use-film-status";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { HERO_CAPTION } from "@/lib/video/video-status-copy";
 import { videoHref } from "@/lib/film-room/href";
-import { noteRatingWatched } from "@/lib/rating/header-elo";
+import { noteRatingWatched, noteVerdictOutcome } from "@/lib/rating/header-elo";
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;
@@ -161,6 +161,10 @@ export function VerdictStep(props: VerdictStepProps) {
   React.useEffect(() => {
     if (eloAfter != null && !disputed) noteRatingWatched(me.athlete_id, eloAfter);
   }, [me.athlete_id, eloAfter, disputed]);
+  // Its outcome too, stamped rating or not: a draw's later header delta is amber.
+  React.useEffect(() => {
+    if (outcome && !disputed) noteVerdictOutcome(me.athlete_id, matchId, outcome);
+  }, [me.athlete_id, matchId, outcome, disputed]);
 
   const verdict = disputed ? "DISPUTED" : win ? "YOU WON" : loss ? "YOU LOST" : outcome === "draw" ? "DRAW" : "MATCH RECORDED";
   const verdictColor = outcome === "draw" && !disputed ? p.amber : p.text;

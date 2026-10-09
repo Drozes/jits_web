@@ -62,8 +62,15 @@ export function BrandHeader({ title, onArena = false }: BrandHeaderProps) {
 
   return (
     <View
-      className="bg-surface-2 border-b border-hairline flex-row items-center justify-between px-4"
-      style={{ paddingTop: insets.top, height: 56 + insets.top, gap: 12 }}
+      className="bg-surface-2 border-b border-hairline flex-row items-center justify-between"
+      style={{
+        paddingTop: insets.top,
+        height: 56 + insets.top,
+        // The 16pt gutter, or the side safe area when wider (landscape).
+        paddingLeft: Math.max(16, insets.left),
+        paddingRight: Math.max(16, insets.right),
+        gap: 12,
+      }}
     >
       <Text
         // Read first on the tab root, never drawn. An element every state of
