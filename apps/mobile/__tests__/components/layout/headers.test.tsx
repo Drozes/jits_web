@@ -115,7 +115,7 @@ beforeEach(() => {
 const TAB_ROOTS: [string, string][] = [
   ["Home", "app/(app)/(tabs)/(home)/index.tsx"],
   ["Arena", "app/(app)/(tabs)/arena/index.tsx"],
-  ["Matches", "app/(app)/(tabs)/matches/index.tsx"],
+  ["Film", "app/(app)/(tabs)/matches/index.tsx"],
   ["Rankings", "app/(app)/(tabs)/leaderboard/index.tsx"],
   ["Profile", "app/(app)/(tabs)/profile/index.tsx"],
 ];

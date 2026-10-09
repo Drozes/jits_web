@@ -14,7 +14,7 @@
  *     Matches tab's posters `film-card-<matchId>` (the tab replaced the
  *     Film Room and Profile's Recent Matches and Film Room preview, spec
  *     specs/matches-tab/spec.md); its header title
- *     `tab-header-title-matches` proves the tab root is showing (the result
+ *     `tab-header-title-film` proves the tab root is showing (the result
  *     chips are hidden on a zero-match account).
  * Selectors take the testID OR the label, never a container testID.
  */
@@ -35,7 +35,7 @@ const TAB_PROOF: Record<ProvenTab, Query> = {
   // BrandHeader's accessibility-only tab heading (never drawn since
   // jits-1ez5, still in the accessibility tree): present in every Matches state (zero, low data,
   // loading, error), unlike the result chips, which a zero-match account hides.
-  Matches: { id: "tab-header-title-matches" },
+  Matches: { id: "tab-header-title-film" },
   Profile: { label: /^(share profile|view detailed stats)$/i, type: "Button" },
 };
 

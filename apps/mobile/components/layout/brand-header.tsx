@@ -75,7 +75,7 @@ export function BrandHeader({ title, onArena = false }: BrandHeaderProps) {
       <Text
         // Read first on the tab root, never drawn. An element every state of
         // the tab root has (the match-loop harness proves which tab is open
-        // by it: `tab-header-title-matches`).
+        // by it: `tab-header-title-film`).
         testID={`tab-header-title-${title.toLowerCase()}`}
         accessibilityRole="header"
         style={VISUALLY_HIDDEN}

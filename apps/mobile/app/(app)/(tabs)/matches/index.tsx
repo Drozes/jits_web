@@ -7,7 +7,6 @@ import { useRefetchOnUploadSettled } from "@/lib/profile/use-my-match-videos";
 import { useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
-import { videoHref } from "@/lib/film-room/href";
 import { useMatchLibrary } from "@/lib/film-room/use-match-library";
 import { useFilmRoomPhases } from "@/lib/film-room/use-film-room-phases";
 import { markMatchSeen, useSeenMatches } from "@/lib/film-room/seen-store";
@@ -104,14 +103,11 @@ export default function MatchesScreen() {
   const viewerPhoto = athlete?.profile_photo_url ?? null;
   // Stable props so memoized cards skip unrelated re-renders.
   const viewer = React.useMemo(() => ({ name: viewerName, photoUrl: viewerPhoto }), [viewerName, viewerPhoto]);
-  // Either card target clears NEW (AC 2.15), as match detail does.
+  // A card tap opens match detail (never straight into the player) and
+  // clears NEW (AC 2.15), as match detail does.
   const open = React.useCallback((matchId: string) => {
     markMatchSeen(matchId);
     router.push(matchDetailHref(matchId));
-  }, [router]);
-  const play = React.useCallback((videoId: string, matchId: string) => {
-    markMatchSeen(matchId);
-    router.push(videoHref(videoId));
   }, [router]);
   // Clips come from the lane read (fail-closed: false until it succeeds, and
   // after a failed read). Until that read settles the flag is unknown, so the
@@ -192,7 +188,6 @@ export default function MatchesScreen() {
                 tags: tagsFor(tags, m.match_id),
                 noFilmHelper: m.match_id === helperId,
                 onOpen: open,
-                onPlay: play,
               })}
             </MilestoneMoment>
           ))}
@@ -200,7 +195,7 @@ export default function MatchesScreen() {
         </View>
       );
     },
-    [viewer, viewerId, seen, open, play, hasMore, phases, tags, helperId, cardCelebration, dismissMilestone],
+    [viewer, viewerId, seen, open, hasMore, phases, tags, helperId, cardCelebration, dismissMilestone],
   );
 
   // The lane fields the carousel draws from: a new object only when one changes.
@@ -255,7 +250,7 @@ export default function MatchesScreen() {
 
   return (
     <View testID="matches-screen" className="flex-1 bg-surface">
-      <BrandHeader title="Matches" />
+      <BrandHeader title="Film" />
       <FlatList
         data={rows}
         keyExtractor={(r) => r.key}

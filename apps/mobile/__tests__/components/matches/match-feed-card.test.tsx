@@ -28,7 +28,6 @@ const NO_TAGS: readonly string[] = [];
 
 function renderCard(over: Partial<MatchFeedCardProps> = {}) {
   const onOpen = jest.fn();
-  const onPlay = jest.fn();
   const props: MatchFeedCardProps = {
     item: libItem({ match_id: "m-1" }),
     viewer,
@@ -38,11 +37,10 @@ function renderCard(over: Partial<MatchFeedCardProps> = {}) {
     tags: NO_TAGS,
     noFilmHelper: false,
     onOpen,
-    onPlay,
     ...over,
   };
   const utils = render(<MatchFeedCard {...props} />);
-  return { ...utils, onOpen, onPlay, props };
+  return { ...utils, onOpen, props };
 }
 
 function textOf(node: ReturnType<ReturnType<typeof render>["getByTestId"]>): string {
@@ -117,7 +115,7 @@ describe("media and the crop rule (spec 6.3, AC 2.8)", () => {
     expect(u.getByTestId("film-card-media-m-1").props.accessibilityLabel).toBe("No film for this one. Open match vs M. Park");
   });
 
-  it("uses the elected primary angle for the poster and the play target", () => {
+  it("uses the elected primary angle for the poster, and the media still opens match detail", () => {
     const item = libItem({
       videos: [
         libVideo({ video_id: "mine", poster_url: "https://signed/mine.jpg", thumbnail_key: "mine.jpg" }),
@@ -127,20 +125,20 @@ describe("media and the crop rule (spec 6.3, AC 2.8)", () => {
     const u = renderCard({ item });
     expect(u.getByTestId("feed-poster").props.source).toEqual({ uri: "https://signed/p.jpg", cacheKey: "film-still-p.jpg" });
     fireEvent.press(u.getByTestId("film-card-media-m-1"));
-    expect(u.onPlay).toHaveBeenCalledWith("primary", "m-1");
+    expect(u.onOpen).toHaveBeenCalledWith("m-1");
   });
 });
 
 describe("play glyph, duration and taps (AC 2.6, 2.9)", () => {
-  it("a playable card shows the play glyph and an m:ss duration; the media plays the selected video", () => {
+  it("a playable card shows the play glyph and an m:ss duration; the media opens match detail, not the player", () => {
     const u = renderCard({ item: libItem({ videos: [libVideo({ duration_seconds: 252 })] }) });
     expect(u.getByTestId("film-card-play")).toBeTruthy();
     expect(textOf(u.getByTestId("film-card-duration"))).toBe("4:12");
     const media = u.getByTestId("film-card-media-m-1");
-    expect(media.props.accessibilityLabel).toBe("Play match vs M. Park, breakdown ready");
+    expect(media.props.accessibilityLabel).toBe("Open match vs M. Park, breakdown ready");
     fireEvent.press(media);
-    expect(u.onPlay).toHaveBeenCalledWith("v-1", "m-1");
-    expect(u.onOpen).not.toHaveBeenCalled();
+    expect(u.onOpen).toHaveBeenCalledTimes(1);
+    expect(u.onOpen).toHaveBeenCalledWith("m-1");
   });
 
   it("nothing playable: no glyph, no duration, and the media opens match detail", () => {
@@ -149,16 +147,14 @@ describe("play glyph, duration and taps (AC 2.6, 2.9)", () => {
     expect(u.queryByTestId("film-card-duration")).toBeNull();
     fireEvent.press(u.getByTestId("film-card-media-m-1"));
     expect(u.onOpen).toHaveBeenCalledWith("m-1");
-    expect(u.onPlay).not.toHaveBeenCalled();
   });
 
-  it("the meta row always opens match detail, even when the media would play", () => {
+  it("the meta row always opens match detail", () => {
     const u = renderCard();
     const meta = u.getByTestId("film-card-m-1");
     expect(meta.props.accessibilityLabel).toMatch(/^Open match vs M\. Park, breakdown ready\. Won, plus 14, [A-Z][a-z]{2} \d{1,2}$/);
     fireEvent.press(meta);
     expect(u.onOpen).toHaveBeenCalledWith("m-1");
-    expect(u.onPlay).not.toHaveBeenCalled();
   });
 
   it("the chevron is decoration inside the meta row: hidden from accessibility, no target", () => {

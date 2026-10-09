@@ -82,7 +82,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="matches"
         options={{
-          title: "Matches",
+          title: "Film",
           tabBarIcon: ({ color, size }) => <Film color={color} size={size} />,
         }}
       />

@@ -20,8 +20,6 @@ export interface MatchRenderContext {
   noFilmHelper: boolean;
   /** Stable across renders; opens match detail and marks the match seen. */
   onOpen: (matchId: string) => void;
-  /** Stable across renders; plays a video and marks the match seen. */
-  onPlay: (videoId: string, matchId: string) => void;
 }
 
 /** Renders one match of the feed (a memoised component). The screen keys it by match id. */

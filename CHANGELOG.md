@@ -31,6 +31,21 @@ Owner-approved option F "Wordmark + ELO" from the Elo in the Header review. Ever
 **Removed**
 - `apps/mobile/components/layout/tab-header.tsx` (`TabHeader`): every tab root uses `BrandHeader`.
 - Home (`apps/mobile/app/(app)/(tabs)/(home)/index.tsx`, jits-1ez5.3): the "Welcome back" / "Welcome" MetaTag, the display name and the `EloTile` hero, with their imports. Home is now: header, Resume (when a match is open), Highlights, the practice offer or invite card, Recent Activity.
+## OTA "Film tab label + feed cards open match detail" (runtime 0.5.0), 2026-10-09
+
+Production OTA group `91e6cddd-18e2-487e-8f27-92df29c532d1` (iOS `01a12233-56e5-717a-bc73-2b4267ec9224`, Android `01a12233-56e5-7067-b167-bddde6f8ef89`) from jits_web `main` `38924821` (merge of development `1b80e4da`, pushed directly without a PR at the owner's request), published from a clean worktree so local `.env` files could not leak in. JS-only, non-critical (`updateCriticalIndex` 1, unchanged). Rollback target: `f4144216-2bf7-49a2-b858-983a128c96b7`. No backend dependency.
+
+### Mobile: the Matches tab is labelled Film; feed cards open match detail first
+
+Owner request 2026-10-09. JS-only (OTA-eligible). The route stays `matches`, so deep links, the Film Room redirect and testIDs are unchanged.
+
+**Changed**
+- `apps/mobile/app/(app)/(tabs)/_layout.tsx`, `apps/mobile/app/(app)/(tabs)/matches/index.tsx`: the tab bar label and the tab header read `Film` instead of `Matches`.
+- `apps/mobile/app/(app)/settings/help.tsx`: the footage paragraph points to "the Film tab". `apps/mobile/components/reels/reel-tile-copy.ts`: the reel "See all" accessibility label is "See all, open Film".
+- `apps/mobile/components/matches/match-feed-card.tsx`, `match-feed-media.tsx`, `match-list-layout.tsx`: tapping a card's media now opens match detail (the result page) instead of playing the video; the `onPlay` path is removed. Playable cards keep the play glyph and duration as a "has film" cue, and the media's accessibility label reads "Open match vs ...".
+
+**Fixed**
+- `apps/mobile/__tests__/lib/invites/pending-invite.test.ts`: "keeps the first touch" pins the clock inside the 7-day token TTL; it went red once 2026-10-08 passed.
 
 ## OTA "Breakdown heading without AI" (runtime 0.5.0), 2026-10-07
 

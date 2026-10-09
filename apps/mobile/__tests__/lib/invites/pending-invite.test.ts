@@ -51,9 +51,9 @@ describe("parsePendingInvite", () => {
 
 describe("save / load / clear", () => {
   it("keeps the first touch when the same link is opened again", async () => {
-    // The save reads the stored record against the real clock: pin it inside
-    // the record's window, or the test starts failing once T0 has expired.
-    jest.useFakeTimers({ now: new Date("2026-10-02T00:00:00Z") });
+    // savePendingInvite reads the stored record against the real clock, so pin
+    // it inside the 7-day token TTL (the test went red once 2026-10-08 passed).
+    jest.useFakeTimers({ now: new Date("2026-10-02T00:00:00Z"), doNotFake: ["nextTick", "setImmediate", "queueMicrotask"] });
     try {
       await savePendingInvite(makePendingInvite({ token: TOKEN }, "universal_link", T0)!);
       await savePendingInvite(makePendingInvite({ token: TOKEN }, "universal_link", new Date("2026-10-02T00:00:00Z"))!);
