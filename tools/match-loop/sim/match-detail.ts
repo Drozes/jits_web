@@ -32,7 +32,8 @@ type ProvenTab = "Home" | "Matches" | "Profile";
 /** An element only that tab's root renders. */
 const TAB_PROOF: Record<ProvenTab, Query> = {
   Home: { label: "Me", type: "Button" },
-  // The TabHeader title: present in every Matches state (zero, low data,
+  // BrandHeader's accessibility-only tab heading (never drawn since
+  // jits-1ez5, still in the accessibility tree): present in every Matches state (zero, low data,
   // loading, error), unlike the result chips, which a zero-match account hides.
   Matches: { id: "tab-header-title-matches" },
   Profile: { label: /^(share profile|view detailed stats)$/i, type: "Button" },

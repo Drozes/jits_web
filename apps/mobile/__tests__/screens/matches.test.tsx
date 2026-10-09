@@ -40,12 +40,12 @@ jest.mock("@/components/ui/skeleton", () => {
   return { SkeletonProvider: Pass, SkeletonBlock: () => R.createElement(RN.View) };
 });
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
-// The shared tab header (Live Chip and bell) is covered by its own suites;
-// here it only has to be the one the screen draws, titled Matches.
-const mockTabHeader = jest.fn();
-jest.mock("@/components/layout/tab-header", () => ({
-  TabHeader: (props: { title: string }) => {
-    mockTabHeader(props);
+// The shared tab header (wordmark, rating, Live Chip and bell) is covered by
+// its own suites; here it only has to be the one the screen draws, for Matches.
+const mockBrandHeader = jest.fn();
+jest.mock("@/components/layout/brand-header", () => ({
+  BrandHeader: (props: { title: string }) => {
+    mockBrandHeader(props);
     const R = require("react");
     const RN = require("react-native");
     return R.createElement(RN.Text, { testID: "tab-header", accessibilityRole: "header" }, props.title);
@@ -202,7 +202,7 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
   it("shows the Matches tab header, the record strip and a skeleton while the first page loads", () => {
     mockGetMyMatchLibrary.mockReturnValue(new Promise(() => undefined));
     const utils = render(<MatchesScreen />);
-    expect(mockTabHeader).toHaveBeenLastCalledWith({ title: "Matches" });
+    expect(mockBrandHeader).toHaveBeenLastCalledWith({ title: "Matches" });
     expect(utils.getByTestId("tab-header")).toHaveTextContent("Matches");
     expect(utils.getByTestId("matches-record")).toHaveTextContent("24 MATCHES · 15W 7L 2D · 1526");
     expect(utils.getByTestId("matches-loading")).toBeTruthy();

@@ -113,6 +113,12 @@ export interface RollingNumberProps {
   maxSpan?: number;
   /** Roll curve; defaults to `easing.brandOut` (the splash keeps `easing.outCubic`). */
   curve?: (typeof easing)[keyof typeof easing];
+  /**
+   * Dynamic Type cap of the rolling digits; defaults to ROLL_MAX_FONT_SCALE.
+   * Pass the landed Text's `maxFontSizeMultiplier` too (the header rating
+   * rolls at most 1.3x).
+   */
+  maxFontScale?: number;
 }
 
 /**
@@ -141,6 +147,7 @@ export function RollingNumber({
   durationMs = ROLL_MS,
   maxSpan = ROLL_MAX_SPAN,
   curve = easing.brandOut,
+  maxFontScale = ROLL_MAX_FONT_SCALE,
 }: RollingNumberProps) {
   const reduceMotion = useReduceMotion();
   const { fontScale } = useWindowDimensions();
@@ -213,7 +220,7 @@ export function RollingNumber({
 
   // The digits size themselves for Dynamic Type (clamped), with the OS
   // scaling off, so a column's cell height always matches its glyphs.
-  const scale = Math.min(Math.max(fontScale || 1, 1), ROLL_MAX_FONT_SCALE);
+  const scale = Math.min(Math.max(fontScale || 1, 1), maxFontScale);
   const cellHeight = style.lineHeight * scale;
   const digitStyle: StyleProp<TextStyle> = [
     style,

@@ -34,6 +34,7 @@ import { useFilmStatus } from "@/lib/video/use-film-status";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { HERO_CAPTION } from "@/lib/video/video-status-copy";
 import { videoHref } from "@/lib/film-room/href";
+import { noteRatingWatched } from "@/lib/rating/header-elo";
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;
@@ -155,6 +156,11 @@ export function VerdictStep(props: VerdictStepProps) {
   const eloAfter = me.elo_after ?? null;
   const eloDelta = me.elo_delta ?? null;
   const gap = me.weight_division_gap ?? 0;
+  // The athlete saw this rating land here: the header does not roll it again
+  // when the auth row catches up after the exit (jits-1ez5.4).
+  React.useEffect(() => {
+    if (eloAfter != null && !disputed) noteRatingWatched(me.athlete_id, eloAfter);
+  }, [me.athlete_id, eloAfter, disputed]);
 
   const verdict = disputed ? "DISPUTED" : win ? "YOU WON" : loss ? "YOU LOST" : outcome === "draw" ? "DRAW" : "MATCH RECORDED";
   const verdictColor = outcome === "draw" && !disputed ? p.amber : p.text;

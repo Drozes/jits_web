@@ -32,6 +32,8 @@ interface DeltaChipProps {
   /** This mount plays the pop (a real transition, once). */
   animate: boolean;
   style?: StyleProp<TextStyle>;
+  /** Dynamic Type cap for the chip's text (the header delta stops at 1.3x). */
+  maxFontSizeMultiplier?: number;
   testID?: string;
 }
 
@@ -40,7 +42,7 @@ interface DeltaChipProps {
  * lands it pops in from 0.6 on the short press spring with a fade. Under
  * Reduce Motion, or when the moment already played, it is shown in place.
  */
-export function DeltaChip({ delta, color, shown, animate, style, testID }: DeltaChipProps) {
+export function DeltaChip({ delta, color, shown, animate, style, maxFontSizeMultiplier, testID }: DeltaChipProps) {
   const reduceMotion = useReduceMotion();
   const pop = animate && !reduceMotion;
   const visible = shown || !animate;
@@ -58,7 +60,11 @@ export function DeltaChip({ delta, color, shown, animate, style, testID }: Delta
   const anim = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ scale: scale.value }] }));
   return (
     <Animated.View style={anim}>
-      <Text testID={testID} className="font-mono-bold" style={[{ color, fontVariant: ["tabular-nums"] }, style]}>
+      <Text
+        testID={testID}
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
+        className="font-mono-bold"
+        style={[{ color, fontVariant: ["tabular-nums"] }, style]}>
         {formatDeltaChip(delta)}
       </Text>
     </Animated.View>

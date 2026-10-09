@@ -10,7 +10,6 @@
 import * as React from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
-import { NavigationContext } from "@react-navigation/native";
 import { LiveDot, PendingDot } from "@/components/ui/elo-system/live-pill";
 import {
   arenaActions,
@@ -52,6 +51,7 @@ import {
   type ChipTone,
 } from "@/lib/arena/header-chip-model";
 import { msToNextSecond } from "@/lib/arena/fresh-countdown";
+import { useScreenFocused } from "@/lib/navigation/use-screen-focused";
 
 // ---------------------------------------------------------------------------
 // Clock
@@ -70,27 +70,6 @@ function useCountdownTicker(remainingMs: number | null): void {
     const id = setTimeout(() => setTick((n) => n + 1), delay);
     return () => clearTimeout(id);
   }, [delay, tick]);
-}
-
-/**
- * Whether the enclosing screen is focused; true outside a navigator. Every
- * tab root mounts its own chip, so the unfocused ones must not tick.
- * (`useIsFocused` throws outside a navigator, hence the context read.)
- */
-function useScreenFocused(): boolean {
-  const navigation = React.useContext(NavigationContext);
-  const [focused, setFocused] = React.useState(() => navigation?.isFocused() ?? true);
-  React.useEffect(() => {
-    if (!navigation) return;
-    setFocused(navigation.isFocused());
-    const offFocus = navigation.addListener("focus", () => setFocused(true));
-    const offBlur = navigation.addListener("blur", () => setFocused(false));
-    return () => {
-      offFocus();
-      offBlur();
-    };
-  }, [navigation]);
-  return focused;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +110,18 @@ const TEXT_STYLE = { fontVariant: ["tabular-nums" as const] };
 /** How long a second chip tap after a go-live tap is ignored (round 4). */
 export const CHIP_DOUBLE_TAP_GUARD_MS = 300;
 
-export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}) {
+interface HeaderStatusChipProps {
+  /** This header is the Arena tab's. */
+  onArena?: boolean;
+  /**
+   * Reports the width the header leaves the chip that the chip does not use
+   * (its slot minus its drawn row), so the header rating's post-match delta
+   * shows only when it fits (jits-1ez5.4).
+   */
+  onSpareWidth?: (px: number) => void;
+}
+
+export function HeaderStatusChip({ onArena = false, onSpareWidth }: HeaderStatusChipProps = {}) {
   const router = useRouter();
   const arena = useArenaState();
   const phase = useLiveSwitchPhase();
@@ -156,6 +146,11 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
   const [menuOpen, setMenuOpen] = React.useState(false);
   // The width the header leaves the chip; null (the 160pt cap) until laid out.
   const [slotWidth, setSlotWidth] = React.useState<number | null>(null);
+  // The chip's drawn width (its 44pt touch row), for the spare-width report.
+  const [rowWidth, setRowWidth] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (onSpareWidth && slotWidth !== null && rowWidth !== null) onSpareWidth(Math.max(0, slotWidth - rowWidth));
+  }, [onSpareWidth, slotWidth, rowWidth]);
 
   const model = describeHeaderChip({
     isLive: arena.isLive,
@@ -245,6 +240,10 @@ export function HeaderStatusChip({ onArena = false }: { onArena?: boolean } = {}
       {/* The 44pt touch row: clips to CHIP_MAX_WIDTH, never to the 28pt frame. */}
       <View
         testID="header-status-chip-row"
+        onLayout={(e) => {
+          const w = Math.ceil(e.nativeEvent.layout.width);
+          setRowWidth((prev) => (prev === w ? prev : w));
+        }}
         className="flex-row items-center"
         style={{
           height: CHIP_TARGET_HEIGHT,
