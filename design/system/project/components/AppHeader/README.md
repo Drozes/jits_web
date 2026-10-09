@@ -14,7 +14,7 @@ AppHeader is the 56pt header family: one panel bar with a hairline bottom edge i
 
 While the athlete is live the right slot shows `HeaderLiveDot` (a 7px `gain-green` dot in a 16x28 box, not tappable). Side slots share the leftover width (flex 1, basis 0) so the title stays centred.
 
-**BrandHeader** (every tab root: Home, Arena, Matches, Rankings, Profile; jits-1ez5): left, the Bebas Neue 22px "ELO RATED" wordmark (live text, tracking -0.07px, no Dynamic Type growth, not a VoiceOver stop), 10pt, a 1px x 16pt `hairline-strong` rule, 10pt, then **HeaderElo**: the athlete's `current_elo` in JetBrains Mono 700 16px `ink`, tabular, on the wordmark's baseline, Dynamic Type capped at 1.3x (the chip's cap). The rating is a button in a 44pt tall row (pressed: a `plate` fill reaching 6pt past the digits), label "Your rating 1512", hint "Opens your numbers"; it opens the **Your numbers** sheet (shared sheet chrome): the rating at 44px with the last match's delta, the rating line over the last 20 matches with the peak as a dashed `hairline-strong` line, global rank "#37 of 412" with "Top 9%" (rounded up), the record, peak and this month, "Unranked" before a first match, and View full stats. No streak. Right, `TabHeaderActions` = HeaderStatusChip then the bell, 8pt apart; nothing else goes on the right. No tab title is drawn; the tab keeps an accessibility-only heading. The left side never yields: the chip takes the rest of the row (up to 160pt) and runs its own fit.
+**BrandHeader** (every tab root: Home, Arena, Matches, Rankings, Profile; jits-1ez5): left, the Bebas Neue 22px "ELO RATED" wordmark (live text, tracking -0.07px, no Dynamic Type growth, not a VoiceOver stop), 10pt, a 1px x 16pt `hairline-strong` rule, 10pt, then **HeaderElo**: the athlete's `current_elo` in JetBrains Mono 700 16px `ink`, tabular, on the wordmark's baseline, sized from the system text scale up to 1.3x (the chip's cap; OS scaling off, like the chip). The rating is a button in a 44pt tall row (pressed: a `plate` fill reaching 6pt past the digits), label "Your rating 1512", hint "Opens your numbers"; it opens the **Your numbers** sheet (shared sheet chrome): the rating at 44px with the last match's delta, the rating line over the last 20 matches with the peak as a dashed `hairline-strong` line, global rank "#37 of 412" with "Top 9%" (rounded up), the record, peak and this month (from the rating history; "Unavailable" when it fails), "Unranked" before a first match, and View full stats. The sheet stops below the top safe area and scrolls at large text sizes. No streak. Right, `TabHeaderActions` = HeaderStatusChip then the bell, 8pt apart; nothing else goes on the right. No tab title is drawn; the tab keeps an accessibility-only heading. The left side never yields: the chip takes the rest of the row (up to 160pt) and runs its own fit.
 
 **HeaderStatusChip**: a 28pt drawn frame (2px corners, 1px border in the tone) centred in a 44pt touch row, at most 160pt wide; mono 700 10px caps tabular text; 8pt side padding, 5pt glyph gap.
 
@@ -28,7 +28,7 @@ A match to confirm adds a "▪ CONFIRM" segment (compact "▪" when narrow). Tap
 
 Bell: 28px box, lucide Bell 18 `ink`, CountPill at its top right, pressed `plate-bright`.
 
-On device the bar adds the top safe-area inset (47 on Face ID phones) above the 56pt row and at least 16pt side padding.
+On device the bar adds the top safe-area inset (47 on Face ID phones) above the 56pt row and 16pt side padding (or the side safe area, when wider).
 
 ## Tokens used
 
@@ -36,7 +36,7 @@ On device the bar adds the top safe-area inset (47 on Face ID phones) above the 
 
 ## Motion
 
-The bar itself does not animate. **Header ELO roll** (Moment): when a result changes the rating on the focused tab root, the rating rolls once (RollingNumber) and the delta (DeltaChip, mono 700 10px) holds beside it about 4s, then fades out; only when it fits beside the chip. Reduce Motion: the landed value at once, the delta shown then removed in place. No haptic. Its dots use **LIVE pulse** on the shared Arena tempo clock (Ambient; static under Reduce Motion). The live popover opens with no animation.
+The bar itself does not animate. **Header ELO roll** (Moment): when a result changes the rating on the focused tab root, the rating rolls once (RollingNumber) and the delta (DeltaChip, mono 700 10px) holds beside it about 4s, then fades out; only when it fits beside the chip; amber for a negative delta after a draw. Reduce Motion: the landed value at once, the delta shown then removed in place. No haptic. Its dots use **LIVE pulse** on the shared Arena tempo clock (Ambient; static under Reduce Motion). The live popover opens with no animation.
 
 ## Source
 
