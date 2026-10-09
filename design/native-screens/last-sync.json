@@ -1,7 +1,7 @@
 {
   "canvas": "https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D",
-  "commit": "06cdac78c20a6f656bf8a70e9817c653de71fdf5",
-  "synced_at": "2026-10-07T18:36:26-04:00",
-  "version": "1791412578-24e9",
-  "note": "Synced 2026-10-07 to production OTA f4144216-2bf7-49a2-b858-983a128c96b7 (main 06cdac78, PR #73, commit 58a716ea, jits-xfvd.21). Redrew 32-Match-Detail only (the one board drift.mjs reported): the non-admin analysis plate heading is now 'BREAKDOWN' (a11y 'Breakdown') and the STANDARD/PREMIUM tier badge is hidden (admin-only); heading row is now 13 px (micro line height) instead of the 18 px badge, so the board height went 2042 to 2037 (canvas.json h, root and $preview). Board title 'Match detail (AI breakdown)' kept. Independently reviewed (clean). No other boards affected; no triage rows touched."
+  "commit": "1b80e4da9b2b60ab349403c8d0d8c2fe9b598237",
+  "synced_at": "2026-10-09T15:51:59-04:00",
+  "version": "1791575500-0a66",
+  "note": "Synced 2026-10-09 to production OTA 91e6cddd-18e2-487e-8f27-92df29c532d1 (main 38924821, development 1b80e4da). Redrew the 22 boards drift.mjs reported: the tab bar label reads Film instead of Matches on every board that draws it (Main, 11 to 19c, 42, 48, 57 to 61); the tab header h1 reads Film on 19, 19b, 19c and 19d; playable feed-card media on 19, 19d and 38 now link to 32-Match-Detail with 'Open match vs ...' labels (play glyph and duration kept, as in code); 19d's See all a11y label is 'See all, open Film'; 46-Help says 'the Film tab'. Text-only edits, no height changes, canvas.json untouched; board titles ('Matches tab: ...') and file names kept since the route is still matches. Independently reviewed (clean)."
 }
