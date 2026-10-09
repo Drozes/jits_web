@@ -343,6 +343,24 @@ export async function getEloHistory(
   return (data as EloHistoryRow[]) ?? [];
 }
 
+/**
+ * `getEloHistory` that keeps a failed read apart from an empty history (an
+ * athlete with only legacy casual matches has no rows): the error is a
+ * `Result` failure, never `[]`.
+ */
+export async function getEloHistoryResult(
+  supabase: Client,
+  athleteId: string,
+  since?: string | null,
+): Promise<Result<EloHistoryRow[]>> {
+  const { data, error } = await supabase.rpc("get_elo_history", {
+    p_athlete_id: athleteId,
+    ...(since ? { p_since: since } : {}),
+  });
+  if (error) return { ok: false, error: mapPostgrestError(error) };
+  return { ok: true, data: (data as EloHistoryRow[]) ?? [] };
+}
+
 /** Preview ELO stakes for a potential ranked match (weight-aware) */
 export async function getEloStakes(
   supabase: Client,

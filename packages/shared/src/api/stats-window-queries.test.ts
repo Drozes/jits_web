@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getEloHistory, getMatchHistory, getSubmissionBreakdownRpc } from "./queries";
+import { getEloHistory, getEloHistoryResult, getMatchHistory, getSubmissionBreakdownRpc } from "./queries";
 
 function client(result: { data: unknown; error: unknown }) {
   const rpc = vi.fn().mockResolvedValue(result);
@@ -29,6 +29,16 @@ describe("windowed history wrappers (jr_be-ahn.8 contract)", () => {
       ["get_elo_history", { p_athlete_id: "a1" }],
       ["get_elo_history", { p_athlete_id: "a1", p_since: SINCE }],
     ]);
+  });
+
+  it("getEloHistoryResult keeps an empty history apart from a failed read", async () => {
+    const empty = client({ data: [], error: null });
+    expect(await getEloHistoryResult(empty.supabase, "a1")).toEqual({ ok: true, data: [] });
+    expect(empty.rpc).toHaveBeenCalledWith("get_elo_history", { p_athlete_id: "a1" });
+    const failed = client({ data: null, error: { code: "P0001", message: "boom", details: "", hint: "" } });
+    const r = await getEloHistoryResult(failed.supabase, "a1", SINCE);
+    expect(r.ok).toBe(false);
+    expect(failed.rpc).toHaveBeenCalledWith("get_elo_history", { p_athlete_id: "a1", p_since: SINCE });
   });
 });
 

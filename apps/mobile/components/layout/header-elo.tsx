@@ -26,7 +26,7 @@ import {
   headerEloAnnouncement,
   headerEloLabel,
   headerEloScale,
-  lastVerdictOutcome,
+  takeVerdictOutcomeFor,
   useHeaderEloMoment,
   type HeaderEloMoment,
 } from "@/lib/rating/header-elo";
@@ -176,7 +176,11 @@ function HeaderEloRoll({
   const p = usePalette();
   // Decided once, on mount: the delta's own width must not re-decide it.
   const [withDelta] = React.useState(() => play && headerDeltaFits(moment.delta, scale, spareWidth));
-  const [tone] = React.useState(() => headerDeltaTone(moment.delta, lastVerdictOutcome(athleteId)));
+  // Only the playing header spends the verdict's outcome, and only on the
+  // change that verdict started from.
+  const [tone] = React.useState(() =>
+    headerDeltaTone(moment.delta, play ? takeVerdictOutcomeFor(athleteId, moment.from) : null),
+  );
   const [phase, setPhase] = React.useState<"rolling" | "shown" | "gone">(withDelta ? "rolling" : "gone");
 
   const onLanded = React.useCallback(() => {

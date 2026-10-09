@@ -76,8 +76,11 @@ export type VerdictOutcome = "win" | "loss" | "draw";
 
 /** The post-match rating the athlete last saw on a verdict, this app run. */
 let watched: { athleteId: string; rating: number } | null = null;
-/** The outcome of the last verdict the athlete saw, this app run. */
-let lastVerdict: { athleteId: string; matchId: string; outcome: VerdictOutcome } | null = null;
+/**
+ * The last verdict the athlete saw, this app run, with the rating it started
+ * from: it colors only the change that starts there, and only once.
+ */
+let lastVerdict: { athleteId: string; matchId: string; outcome: VerdictOutcome; eloBefore: number | null } | null = null;
 
 /** The verdict showed this athlete's stamped post-match rating. */
 export function noteRatingWatched(athleteId: string, rating: number): void {
@@ -96,15 +99,36 @@ export function wasRatingWatched(athleteId: string, rating: number): boolean {
 export function consumeRatingWatched(athleteId: string, rating: number): boolean {
   if (!wasRatingWatched(athleteId, rating)) return false;
   watched = null;
+  // That verdict's change is spent: its outcome must not color a later one.
+  lastVerdict = null;
   return true;
 }
 
 /**
  * The verdict showed a result (not disputed), with or without its stamped
- * rating, so the header can color a later negative delta amber on a draw.
+ * rating, so the header can color that result's negative delta amber on a
+ * draw. `eloBefore` ties it to the change it explains.
  */
-export function noteVerdictOutcome(athleteId: string, matchId: string, outcome: VerdictOutcome): void {
-  lastVerdict = { athleteId, matchId, outcome };
+export function noteVerdictOutcome(
+  athleteId: string,
+  matchId: string,
+  outcome: VerdictOutcome,
+  eloBefore: number | null = null,
+): void {
+  lastVerdict = { athleteId, matchId, outcome, eloBefore };
+}
+
+/**
+ * The verdict outcome for the change that starts at `from`, used at most
+ * once: null (and kept) when it explains another change; returned and
+ * cleared when it matches. Without a known `eloBefore` it never matches, so
+ * an unknown change stays red rather than borrowing an old draw.
+ */
+export function takeVerdictOutcomeFor(athleteId: string, from: number): VerdictOutcome | null {
+  if (lastVerdict === null || lastVerdict.athleteId !== athleteId || lastVerdict.eloBefore !== from) return null;
+  const { outcome } = lastVerdict;
+  lastVerdict = null;
+  return outcome;
 }
 
 /** The last verdict outcome recorded for this athlete, or null (unknown). */

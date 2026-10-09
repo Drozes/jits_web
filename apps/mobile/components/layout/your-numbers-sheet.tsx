@@ -20,7 +20,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheetModal, BottomSheetScrollView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 import Svg, { Line, Polyline, Rect } from "react-native-svg";
-import { getEloHistory, type AthleteGuardRow } from "@jits/shared/api/queries";
+import { getEloHistoryResult, type AthleteGuardRow } from "@jits/shared/api/queries";
 import type { EloHistoryRow } from "@jits/shared/types/composites";
 import { Button, DeltaChip, Label, Mono, spokenDelta } from "@/components/ui/elo-system";
 import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
@@ -100,6 +100,9 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
   );
 
   const openStats = () => {
+    // One dismiss only: the push blurs the tab and the parent sets open to
+    // false, which must not dismiss again while gorhom is DISMISSING.
+    wasOpen.current = false;
     ref.current?.dismiss();
     router.push(PROFILE_STATS_HREF);
   };
@@ -119,8 +122,13 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
       {...chrome}
     >
       <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 32 + insets.bottom }}>
-        <View testID={YOUR_NUMBERS_SHEET_TEST_ID} className="gap-5 px-4 pt-2">
-          <Text accessibilityRole="header" className="font-heading text-callout uppercase tracking-caps-l text-ink">
+        {/* 16pt sides, the header bar's gutter. */}
+        <View testID={YOUR_NUMBERS_SHEET_TEST_ID} className="gap-5 pt-2" style={{ paddingHorizontal: 16 }}>
+          <Text
+            accessibilityRole="header"
+            maxFontSizeMultiplier={SHEET_MAX_FONT_SCALE}
+            className="font-heading text-callout uppercase tracking-caps-l text-ink"
+          >
             Your numbers
           </Text>
           <YourNumbersBody athlete={athlete} />
@@ -142,9 +150,15 @@ export function YourNumbersBody({ athlete }: { athlete: AthleteGuardRow }) {
   const p = usePalette();
   const dashboard = useDashboardSummary(athlete.id, { quiet: true });
   // `get_elo_history` takes no row limit; the sparkline draws the newest 20.
+  // The Result variant: a failed read throws (an error state), while an empty
+  // history (only legacy casual matches, which write no rows) is real data.
   const history = useCachedResource<EloHistoryRow[]>(
     `elo-history:${athlete.id}`,
-    async () => getEloHistory(supabase, athlete.id),
+    async () => {
+      const r = await getEloHistoryResult(supabase, athlete.id);
+      if (!r.ok) throw new Error(r.error.message);
+      return r.data;
+    },
     [athlete.id],
   );
 
@@ -153,10 +167,8 @@ export function YourNumbersBody({ athlete }: { athlete: AthleteGuardRow }) {
   const last = lastMatchDelta(summary);
   const totalMatches = summary?.stats?.total_matches ?? 0;
   const unranked = summary !== null && totalMatches === 0;
-  // `getEloHistory` answers a failed read with no rows: an athlete with
-  // matches and no history is a failed read, never "no change this month".
-  const historyFailed =
-    history.error !== null || (history.data !== undefined && history.data.length === 0 && totalMatches > 0);
+  // Unavailable only on a real failed read with nothing cached to show.
+  const historyFailed = history.error !== null && history.data === undefined;
   const historyRows = !historyFailed && history.data ? history.data : null;
   const thisMonth: MonthValue = history.isLoading && !history.data
     ? { kind: "loading" }
@@ -214,6 +226,11 @@ export function YourNumbersBody({ athlete }: { athlete: AthleteGuardRow }) {
       ) : historyFailed ? (
         <Text testID="your-numbers-history-unavailable" className="font-body text-body text-ink-2">
           Your rating history is unavailable right now.
+        </Text>
+      ) : historyRows && summary !== null ? (
+        // Matches but no rated ones yet (legacy casual only): an empty line, not an error.
+        <Text testID="your-numbers-no-rated-matches" className="font-body text-body text-ink-2">
+          Your next match starts your rating line.
         </Text>
       ) : null}
 

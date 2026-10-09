@@ -312,17 +312,58 @@ describe("HeaderElo post-match moment", () => {
     const red = color(loss);
     loss.unmount();
 
-    noteVerdictOutcome("a1", "m1", "draw");
+    // The draw verdict started at 1489: it colors the change from 1489, once.
+    noteVerdictOutcome("a1", "m1", "draw", 1489);
+    expect(lastVerdictOutcome("a1")).toBe("draw");
     const draw = render(header());
     setRating(1480);
     draw.rerender(header());
     const amber = color(draw);
     expect(amber).not.toBe(red);
-    expect(lastVerdictOutcome("a1")).toBe("draw");
+    expect(lastVerdictOutcome("a1")).toBeNull();
     expect(headerDeltaTone(-2, "draw")).toBe("draw");
     expect(headerDeltaTone(-2, null)).toBe("loss");
     expect(headerDeltaTone(-2, "loss")).toBe("loss");
     expect(headerDeltaTone(14, "draw")).toBe("win");
+  });
+
+  it("after a draw verdict, a later unrelated negative change rolls red, not amber (review N1)", () => {
+    const color = (utils: ReturnType<typeof render>) =>
+      (StyleSheet.flatten(utils.getByTestId("header-elo-delta-text", { includeHiddenElements: true }).props.style) as { color?: string }).color;
+    const reference = render(header());
+    setRating(1490);
+    reference.rerender(header());
+    const red = color(reference);
+    reference.unmount();
+
+    // A draw verdict that started from another rating (e.g. the athlete left
+    // before it ever reached the header): it must not color this change.
+    noteVerdictOutcome("a1", "m9", "draw", 1600);
+    const later = render(header());
+    setRating(1470);
+    later.rerender(header());
+    expect(color(later)).toBe(red);
+    // Without a known starting rating a draw never borrows its amber either.
+    noteVerdictOutcome("a1", "m10", "draw", null);
+    act(() => {
+      jest.advanceTimersByTime(LAND);
+    });
+    act(() => {
+      jest.advanceTimersByTime(HEADER_DELTA_HOLD_MS);
+    });
+    setRating(1460);
+    later.rerender(header());
+    expect(color(later)).toBe(red);
+  });
+
+  it("a watched verdict spends its outcome: the next change does not inherit the draw", () => {
+    const utils = render(header());
+    noteVerdictOutcome("a1", "m1", "draw", 1498);
+    noteRatingWatched("a1", 1496);
+    setRating(1496);
+    utils.rerender(header());
+    expect(utils.queryByTestId("header-elo-delta")).toBeNull();
+    expect(lastVerdictOutcome("a1")).toBeNull();
   });
 
   it("sizes the rating for Dynamic Type itself, up to 1.3x, with OS scaling off (review D2)", () => {

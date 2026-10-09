@@ -163,8 +163,8 @@ export function VerdictStep(props: VerdictStepProps) {
   }, [me.athlete_id, eloAfter, disputed]);
   // Its outcome too, stamped rating or not: a draw's later header delta is amber.
   React.useEffect(() => {
-    if (outcome && !disputed) noteVerdictOutcome(me.athlete_id, matchId, outcome);
-  }, [me.athlete_id, matchId, outcome, disputed]);
+    if (outcome && !disputed) noteVerdictOutcome(me.athlete_id, matchId, outcome, eloBefore);
+  }, [me.athlete_id, matchId, outcome, disputed, eloBefore]);
 
   const verdict = disputed ? "DISPUTED" : win ? "YOU WON" : loss ? "YOU LOST" : outcome === "draw" ? "DRAW" : "MATCH RECORDED";
   const verdictColor = outcome === "draw" && !disputed ? p.amber : p.text;

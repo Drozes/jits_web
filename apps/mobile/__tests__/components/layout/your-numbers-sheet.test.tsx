@@ -154,11 +154,26 @@ describe("YourNumbersBody", () => {
     expect(utils.queryByTestId("your-numbers-sparkline")).toBeNull();
   });
 
-  it("no history rows for an athlete with matches is a failed read too (the wrapper swallows errors)", () => {
+  it("an athlete with only legacy casual matches (no rating history) is not an error: empty line, This month 0 (review N2)", () => {
     mockHistory = { data: [], isLoading: false, error: null };
     const utils = render(<YourNumbersBody athlete={ATHLETE} />);
-    expect(utils.getByTestId("your-numbers-history-unavailable")).toBeTruthy();
-    expect(utils.queryByText("0")).toBeNull();
+    expect(utils.queryByTestId("your-numbers-history-unavailable")).toBeNull();
+    expect(utils.queryByTestId("your-numbers-month-unavailable")).toBeNull();
+    expect(utils.getByTestId("your-numbers-no-rated-matches")).toHaveTextContent("Your next match starts your rating line.");
+    expect(utils.getByTestId("your-numbers-month")).toHaveProp("accessibilityLabel", "This month: no change");
+  });
+
+  it("a failed refresh keeps cached history on screen instead of Unavailable", () => {
+    mockHistory = { data: history(21), isLoading: false, error: new Error("boom") };
+    const utils = render(<YourNumbersBody athlete={ATHLETE} />);
+    expect(utils.queryByTestId("your-numbers-history-unavailable")).toBeNull();
+    expect(utils.getByTestId("your-numbers-sparkline")).toBeTruthy();
+  });
+
+  it("caps the title at 1.3x and uses the header's 16pt side gutter (design polish)", () => {
+    const utils = render(<YourNumbersSheet athlete={ATHLETE} open onClosed={jest.fn()} />);
+    expect(utils.getByRole("header")).toHaveProp("maxFontSizeMultiplier", 1.3);
+    expect(utils.getByTestId("your-numbers-sheet")).toHaveStyle({ paddingHorizontal: 16 });
   });
 
   it("skeletons the chart and the month while the history loads", () => {
@@ -216,6 +231,10 @@ describe("YourNumbersSheet", () => {
     fireEvent.press(utils.getByLabelText("View full stats"));
     expect(mockDismiss).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith("/(app)/profile/stats");
+    // The push blurs the tab and the parent sets open=false: no second
+    // dismiss while gorhom is DISMISSING (review nit).
+    utils.rerender(<YourNumbersSheet athlete={ATHLETE} open={false} onClosed={onClosed} />);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
   });
 
   it("caps its height below the top safe area and scrolls its content (review D1)", () => {
