@@ -102,7 +102,7 @@ function buildProps(
 const CURRENT_TABS: Screen[] = [
   { name: "(home)", title: "Home" },
   { name: "arena", title: "Arena" },
-  { name: "matches", title: "Matches" },
+  { name: "matches", title: "Film" },
   { name: "leaderboard", title: "Rankings" },
   { name: "profile", title: "Profile" },
 ];
@@ -124,7 +124,7 @@ describe("EloTabBar", () => {
     );
     const buttons = getAllByRole("button");
     expect(buttons).toHaveLength(CURRENT_TABS.length);
-    expect(buttons.map((b) => b.props.accessibilityLabel)).toEqual(["Home", "Arena", "Matches", "Rankings", "Profile"]);
+    expect(buttons.map((b) => b.props.accessibilityLabel)).toEqual(["Home", "Arena", "Film", "Rankings", "Profile"]);
   });
 
   it("renders no gym tabs", () => {
@@ -221,12 +221,12 @@ describe("EloTabBar at five tabs (spec specs/matches-tab/spec.md 4.1, AC 1.3)", 
   it("gives the Matches tab no badge mark", () => {
     const u = render(React.createElement(EloTabBar, { ...buildProps(CURRENT_TABS), badges: { arena: { kind: "count", count: 2 } } }));
     expect(u.queryByTestId(/^tab-badge-.*matches$/)).toBeNull();
-    expect(u.getByLabelText("Matches").props.accessibilityValue?.text).toBeUndefined();
+    expect(u.getByLabelText("Film").props.accessibilityValue?.text).toBeUndefined();
   });
 
   it("navigates to the Matches tab", () => {
     const u = render(React.createElement(EloTabBar, buildProps(CURRENT_TABS)));
-    fireEvent.press(u.getByLabelText("Matches"));
+    fireEvent.press(u.getByLabelText("Film"));
     expect(mockNavigate).toHaveBeenCalledWith("matches", undefined);
   });
 });

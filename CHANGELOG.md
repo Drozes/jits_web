@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Mobile: the Matches tab is labelled Film; feed cards open match detail first
+
+Owner request 2026-10-09. JS-only (OTA-eligible). The route stays `matches`, so deep links, the Film Room redirect and testIDs are unchanged.
+
+**Changed**
+- `apps/mobile/app/(app)/(tabs)/_layout.tsx`, `apps/mobile/app/(app)/(tabs)/matches/index.tsx`: the tab bar label and the tab header read `Film` instead of `Matches`.
+- `apps/mobile/app/(app)/settings/help.tsx`: the footage paragraph points to "the Film tab". `apps/mobile/components/reels/reel-tile-copy.ts`: the reel "See all" accessibility label is "See all, open Film".
+- `apps/mobile/components/matches/match-feed-card.tsx`, `match-feed-media.tsx`, `match-list-layout.tsx`: tapping a card's media now opens match detail (the result page) instead of playing the video; the `onPlay` path is removed. Playable cards keep the play glyph and duration as a "has film" cue, and the media's accessibility label reads "Open match vs ...".
+
+**Fixed**
+- `apps/mobile/__tests__/lib/invites/pending-invite.test.ts`: "keeps the first touch" pins the clock inside the 7-day token TTL; it went red once 2026-10-08 passed.
+
 ## OTA "Breakdown heading without AI" (runtime 0.5.0), 2026-10-07
 
 Production OTA group `f4144216-2bf7-49a2-b858-983a128c96b7` (iOS `01a1187d-8aa5-7bdc-a728-5966b18461cd`, Android `01a1187d-8aa5-79f1-81cb-2f4eac46e086`) from jits_web `main` `815b27d8` (release PR #74 from #73; development merge `06cdac78`). JS-only, non-critical. Rollback target: `be389c6c-e64e-4493-ac33-e54ca9fcf905`. Shipped alongside the jr_be 2026-10-07 release (main `46ca8aa`, specs 017 and 018: AI wording hidden on the API for non-admins behind `ai_labels_public` (off), no burned-in move chip on new reels, recorded-result outro); the client does not depend on it. Pending (owner-gated): re-render of existing reels (jr_be-du1.12) and the App Store copy rewrite (jr_be spec 017 B4).

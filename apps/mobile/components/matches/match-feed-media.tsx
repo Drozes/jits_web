@@ -77,7 +77,7 @@ interface MatchFeedMediaProps {
  * The card's 16:9 media area (specs/matches-tab 6.2): the selected poster by
  * the crop rule, else the two-athlete fallback art; one status badge top
  * left; the duration chip and the play glyph only when the selected video is
- * playable. One Pressable: plays when playable, else opens match detail.
+ * playable. One Pressable that always opens match detail.
  */
 export function MatchFeedMedia({ item, status, media, viewer, opp, helper, onPress, onRetry }: MatchFeedMediaProps) {
   const p = usePalette();
@@ -89,7 +89,7 @@ export function MatchFeedMedia({ item, status, media, viewer, opp, helper, onPre
   const uploading = status.kind === "uploading";
   const progress = uploading && status.progress != null ? Math.min(1, Math.max(0, status.progress)) : null;
   const label = playable
-    ? `Play match vs ${opp}${badge ? `, ${badge.toLowerCase()}` : ""}`
+    ? `Open match vs ${opp}${badge ? `, ${badge.toLowerCase()}` : ""}`
     : `${noFilm ? `${NO_FILM_CAPTION}. ` : badge ? `${sentence(badge)}. ` : ""}Open match vs ${opp}`;
 
   return (

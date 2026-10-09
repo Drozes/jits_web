@@ -202,8 +202,8 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
   it("shows the Matches tab header, the record strip and a skeleton while the first page loads", () => {
     mockGetMyMatchLibrary.mockReturnValue(new Promise(() => undefined));
     const utils = render(<MatchesScreen />);
-    expect(mockTabHeader).toHaveBeenLastCalledWith({ title: "Matches" });
-    expect(utils.getByTestId("tab-header")).toHaveTextContent("Matches");
+    expect(mockTabHeader).toHaveBeenLastCalledWith({ title: "Film" });
+    expect(utils.getByTestId("tab-header")).toHaveTextContent("Film");
     expect(utils.getByTestId("matches-record")).toHaveTextContent("24 MATCHES · 15W 7L 2D · 1526");
     expect(utils.getByTestId("matches-loading")).toBeTruthy();
     // The feed skeleton is three full-width cards (spec 6.4, AC 2.12).
@@ -230,10 +230,10 @@ describe("MatchesScreen (the Matches tab, spec specs/matches-tab/spec.md section
     await waitFor(() => expect(badgeOf(utils, "m-new")).not.toBe("NEW"));
   });
 
-  it("a playable card's media plays the selected video and clears NEW; one with nothing playable opens the match", async () => {
+  it("every card's media opens match detail (never the player) and clears NEW", async () => {
     const utils = await renderLoaded();
     fireEvent.press(utils.getByTestId("film-card-media-m-new"));
-    expect(mockPush).toHaveBeenLastCalledWith("/(app)/video/v-1");
+    expect(mockPush).toHaveBeenLastCalledWith("/(app)/match-detail/m-new");
     expect(isMatchSeen("m-new")).toBe(true);
     fireEvent.press(utils.getByTestId("film-card-media-m-failed"));
     expect(mockPush).toHaveBeenLastCalledWith("/(app)/match-detail/m-failed");

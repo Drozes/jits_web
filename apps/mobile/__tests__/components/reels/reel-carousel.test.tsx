@@ -151,7 +151,7 @@ describe("ReelCarousel", () => {
     expect(tiles.filter((t) => t.kind === "ready")).toHaveLength(10);
     expect(tiles[tiles.length - 1].kind).toBe("see_all");
     const { getByLabelText } = renderCarousel(tiles);
-    fireEvent.press(getByLabelText("See all, open Matches"));
+    fireEvent.press(getByLabelText("See all, open Film"));
     expect(mockNavigate).toHaveBeenCalledWith("/(app)/(tabs)/matches?entry=see_all");
   });
 
