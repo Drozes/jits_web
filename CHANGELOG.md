@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+### Mobile: Elo in the header, wordmark + rating on every tab root (epic jits-1ez5)
+
+Owner-approved option F "Wordmark + ELO" from the Elo in the Header review. Every tab root (Home, Arena, Matches, Rankings, Profile) shows the "ELO RATED" wordmark with the athlete's rating beside it; tapping the rating opens Your numbers. Owner decisions: the rating's Dynamic Type cap is the chip's 1.3x (not the proposed 1.15x); pushed screens keep `AppHeader`; no streak anywhere. JS-only (OTA-eligible).
+
+**Added**
+- `apps/mobile/components/layout/header-elo.tsx`: `HeaderElo`, after the wordmark: a 1px `hairline-strong` rule, then `current_elo` in mono 700 16px `ink` on the wordmark's baseline (Dynamic Type capped at 1.3x, never truncated). Reads the auth context only (first frame, no fetch). The rating is one button in a 44pt tall row, label "Your rating N", hint "Opens your numbers" (jits-1ez5.1).
+- `apps/mobile/components/layout/your-numbers-sheet.tsx`: the Your numbers sheet (gorhom, shared sheet chrome, mounted only while open): the rating at 44px with the last match's delta, a sparkline of the last 20 matches' `rating_after` with the peak as a dashed line, global rank "#37 of 412" with "Top 9%" (rounded up), the record (`formatRecord`), peak (`highest_elo`) and this month (`useProfileData().eloThisMonth`); "Unranked" and "Your first match sets your rank." when `stats.total_matches` is 0; skeleton cells while the summary loads and an inline Try again when it fails; "View full stats" pushes `/(app)/profile/stats` (jits-1ez5.2).
+- `apps/mobile/lib/dashboard/use-dashboard-summary.ts`: `useDashboardSummary`, Home's dashboard read moved to a shared hook on the one `dashboard:<athleteId>` cache entry, so Home and the sheet share it (`quiet` skips Home's toast).
+- `apps/mobile/lib/rating/header-elo.ts`: the header rating's constants (`HEADER_ELO_MAX_FONT_SCALE` = `CHIP_MAX_FONT_SCALE`, `HEADER_DELTA_HOLD_MS` 4000), the delta width budget, the transition and its `useHeaderEloMoment` hook, and `noteRatingWatched` (the verdict marks the rating it showed).
+- `apps/mobile/lib/rating/your-numbers.ts`: the sheet's derived values (`topPercent`, `rankCell`, `recordCell`, `peakNote`, `lastMatchDelta`, `monthStartLabel`, `sparkPoints`).
+- `apps/mobile/lib/navigation/use-screen-focused.ts`: `useScreenFocused`, moved out of `header-status-chip.tsx` (now used by the chip and the header rating).
+- Post-match moment "Header ELO roll" (jits-1ez5.4, registered in the DESIGN.md and `design/system/project/Motion.md` Motion registry): when `current_elo` changes on the focused tab root, the rating rolls once (`RollingNumber`) and a `DeltaChip` (▲ +14 / ▼ −11) holds beside it about 4s, then fades; skipped when it would not fit beside the chip; a rating already watched on the verdict never rolls again; one VoiceOver announcement; no haptic. Reduce Motion: the landed value at once, the delta shown then removed in place.
+- Tests: `apps/mobile/__tests__/lib/rating/header-elo.test.tsx` (width budget at 375 and 390pt, transition, play-once roll, delta fit and hold, Reduce Motion), `apps/mobile/__tests__/lib/rating/your-numbers.test.ts` (top %, Unranked, record, this month, sparkline), `apps/mobile/__tests__/components/layout/your-numbers-sheet.test.tsx`.
+
+**Changed**
+- `apps/mobile/components/layout/brand-header.tsx`: `BrandHeader({ title, onArena })` is the one tab-root header: wordmark, rule, rating left; `TabHeaderActions` (moved here) right. The tab title is no longer drawn; each tab root keeps an accessibility-only heading (`tab-header-title-<tab>`, the match-loop harness's tab proof). The wordmark is no longer a VoiceOver stop.
+- `apps/mobile/app/(app)/(tabs)/arena/index.tsx`, `matches/index.tsx`, `profile/index.tsx`, `leaderboard/index.tsx`, `(home)/index.tsx`: all five tab roots use `<BrandHeader title="..." />`. Arena, Matches and Profile lose the drawn ARENA / MATCHES / PROFILE titles and move from 16pt to `BrandHeader`'s `px-4` side padding.
+- `apps/mobile/components/layout/header-status-chip.tsx`: optional `onSpareWidth` reports the width the chip leaves unused (for the post-match delta).
+- `apps/mobile/components/ui/elo-system/rolling-number.tsx`: optional `maxFontScale` (default 2x) for the rolling digits. `delta-chip.tsx`: optional `maxFontSizeMultiplier`.
+- `apps/mobile/components/match-flow/verdict/verdict-step.tsx`: records the stamped post-match rating as watched, so the header does not roll it a second time after the exit.
+- `CLAUDE.md` "Tab header rule", `DESIGN.md` and `design/system/project/` (`components/AppHeader/README.md`, `Layout.md`, `Components.md`, `Accessibility.md`, `Motion.md`, `Typography.md`, `tokens.json`): the new header rule, the 1.3x rating cap and the Motion registry row.
+- `tools/match-loop/sim/match-detail.ts`: comment only; `tab-header-title-matches` is still the Matches tab proof.
+- `apps/mobile/__tests__/lib/invites/pending-invite.test.ts`: pins the clock in "keeps the first touch" (it read the real date and started failing once the 2026-10-01 fixture expired).
+
+**Removed**
+- `apps/mobile/components/layout/tab-header.tsx` (`TabHeader`): every tab root uses `BrandHeader`.
+- Home (`apps/mobile/app/(app)/(tabs)/(home)/index.tsx`, jits-1ez5.3): the "Welcome back" / "Welcome" MetaTag, the display name and the `EloTile` hero, with their imports. Home is now: header, Resume (when a match is open), Highlights, the practice offer or invite card, Recent Activity.
+
 ## OTA "Breakdown heading without AI" (runtime 0.5.0), 2026-10-07
 
 Production OTA group `f4144216-2bf7-49a2-b858-983a128c96b7` (iOS `01a1187d-8aa5-7bdc-a728-5966b18461cd`, Android `01a1187d-8aa5-79f1-81cb-2f4eac46e086`) from jits_web `main` `815b27d8` (release PR #74 from #73; development merge `06cdac78`). JS-only, non-critical. Rollback target: `be389c6c-e64e-4493-ac33-e54ca9fcf905`. Shipped alongside the jr_be 2026-10-07 release (main `46ca8aa`, specs 017 and 018: AI wording hidden on the API for non-admins behind `ai_labels_public` (off), no burned-in move chip on new reels, recorded-result outro); the client does not depend on it. Pending (owner-gated): re-render of existing reels (jr_be-du1.12) and the App Store copy rewrite (jr_be spec 017 B4).

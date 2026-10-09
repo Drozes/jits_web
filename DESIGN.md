@@ -282,7 +282,7 @@ Copy, labels and inline data, in any family. Line height is about 1.3x up to 16p
 | `title-l` | `text-title-l` | 20 | 24 | Compare-stats figures, the feedback sheet title (text-[20px]). |
 | `title-xl` | `text-title-xl` | 22 | 26 | The rating-moment odometer (Adding Flare), stat figures, the BrandHeader wordmark (22px). |
 | `headline` | `text-headline` | 24 | 29 | Profile and competitor names and records (24px). |
-| `headline-l` | `text-headline-l` | 26 | 31 | The rating-moment delta chip (Adding Flare), the fight delta, the Home greeting (26px). |
+| `headline-l` | `text-headline-l` | 26 | 31 | The rating-moment delta chip (Adding Flare), the fight delta (26px). |
 | `headline-xl` | `text-headline-xl` | 28 | 34 | Stat figures, the invite code input, practice titles (28px). |
 | `headline-2xl` | `text-headline-2xl` | 30 | 36 | Match-flow step headers, the result score input (30px). |
 
@@ -587,8 +587,8 @@ Other fixed sizes live with their components: the live broadcast HUD uses `BROAD
 ### Screen frame
 
 - Design at 390px wide (the canvas board width), dark first.
-- A tab root is: header bar (`panel`, `size-header` plus inset, `hairline` bottom rule), a scrolling `void` body with a `gutter`, and the tab bar (`panel`, four tabs: Home, Arena, Rankings, Profile).
-- Pushed screens use `AppHeader` ([back | title | live dot and actions]); Home and Rankings use `BrandHeader` (the wordmark); Arena and Profile use `TabHeader` (title plus the status chip and the bell, 8px apart).
+- A tab root is: header bar (`panel`, `size-header` plus inset, `hairline` bottom rule), a scrolling `void` body with a `gutter`, and the tab bar (`panel`, five tabs: Home, Arena, Matches, Rankings, Profile).
+- Pushed screens use `AppHeader` ([back | title | live dot and actions]). Every tab root uses `BrandHeader`: [wordmark | rule | your rating ... status chip and bell, 8px apart], with no drawn tab title (an accessibility-only heading names the tab).
 - Immersive routes (the match flow, profile setup) hide the tab bar.
 
 ### Z order
@@ -691,6 +691,7 @@ Every approved animation in the mobile app. **Adding a new animation means addin
 |---|---|---|---|---|---|
 | Odometer ELO roll | Moment | `RollingNumber` (`apps/mobile/components/ui/elo-system/rolling-number.tsx`) in `EloTile` and the verdict celebration; replaces the old count-up rating tick | A confirmed rating change: only the digits that change roll, 600ms on the brand ease-out (also handles 999 to 1003 and losses). Plays once per result: the played key is persisted and a result counts as fresh only if this athlete just confirmed it or it completed within the last 5 minutes, so no replay on re-render, remount or navigating back. VoiceOver reads only the final value and delta | `ratingGain` on a gain only; silent on a loss or draw | Final value shown at once |
 | ELO delta chip | Moment | `DeltaChip` (`apps/mobile/components/ui/elo-system/delta-chip.tsx`), result and verdict | After the roll lands: pops in from about 0.6 on a short spring with opacity; carries a sign and an arrow glyph, not only color | none | Shown in place |
+| Header ELO roll | Moment | `HeaderElo` (`apps/mobile/components/layout/header-elo.tsx`, logic in `lib/rating/header-elo.ts`), the rating beside the wordmark on every tab root | The athlete's `current_elo` changes while that tab root is focused (a result landed): the rating rolls once from the old value (`RollingNumber`, 600ms brand ease-out), then the `DeltaChip` (mono 700 10px) pops beside it, holds about 4s and fades out over `duration.fast`. Keyed on the rating transition with `usePlayOnce`, so never on mount, a refetch, a tab switch or in a second header; a rating the athlete already watched land on the verdict never rolls again. The delta shows only if it fits beside the chip. VoiceOver announces "Your rating N, up D last match" once | none | Landed value at once; the delta shown, then removed in place |
 | The tap | Moment | Submission result card | A submission win: three Signal Red tick marks fill (180ms apart) with micro-nudges, then the delta rises | `tapTick` x3, winner only | Ticks shown filled (winner haptics kept); the loser sees them filled, still and silent |
 | LIVE pulse | Ambient | `LiveDot` / `LivePill`, header live dot | While live. Arena and header live dots pulse on the ONE shared Arena tempo clock (`lib/arena/arena-tempo.ts`), in phase. The match LIVE pill and the "Sent" pill keep the fixed `duration.pulse` (1400ms) pace | none | Static dot |
 | LIVE pulse tempo | Ambient | Every tempo-clock dot and the ON AIR heartbeat | Lobby activity (others live in `lobby:online`) picks `tempo` quiet / normal / busy; the period eases between buckets instead of restarting | none | Static dots |
@@ -854,7 +855,7 @@ Rule (the on-media contrast rule, WP7): on-media text sits only on `on-media-bad
 ### Text size and Dynamic Type
 
 - 10px is the floor (`palette.ts:28`: `text3` is for "labels only, mono 10px and up"). Thirteen sites still render 8 or 9px (R3 A1-3, WP5); only the CountPill digit is sanctioned at 9px.
-- Fixed-height chrome caps Dynamic Type: `maxFontSizeMultiplier={1.3}` on CountPill, OutlineAction (`MAX_SCALE`) and tab header titles; the BrandHeader wordmark is capped at 1. Everything else scales.
+- Fixed-height chrome caps Dynamic Type: `maxFontSizeMultiplier={1.3}` on CountPill, OutlineAction (`MAX_SCALE`), the header status chip and the header rating (`HEADER_ELO_MAX_FONT_SCALE`); the BrandHeader wordmark is capped at 1. Everything else scales.
 - The smallest tappable text is "Not now" (10px `ink-3` underlined mono, `practice-offer-card.tsx:50-57`); check it at large Dynamic Type sizes (R3 A1-5).
 
 ### Touch targets
@@ -932,7 +933,7 @@ Cards (Data family): **EloTile**, **RollingNumber** (settled frame), **DeltaChip
 
 #### Navigation
 
-`EloTabBar` (`components/layout/elo-tab-bar.tsx`): four tabs (Home, Arena, Rankings, Profile) on `panel`, 18px lucide icons, `tab-label` text (`ink` active, `ink-3` inactive), a 2px `signal-red` top edge on the active tab, tab select bounce. `ArenaTabIcon` (`components/layout/arena-tab-icon.tsx`) draws lucide `Swords` as two blade halves so it can carry heat: live embers, countable embers (1 to 3 pending), blade clash. Headers are one system of three slots on the same 56px `panel` bar: `AppHeader` (pushed screens), `BrandHeader` (wordmark; Home, Rankings), `TabHeader` (Arena, Profile).
+`EloTabBar` (`components/layout/elo-tab-bar.tsx`): four tabs (Home, Arena, Rankings, Profile) on `panel`, 18px lucide icons, `tab-label` text (`ink` active, `ink-3` inactive), a 2px `signal-red` top edge on the active tab, tab select bounce. `ArenaTabIcon` (`components/layout/arena-tab-icon.tsx`) draws lucide `Swords` as two blade halves so it can carry heat: live embers, countable embers (1 to 3 pending), blade clash. Headers are one system of two slot layouts on the same 56px `panel` bar: `AppHeader` (pushed screens) and `BrandHeader` (every tab root: the wordmark, a rule and the athlete's rating, which opens Your numbers).
 
 Cards (Navigation family): **TabBar** (with the Arena icon's live ember and countable embers), **AppHeader** (with the header status chip) and **Chip** (shipped in WP2: selected = `plate-bright`, `hairline-strong`, `ink`).
 
