@@ -21,7 +21,7 @@ import { useReelLane } from "@/lib/highlight/use-reel-lane";
 import { fallbackInFlight, laneShowsRecordingHelper, type ReelTileModel } from "@/lib/highlight/reel-lane";
 import { logEmptyCta } from "@/lib/matches/telemetry";
 import { useMatchesTabOpened } from "@/lib/matches/use-tab-opened";
-import { TabHeader } from "@/components/layout/tab-header";
+import { BrandHeader } from "@/components/layout/brand-header";
 import { OpponentPicker } from "@/components/film-room/opponent-picker";
 import { FilmRoomEmpty, FilmRoomError, ListFooter, MonthHeader } from "@/components/film-room/film-room-states";
 import { MatchesListHeader } from "@/components/matches/matches-list-header";
@@ -250,7 +250,7 @@ export default function MatchesScreen() {
 
   return (
     <View testID="matches-screen" className="flex-1 bg-surface">
-      <TabHeader title="Film" />
+      <BrandHeader title="Film" />
       <FlatList
         data={rows}
         keyExtractor={(r) => r.key}

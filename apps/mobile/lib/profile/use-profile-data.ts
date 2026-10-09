@@ -4,6 +4,7 @@ import { getAthleteStatsRpc, getMatchHistory, type AthleteStatsRpc } from "@jits
 import type { MatchHistoryRow } from "@jits/shared/types/composites";
 import { useCachedResource, type CancelToken } from "@/lib/cache/use-cached-resource";
 import { toast } from "@/components/ui/toast";
+import { sumEloThisMonth } from "./elo-this-month";
 
 interface ProfilePayload {
   stats: AthleteStatsRpc | null;
@@ -47,10 +48,7 @@ export function useProfileData(
       ]);
 
       // Derive "ELO this month" from the same history array.
-      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-      const eloThisMonth = history
-        .filter((m) => m.completed_at != null && new Date(m.completed_at) >= startOfMonth)
-        .reduce((sum, m) => sum + (m.elo_delta ?? 0), 0);
+      const eloThisMonth = sumEloThisMonth(history.map((m) => ({ at: m.completed_at, delta: m.elo_delta })));
 
       return {
         stats,

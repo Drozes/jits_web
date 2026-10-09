@@ -81,6 +81,7 @@ jest.mock("@jits/shared/api/highlight-share", () => ({
 
 import { Share } from "react-native";
 import { VerdictStep } from "@/components/match-flow/verdict/verdict-step";
+import { __resetHeaderEloForTests, lastVerdictOutcome, wasRatingWatched } from "@/lib/rating/header-elo";
 import { WizardScrollContext, useWizardScrollSource } from "@/components/match-flow/wizard-scroll";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -118,6 +119,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   __resetPlayedMomentsForTests();
   __resetFreshForTests();
+  __resetHeaderEloForTests();
   mockSyncParams = {};
   mockDetailView.mockResolvedValue({ ok: true, data: { videos: [] } });
   mockRankChange.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "missing" } });
@@ -787,5 +789,29 @@ describe("the verdict Film block (jits-n2im.25): the same plate as match detail"
     // The phase tag and the hero caption say the same words.
     expect(s.getAllByText("NO VIDEO YET")).toHaveLength(2);
     expect(s.queryByText("NO FILM FOR THIS MATCH")).toBeNull();
+  });
+});
+
+// jits-1ez5.4 (review C2): the verdict tells the header what the athlete saw.
+describe("the header rating's verdict record", () => {
+  it("marks the stamped rating as watched and records the outcome, so the header does not roll it again", async () => {
+    renderVerdict();
+    await flush();
+    expect(wasRatingWatched("me", 1526)).toBe(true);
+    expect(lastVerdictOutcome("me")).toBe("win");
+  });
+
+  it("records a draw even before the stamped rating is in (the header's later delta is amber)", async () => {
+    renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: null, elo_after: null, elo_delta: null } });
+    await flush();
+    expect(lastVerdictOutcome("me")).toBe("draw");
+    expect(wasRatingWatched("me", 1498)).toBe(false);
+  });
+
+  it("records nothing for a disputed match", async () => {
+    renderVerdict({ matchStatus: "disputed" });
+    await flush();
+    expect(lastVerdictOutcome("me")).toBeNull();
+    expect(wasRatingWatched("me", 1526)).toBe(false);
   });
 });

@@ -24,7 +24,7 @@ import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
-import { TabHeader } from "@/components/layout/tab-header";
+import { BrandHeader } from "@/components/layout/brand-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { useLobbyIds, useLobbyKnown } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
@@ -308,7 +308,7 @@ export default function ArenaScreen() {
   if (authLoading || !athlete) {
     return (
       <View className="flex-1 bg-surface">
-        <TabHeader title="Arena" onArena />
+        <BrandHeader title="Arena" onArena />
         <PageContainer contentContainerStyle={{ paddingTop: 16, paddingBottom: ARENA_BOTTOM_PAD }}>
           <ArenaSkeleton />
         </PageContainer>
@@ -318,7 +318,7 @@ export default function ArenaScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <TabHeader title="Arena" onArena />
+      <BrandHeader title="Arena" onArena />
 
       {/* Outside the scroll view, so it stays put (sticky, AC-A1). */}
       <MatControlBar

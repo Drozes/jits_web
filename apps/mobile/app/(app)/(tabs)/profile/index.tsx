@@ -12,7 +12,7 @@ import { ProfileQuickStats } from "@/components/profile/profile-quick-stats";
 import { AccountSection } from "@/components/profile/account-section";
 import { ShareProfileSheet } from "@/components/share-profile-sheet";
 import { ProfileInviteActions } from "@/components/invite/profile-invite-actions";
-import { TabHeader } from "@/components/layout/tab-header";
+import { BrandHeader } from "@/components/layout/brand-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { AppVersionLabel } from "@/components/layout/app-version-label";
 import { Button } from "@/components/ui/elo-system/button";
@@ -120,7 +120,7 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <TabHeader title="Profile" />
+      <BrandHeader title="Profile" />
       <PageContainer
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={tokens.textTertiary} />

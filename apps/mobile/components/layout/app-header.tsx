@@ -26,7 +26,7 @@ interface AppHeaderProps {
  * Mobile equivalent of apps/web/components/layout/app-header.tsx, for PUSHED
  * screens (match, practice, settings, athlete, stats) and the auth screens.
  * 56pt tall, [back | title | live dot + right] grid, font-heading caps title.
- * The four tab roots use `BrandHeader` / `TabHeader` instead, which carry the
+ * The five tab roots use `BrandHeader` instead (wordmark and rating), which carry the
  * interactive status chip.
  *
  * While live, the right slot shows a small NON-interactive live dot (decision

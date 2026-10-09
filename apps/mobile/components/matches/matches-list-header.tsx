@@ -30,7 +30,7 @@ export interface MatchesListHeaderProps {
 /**
  * Everything above the Matches feed, top to bottom (spec 6.1): the record
  * strip, the carousel slot, the result chips with the opponent picker
- * button, then the cold-load skeleton. The tab header itself (`TabHeader`)
+ * button, then the cold-load skeleton. The tab header itself (`BrandHeader`)
  * sits outside the list so it never scrolls away.
  */
 export function MatchesListHeader({ record, carousel = null, filter, opponentName, onOutcome, onOpenOpponents, skeleton = null, zero = false }: MatchesListHeaderProps) {

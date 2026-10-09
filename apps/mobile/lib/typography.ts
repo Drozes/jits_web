@@ -56,7 +56,7 @@ export const TEXT_STEPS = {
   "title-xl": { fontSize: 22, lineHeight: 26 },
   /** 24: profile and competitor names and records. */
   headline: { fontSize: 24, lineHeight: 29 },
-  /** 26: the rating-moment delta chip, fight delta, Home greeting. */
+  /** 26: the rating-moment delta chip, fight delta. */
   "headline-l": { fontSize: 26, lineHeight: 31 },
   /** 28: stat figures, invite code input, practice titles. */
   "headline-xl": { fontSize: 28, lineHeight: 34 },
