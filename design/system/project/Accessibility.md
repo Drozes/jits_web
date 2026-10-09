@@ -117,7 +117,7 @@ Rule (the on-media contrast rule, WP7): on-media text sits only on `on-media-bad
 ## Text size and Dynamic Type
 
 - 10px is the floor (`palette.ts:28`: `text3` is for "labels only, mono 10px and up"). Thirteen sites still render 8 or 9px (R3 A1-3, WP5); only the CountPill digit is sanctioned at 9px.
-- Fixed-height chrome caps Dynamic Type: `maxFontSizeMultiplier={1.3}` on CountPill, OutlineAction (`MAX_SCALE`) and tab header titles; the BrandHeader wordmark is capped at 1. Everything else scales.
+- Fixed-height chrome caps Dynamic Type: `maxFontSizeMultiplier={1.3}` on CountPill, OutlineAction (`MAX_SCALE`), the header status chip and the header rating (`HEADER_ELO_MAX_FONT_SCALE`); the BrandHeader wordmark is capped at 1. Everything else scales.
 - The smallest tappable text is "Not now" (10px `ink-3` underlined mono, `practice-offer-card.tsx:50-57`); check it at large Dynamic Type sizes (R3 A1-5).
 
 ## Touch targets

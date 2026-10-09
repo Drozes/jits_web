@@ -99,8 +99,8 @@ Other fixed sizes live with their components: the live broadcast HUD uses `BROAD
 ## Screen frame
 
 - Design at 390px wide (the canvas board width), dark first.
-- A tab root is: header bar (`panel`, `size-header` plus inset, `hairline` bottom rule), a scrolling `void` body with a `gutter`, and the tab bar (`panel`, four tabs: Home, Arena, Rankings, Profile).
-- Pushed screens use `AppHeader` ([back | title | live dot and actions]); Home and Rankings use `BrandHeader` (the wordmark); Arena and Profile use `TabHeader` (title plus the status chip and the bell, 8px apart).
+- A tab root is: header bar (`panel`, `size-header` plus inset, `hairline` bottom rule), a scrolling `void` body with a `gutter`, and the tab bar (`panel`, five tabs: Home, Arena, Matches, Rankings, Profile).
+- Pushed screens use `AppHeader` ([back | title | live dot and actions]). Every tab root uses `BrandHeader`: [wordmark | rule | your rating ... status chip and bell, 8px apart], with no drawn tab title (an accessibility-only heading names the tab).
 - Immersive routes (the match flow, profile setup) hide the tab bar.
 
 ## Z order

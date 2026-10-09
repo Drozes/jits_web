@@ -1,22 +1,17 @@
 import * as React from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { BrandHeader } from "@/components/layout/brand-header";
-import { supabase } from "@/lib/supabase/client";
-import { getDashboardSummary } from "@jits/shared/api/queries";
-import type { DashboardSummary } from "@jits/shared/types/composites";
-import { EloTile, MetaTag } from "@/components/ui/elo-system";
 import { RecentActivitySection } from "@/components/dashboard/recent-activity-section";
-import { toast } from "@/components/ui/toast";
 import {
   SkeletonProvider,
   SkeletonPlate,
   SkeletonParticipantRow,
 } from "@/components/ui/skeleton";
-import { useCachedResource } from "@/lib/cache/use-cached-resource";
+import { useDashboardSummary } from "@/lib/dashboard/use-dashboard-summary";
 import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
@@ -33,25 +28,6 @@ import { useMilestoneCelebration } from "@/lib/milestones/use-milestone-celebrat
 import { MilestoneMoment } from "@/components/milestones/milestone-moment";
 import { requestBellRefresh } from "@/lib/highlight/highlight-store";
 import { markNotificationRouterReady } from "@/lib/notifications/handlers";
-import { formatRecord, recordA11yLabel } from "@/lib/athlete/record";
-
-interface DashboardData {
-  summary: DashboardSummary;
-}
-
-function useDashboardData(athleteId: string | undefined) {
-  const { data, isLoading, isValidating, error, refresh } = useCachedResource<DashboardData>(
-    `dashboard:${athleteId}`,
-    async (_signal) => ({ summary: await getDashboardSummary(supabase) }),
-    [athleteId],
-  );
-
-  React.useEffect(() => {
-    if (error) toast.error("Could not load dashboard");
-  }, [error]);
-
-  return { data, isLoading, isValidating, refresh };
-}
 
 /** Cold-start placeholder mirroring RecentActivity. */
 function DashboardSkeleton() {
@@ -71,7 +47,8 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const tokens = useThemedTokens();
   const router = useRouter();
-  const { data, isLoading, isValidating, refresh } = useDashboardData(athlete?.id);
+  // Shared with the header's Your numbers sheet: one cache entry.
+  const { data, isLoading, isValidating, refresh } = useDashboardSummary(athlete?.id);
   // SWR keeps stale data on screen while revalidating; the spinner shows only
   // for a pull, never for the silent refetch when the tab regains focus.
   const { match: activeMatch, refresh: refreshActiveMatch } = useMyActiveMatch(athlete?.id);
@@ -135,8 +112,6 @@ export default function DashboardScreen() {
   }
 
   const stats = data?.summary.stats;
-  // "Welcome back" only for someone who has actually been here: a brand-new
-  // athlete (zero matches) and the pre-load frame both get a plain "Welcome".
   const hasMatches = !!stats && stats.wins + stats.losses + stats.draws > 0;
   const offerPractice =
     !practiceDismissed &&
@@ -147,12 +122,6 @@ export default function DashboardScreen() {
       hasMatches,
       hasEverPlayed,
     });
-
-  // The record rides in the Elo tile (P-Home). It needs the summary, so the
-  // line appears once that lands; a summary with no stats is a 0-0-0 record.
-  const record = data
-    ? { wins: stats?.wins ?? 0, losses: stats?.losses ?? 0, draws: stats?.draws ?? 0 }
-    : null;
 
   const recentMatches = (data?.summary.recent_matches ?? []).map((m) => ({
     id: m.match_id,
@@ -172,7 +141,8 @@ export default function DashboardScreen() {
 
   return (
     <View className="flex-1 bg-surface">
-      <BrandHeader />
+      {/* The rating lives in the header (jits-1ez5): no greeting, name or EloTile. */}
+      <BrandHeader title="Home" />
 
       <ScrollView
         className="flex-1"
@@ -210,25 +180,6 @@ export default function DashboardScreen() {
           </MilestoneMoment>
         ) : null}
 
-        <View>
-          <MetaTag>{hasMatches ? "Welcome back" : "Welcome"}</MetaTag>
-          <Text className="font-heading text-headline-l text-ink mt-2" numberOfLines={1}>
-            {athlete.display_name}
-          </Text>
-        </View>
-
-        {/* The rating reads only the athlete, so it paints on the first frame;
-            the record line under it joins once the summary lands, into a
-            reserved slot so the tile never grows. No label and no Arena card
-            (P-Home): the Arena tab is the way to a match. */}
-        <EloTile
-          size="hero"
-          value={athlete.current_elo}
-          meta={record ? formatRecord(record) : undefined}
-          metaLabel={record ? recordA11yLabel(record) : undefined}
-          reserveMeta
-          accentBar
-        />
         {/* One-time practice offer for a brand-new athlete. While it shows
             it holds Home's red CTA. */}
         {offerPractice ? (

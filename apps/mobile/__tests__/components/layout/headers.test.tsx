@@ -1,10 +1,13 @@
 /**
- * Header chrome (spec 4.1, AC-H1; decision Q1): the four tab roots carry the
- * interactive status chip then the bell, and nothing else on the right;
- * pushed screens keep only a small NON-interactive live dot.
+ * Header chrome (spec 4.1, AC-H1; decision Q1; jits-1ez5.1): every tab root
+ * carries one BrandHeader: the wordmark, a rule and the athlete's rating on
+ * the left, the interactive status chip then the bell on the right, and no
+ * drawn tab title; pushed screens keep only a small NON-interactive live dot.
  */
+import * as fs from "fs";
+import * as path from "path";
 import * as React from "react";
-import { act, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 import { Text } from "react-native";
 
 type HostNode = ReturnType<typeof render>["UNSAFE_root"];
@@ -47,6 +50,20 @@ jest.mock("@/lib/match-flow/active-match-store", () => ({
   useMatchToConfirm: () => null,
 }));
 
+const mockAthlete = { id: "a1", current_elo: 1512, highest_elo: 1540, primary_gym_id: null };
+jest.mock("@/lib/auth/hooks", () => ({
+  useAuth: () => ({ athlete: mockAthlete }),
+}));
+
+// The sheet itself is covered in your-numbers-sheet.test.tsx.
+jest.mock("@/components/layout/your-numbers-sheet", () => ({
+  YourNumbersSheet: ({ open }: { open: boolean }) => {
+    const R = require("react");
+    const RN = require("react-native");
+    return R.createElement(RN.View, { testID: open ? "your-numbers-open" : "your-numbers-closed" });
+  },
+}));
+
 jest.mock("expo-router", () => ({
   useRouter: () => ({
     navigate: jest.fn(),
@@ -59,7 +76,9 @@ jest.mock("expo-router", () => ({
 
 import { AppHeader } from "@/components/layout/app-header";
 import { BRAND_WORDMARK_MAX_FONT_SCALE, BrandHeader } from "@/components/layout/brand-header";
-import { TabHeader } from "@/components/layout/tab-header";
+import { HEADER_ELO_TARGET_HEIGHT } from "@/components/layout/header-elo";
+import { HEADER_ELO_MAX_FONT_SCALE } from "@/lib/rating/header-elo";
+import { CHIP_MAX_FONT_SCALE } from "@/lib/arena/header-chip-model";
 import { HeaderLiveDot } from "@/components/layout/header-live-dot";
 import { LiveDot } from "@/components/ui/elo-system/live-pill";
 import {
@@ -93,59 +112,102 @@ beforeEach(() => {
   __resetArenaStoreForTests();
 });
 
-describe("BrandHeader (Home, Rankings)", () => {
+const TAB_ROOTS: [string, string][] = [
+  ["Home", "app/(app)/(tabs)/(home)/index.tsx"],
+  ["Arena", "app/(app)/(tabs)/arena/index.tsx"],
+  ["Film", "app/(app)/(tabs)/matches/index.tsx"],
+  ["Rankings", "app/(app)/(tabs)/leaderboard/index.tsx"],
+  ["Profile", "app/(app)/(tabs)/profile/index.tsx"],
+];
+
+describe("BrandHeader (every tab root)", () => {
   it.each([false, true])(
     "shows the chip then the bell on the right, live=%s (AC-H1)",
     (isLive) => {
       setLive(isLive);
-      const { UNSAFE_root, getByTestId } = render(<BrandHeader />);
+      const { UNSAFE_root, getByTestId } = render(<BrandHeader title="Home" />);
       const ids = testIds(UNSAFE_root);
       expect(getByTestId("header-status-chip")).toBeTruthy();
       expect(ids.indexOf("header-status-chip")).toBeLessThan(ids.indexOf("notification-bell"));
-      // The chip is the only header button (the bell is stubbed here).
-      expect(buttons(UNSAFE_root)).toHaveLength(1);
+      // The rating and the chip are the header's buttons (the bell is stubbed here).
+      const all = buttons(UNSAFE_root);
+      expect(all).toHaveLength(2);
+      expect(all[0]).toBe("Your rating 1512");
       expect(ids).not.toContain("header-live-dot");
     },
   );
 
   it("offline still offers going live from the header", () => {
-    const { getByLabelText } = render(<BrandHeader />);
+    const { getByLabelText } = render(<BrandHeader title="Home" />);
     expect(getByLabelText("Live status: 4 on the mat. Go live")).toBeTruthy();
   });
 
-  it("the wordmark does not grow with Dynamic Type, so it cannot squeeze the chip (AC-H12)", () => {
-    const { getByText } = render(<BrandHeader />);
-    expect(BRAND_WORDMARK_MAX_FONT_SCALE).toBe(1);
-    expect(getByText("ELO RATED").props.maxFontSizeMultiplier).toBe(
-      BRAND_WORDMARK_MAX_FONT_SCALE,
+  it("draws the wordmark, the rule, then the rating, all before the chip (jits-1ez5.1)", () => {
+    const { UNSAFE_root, getByTestId } = render(<BrandHeader title="Arena" onArena />);
+    const ids = testIds(UNSAFE_root);
+    expect(ids.indexOf("header-elo-rule")).toBeLessThan(ids.indexOf("header-elo"));
+    expect(ids.indexOf("header-elo")).toBeLessThan(ids.indexOf("header-status-chip"));
+    expect(getByTestId("header-elo-value").props.children).toBe(1512);
+    const wordmark = UNSAFE_root.find(
+      (n: HostNode) => typeof n.type === "string" && n.props.children === "ELO RATED",
     );
+    // The logo is decorative: VoiceOver skips it, the rating is the stop.
+    expect(wordmark.props.accessibilityElementsHidden).toBe(true);
   });
-});
 
-describe("TabHeader (Arena, Profile)", () => {
-  it.each(["Arena", "Profile"])(
-    "puts the %s title at the left, then the chip and the bell (AC-H1)",
+  it("keeps the 16pt gutter on both sides (the side safe area when wider), as TabHeader had", () => {
+    const { UNSAFE_root } = render(<BrandHeader title="Arena" onArena />);
+    const bar = UNSAFE_root.find(
+      (n: HostNode) => typeof n.type === "string" && typeof n.props.className === "string" && n.props.className.includes("bg-surface-2"),
+    );
+    expect(bar.props.style).toMatchObject({ paddingLeft: 16, paddingRight: 16, height: 56 });
+    expect(bar.props.className).not.toContain("px-4");
+  });
+
+  it("the rating is one button: label, hint and a 44pt tall target that opens Your numbers", () => {
+    const { getByTestId, queryByTestId } = render(<BrandHeader title="Home" />);
+    const rating = getByTestId("header-elo");
+    expect(rating.props.accessibilityRole).toBe("button");
+    expect(rating.props.accessibilityLabel).toBe("Your rating 1512");
+    expect(rating.props.accessibilityHint).toBe("Opens your numbers");
+    expect(HEADER_ELO_TARGET_HEIGHT).toBeGreaterThanOrEqual(44);
+    expect(queryByTestId("your-numbers-open")).toBeNull();
+    fireEvent.press(rating);
+    expect(getByTestId("your-numbers-open")).toBeTruthy();
+  });
+
+  it("the wordmark does not grow with Dynamic Type; the rating stops at the chip's 1.3x (AC-H12)", () => {
+    const { UNSAFE_root, getByTestId } = render(<BrandHeader title="Home" />);
+    expect(BRAND_WORDMARK_MAX_FONT_SCALE).toBe(1);
+    const wordmark = UNSAFE_root.find(
+      (n: HostNode) => typeof n.type === "string" && n.props.children === "ELO RATED",
+    );
+    expect(wordmark.props.maxFontSizeMultiplier).toBe(BRAND_WORDMARK_MAX_FONT_SCALE);
+    expect(HEADER_ELO_MAX_FONT_SCALE).toBe(CHIP_MAX_FONT_SCALE);
+    // The rating sizes itself from the text scale (capped there), OS scaling off;
+    // header-elo.test.tsx covers 1x, 1.2x and AX sizes.
+    expect(getByTestId("header-elo-value").props.allowFontScaling).toBe(false);
+    expect(getByTestId("header-elo-value").props.numberOfLines).toBe(1);
+  });
+
+  it.each(TAB_ROOTS.map(([t]) => t))(
+    "draws no %s title, but keeps an accessibility-only heading for it (tab-header-title-<tab>)",
     (title) => {
-      const { UNSAFE_root, getByRole } = render(<TabHeader title={title} />);
-      const header = getByRole("header");
-      expect(header.props.children).toBe(title);
-      expect(header.props.className).toContain("uppercase");
-      expect(header.props.className).toContain("font-heading");
-
-      const order = UNSAFE_root.findAll(
-        (n: HostNode) =>
-          typeof n.type === "string" &&
-          (n.props.accessibilityRole === "header" || typeof n.props.testID === "string"),
-      ).map((n: HostNode) => (n.props.accessibilityRole === "header" ? "title" : n.props.testID));
-      expect(order.indexOf("title")).toBeLessThan(order.indexOf("header-status-chip"));
-      expect(order.indexOf("header-status-chip")).toBeLessThan(order.indexOf("notification-bell"));
-      expect(buttons(UNSAFE_root)).toHaveLength(1);
+      const { getByTestId, queryByText } = render(<BrandHeader title={title} />);
+      const heading = getByTestId(`tab-header-title-${title.toLowerCase()}`);
+      expect(heading.props.accessibilityRole).toBe("header");
+      expect(heading.props.children).toBe(title);
+      // Out of the row and never visible.
+      expect(heading.props.style).toMatchObject({ position: "absolute", color: "transparent" });
+      expect(heading.props.className).toBeUndefined();
+      expect(queryByText(title.toUpperCase())).toBeNull();
     },
   );
 
-  it("tags the title for the match-loop harness's tab proof (tab-header-title-<tab>)", () => {
-    const { getByTestId } = render(<TabHeader title="Matches" />);
-    expect(getByTestId("tab-header-title-matches").props.accessibilityRole).toBe("header");
+  it.each(TAB_ROOTS)("the %s tab root uses BrandHeader with its title, never TabHeader", (title, file) => {
+    const src = fs.readFileSync(path.join(__dirname, "../../..", file), "utf8");
+    expect(src).toContain(`<BrandHeader title="${title}"`);
+    expect(src).not.toMatch(/TabHeader\b/);
   });
 });
 

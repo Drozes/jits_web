@@ -8,7 +8,7 @@ import RNToast, {
 import * as SafeArea from "react-native-safe-area-context";
 import { cn } from "@/lib/cn";
 
-/** The header bar's height below the safe area (`BrandHeader`, `TabHeader`, `AppHeader`). */
+/** The header bar's height below the safe area (`BrandHeader`, `AppHeader`). */
 const HEADER_BAR_HEIGHT = 56;
 
 /**

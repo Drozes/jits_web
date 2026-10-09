@@ -43,7 +43,7 @@ Copy, labels and inline data, in any family. Line height is about 1.3x up to 16p
 | `title-l` | `text-title-l` | 20 | 24 | Compare-stats figures, the feedback sheet title (text-[20px]). |
 | `title-xl` | `text-title-xl` | 22 | 26 | The rating-moment odometer (Adding Flare), stat figures, the BrandHeader wordmark (22px). |
 | `headline` | `text-headline` | 24 | 29 | Profile and competitor names and records (24px). |
-| `headline-l` | `text-headline-l` | 26 | 31 | The rating-moment delta chip (Adding Flare), the fight delta, the Home greeting (26px). |
+| `headline-l` | `text-headline-l` | 26 | 31 | The rating-moment delta chip (Adding Flare), the fight delta (26px). |
 | `headline-xl` | `text-headline-xl` | 28 | 34 | Stat figures, the invite code input, practice titles (28px). |
 | `headline-2xl` | `text-headline-2xl` | 30 | 36 | Match-flow step headers, the result score input (30px). |
 

@@ -99,6 +99,8 @@ const mockAthlete = {
 let mockAuthAthlete: typeof mockAthlete | null = mockAthlete;
 jest.mock("@/lib/auth/hooks", () => ({
   useRequireAthlete: () => ({ athlete: mockAuthAthlete, isLoading: false }),
+  // The header rating (BrandHeader) reads the same auth context.
+  useAuth: () => ({ athlete: mockAuthAthlete }),
 }));
 
 const mockPush = jest.fn();

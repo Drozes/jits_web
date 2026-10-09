@@ -40,16 +40,17 @@ jest.mock("expo-router", () => ({
     }, [cb]);
   },
 }));
+const mockMe = {
+  id: "me-1",
+  display_name: "Me",
+  current_elo: 1200,
+  current_weight: 180,
+  primary_gym_id: null,
+};
 jest.mock("@/lib/auth/hooks", () => ({
-  useRequireAthlete: () => ({
-    athlete: {
-      id: "me-1",
-      display_name: "Me",
-      current_elo: 1200,
-      current_weight: 180,
-      primary_gym_id: null,
-    },
-  }),
+  useRequireAthlete: () => ({ athlete: mockMe }),
+  // The header rating (BrandHeader) reads the same auth context.
+  useAuth: () => ({ athlete: mockMe }),
 }));
 const mockProfileRefetch = jest.fn();
 const mockHistory: Record<string, unknown>[] = [];
