@@ -201,9 +201,9 @@ describe("(tabs)/_layout", () => {
     );
   });
 
-  it("labels the five tabs Home, Arena, Matches, Rankings, Profile (AC 1.1)", () => {
+  it("labels the five tabs Home, Arena, Film, Rankings, Profile (AC 1.1)", () => {
     render(React.createElement(TabsLayout));
-    expect(capturedScreens.map((s) => s.options.title)).toEqual(["Home", "Arena", "Matches", "Rankings", "Profile"]);
+    expect(capturedScreens.map((s) => s.options.title)).toEqual(["Home", "Arena", "Film", "Rankings", "Profile"]);
   });
 
   it("draws the Matches tab with the lucide Film icon, in the tab's color and size", () => {

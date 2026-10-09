@@ -96,7 +96,7 @@ export function ctaCopy(variant: CtaVariant): { label: string; a11y: string } {
   return { label, a11y: `${label}. Opens the Arena tab` };
 }
 
-export const SEE_ALL_A11Y = "See all, open Matches";
+export const SEE_ALL_A11Y = "See all, open Film";
 
 /** `28s` duration chip (whole seconds). */
 export function durationChip(seconds: number): string {

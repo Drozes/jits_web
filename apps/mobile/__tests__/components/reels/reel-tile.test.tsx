@@ -236,7 +236,7 @@ describe("ghost, CTA, See all and skeleton tiles", () => {
     const tile: ReelTileModel = { kind: "see_all", key: "see_all" };
     const { getByText, getByLabelText, onPress } = renderTile(tile);
     expect(getByText("See all")).toBeTruthy();
-    fireEvent.press(getByLabelText("See all, open Matches"));
+    fireEvent.press(getByLabelText("See all, open Film"));
     expect(onPress).toHaveBeenCalledWith(tile);
   });
 
