@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## OTA "Film tab label + feed cards open match detail" (runtime 0.5.0), 2026-10-09
+
+Production OTA group `91e6cddd-18e2-487e-8f27-92df29c532d1` (iOS `01a12233-56e5-717a-bc73-2b4267ec9224`, Android `01a12233-56e5-7067-b167-bddde6f8ef89`) from jits_web `main` `38924821` (merge of development `1b80e4da`, pushed directly without a PR at the owner's request), published from a clean worktree so local `.env` files could not leak in. JS-only, non-critical (`updateCriticalIndex` 1, unchanged). Rollback target: `f4144216-2bf7-49a2-b858-983a128c96b7`. No backend dependency.
+
 ### Mobile: the Matches tab is labelled Film; feed cards open match detail first
 
 Owner request 2026-10-09. JS-only (OTA-eligible). The route stays `matches`, so deep links, the Film Room redirect and testIDs are unchanged.
