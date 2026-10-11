@@ -240,7 +240,10 @@ LIB_OK = re.compile(
     r"|recording-space"
     # Match video status UX (jits-n2im.25 / .2): the copy module and the view models that decide
     # what the Film status plate, the Film Room badge and the upload strip say.
-    r"|film-status|upload-strip)\.tsx?$"
+    r"|film-status|upload-strip"
+    # The wordmark + rating header (jits-1ez5): the rating's label and post-match moment, and
+    # the values the Your numbers sheet derives (rank, top %, record, peak note, this month).
+    r"|header-elo|your-numbers)\.tsx?$"
 )
 # packages/shared files whose strings or formatting are drawn on boards.
 SHARED_OK = {SH + p for p in [
@@ -262,6 +265,12 @@ PANEL = {M + p for p in [
 ]}
 
 
+# The Your numbers sheet (jits-1ez5.2) is mounted by the rating in every tab-root header
+# (header-elo.tsx) but only drawn open on board 10, so like the panel it is kept off the
+# other boards' walks.
+YOUR_NUMBERS = {M + "components/layout/your-numbers-sheet.tsx"}
+
+
 def expand(globs):
     out = []
     for g in globs:
@@ -276,6 +285,8 @@ def walk(seeds, exclude=(), panel_rule=True):
         ex |= PANEL
     if not (STRIP & set(seeds)):
         ex |= STRIP
+    if not (YOUR_NUMBERS & set(seeds)):
+        ex |= YOUR_NUMBERS
     seen, out, st = set(), set(), list(seeds)
     while st:
         rel = st.pop()
@@ -363,6 +374,10 @@ BOARDS = {
     "07-Setup-Who.dc.html": dict(seeds=SETUP, exclude=[TOS, WHERE]),
     "08-Setup-Where.dc.html": dict(seeds=SETUP, exclude=[TOS, WHO]),
     "Main.dc.html": dict(seeds=HOME, exclude=[
+        "components/dashboard/resume-match-card.tsx",
+        "components/dashboard/practice-offer-card.tsx"]),
+    # Home with the Your numbers sheet open (tap the header rating; jits-1ez5, cb06ce8a).
+    "10-Your-Numbers.dc.html": dict(seeds=HOME + ["components/layout/your-numbers-sheet.tsx"], exclude=[
         "components/dashboard/resume-match-card.tsx",
         "components/dashboard/practice-offer-card.tsx"]),
     "11-Home-Resume.dc.html": dict(seeds=HOME),

@@ -184,7 +184,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/match-card.tsx",
         "apps/mobile/components/milestones/**",
         "apps/mobile/components/notifications/notification-bell.tsx",
@@ -203,7 +202,6 @@
         "apps/mobile/components/ui/elo-system/selection.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -214,17 +212,19 @@
         "apps/mobile/lib/arena/mat-board.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
         "apps/mobile/lib/practice/constants.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
       ]
     },
-    "11-Home-Resume.dc.html": {
-      "title": "Home: resume match + highlights",
+    "10-Your-Numbers.dc.html": {
+      "title": "Your numbers sheet (tap the header rating)",
       "sources": [
         "apps/mobile/app/(app)/(tabs)/(home)/**",
         "apps/mobile/app/(app)/(tabs)/_layout.tsx",
         "apps/mobile/app/(app)/_layout.tsx",
-        "apps/mobile/components/dashboard/**",
+        "apps/mobile/components/dashboard/activity-feed-item.tsx",
+        "apps/mobile/components/dashboard/recent-activity-section.tsx",
         "apps/mobile/components/invite/invite-home-card.tsx",
         "apps/mobile/components/layout/arena-tab-icon.tsx",
         "apps/mobile/components/layout/brand-header.tsx",
@@ -246,7 +246,6 @@
         "apps/mobile/components/ui/elo-system/meta-tag.tsx",
         "apps/mobile/components/ui/elo-system/mono.tsx",
         "apps/mobile/components/ui/elo-system/outcome-tag.tsx",
-        "apps/mobile/components/ui/elo-system/plate.tsx",
         "apps/mobile/components/ui/elo-system/play-once.ts",
         "apps/mobile/components/ui/elo-system/rolling-number.tsx",
         "apps/mobile/components/ui/elo-system/selection.tsx",
@@ -263,6 +262,55 @@
         "apps/mobile/lib/arena/mat-board.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
         "apps/mobile/lib/practice/constants.ts",
+        "apps/mobile/lib/rating/**",
+        "apps/mobile/lib/video/video-status-copy.ts",
+        "packages/shared/src/utils/shared.ts"
+      ]
+    },
+    "11-Home-Resume.dc.html": {
+      "title": "Home: resume match + highlights",
+      "sources": [
+        "apps/mobile/app/(app)/(tabs)/(home)/**",
+        "apps/mobile/app/(app)/(tabs)/_layout.tsx",
+        "apps/mobile/app/(app)/_layout.tsx",
+        "apps/mobile/components/dashboard/**",
+        "apps/mobile/components/invite/invite-home-card.tsx",
+        "apps/mobile/components/layout/arena-tab-icon.tsx",
+        "apps/mobile/components/layout/brand-header.tsx",
+        "apps/mobile/components/layout/elo-tab-bar.tsx",
+        "apps/mobile/components/layout/header-elo.tsx",
+        "apps/mobile/components/layout/header-status-chip.tsx",
+        "apps/mobile/components/layout/live-menu-popover.tsx",
+        "apps/mobile/components/match-card.tsx",
+        "apps/mobile/components/milestones/**",
+        "apps/mobile/components/notifications/notification-bell.tsx",
+        "apps/mobile/components/reels/**",
+        "apps/mobile/components/ui/count-pill.tsx",
+        "apps/mobile/components/ui/elo-system/button.tsx",
+        "apps/mobile/components/ui/elo-system/chip.tsx",
+        "apps/mobile/components/ui/elo-system/delta-chip.tsx",
+        "apps/mobile/components/ui/elo-system/label.tsx",
+        "apps/mobile/components/ui/elo-system/live-pill.tsx",
+        "apps/mobile/components/ui/elo-system/meta-tag.tsx",
+        "apps/mobile/components/ui/elo-system/mono.tsx",
+        "apps/mobile/components/ui/elo-system/outcome-tag.tsx",
+        "apps/mobile/components/ui/elo-system/plate.tsx",
+        "apps/mobile/components/ui/elo-system/play-once.ts",
+        "apps/mobile/components/ui/elo-system/rolling-number.tsx",
+        "apps/mobile/components/ui/elo-system/selection.tsx",
+        "apps/mobile/components/ui/elo-system/wordmark.tsx",
+        "apps/mobile/components/ui/pressable-scale.tsx",
+        "apps/mobile/components/ui/skeleton/skeleton.tsx",
+        "apps/mobile/components/ui/state-pressable.tsx",
+        "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/lib/arena/constants.ts",
+        "apps/mobile/lib/arena/fresh-countdown.ts",
+        "apps/mobile/lib/arena/go-live-feedback.ts",
+        "apps/mobile/lib/arena/header-chip-model.ts",
+        "apps/mobile/lib/arena/mat-board.ts",
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/practice/constants.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
       ]
@@ -288,7 +336,6 @@
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
         "apps/mobile/components/ui/elo-system/avatar-32.tsx",
@@ -303,7 +350,6 @@
         "apps/mobile/components/ui/elo-system/rolling-number.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -313,7 +359,8 @@
         "apps/mobile/lib/arena/go-live-feedback.ts",
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
-        "apps/mobile/lib/navigation/tab-badge.ts"
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts"
       ]
     },
     "13-Arena-Live.dc.html": {
@@ -337,7 +384,6 @@
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
         "apps/mobile/components/ui/elo-system/avatar-32.tsx",
@@ -352,7 +398,6 @@
         "apps/mobile/components/ui/elo-system/rolling-number.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -362,7 +407,8 @@
         "apps/mobile/lib/arena/go-live-feedback.ts",
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
-        "apps/mobile/lib/navigation/tab-badge.ts"
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts"
       ]
     },
     "14-Arena-Waiting.dc.html": {
@@ -386,7 +432,6 @@
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
         "apps/mobile/components/ui/elo-system/avatar-32.tsx",
@@ -401,7 +446,6 @@
         "apps/mobile/components/ui/elo-system/rolling-number.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -411,7 +455,8 @@
         "apps/mobile/lib/arena/go-live-feedback.ts",
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
-        "apps/mobile/lib/navigation/tab-badge.ts"
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts"
       ]
     },
     "15-Challenge-Sheet.dc.html": {
@@ -432,7 +477,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/match-card.tsx",
         "apps/mobile/components/match-flow/fight/**",
         "apps/mobile/components/milestones/**",
@@ -467,6 +511,7 @@
         "apps/mobile/lib/arena/mat-board.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
         "apps/mobile/lib/practice/constants.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
       ]
@@ -483,11 +528,9 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/leaderboard/**",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
-        "apps/mobile/components/ui/elo-system/button.tsx",
         "apps/mobile/components/ui/elo-system/chip.tsx",
         "apps/mobile/components/ui/elo-system/delta-chip.tsx",
         "apps/mobile/components/ui/elo-system/delta-number.tsx",
@@ -500,17 +543,14 @@
         "apps/mobile/components/ui/elo-system/rolling-number.tsx",
         "apps/mobile/components/ui/elo-system/selection.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
-        "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
-        "apps/mobile/components/ui/state-pressable.tsx",
-        "apps/mobile/components/ui/steel-sheen.tsx",
         "apps/mobile/lib/arena/constants.ts",
         "apps/mobile/lib/arena/fresh-countdown.ts",
         "apps/mobile/lib/arena/go-live-feedback.ts",
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
-        "apps/mobile/lib/navigation/tab-badge.ts"
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts"
       ]
     },
     "17-Profile.dc.html": {
@@ -529,7 +569,6 @@
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/profile/account-section.tsx",
         "apps/mobile/components/profile/profile-header.tsx",
@@ -546,7 +585,6 @@
         "apps/mobile/components/ui/elo-system/rolling-number.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -556,6 +594,7 @@
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/updates/app-version.ts",
         "apps/mobile/lib/video/upload-copy.ts",
         "apps/mobile/lib/video/upload-errors.ts",
@@ -609,7 +648,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/matches/feed-poster.tsx",
         "apps/mobile/components/matches/match-feed-card.tsx",
         "apps/mobile/components/matches/match-feed-media.tsx",
@@ -647,6 +685,7 @@
         "apps/mobile/lib/matches/feed-states.ts",
         "apps/mobile/lib/milestones/milestone-store.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
@@ -670,7 +709,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/matches/feed-poster.tsx",
         "apps/mobile/components/matches/match-feed-card.tsx",
         "apps/mobile/components/matches/match-feed-media.tsx",
@@ -712,6 +750,7 @@
         "apps/mobile/lib/matches/feed-states.ts",
         "apps/mobile/lib/milestones/milestone-store.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
@@ -735,7 +774,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/matches/feed-poster.tsx",
         "apps/mobile/components/matches/match-feed-card.tsx",
         "apps/mobile/components/matches/match-feed-media.tsx",
@@ -776,6 +814,7 @@
         "apps/mobile/lib/matches/feed-states.ts",
         "apps/mobile/lib/milestones/milestone-store.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
@@ -799,7 +838,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/matches/**",
         "apps/mobile/components/milestones/**",
         "apps/mobile/components/notifications/notification-bell.tsx",
@@ -832,6 +870,7 @@
         "apps/mobile/lib/matches/feed-states.ts",
         "apps/mobile/lib/milestones/milestone-store.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/use-upload-actions.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
@@ -1287,6 +1326,7 @@
         "apps/mobile/lib/match-flow/match-extras.ts",
         "apps/mobile/lib/match-flow/step-router.ts",
         "apps/mobile/lib/match-flow/use-verdict-data.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/film-status.ts",
         "apps/mobile/lib/video/upload-banner-state.ts",
         "apps/mobile/lib/video/upload-capabilities.ts",
@@ -1643,7 +1683,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/match-card.tsx",
         "apps/mobile/components/milestones/**",
         "apps/mobile/components/notifications/**",
@@ -1675,6 +1714,7 @@
         "apps/mobile/lib/navigation/tab-badge.ts",
         "apps/mobile/lib/notifications/notification-items.ts",
         "apps/mobile/lib/practice/constants.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
       ]
@@ -1762,7 +1802,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/match-card.tsx",
         "apps/mobile/components/milestones/**",
         "apps/mobile/components/notifications/notification-bell.tsx",
@@ -1783,7 +1822,6 @@
         "apps/mobile/components/ui/elo-system/selection.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -1795,6 +1833,7 @@
         "apps/mobile/lib/arena/mat-board.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
         "apps/mobile/lib/practice/constants.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/updates/update-policy.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
@@ -1978,7 +2017,6 @@
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
         "apps/mobile/components/ui/elo-system/avatar-32.tsx",
@@ -1993,7 +2031,6 @@
         "apps/mobile/components/ui/elo-system/rolling-number.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -2003,7 +2040,8 @@
         "apps/mobile/lib/arena/go-live-feedback.ts",
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
-        "apps/mobile/lib/navigation/tab-badge.ts"
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts"
       ]
     },
     "58-Go-Live-Location.dc.html": {
@@ -2031,7 +2069,6 @@
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/match-flow/fight/**",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/offline-banner.tsx",
@@ -2059,7 +2096,8 @@
         "apps/mobile/lib/arena/go-live-feedback.ts",
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
-        "apps/mobile/lib/navigation/tab-badge.ts"
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts"
       ]
     },
     "59-Start-Blocked.dc.html": {
@@ -2087,7 +2125,6 @@
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/match-flow/fight/**",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/offline-banner.tsx",
@@ -2115,7 +2152,8 @@
         "apps/mobile/lib/arena/go-live-feedback.ts",
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
-        "apps/mobile/lib/navigation/tab-badge.ts"
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts"
       ]
     },
     "60-Arena-Booked.dc.html": {
@@ -2139,7 +2177,6 @@
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/notifications/notification-bell.tsx",
         "apps/mobile/components/ui/count-pill.tsx",
         "apps/mobile/components/ui/elo-system/avatar-32.tsx",
@@ -2154,7 +2191,6 @@
         "apps/mobile/components/ui/elo-system/rolling-number.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -2164,7 +2200,8 @@
         "apps/mobile/lib/arena/go-live-feedback.ts",
         "apps/mobile/lib/arena/header-chip-model.ts",
         "apps/mobile/lib/arena/mat-board.ts",
-        "apps/mobile/lib/navigation/tab-badge.ts"
+        "apps/mobile/lib/navigation/tab-badge.ts",
+        "apps/mobile/lib/rating/header-elo.ts"
       ]
     },
     "61-Home-Invite.dc.html": {
@@ -2181,7 +2218,6 @@
         "apps/mobile/components/layout/header-elo.tsx",
         "apps/mobile/components/layout/header-status-chip.tsx",
         "apps/mobile/components/layout/live-menu-popover.tsx",
-        "apps/mobile/components/layout/your-numbers-sheet.tsx",
         "apps/mobile/components/match-card.tsx",
         "apps/mobile/components/milestones/**",
         "apps/mobile/components/notifications/notification-bell.tsx",
@@ -2201,7 +2237,6 @@
         "apps/mobile/components/ui/elo-system/selection.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
-        "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/skeleton/skeleton.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
@@ -2212,6 +2247,7 @@
         "apps/mobile/lib/arena/mat-board.ts",
         "apps/mobile/lib/navigation/tab-badge.ts",
         "apps/mobile/lib/practice/constants.ts",
+        "apps/mobile/lib/rating/header-elo.ts",
         "apps/mobile/lib/video/video-status-copy.ts",
         "packages/shared/src/utils/shared.ts"
       ]
