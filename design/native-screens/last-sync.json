@@ -1,7 +1,7 @@
 {
   "canvas": "https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D",
-  "commit": "1b80e4da9b2b60ab349403c8d0d8c2fe9b598237",
-  "synced_at": "2026-10-09T15:51:59-04:00",
-  "version": "1791575500-0a66",
-  "note": "Synced 2026-10-09 to production OTA 91e6cddd-18e2-487e-8f27-92df29c532d1 (main 38924821, development 1b80e4da). Redrew the 22 boards drift.mjs reported: the tab bar label reads Film instead of Matches on every board that draws it (Main, 11 to 19c, 42, 48, 57 to 61); the tab header h1 reads Film on 19, 19b, 19c and 19d; playable feed-card media on 19, 19d and 38 now link to 32-Match-Detail with 'Open match vs ...' labels (play glyph and duration kept, as in code); 19d's See all a11y label is 'See all, open Film'; 46-Help says 'the Film tab'. Text-only edits, no height changes, canvas.json untouched; board titles ('Matches tab: ...') and file names kept since the route is still matches. Independently reviewed (clean)."
+  "commit": "cb06ce8aff2c3923ff56979e04e4a3e0f71a3a95",
+  "synced_at": "2026-10-11T16:47:06-04:00",
+  "version": "1791750996-b382",
+  "note": "Synced 2026-10-11 to production OTA bcbc74ea-3164-4bd6-b030-655193b3d5bc (main cb06ce8a, release PR #79, epic jits-1ez5). Redrew the 19 tab-root boards: every tab root uses BrandHeader (ELO RATED wordmark, a 1px hairline-strong rule with 10pt each side, the rating 1487 in JetBrains Mono bold 16 ink linking to the Your numbers sheet; side padding 16; tab titles are visually hidden headings only) on Main, 11, 15, 42, 48 and 61 (Home), 12, 13, 14, 57, 58, 59 and 60 (Arena), 16 (Rankings), 17 (Profile), 19, 19b, 19c and 19d (Film). Home dropped the Welcome back tag, the display name and the EloTile on Main, 11, 15, 42, 48 and 61; heights Main 1128 to 866, 11 1278 to 1016, 61 1286 to 1024 (15, 42 and 48 keep 844). Added board 10-Your-Numbers (Home with the Your numbers sheet open, 390 x 844, end of the tabs row, ordered after Main), mapped in build-board-map.py. Skipped (not visible): app-header.tsx and toast.tsx comment changes, new delta-chip and rolling-number props, verdict-step effects, use-screen-focused extraction, so the auth, match, film, settings and invite boards were not redrawn. 16-Rankings merged onto a teammate's re-save (entity serialization only). No triage rows shipped. Independently reviewed (clean after two sample-data fixes on board 10)."
 }
