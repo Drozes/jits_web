@@ -6,7 +6,7 @@ import { usePalette, TABULAR } from "@/lib/theme/palette";
 import { typeSize, typeStep } from "@/lib/typography";
 import { DeltaChip, spokenDelta } from "@/components/ui/elo-system/delta-chip";
 import { RollingNumber } from "@/components/ui/elo-system/rolling-number";
-import { RatingBlock, deltaColor } from "../fight/fight-ui";
+import { RatingBlock, deltaColor, drawDeltaColor } from "../fight/fight-ui";
 
 /** "The tap": three tick marks, 180ms apart (Motion Rule registry). */
 export const TAP_COUNT = 3;
@@ -161,7 +161,7 @@ export function RatingMoment({ play: playProp, outcome, disputed, submission, be
               <DeltaChip
                 testID="summary-elo-delta"
                 delta={delta}
-                color={outcome === "draw" ? p.amber : deltaColor(delta, p)}
+                color={outcome === "draw" ? drawDeltaColor(delta, p) : deltaColor(delta, p)}
                 shown={landed}
                 animate={play}
                 style={typeSize("headline-l")}

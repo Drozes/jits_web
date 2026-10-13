@@ -3,6 +3,7 @@ import type { Database } from "../types/database";
 import type { Athlete } from "../types/athlete";
 import type {
   EloStakes,
+  RatingStakes,
   MatchHistoryRow,
   EloHistoryRow,
   DashboardSummary,
@@ -361,7 +362,33 @@ export async function getEloHistoryResult(
   return { ok: true, data: (data as EloHistoryRow[]) ?? [] };
 }
 
-/** Preview ELO stakes for a potential ranked match (weight-aware) */
+/**
+ * Rating V9 stakes for a match against `opponentId`, from the signed-in
+ * athlete's side (`get_rating_stakes`). With `matchId` the server prices the
+ * match on that match's challenge weights, exactly as `record_match_result`
+ * will rate it. Null on any error or a null response: callers hide the strip.
+ */
+export async function getRatingStakes(
+  supabase: Client,
+  opponentId: string,
+  matchId?: string | null,
+): Promise<RatingStakes | null> {
+  const { data, error } = await supabase.rpc("get_rating_stakes", {
+    p_opponent_id: opponentId,
+    ...(matchId ? { p_match_id: matchId } : {}),
+  });
+  if (error) {
+    console.error("getRatingStakes:", error);
+    return null;
+  }
+  return (data as unknown as RatingStakes) ?? null;
+}
+
+/**
+ * Preview ELO stakes for a potential ranked match (weight-aware). Deprecated
+ * by Rating V9: `calculate_elo_stakes` now returns NULL for every input, so
+ * this always resolves null. Kept for the web app (jits-76le.3).
+ */
 export async function getEloStakes(
   supabase: Client,
   challengerElo: number,

@@ -81,7 +81,7 @@ export interface LastMatchDelta {
   outcome: MatchOutcome;
 }
 
-/** The last match's rating change and its outcome (a draw's is amber), or null. */
+/** The last match's rating change and its outcome (a draw's tone is by its sign), or null. */
 export function lastMatchDelta(summary: Pick<DashboardSummary, "recent_matches"> | null | undefined): LastMatchDelta | null {
   const last = summary?.recent_matches?.[0];
   const delta = last?.elo_delta;
@@ -89,10 +89,15 @@ export function lastMatchDelta(summary: Pick<DashboardSummary, "recent_matches">
   return { delta, outcome: last.outcome };
 }
 
-/** A rating delta's tone: amber for a draw (always), else by its sign. */
+/**
+ * A rating delta's tone, by its sign. A draw (Rating V9) can move either way:
+ * the underdog gains (`win`, the gain colour), the favourite gives a little
+ * up (`draw`, amber: a draw is not a loss), and equals move 0 (`flat`).
+ */
 export function deltaTone(delta: number, outcome?: MatchOutcome | null): "win" | "draw" | "loss" | "flat" {
-  if (outcome === "draw") return "draw";
-  return delta > 0 ? "win" : delta < 0 ? "loss" : "flat";
+  if (delta > 0) return "win";
+  if (delta < 0) return outcome === "draw" ? "draw" : "loss";
+  return "flat";
 }
 
 /** "This month" from the rating history: the profile query's sum (`sumEloThisMonth`). */

@@ -22,6 +22,15 @@ export function deltaColor(delta: number, p: Palette): string {
   return delta > 0 ? p.win : delta < 0 ? p.loss : p.text;
 }
 
+/**
+ * A draw's rating change, by its sign (Rating V9): the underdog GAINS in a
+ * draw (gain colour), the favourite gives a little up (amber, never loss
+ * red: a draw is not a loss), and equals move 0 (neutral ink).
+ */
+export function drawDeltaColor(delta: number, p: Palette): string {
+  return delta > 0 ? p.win : delta < 0 ? p.amber : p.text;
+}
+
 /** First letters of the first and last word: "Mina Park" -> "MP". */
 export function initialsOf(name: string | null | undefined): string {
   const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -216,7 +225,7 @@ export function StakesStrip({
             numberOfLines={lines}
             maxFontSizeMultiplier={maxFontSizeMultiplier}
             className="font-mono-bold"
-            style={[typeStep("subhead"), { color: c.key === "draw" ? (c.value < 0 ? p.amber : p.text) : deltaColor(c.value, p) }, TABULAR]}
+            style={[typeStep("subhead"), { color: c.key === "draw" ? drawDeltaColor(c.value, p) : deltaColor(c.value, p) }, TABULAR]}
           >
             {formatSignedDelta(c.value)}
           </Text>

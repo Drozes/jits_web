@@ -58,6 +58,14 @@ it("stores the rank on a first visit without a climb", async () => {
   await waitFor(async () => expect(await AsyncStorage.getItem(KEY)).toBe("4"));
 });
 
+it("ignores a rank stored before the Rating V9 cutover (v1): a fresh baseline, no false climb", async () => {
+  expect(RANK_STORAGE_PREFIX).toBe("rankings:last-seen-rank:v2:");
+  await AsyncStorage.setItem("rankings:last-seen-rank:v1:me", "40");
+  const hook = await mount(3);
+  expect(hook.result.current.climb).toBeNull();
+  await waitFor(async () => expect(await AsyncStorage.getItem(KEY)).toBe("3"));
+});
+
 it("reports a climb from the stored rank, once, then stores the new rank", async () => {
   await AsyncStorage.setItem(KEY, "5");
   const hook = await mount(3);

@@ -14,7 +14,13 @@ import type { RankedAthlete } from "./use-leaderboard-data";
  * Last-seen rank is per device and per athlete (AsyncStorage, like the Film
  * Room seen set): "the rank I last saw on this phone" needs no backend column.
  */
-export const RANK_STORAGE_PREFIX = "rankings:last-seen-rank:v1:";
+/**
+ * v2 since the Rating V9 cutover (jr_be spec 019): the replay moves every
+ * rating and Rankings now lists only athletes who have played, so a rank seen
+ * before it is not comparable. A fresh prefix sets a new baseline on the
+ * first visit instead of a false "you climbed" flare.
+ */
+export const RANK_STORAGE_PREFIX = "rankings:last-seen-rank:v2:";
 
 /** How long the old order holds (the first-load stagger lands first), ms. */
 export const RANK_SWAP_DELAY_MS = 1140;

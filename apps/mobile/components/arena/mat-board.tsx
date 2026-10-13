@@ -30,7 +30,7 @@ import {
   spokenCountdown,
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
-import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
+import { useViewerStakes, weightsStakesKey } from "@/lib/match-flow/use-viewer-stakes";
 import { TABULAR } from "@/lib/typography";
 
 /** What a countdown counts down to: a challenge's live window. */
@@ -552,12 +552,16 @@ export function ClosestMatchCard({
   onChallenge,
   onGoLive,
 }: ClosestMatchProps) {
+  // Keyed on the athlete (Rating V9 prices their full rating state, the
+  // rematch history and the weights server-side), from the viewer's side;
+  // both weights are in the key so a weight change reads again.
   const stakes = useViewerStakes(
-    !!athlete,
+    !!athlete && viewer.elo != null,
+    athlete?.id ?? null,
+    null,
     viewer.elo,
     athlete?.currentElo ?? null,
-    viewer.weight,
-    athlete?.weight ?? null,
+    weightsStakesKey(viewer.weight, athlete?.weight ?? null),
   );
 
   if (!athlete || kind === "none") {
@@ -633,7 +637,7 @@ export function ClosestMatchCard({
               className="mt-0.5 font-mono-bold text-caption text-ink-2 uppercase"
               style={TABULAR}
             >
-              {`Win ${formatGap(stakes.challenger_win)} · Loss ${formatGap(stakes.challenger_loss)}`}
+              {`Win ${formatGap(stakes.win)} · Loss ${formatGap(stakes.loss)}`}
             </Text>
           ) : null}
         </View>

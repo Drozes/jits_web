@@ -20,9 +20,7 @@ import { Plate } from "@/components/ui/elo-system";
  *  - live: the header chip on tab roots (GO LIVE / LIVE menu), offline for a
  *    match and in the background, restored after (`use-arena-live.ts`);
  *  - leaving the confirm step counts as confirming (jits-02vo.7);
- *  - ELO: 1000 for everyone, +50 phantom per IBJJF division gap for the
- *    expected score only, submission or draw, draws cost both and the
- *    favorite more (`record_match_result`, `calculate_elo_stakes`);
+ *  - rating: Thomas V9 (Glicko-2) from 1500, weight ratio in the odds, draws move points from the favourite to the underdog, win and loss floors of 1, rematch weights (`record_match_result`, `get_rating_stakes`);
  *  - footage: no download UI, recorded matches are in the Film tab (C-H1).
  */
 type HelpSection = {
@@ -46,9 +44,9 @@ const HELP_SECTIONS: HelpSection[] = [
   {
     title: "How ELO Works",
     paragraphs: [
-      "Universal starting rating. No belt seeding. Weight is normalized into the exchange so heavier athletes get a small phantom-ELO offset (+50 per IBJJF division gap).",
-      "A win is by submission only. Tap or don't. Anything else is a draw, and draws cost ELO for both fighters, and the favorite on paper loses more.",
-      "Wins, losses, and draws all move your number. Your number is your number.",
+      "Everyone starts at 1500. No belt seeding. A new rating moves fast and settles as you play, and loosens again after a long break. Weight is part of the odds: the heavier athlete is expected to do better, so they win fewer points and lose more.",
+      "A win is by submission only. Tap or don't. Anything else is a draw. A draw between equals changes nothing; otherwise the favourite gives up a few points to the underdog.",
+      "Every win gains at least 1 point and every loss costs at least 1. Rematches with the same partner count for less from the third meeting in 30 days. Your number is your number.",
     ],
   },
   {

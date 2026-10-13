@@ -285,7 +285,7 @@ export function VerdictStep(props: VerdictStepProps) {
         ) : null}
 
         {gap > 0 ? (
-          <Mono size="micro" spacing="caps">{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. Heavier athlete’s ELO was adjusted.`}</Mono>
+          <Mono size="micro" spacing="caps">{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. The heavier athlete was favoured, so they win fewer points.`}</Mono>
         ) : null}
 
         {fsView ? (

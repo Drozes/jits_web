@@ -10,6 +10,7 @@ import {
   getGymsWithSessionsResult,
   getMatchConfirmations,
   getPendingChallengesForAthlete,
+  getRatingStakes,
 } from "./queries";
 
 // ---------------------------------------------------------------------------
@@ -937,6 +938,42 @@ describe("getCurrentAthleteResult", () => {
     await expect(getCurrentAthlete(failed.client, "u-1")).resolves.toBeNull();
     const ok = athleteGuardClient({ data: ROW, error: null });
     await expect(getCurrentAthlete(ok.client, "u-1")).resolves.toEqual(ROW);
+    spy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getRatingStakes (Rating V9, jr_be spec 019 section 5.2)
+// ---------------------------------------------------------------------------
+
+describe("getRatingStakes", () => {
+  function rpcClient(resp: { data: unknown; error: unknown }) {
+    const rpc = vi.fn(() => Promise.resolve(resp));
+    return { client: { rpc } as unknown as Parameters<typeof getRatingStakes>[0], rpc };
+  }
+
+  it("sends the opponent id and the match id", async () => {
+    const stakes = { model: "thomas-v9", win: 14, draw: 4, loss: -9 };
+    const { client, rpc } = rpcClient({ data: stakes, error: null });
+    await expect(getRatingStakes(client, "opp-1", "M1")).resolves.toBe(stakes);
+    expect(rpc).toHaveBeenCalledWith("get_rating_stakes", { p_opponent_id: "opp-1", p_match_id: "M1" });
+  });
+
+  it("omits p_match_id when there is no match (null or undefined)", async () => {
+    const { client, rpc } = rpcClient({ data: null, error: null });
+    await getRatingStakes(client, "opp-1", null);
+    await getRatingStakes(client, "opp-1");
+    expect(rpc).toHaveBeenNthCalledWith(1, "get_rating_stakes", { p_opponent_id: "opp-1" });
+    expect(rpc).toHaveBeenNthCalledWith(2, "get_rating_stakes", { p_opponent_id: "opp-1" });
+  });
+
+  it("resolves null (never throws) on an RPC error result and on a null body", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const err = rpcClient({ data: null, error: { code: "PGRST202", message: "function get_rating_stakes not found" } });
+    await expect(getRatingStakes(err.client, "opp-1", "M1")).resolves.toBeNull();
+    expect(spy).toHaveBeenCalled();
+    const empty = rpcClient({ data: null, error: null });
+    await expect(getRatingStakes(empty.client, "opp-1")).resolves.toBeNull();
     spy.mockRestore();
   });
 });

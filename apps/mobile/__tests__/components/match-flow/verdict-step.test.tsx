@@ -231,6 +231,22 @@ describe("verdict copy and the harness contract", () => {
     expect(color(s.getByTestId("summary-elo-delta"))).toBe("#F59E0B");
   });
 
+  it("an underdog's draw GAINS (Rating V9): the delta is gain green, the verdict stays amber", async () => {
+    const s = renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1500, elo_after: 1503, elo_delta: 3 } });
+    await flush();
+    expect(s.getByTestId("summary-verdict")).toHaveTextContent("DRAW");
+    expect(color(s.getByTestId("summary-verdict"))).toBe("#F59E0B");
+    expect(s.getByTestId("summary-elo-delta")).toHaveTextContent(/\+3/);
+    expect(color(s.getByTestId("summary-elo-delta"))).toBe("#22C55E");
+  });
+
+  it("a draw between equals moves 0: no delta chip, never a loss colour", async () => {
+    const s = renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1500, elo_after: 1500, elo_delta: 0 } });
+    await flush();
+    expect(s.getByTestId("summary-verdict")).toHaveTextContent("DRAW");
+    expect(s.queryByTestId("summary-elo-delta")).toBeNull();
+  });
+
   it("a disputed match: DISPUTED with the review note, no rematch or share", async () => {
     const s = renderVerdict({ matchStatus: "disputed" });
     await flush();
@@ -251,6 +267,9 @@ describe("verdict copy and the harness contract", () => {
     const s = renderVerdict({ me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14, weight_division_gap: 1 } });
     await flush();
     expect(s.getByText(/1 weight class apart/)).toBeTruthy();
+    // Rating V9 copy (spec 019 section 7.3): the weight is in the odds, not an adjustment.
+    s.getByText("1 weight class apart. The heavier athlete was favoured, so they win fewer points.");
+    expect(s.queryByText(/ELO was adjusted/)).toBeNull();
   });
 });
 

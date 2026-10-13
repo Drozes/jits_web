@@ -48,7 +48,7 @@ jest.mock("@/lib/theme/use-theme", () => ({
 }));
 
 // The prompt's stakes strip reads calculate_elo_stakes; not under test here.
-jest.mock("@/lib/match-flow/use-viewer-stakes", () => ({ useViewerStakes: () => null, viewerStakesKey: () => "" }));
+jest.mock("@/lib/match-flow/use-viewer-stakes", () => ({ useViewerStakes: () => null, viewerStakesKey: () => "", weightsStakesKey: () => "" }));
 
 let mockAthlete: Record<string, unknown> | null = null;
 const mockRefreshAthleteSoft = jest.fn(() => Promise.resolve());
