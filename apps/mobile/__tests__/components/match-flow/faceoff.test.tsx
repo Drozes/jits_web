@@ -81,9 +81,11 @@ const ME = { athlete_id: "me-1", display_name: "Kai Reyes", current_elo: 1512 };
 const OPP = { athlete_id: "opp-1", display_name: "Mina Park", current_elo: 1498 };
 const STAKES = ratingStakes();
 
-function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCancelledRemotely = jest.fn(), weightsRated = true }: {
+function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCancelledRemotely = jest.fn(), weightsRated = true, myWeight = 170, opponentWeight = 167 }: {
   phase: "weight" | "ready";
   weightsRated?: boolean;
+  myWeight?: number;
+  opponentWeight?: number;
   onWeighedIn?: () => void;
   onStarted?: (s: string) => void;
   onCancelledRemotely?: (d?: string) => void;
@@ -96,8 +98,8 @@ function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCanc
       exitHref="/arena"
       meId="me-1"
       opponentId="opp-1"
-      myWeight={170}
-      opponentWeight={167}
+      myWeight={myWeight}
+      opponentWeight={opponentWeight}
       weightsRated={weightsRated}
       onWeighedIn={onWeighedIn}
       onStarted={onStarted}
@@ -226,6 +228,30 @@ describe("weigh-in", () => {
     render(<Harness phase="weight" weightsRated={false} />);
     await flush();
     expect(mockGetRatingStakes).not.toHaveBeenCalled();
+  });
+
+  it("a reweigh (new challenge weights) reads the stakes again and hides the old strip meanwhile", async () => {
+    const s = render(<Harness phase="weight" />);
+    await flush();
+    expect(s.getByTestId("weight-stakes-win")).toHaveTextContent("▲ +14");
+    expect(mockGetRatingStakes).toHaveBeenCalledTimes(1);
+
+    // reweigh_for_match wrote a new opponent weight; the wizard feeds it in.
+    let resolve!: (v: unknown) => void;
+    mockGetRatingStakes.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    s.rerender(<Harness phase="weight" opponentWeight={190} />);
+    expect(s.queryByTestId("weight-stakes")).toBeNull();
+    await flush();
+    expect(mockGetRatingStakes).toHaveBeenCalledTimes(2);
+    expect(mockGetRatingStakes).toHaveBeenLastCalledWith(expect.anything(), "opp-1", "M1");
+    expect(s.queryByTestId("weight-stakes")).toBeNull();
+
+    await act(async () => {
+      resolve(ratingStakes({ win: 19, draw: 3, loss: -5, weight_division_gap: 1 }));
+    });
+    expect(s.getByTestId("weight-stakes-win")).toHaveTextContent("▲ +19");
+    s.getByText("20 LBS APART · 1 DIVISION APART");
+    s.getByTestId("weight-gap-note");
   });
 
   it("an underdog's positive draw shows in the gain colour, not amber", async () => {

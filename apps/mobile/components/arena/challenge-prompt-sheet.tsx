@@ -60,7 +60,7 @@ import {
   spokenCountdown,
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
-import { useViewerStakes, viewerStakesKey } from "@/lib/match-flow/use-viewer-stakes";
+import { useViewerStakes, viewerStakesKey, weightsStakesKey } from "@/lib/match-flow/use-viewer-stakes";
 import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
 import type { RatingStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
@@ -215,19 +215,17 @@ export function ChallengePromptSheet({
 
   // Later passes challenge=null, which resets the stakes read below. Keep the
   // last stakes read so reopening from the chip shows the strip at once
-  // instead of the fallback line followed by the strip. The cache is keyed on
-  // the same inputs as useViewerStakes (the challenger, no match yet, and
-  // both ratings) plus both weights, never on the challenge id:
-  // useViewerStakes only returns stakes for its current inputs, and reuse
+  // instead of the fallback line followed by the strip. The cache is keyed
+  // EXACTLY as useViewerStakes keys its read (the challenger, no match yet,
+  // both ratings, and both weights as its extra key), never on the challenge
+  // id: useViewerStakes only returns stakes for its current inputs, and reuse
   // here requires the same challenger, both ratings and both weights
   // unchanged, so one challenger's stakes can never show for another, nor
   // for a new challenge from them at another weight (the server prices an
-  // open challenge on its weights).
-  const stakesKey = [
-    viewerStakesKey(challenge?.challengerId, null, viewer?.elo, challenge?.challengerElo),
-    viewer?.weight ?? "",
-    challenge?.challengerWeight ?? "",
-  ].join("|");
+  // open challenge on its weights), even when it replaces the old one in
+  // place with no null render between.
+  const weightsKey = weightsStakesKey(viewer?.weight, challenge?.challengerWeight);
+  const stakesKey = viewerStakesKey(challenge?.challengerId, null, viewer?.elo, challenge?.challengerElo, weightsKey);
   // Held in state and written from an effect, never from render: a render
   // React throws away (concurrent rendering, StrictMode) must not leave its
   // value behind. The live read is used directly while it exists, so the
@@ -249,6 +247,7 @@ export function ChallengePromptSheet({
     null,
     viewer?.elo,
     challenge?.challengerElo,
+    weightsKey,
   );
   const hasChallenge = challenge !== null;
   React.useEffect(() => {

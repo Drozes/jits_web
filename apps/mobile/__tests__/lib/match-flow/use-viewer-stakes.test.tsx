@@ -14,14 +14,14 @@ jest.mock("@jits/shared/api/queries", () => ({
   getEloStakes: (...a: unknown[]) => mockGetEloStakes(...a),
 }));
 
-import { useViewerStakes, viewerStakesKey } from "@/lib/match-flow/use-viewer-stakes";
+import { useViewerStakes, viewerStakesKey, weightsStakesKey } from "@/lib/match-flow/use-viewer-stakes";
 import { ratingStakes } from "../../support/rating-stakes";
 
-type Props = { enabled: boolean; opp: string | null; match: string | null; my: number | null; their: number | null };
-const BASE: Props = { enabled: true, opp: "opp-1", match: "M1", my: 1512, their: 1498 };
+type Props = { enabled: boolean; opp: string | null; match: string | null; my: number | null; their: number | null; extra?: string | null };
+const BASE: Props = { enabled: true, opp: "opp-1", match: "M1", my: 1512, their: 1498, extra: "170|167" };
 
 function mount(initial: Props = BASE) {
-  return renderHook((p: Props) => useViewerStakes(p.enabled, p.opp, p.match, p.my, p.their), { initialProps: initial });
+  return renderHook((p: Props) => useViewerStakes(p.enabled, p.opp, p.match, p.my, p.their, p.extra), { initialProps: initial });
 }
 
 async function flush() {
@@ -38,8 +38,9 @@ beforeEach(() => {
 
 describe("viewerStakesKey", () => {
   it("joins the opponent, the match and both ratings", () => {
-    expect(viewerStakesKey("opp-1", "M1", 1512, 1498)).toBe("opp-1|M1|1512|1498");
-    expect(viewerStakesKey("opp-1", null, 1512, null)).toBe("opp-1||1512|");
+    expect(viewerStakesKey("opp-1", "M1", 1512, 1498)).toBe("opp-1|M1|1512|1498|");
+    expect(viewerStakesKey("opp-1", null, 1512, null)).toBe("opp-1||1512||");
+    expect(viewerStakesKey("opp-1", "M1", 1512, 1498, weightsStakesKey(170, null))).toBe("opp-1|M1|1512|1498|170|");
     expect(viewerStakesKey("opp-1", "M1", 1512, 1498)).not.toBe(viewerStakesKey("opp-2", "M1", 1512, 1498));
     expect(viewerStakesKey("opp-1", "M1", 1512, 1498)).not.toBe(viewerStakesKey("opp-1", "M2", 1512, 1498));
   });
@@ -111,6 +112,24 @@ describe("useViewerStakes", () => {
     expect(result.current).toBeNull();
     await flush();
     expect(mockGetRatingStakes).toHaveBeenCalledTimes(3);
+    expect(result.current).toBe(second);
+  });
+
+  it("a new extra key (a reweigh) drops the stakes at once and reads again", async () => {
+    const first = ratingStakes({ win: 14 });
+    const second = ratingStakes({ win: 19 });
+    mockGetRatingStakes.mockResolvedValueOnce(first);
+    const { result, rerender } = mount();
+    await flush();
+    expect(result.current).toBe(first);
+    let resolve!: (v: unknown) => void;
+    mockGetRatingStakes.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    rerender({ ...BASE, extra: "170|190" });
+    expect(result.current).toBeNull();
+    expect(mockGetRatingStakes).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      resolve(second);
+    });
     expect(result.current).toBe(second);
   });
 });

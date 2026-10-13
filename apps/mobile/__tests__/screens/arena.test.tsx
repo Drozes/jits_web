@@ -964,6 +964,21 @@ describe("Arena screen", () => {
       expect(mockImpact).toHaveBeenCalledWith("light");
     });
 
+    it("reads the closest match's stakes again when its weight changes", async () => {
+      mockIsLive = true;
+      mat();
+      mockGetRatingStakes.mockImplementation(() => Promise.resolve(ratingStakes({ win: 15, loss: -15 })));
+      const r = render(<ArenaScreen />);
+      await waitFor(() => expect(r.getByTestId("arena-closest-stakes")).toBeTruthy());
+      const calls = mockGetRatingStakes.mock.calls.length;
+      mockGetRatingStakes.mockImplementation(() => new Promise(() => undefined));
+      mockRoster.competitors = mockRoster.competitors.map((c) => ((c as { id: string }).id === "near" ? { ...(c as object), weight: 205 } : c));
+      r.rerender(<ArenaScreen />);
+      expect(r.queryByTestId("arena-closest-stakes")).toBeNull();
+      await waitFor(() => expect(mockGetRatingStakes.mock.calls.length).toBe(calls + 1));
+      expect(mockGetRatingStakes).toHaveBeenLastCalledWith(expect.anything(), "near", null);
+    });
+
     it("hides the stakes line when get_rating_stakes returns null or fails, with no error", async () => {
       mockIsLive = true;
       mat();

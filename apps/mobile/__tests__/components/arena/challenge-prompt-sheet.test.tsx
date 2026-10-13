@@ -606,6 +606,51 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     },
   );
 
+  it("a new challenge from the same challenger at another weight, replaced in place, never shows the old stakes", async () => {
+    const viewer = { elo: 1512, weight: 170 };
+    mockGetRatingStakes.mockResolvedValueOnce(ratingStakes({ win: 14 }));
+    const screen = render(
+      <ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +14");
+
+    let resolve!: (v: unknown) => void;
+    mockGetRatingStakes.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    const heavier = { ...RIVAL, challengeId: "ch-heavy", challengerWeight: 230 };
+    screen.rerender(
+      <ChallengePromptSheet challenge={heavier} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
+    );
+    // The very first render for the new challenge: the old stakes are gone.
+    expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockGetRatingStakes).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
+    await act(async () => {
+      resolve(ratingStakes({ win: 22 }));
+    });
+    expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +22");
+
+    // Later then reopen at the new weight: its own stakes, from the cache.
+    mockGetRatingStakes.mockReturnValue(new Promise(() => undefined));
+    screen.rerender(
+      <ChallengePromptSheet challenge={null} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
+    );
+    screen.rerender(
+      <ChallengePromptSheet challenge={heavier} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
+    );
+    expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +22");
+    // And the original weight never borrows the heavier challenge's stakes.
+    screen.rerender(
+      <ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
+    );
+    expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
+  });
+
   it("reuses the stakes for a new challenge only for the same challenger, ratings and weights", async () => {
     mockGetRatingStakes.mockResolvedValueOnce(STAKES);
     const viewer = { elo: 1512, weight: 170 };

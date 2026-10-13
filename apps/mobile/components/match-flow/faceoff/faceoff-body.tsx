@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
-import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
+import { useViewerStakes, weightsStakesKey } from "@/lib/match-flow/use-viewer-stakes";
 import { setRecordingOptIn } from "@/lib/match-flow/recording-optin";
 import { useRecordingSpaceWarning } from "@/lib/video/recording-space";
 import { usePalette } from "@/lib/theme/palette";
@@ -38,8 +38,17 @@ function WeighIn({ me, opponent, matchId }: FaceoffBodyProps) {
   // Priced by the server on this match's challenge weights, exactly as
   // record_match_result will rate it (a missing one means no offset). Read
   // once the rated weights are read here too, so the LBS line beside the
-  // division line is the same pair of weights.
-  const stakes = useViewerStakes(f.weightsRated, opponent.athlete_id, matchId ?? null, me.current_elo, opponent.current_elo);
+  // division line is the same pair of weights. The weights are in the key: a
+  // reweigh (reweigh_for_match) writes new challenge weights, and the strip,
+  // the division line and the note must be read again for them.
+  const stakes = useViewerStakes(
+    f.weightsRated,
+    opponent.athlete_id,
+    matchId ?? null,
+    me.current_elo,
+    opponent.current_elo,
+    weightsStakesKey(f.myWeight, f.opponentWeight),
+  );
   const gap = stakes?.weight_division_gap ?? 0;
   const both = f.myWeight != null && f.opponentWeight != null;
   const diff = both ? Math.round(Math.abs(f.myWeight! - f.opponentWeight!) * 10) / 10 : null;
