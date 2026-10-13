@@ -11,7 +11,8 @@ Spec 020 section D (owner decision 2026-10-13): the full-screen reel viewer no l
 - `apps/mobile/lib/highlight/reel-meta.ts`: `ReelMetaInfo.title` and the `vs()` helper are removed from `metaFromItem`, `metaFromDetail` and `pageMeta`.
 - `apps/mobile/components/highlight-viewer/viewer-ready.tsx`, `viewer-frame.tsx`, `reel-video.tsx`, `reel-binding.ts`: `ViewerReady` passes the reel's subject (own, or the lane item's `opponentName` for a reel that is not yours) through `ViewerFrame` into `ReelVideo`.
 - `apps/mobile/lib/highlight/highlight-copy.ts`: new `reelPlayerLabel(durationS, subject)` and `ReelSubject`; `playerLabel` is unchanged (match detail's player keeps it).
-- Tests: `apps/mobile/__tests__/lib/highlight/reel-meta.test.ts`, `apps/mobile/__tests__/components/highlight-viewer/viewer-actions.test.tsx`, `apps/mobile/__tests__/components/highlight-viewer/reel-pager.test.tsx` (no title line for own and not-own pages; own, named and nameless not-own labels).
+- `apps/mobile/lib/highlight/reel-types.ts`: the `opponentName` doc now says it also feeds the viewer's VoiceOver label.
+- Tests: `apps/mobile/__tests__/lib/highlight/highlight-copy.test.ts` (new: `reelPlayerLabel` own, named, blank and missing names), `apps/mobile/__tests__/lib/highlight/reel-meta.test.ts`, `apps/mobile/__tests__/components/highlight-viewer/viewer-actions.test.tsx`, `apps/mobile/__tests__/components/highlight-viewer/reel-pager.test.tsx` (no title line for own and not-own pages; own, named and nameless not-own labels).
 
 **Fixed**
 - `apps/mobile/components/highlight-viewer/reel-video.tsx`: VoiceOver read "Your highlight reel, N seconds" on someone else's reel; it now reads "{Name}'s highlight reel, N seconds" ("Highlight reel, N seconds" when the name is missing).
