@@ -115,18 +115,18 @@ describe("secondary action (spec 8.6)", () => {
     expect(utils.queryByText("View profile")).toBeNull();
   });
 
-  it("anyone else gets View profile (C-V5) to the subject's profile, with the subject's name", () => {
+  it("anyone else gets View profile (C-V5) to the subject's profile, with no title line", () => {
     const item = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
     const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, item)} />);
-    expect(utils.getByTestId("viewer-title")).toHaveTextContent("C. Ruiz");
+    expect(utils.queryByTestId("viewer-title")).toBeNull();
     fireEvent.press(utils.getByText("View profile"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/athlete/ath-9");
     expect(utils.queryByText("Open match")).toBeNull();
   });
 
-  it("own reel: vs {opp} and the mono date + duration line", () => {
+  it("own reel: no title line, just the mono date + duration line", () => {
     const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, reel(1))} />);
-    expect(utils.getByTestId("viewer-title")).toHaveTextContent("vs Bea");
+    expect(utils.queryByTestId("viewer-title")).toBeNull();
     expect(utils.getByTestId("viewer-meta")).toHaveTextContent("OCT 04 · 0:28");
   });
 });

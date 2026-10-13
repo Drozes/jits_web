@@ -302,6 +302,21 @@ describe("ReelPager", () => {
     expect(utils.queryByTestId("viewer-rail")).toBeNull();
     expect(utils.queryByTestId("reel-scrim-rail")).toBeNull();
     expect(utils.getByTestId("reel-scrim-bottom")).toBeTruthy();
+    // No title line; VoiceOver names the subject, not "Your" (spec 020 D).
+    expect(utils.queryByTestId("viewer-title")).toBeNull();
+    expect(utils.getByTestId("highlight-player-toggle").props.accessibilityLabel).toBe("C. Ruiz's highlight reel, 28 seconds");
+  });
+
+  it("not yours with no subject name: a neutral VoiceOver label", async () => {
+    const other = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: null });
+    const utils = await open(session([other], 0));
+    expect(utils.getByTestId("highlight-player-toggle").props.accessibilityLabel).toBe("Highlight reel, 28 seconds");
+  });
+
+  it("own reel: no title line, VoiceOver says Your highlight reel", async () => {
+    const utils = await open(session([reel(1), reel(2)], 0));
+    expect(utils.queryByTestId("viewer-title")).toBeNull();
+    expect(utils.getByTestId("highlight-player-toggle").props.accessibilityLabel).toBe("Your highlight reel, 28 seconds");
   });
 
   it("own reel: Share to Instagram is the page's one red CTA; opening it suspends paging and pauses", async () => {

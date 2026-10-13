@@ -5,8 +5,6 @@ import { reelSecondaryAction, type ReelItem } from "./reel-types";
 
 /** The bottom-left meta of a full-screen reel page (spec 8.2, 8.6). */
 export interface ReelMetaInfo {
-  /** `vs {opp}` for an own reel, the subject's name otherwise; null when unknown. */
-  title: string | null;
   dateIso: string | null;
   matchId: string;
   secondary: "open_match" | "view_profile" | null;
@@ -25,15 +23,9 @@ export function reelMetaLine(dateIso: string | null, durationS: number | null | 
   return date ? `${date} · ${reelDuration(durationS)}` : reelDuration(durationS);
 }
 
-function vs(name: string | null | undefined): string | null {
-  const n = name?.trim();
-  return n ? `vs ${n}` : null;
-}
-
-/** A lane item (pager). A non-own item's `opponentName` carries the caption name of its subject. */
+/** A lane item (pager). */
 export function metaFromItem(item: ReelItem): ReelMetaInfo {
   return {
-    title: item.isOwn ? vs(item.opponentName) : item.opponentName?.trim() || null,
     dateIso: item.readyAt,
     matchId: item.matchId,
     secondary: reelSecondaryAction(item),
@@ -44,7 +36,6 @@ export function metaFromItem(item: ReelItem): ReelMetaInfo {
 /** The single-reel viewer: always the athlete's own reel, so always Open match. */
 export function metaFromDetail(detail: HighlightDetail): ReelMetaInfo {
   return {
-    title: vs(detail.caption?.opponentName),
     dateIso: detail.caption?.playedAt ?? null,
     matchId: detail.matchId,
     secondary: "open_match",
@@ -59,8 +50,8 @@ export function secondaryHref(meta: ReelMetaInfo): string | null {
 }
 
 /**
- * A page's meta: the detail read (match date, opponent) plus, in the pager,
- * the lane item's ownership-driven parts (title rule, secondary action).
+ * A page's meta: the detail read (match date) plus, in the pager, the lane
+ * item's ownership-driven secondary action.
  */
 export function pageMeta(detail: HighlightDetail, item?: ReelItem | null): ReelMetaInfo {
   const fromDetail = metaFromDetail(detail);
@@ -68,7 +59,6 @@ export function pageMeta(detail: HighlightDetail, item?: ReelItem | null): ReelM
   const fromItem = metaFromItem(item);
   return {
     ...fromDetail,
-    title: item.isOwn ? (fromDetail.title ?? fromItem.title) : fromItem.title,
     secondary: fromItem.secondary,
     subjectAthleteId: fromItem.subjectAthleteId,
   };

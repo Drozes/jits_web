@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Mobile: highlight viewer drops the title (spec 020)
+
+Spec 020 section D (owner decision 2026-10-13): the full-screen reel viewer no longer draws a title line (`vs {opp}` on your own reel, the subject's name on someone else's); the mono date and duration line and Open match / View profile stay. The play / pause VoiceOver label now names whose reel it is. JS-only (OTA-eligible).
+
+**Changed**
+- `apps/mobile/components/highlight-viewer/viewer-meta.tsx`: the `viewer-title` Text is removed.
+- `apps/mobile/lib/highlight/reel-meta.ts`: `ReelMetaInfo.title` and the `vs()` helper are removed from `metaFromItem`, `metaFromDetail` and `pageMeta`.
+- `apps/mobile/components/highlight-viewer/viewer-ready.tsx`, `viewer-frame.tsx`, `reel-video.tsx`, `reel-binding.ts`: `ViewerReady` passes the reel's subject (own, or the lane item's `opponentName` for a reel that is not yours) through `ViewerFrame` into `ReelVideo`.
+- `apps/mobile/lib/highlight/highlight-copy.ts`: new `reelPlayerLabel(durationS, subject)` and `ReelSubject`; `playerLabel` is unchanged (match detail's player keeps it).
+- Tests: `apps/mobile/__tests__/lib/highlight/reel-meta.test.ts`, `apps/mobile/__tests__/components/highlight-viewer/viewer-actions.test.tsx`, `apps/mobile/__tests__/components/highlight-viewer/reel-pager.test.tsx` (no title line for own and not-own pages; own, named and nameless not-own labels).
+
+**Fixed**
+- `apps/mobile/components/highlight-viewer/reel-video.tsx`: VoiceOver read "Your highlight reel, N seconds" on someone else's reel; it now reads "{Name}'s highlight reel, N seconds" ("Highlight reel, N seconds" when the name is missing).
+
 ### Mobile: Elo in the header, wordmark + rating on every tab root (epic jits-1ez5)
 
 Owner-approved option F "Wordmark + ELO" from the Elo in the Header review. Every tab root (Home, Arena, Matches, Rankings, Profile) shows the "ELO RATED" wordmark with the athlete's rating beside it; tapping the rating opens Your numbers. Owner decisions: the rating's Dynamic Type cap is the chip's 1.3x (not the proposed 1.15x); pushed screens keep `AppHeader`; no streak anywhere. JS-only (OTA-eligible).
