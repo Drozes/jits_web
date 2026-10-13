@@ -19,8 +19,10 @@ jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: 
 const mockDismissTo = jest.fn();
 jest.mock("expo-router", () => ({ useRouter: () => ({ dismissTo: mockDismissTo, push: jest.fn(), back: jest.fn() }) }));
 
+const mockGetRatingStakes = jest.fn();
 const mockGetEloStakes = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
+  getRatingStakes: (...a: unknown[]) => mockGetRatingStakes(...a),
   getEloStakes: (...a: unknown[]) => mockGetEloStakes(...a),
   getMatchDetails: jest.fn(),
 }));
@@ -73,21 +75,11 @@ import { FaceoffTop } from "@/components/match-flow/faceoff/faceoff-top";
 import { FaceoffBody } from "@/components/match-flow/faceoff/faceoff-body";
 import { __resetRecordingOptInForTests, getRecordingOptIn } from "@/lib/match-flow/recording-optin";
 import { __resetRecordingIntentForTests } from "@/lib/match-flow/recording-intent";
+import { ratingStakes } from "../../support/rating-stakes";
 
-const ME = { display_name: "Kai Reyes", current_elo: 1512 };
-const OPP = { display_name: "Mina Park", current_elo: 1498 };
-const STAKES = {
-  challenger_win: 14,
-  challenger_loss: -9,
-  challenger_draw: -2,
-  opponent_win: 9,
-  opponent_loss: -14,
-  opponent_draw: 2,
-  challenger_expected: 0.5,
-  opponent_expected: 0.5,
-  weight_division_gap: 0,
-  draw_score: 0.25,
-};
+const ME = { athlete_id: "me-1", display_name: "Kai Reyes", current_elo: 1512 };
+const OPP = { athlete_id: "opp-1", display_name: "Mina Park", current_elo: 1498 };
+const STAKES = ratingStakes();
 
 function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCancelledRemotely = jest.fn(), weightsRated = true }: {
   phase: "weight" | "ready";
@@ -112,9 +104,14 @@ function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCanc
       onCancelledRemotely={onCancelledRemotely}
     >
       <FaceoffTop phase={phase} me={ME} opponent={OPP} />
-      <FaceoffBody phase={phase} me={ME} opponent={OPP} />
+      <FaceoffBody phase={phase} me={ME} opponent={OPP} matchId="M1" />
     </FaceoffProvider>
   );
+}
+
+function colorOf(node: { props: { style?: unknown } }): unknown {
+  const flat = (Array.isArray(node.props.style) ? Object.assign({}, ...node.props.style.flat()) : node.props.style) as { color?: unknown };
+  return flat?.color;
 }
 
 async function flush() {
@@ -127,7 +124,7 @@ async function flush() {
 beforeEach(() => {
   jest.clearAllMocks();
   mockHandlers = {};
-  mockGetEloStakes.mockResolvedValue(STAKES);
+  mockGetRatingStakes.mockResolvedValue(STAKES);
   __resetRecordingOptInForTests(false);
   mockReadLocation.mockResolvedValue({ status: "denied", canAskAgain: true });
 });
@@ -144,6 +141,8 @@ describe("weigh-in", () => {
     expect(s.getByTestId("faceoff-opponent-weight")).toHaveTextContent("167 LBS");
     s.getByText("3 LBS APART · SAME DIVISION");
     expect(s.getByTestId("weight-stakes-win")).toHaveTextContent("▲ +14");
+    expect(s.getByTestId("weight-stakes-draw")).toHaveTextContent("▼ −2");
+    expect(s.getByTestId("weight-stakes-loss")).toHaveTextContent("▼ −9");
     // The face-off passes no Dynamic Type cap, so the shared strip neither
     // caps nor truncates its cells here (only the incoming prompt does).
     for (const key of ["win", "draw", "loss"]) {
@@ -151,8 +150,10 @@ describe("weigh-in", () => {
       expect([key, cell.props.numberOfLines, cell.props.maxFontSizeMultiplier]).toEqual([key, undefined, undefined]);
     }
     expect(s.getByText("WIN").props.numberOfLines).toBeUndefined();
-    // Viewer as challenger, with both weights.
-    expect(mockGetEloStakes).toHaveBeenCalledWith(expect.anything(), 1512, 1498, 170, 167);
+    // Rating V9: keyed on the opponent's id and this match (its challenge
+    // weights), never the retired value-only calculate_elo_stakes.
+    expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "opp-1", "M1");
+    expect(mockGetEloStakes).not.toHaveBeenCalled();
   });
 
   it("every match is the same kind: no RANKED or CASUAL tag", async () => {
@@ -186,7 +187,7 @@ describe("weigh-in", () => {
     mockUpdateWeight.mockResolvedValue({ ok: true, data: { weight: 172.5 } });
     const s = render(<Harness phase="weight" />);
     await flush();
-    const stakesCalls = mockGetEloStakes.mock.calls.length;
+    const stakesCalls = mockGetRatingStakes.mock.calls.length;
     fireEvent.press(s.getByTestId("faceoff-edit-weight"));
     s.getByText("Updates your profile weight for future matches. This match keeps its weigh-in.");
     // Confirm waits while the editor is open.
@@ -202,7 +203,7 @@ describe("weigh-in", () => {
     s.getByText("Profile weight saved: 172.5 lbs, for future matches.");
     s.getByText("Confirm 170 lbs");
     await flush();
-    expect(mockGetEloStakes.mock.calls.length).toBe(stakesCalls);
+    expect(mockGetRatingStakes.mock.calls.length).toBe(stakesCalls);
     expect(s.getByTestId("weight-confirm").props.accessibilityState.disabled).toBe(false);
     await act(async () => {
       fireEvent.press(s.getByTestId("weight-confirm"));
@@ -224,7 +225,58 @@ describe("weigh-in", () => {
   it("prices nothing until the match's rated (challenge) weights are read", async () => {
     render(<Harness phase="weight" weightsRated={false} />);
     await flush();
-    expect(mockGetEloStakes).not.toHaveBeenCalled();
+    expect(mockGetRatingStakes).not.toHaveBeenCalled();
+  });
+
+  it("an underdog's positive draw shows in the gain colour, not amber", async () => {
+    mockGetRatingStakes.mockResolvedValue(ratingStakes({ win: 31, draw: 4, loss: -6 }));
+    const s = render(<Harness phase="weight" />);
+    await flush();
+    const draw = s.getByTestId("weight-stakes-draw");
+    expect(draw).toHaveTextContent("▲ +4");
+    expect(colorOf(draw)).toBe(colorOf(s.getByTestId("weight-stakes-win")));
+  });
+
+  it("a negative draw is amber and a draw between equals is neutral ink", async () => {
+    const neg = render(<Harness phase="weight" />);
+    await flush();
+    const negColor = colorOf(neg.getByTestId("weight-stakes-draw"));
+    expect(negColor).not.toBe(colorOf(neg.getByTestId("weight-stakes-loss")));
+    neg.unmount();
+    mockGetRatingStakes.mockResolvedValue(ratingStakes({ draw: 0 }));
+    const zero = render(<Harness phase="weight" />);
+    await flush();
+    const zeroDraw = zero.getByTestId("weight-stakes-draw");
+    expect(zeroDraw).toHaveTextContent("0");
+    expect(colorOf(zeroDraw)).not.toBe(negColor);
+    expect(colorOf(zeroDraw)).not.toBe(colorOf(zero.getByTestId("weight-stakes-win")));
+  });
+
+  it("a null response hides the strip and the division line, with no error", async () => {
+    mockGetRatingStakes.mockResolvedValue(null);
+    const s = render(<Harness phase="weight" />);
+    await flush();
+    expect(s.queryByTestId("weight-stakes")).toBeNull();
+    expect(s.queryByTestId("weight-gap-note")).toBeNull();
+    s.getByText("3 LBS APART");
+    expect(s.queryByText(/error|failed/i)).toBeNull();
+  });
+
+  it("a failed read hides the strip, with no error", async () => {
+    mockGetRatingStakes.mockRejectedValue(new Error("function get_rating_stakes does not exist"));
+    const s = render(<Harness phase="weight" />);
+    await flush();
+    expect(s.queryByTestId("weight-stakes")).toBeNull();
+    expect(s.queryByText(/error|failed/i)).toBeNull();
+  });
+
+  it("a weight-class gap says the heavier athlete is favoured (Rating V9 copy)", async () => {
+    mockGetRatingStakes.mockResolvedValue(ratingStakes({ weight_division_gap: 2 }));
+    const s = render(<Harness phase="weight" />);
+    await flush();
+    s.getByText("3 LBS APART · 2 DIVISIONS APART");
+    expect(s.getByTestId("weight-gap-note")).toHaveTextContent("The heavier athlete is favoured, so they win fewer points.");
+    expect(s.queryByText(/adjusted/)).toBeNull();
   });
 });
 

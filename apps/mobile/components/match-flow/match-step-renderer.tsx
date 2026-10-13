@@ -26,7 +26,7 @@ export interface MatchParticipant {
   elo_before: number | null;
   elo_after: number | null;
   elo_delta: number | null;
-  /** BE-stamped IBJJF division gap used for the phantom-ELO adjustment. */
+  /** BE-stamped IBJJF division gap: informational since Rating V9 (no number depends on it). */
   weight_division_gap: number | null;
 }
 
@@ -112,7 +112,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     return <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />;
   }
   if (step === "weight" || step === "ready") {
-    return <FaceoffBody phase={step} me={me} opponent={opponent} durationSeconds={durationSeconds} />;
+    return <FaceoffBody phase={step} me={me} opponent={opponent} matchId={matchId} durationSeconds={durationSeconds} />;
   }
   if (step === "live") {
     return (

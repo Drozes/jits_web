@@ -78,6 +78,7 @@ jest.mock("@jits/shared/api/queries", () => ({
   ...jest.requireActual("@jits/shared/api/queries"),
   getSubmissionTypes: jest.fn(),
   getEloStakes: jest.fn(),
+  getRatingStakes: jest.fn(),
 }));
 
 jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({
@@ -335,6 +336,7 @@ describe("PracticeScreen", () => {
       expect([name, (fn as jest.Mock).mock.calls.length]).toEqual([name, 0]);
     }
     expect(queries.getEloStakes).not.toHaveBeenCalled();
+    expect(queries.getRatingStakes).not.toHaveBeenCalled();
     expect(startMatchVideoUpload).not.toHaveBeenCalled();
     expect(setMatchUpload).not.toHaveBeenCalled();
     expect(useSessionMatchSync).not.toHaveBeenCalled();

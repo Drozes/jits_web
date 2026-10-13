@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+The next OTA ships the Rating V9 client below together with the header rating and Your numbers sheet (epic jits-1ez5, merged but never on phones), per jr_be spec 019 decision D11.
+
+### Mobile: Rating V9 (Glicko-2) client (epic jits-76le, slice D jits-76le.1)
+
+The app moves with the backend from K 32 Elo to Thomas V9 (Glicko-2: everyone starts at 1500, RD aging, a continuous weight ratio, weighted zero-sum draws, win and loss floors of 1, rematch weights). JS-only (OTA-eligible): no native dependency, no `app.json` / `app.config.js` change, no version or `runtimeVersion` bump. **Needs the jr_be V9 migrations (`20261013100000` to `20261013100300`, epic jr_be-o8m) on prod before the OTA**: the client calls `get_rating_stakes`, which does not exist before them (until then every stakes strip hides, as on a failed read). Contract: jr_be `specs/019-glicko-v9-ratings/spec.md` section 7.
+
+**Added**
+- `packages/shared/src/api/queries.ts`: `getRatingStakes(supabase, opponentId, matchId?)`, the viewer's stakes from `get_rating_stakes(p_opponent_id, p_match_id)`; null (and a `console.error`) on any error.
+- `packages/shared/src/types/composites.ts`: `RatingStakes` / `RatingStakesSide`, the RPC's response (spec 5.2).
+- `packages/shared/src/types/database.ts`: hand-written until the backend lands on the local stack: the `athletes` columns `rating`, `rating_rd`, `rating_volatility`, `rating_last_rated_at`, `rated_match_count`, and the `get_rating_stakes` function. Regenerate with `npm run db:types` once the V9 migrations are applied locally.
+- Tests: `apps/mobile/__tests__/lib/match-flow/use-viewer-stakes.test.tsx`, `apps/mobile/__tests__/lib/leaderboard/use-leaderboard-data.test.tsx`, `apps/mobile/__tests__/support/rating-stakes.ts` (fixture whose `challenger_*` aliases differ from `win` / `draw` / `loss`, so a consumer still reading the aliases fails), plus positive / negative / zero draw and null / error cases in the face-off, Arena, challenge prompt, verdict, Your numbers and StakesStrip suites.
+
+**Changed**
+- `apps/mobile/lib/match-flow/use-viewer-stakes.ts`: `useViewerStakes(enabled, opponentId, matchId?, myElo?, oppElo?)` reads `get_rating_stakes`; the key is `opponentId|matchId|myElo|oppElo` (ratings kept so the preview is read again after either changes). Still null while loading, when disabled, on a null response, on an error, and on the render where the key changes.
+- Stakes call sites read `win` / `draw` / `loss`: the face-off weigh-in (`faceoff-body.tsx`, the opponent's id and the match id, so the server prices the match on its challenge weights; new `FaceoffParticipant` type with `athlete_id`), the Arena closest-match card (`mat-board.tsx`, the athlete's id) and the incoming challenge prompt (`challenge-prompt-sheet.tsx`, the challenger's id; its Later / reopen cache key is the hook's key plus both weights).
+- Draw deltas are coloured by their sign (an underdog's draw GAINS under V9): positive in the gain colour, negative amber, zero neutral ink. `fight-ui.tsx` (`drawDeltaColor`, used by `StakesStrip`), the verdict `DeltaChip` (`rating-moment.tsx`) and Your numbers (`deltaTone` in `lib/rating/your-numbers.ts`).
+- Rankings (`lib/leaderboard/use-leaderboard-data.ts`) list only athletes with at least one rated match (`rated_match_count > 0`).
+- Copy (spec 7.3), Help "How ELO Works": "Everyone starts at 1500. No belt seeding. A new rating moves fast and settles as you play, and loosens again after a long break. Weight is part of the odds: the heavier athlete is expected to do better, so they win fewer points and lose more." / "A win is by submission only. Tap or don't. Anything else is a draw. A draw between equals changes nothing; otherwise the favourite gives up a few points to the underdog." / "Every win gains at least 1 point and every loss costs at least 1. Rematches with the same partner count for less from the third meeting in 30 days. Your number is your number." Result form draw: "In a draw the favourite gives up a few points to the underdog." Verdict weight note: "N weight class(es) apart. The heavier athlete was favoured, so they win fewer points." Face-off weight note: "The heavier athlete is favoured, so they win fewer points."
+- `__tests__/components/ui/color-semantics-guard.test.ts`: `fight-ui.tsx` allows a second Gain Green line (the positive draw).
+
+**Deprecated**
+- `getEloStakes` / `EloStakes`: `calculate_elo_stakes` returns NULL under V9. Kept for the web app and the match-loop harness (follow-ups jits-76le.3 and jits-76le.4).
+
 ### Mobile: Elo in the header, wordmark + rating on every tab root (epic jits-1ez5)
 
 Owner-approved option F "Wordmark + ELO" from the Elo in the Header review. Every tab root (Home, Arena, Matches, Rankings, Profile) shows the "ELO RATED" wordmark with the athlete's rating beside it; tapping the rating opens Your numbers. Owner decisions: the rating's Dynamic Type cap is the chip's 1.3x (not the proposed 1.15x); pushed screens keep `AppHeader`; no streak anywhere. JS-only (OTA-eligible).

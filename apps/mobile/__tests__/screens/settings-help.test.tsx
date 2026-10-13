@@ -44,11 +44,14 @@ describe("Help & Support copy", () => {
     expect(text).not.toMatch(/Film Room/);
   });
 
-  it("does not imply casual matches exist, and does not mention a rematch", () => {
+  it("does not imply casual matches exist, and does not mention a Rematch button", () => {
     const text = allText();
     expect(text).not.toMatch(/casual/i);
     expect(text).not.toMatch(/ranked/i);
-    expect(text).not.toMatch(/rematch/i);
+    // The only rematch wording is the Rating V9 rematch weight (spec 019
+    // section 7.3), never the removed Rematch action.
+    expect(text.match(/rematch/gi)).toEqual(["Rematch"]);
+    expect(text).toMatch(/Rematches with the same partner count for less from the third meeting in 30 days\./);
     expect(text).toMatch(/every match counts\./);
     expect(text).toMatch(/Practice Match from Settings/);
   });
@@ -80,10 +83,20 @@ describe("Help & Support copy", () => {
     expect(text).not.toMatch(/until you go offline in the Arena\./);
   });
 
-  it("keeps the verified ELO claims and drops the unverifiable ones", () => {
+  it("describes Rating V9 verbatim (spec 019 section 7.3) and drops the old Elo claims", () => {
     const text = allText();
-    expect(text).toMatch(/\+50 per IBJJF division gap/);
-    expect(text).toMatch(/draws cost ELO for both fighters/);
+    for (const line of [
+      "Everyone starts at 1500. No belt seeding. A new rating moves fast and settles as you play, and loosens again after a long break. Weight is part of the odds: the heavier athlete is expected to do better, so they win fewer points and lose more.",
+      "A win is by submission only. Tap or don't. Anything else is a draw. A draw between equals changes nothing; otherwise the favourite gives up a few points to the underdog.",
+      "Every win gains at least 1 point and every loss costs at least 1. Rematches with the same partner count for less from the third meeting in 30 days. Your number is your number.",
+    ]) {
+      expect(text).toContain(line);
+    }
+    expect(text).not.toMatch(/\+50/);
+    expect(text).not.toMatch(/phantom/i);
+    expect(text).not.toMatch(/pressure/i);
+    expect(text).not.toMatch(/draws? cost/i);
+    expect(text).not.toMatch(/\b1000\b/);
     expect(text).not.toMatch(/harshest/);
   });
 

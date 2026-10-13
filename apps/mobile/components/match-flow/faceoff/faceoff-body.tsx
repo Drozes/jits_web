@@ -11,12 +11,14 @@ import { TRACKING, typeStep } from "@/lib/typography";
 import { FightButton, Mono, StakesStrip, StatusPlate, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 import { WeightCheckPanel, WeightCheckPlate } from "./faceoff-weight-check";
-import type { FaceoffAthlete } from "./faceoff-top";
+import type { FaceoffParticipant } from "./faceoff-top";
 
 interface FaceoffBodyProps {
   phase: "weight" | "ready";
-  me: FaceoffAthlete;
-  opponent: FaceoffAthlete;
+  me: FaceoffParticipant;
+  opponent: FaceoffParticipant;
+  /** This match: the stakes are priced on its challenge weights. */
+  matchId?: string | null;
   /** The match length, for the recording's free-space estimate. */
   durationSeconds?: number | null;
 }
@@ -30,12 +32,14 @@ export function FaceoffBody(props: FaceoffBodyProps) {
   return props.phase === "weight" ? <WeighIn {...props} /> : <ReadyCheck {...props} />;
 }
 
-function WeighIn({ me, opponent }: FaceoffBodyProps) {
+function WeighIn({ me, opponent, matchId }: FaceoffBodyProps) {
   const f = useFaceoffContext();
   const p = usePalette();
-  // Priced on the challenge's rated weights, exactly as record_match_result
-  // will rate it (a missing one means no gap), and only once they are read.
-  const stakes = useViewerStakes(f.weightsRated, me.current_elo, opponent.current_elo, f.myWeight, f.opponentWeight);
+  // Priced by the server on this match's challenge weights, exactly as
+  // record_match_result will rate it (a missing one means no offset). Read
+  // once the rated weights are read here too, so the LBS line beside the
+  // division line is the same pair of weights.
+  const stakes = useViewerStakes(f.weightsRated, opponent.athlete_id, matchId ?? null, me.current_elo, opponent.current_elo);
   const gap = stakes?.weight_division_gap ?? 0;
   const both = f.myWeight != null && f.opponentWeight != null;
   const diff = both ? Math.round(Math.abs(f.myWeight! - f.opponentWeight!) * 10) / 10 : null;
@@ -57,11 +61,11 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
         </View>
       ) : null}
       {stakes ? (
-        <StakesStrip testID="weight-stakes" win={stakes.challenger_win} draw={stakes.challenger_draw} loss={stakes.challenger_loss} />
+        <StakesStrip testID="weight-stakes" win={stakes.win} draw={stakes.draw} loss={stakes.loss} />
       ) : null}
       {gap > 0 ? (
         <Text testID="weight-gap-note" className="font-body" style={[typeStep("body"), { color: p.text2 }]}>
-          The heavier athlete{"’"}s rating is adjusted for the weight gap.
+          The heavier athlete is favoured, so they win fewer points.
         </Text>
       ) : null}
       <View style={{ flexDirection: "row", gap: 12 }}>

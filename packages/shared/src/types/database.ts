@@ -424,6 +424,11 @@ export type Database = {
           practice_match_offered_at: string | null
           primary_gym_id: string | null
           profile_photo_url: string | null
+          rated_match_count: number
+          rating: number
+          rating_last_rated_at: string | null
+          rating_rd: number
+          rating_volatility: number
           role: Database["public"]["Enums"]["athlete_role"]
           status: string
         }
@@ -454,6 +459,11 @@ export type Database = {
           practice_match_offered_at?: string | null
           primary_gym_id?: string | null
           profile_photo_url?: string | null
+          rated_match_count?: number
+          rating?: number
+          rating_last_rated_at?: string | null
+          rating_rd?: number
+          rating_volatility?: number
           role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
@@ -484,6 +494,11 @@ export type Database = {
           practice_match_offered_at?: string | null
           primary_gym_id?: string | null
           profile_photo_url?: string | null
+          rated_match_count?: number
+          rating?: number
+          rating_last_rated_at?: string | null
+          rating_rd?: number
+          rating_volatility?: number
           role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
@@ -4589,6 +4604,10 @@ export type Database = {
       }
       get_or_create_personal_invite: { Args: never; Returns: Json }
       get_playback_settings: { Args: never; Returns: Json }
+      get_rating_stakes: {
+        Args: { p_match_id?: string; p_opponent_id: string }
+        Returns: Json
+      }
       get_recent_activity: {
         Args: { p_limit?: number }
         Returns: {

@@ -167,10 +167,9 @@ jest.mock("@/lib/match-flow/active-match-store", () => ({
   useMatchToConfirm: () => mockConfirm,
 }));
 
-let mockStakes: Record<string, number> | null = null;
-jest.mock("@/lib/match-flow/use-viewer-stakes", () => ({
-  useViewerStakes: () => mockStakes,
-}));
+// The real useViewerStakes runs; only the RPC wrapper is mocked, so the
+// Closest Match card is tested as it consumes get_rating_stakes.
+const mockGetRatingStakes = jest.fn((..._a: unknown[]): Promise<unknown> => Promise.resolve(null));
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 // Invites + friends (jr_be spec 016): controllable stand-ins for the realtime
@@ -203,6 +202,7 @@ jest.mock("@/lib/invites/use-bookings", () => ({
 const mockGetPending = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
   getPendingChallengesForAthlete: (...a: unknown[]) => mockGetPending(...a),
+  getRatingStakes: (...a: unknown[]) => mockGetRatingStakes(...a),
 }));
 const mockResync = jest.fn();
 jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({
@@ -327,6 +327,7 @@ jest.mock("@/lib/arena/arena-store", () => ({
 
 import { MAT_CONTROL_BAR_HEIGHT } from "@/components/arena/mat-board";
 import ArenaScreen from "@/app/(app)/(tabs)/arena/index";
+import { ratingStakes } from "../support/rating-stakes";
 import { publishBellBadge, resetBellStore } from "@/lib/notifications/bell-store";
 import { __resetArenaNearbyForTests } from "@/lib/arena/use-arena-nearby";
 
@@ -385,7 +386,8 @@ beforeEach(() => {
     capReached: false,
   };
   mockConfirm = null;
-  mockStakes = null;
+  mockGetRatingStakes.mockReset();
+  mockGetRatingStakes.mockImplementation(() => Promise.resolve(null));
   mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [], outgoing: [] } });
 });
 
@@ -944,20 +946,38 @@ describe("Arena screen", () => {
       mockLobbyIds = new Set(["far", "near", "mid"]);
     }
 
-    it("suggests the smallest |ΔELO| with its stakes and one red CHALLENGE", () => {
+    it("suggests the smallest |ΔELO| with its stakes and one red CHALLENGE", async () => {
       mockIsLive = true;
       mat();
-      mockStakes = { challenger_win: 15, challenger_loss: -15, challenger_draw: 0 };
+      mockGetRatingStakes.mockImplementation(() => Promise.resolve(ratingStakes({ win: 15, draw: 0, loss: -15 })));
       const r = render(<ArenaScreen />);
       const cta = r.getByTestId("arena-closest-cta");
       expect(cta.props.accessibilityLabel).toBe("Challenge Near");
       expect(cta.props.className).toMatch(/bg-cta/);
-      expect(r.getByTestId("arena-closest-stakes").props.children).toBe("Win +15 · Loss −15");
+      await waitFor(() => expect(r.getByTestId("arena-closest-stakes").props.children).toBe("Win +15 · Loss −15"));
+      // Rating V9: read against the suggested athlete's id, no match yet.
+      expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "near", null);
       expect(redCount(r)).toBe(1);
 
       fireEvent.press(cta);
       expect(mockSendChallenge).toHaveBeenCalledWith("near", "Near");
       expect(mockImpact).toHaveBeenCalledWith("light");
+    });
+
+    it("hides the stakes line when get_rating_stakes returns null or fails, with no error", async () => {
+      mockIsLive = true;
+      mat();
+      const r = render(<ArenaScreen />);
+      await waitFor(() => expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "near", null));
+      await act(async () => undefined);
+      expect(r.queryByTestId("arena-closest-stakes")).toBeNull();
+      r.unmount();
+      mockGetRatingStakes.mockImplementation(() => Promise.reject(new Error("offline")));
+      const failed = render(<ArenaScreen />);
+      await waitFor(() => expect(mockGetRatingStakes).toHaveBeenCalledTimes(2));
+      await act(async () => undefined);
+      expect(failed.queryByTestId("arena-closest-stakes")).toBeNull();
+      expect(failed.getByTestId("arena-closest-cta").props.accessibilityLabel).toBe("Challenge Near");
     });
 
     it("offline, the CTA is a red GO LIVE TO ROLL", () => {

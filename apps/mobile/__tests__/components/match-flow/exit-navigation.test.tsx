@@ -110,7 +110,7 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: jest.fn(),
   getMatchConfirmations: jest.fn(() => Promise.resolve([])),
   // The ranked face-off's stakes strip; null hides it.
-  getEloStakes: jest.fn(() => Promise.resolve(null)),
+  getRatingStakes: jest.fn(() => Promise.resolve(null)),
   // The verdict's opening still.
   getMatchDetailView: jest.fn(() => Promise.resolve({ ok: true, data: { videos: [] } })),
 }));

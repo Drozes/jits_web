@@ -147,7 +147,7 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: (...a: unknown[]) => mockGetMatchDetails(...a),
   getMatchConfirmations: (...a: unknown[]) => mockGetMatchConfirmations(...a),
   getSubmissionTypes: async () => [],
-  getEloStakes: async () => null,
+  getRatingStakes: async () => null,
   getMatchDetailView: async () => ({ ok: true, data: { videos: [] } }),
 }));
 jest.mock("@jits/shared/api/match-rank-change", () => ({

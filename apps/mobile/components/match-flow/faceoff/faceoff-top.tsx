@@ -15,6 +15,15 @@ export interface FaceoffAthlete {
   current_elo: number | null;
 }
 
+/**
+ * A face-off athlete with their id: the weigh-in reads the stakes against the
+ * opponent's id (get_rating_stakes). Kept apart from `FaceoffAthlete`, which
+ * the countdown and live stage share without an id.
+ */
+export interface FaceoffParticipant extends FaceoffAthlete {
+  athlete_id: string;
+}
+
 interface FaceoffTopProps {
   phase: "weight" | "ready";
   me: FaceoffAthlete;

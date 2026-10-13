@@ -55,8 +55,10 @@ jest.mock("@react-native-community/netinfo", () => ({
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
 
+const mockGetRatingStakes = jest.fn();
 const mockGetEloStakes = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
+  getRatingStakes: (...args: unknown[]) => mockGetRatingStakes(...args),
   getEloStakes: (...args: unknown[]) => mockGetEloStakes(...args),
 }));
 
@@ -111,6 +113,7 @@ import type { IncomingChallenge } from "@/lib/arena/use-arena-challenge";
 import { getAnimatedStyle } from "react-native-reanimated";
 import { __setReduceMotionForTests } from "@/lib/motion";
 import { ACCEPT_SWEEP_MS } from "@/components/arena/challenge-prompt-sheet";
+import { ratingStakes } from "../../support/rating-stakes";
 
 const RIVAL: IncomingChallenge = {
   challengeId: "ch-1",
@@ -137,8 +140,9 @@ type Screen = ReturnType<typeof render>;
 const modalOf = (screen: Screen) => screen.UNSAFE_getByType(Modal);
 
 beforeEach(() => {
+  mockGetRatingStakes.mockReset();
+  mockGetRatingStakes.mockResolvedValue(null);
   mockGetEloStakes.mockReset();
-  mockGetEloStakes.mockResolvedValue(null);
   mockNotify.mockClear();
   mockImpact.mockClear();
   __setReduceMotionForTests(false);
@@ -261,7 +265,7 @@ describe("ChallengePromptSheet centered modal (jits-02vo.3)", () => {
   });
 
   it("keeps the board's content order", () => {
-    mockGetEloStakes.mockResolvedValue(undefined);
+    mockGetRatingStakes.mockResolvedValue(undefined);
     const screen = render(
       <ChallengePromptSheet
         challenge={RIVAL}
@@ -293,7 +297,7 @@ describe("ChallengePromptSheet centered modal (jits-02vo.3)", () => {
 
   it("keeps the last card on screen while it fades out, with its answers disabled", async () => {
     jest.useFakeTimers();
-    mockGetEloStakes.mockResolvedValue({ challenger_win: 14, challenger_loss: -9, challenger_draw: -2 });
+    mockGetRatingStakes.mockResolvedValue(ratingStakes({ win: 14, loss: -9, draw: -2 }));
     const viewer = { elo: 1512, weight: 170 };
     const onAccept = jest.fn();
     const screen = render(
@@ -481,21 +485,10 @@ describe("ChallengePromptSheet haptic (jits-4zp.7)", () => {
 });
 
 describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
-  const STAKES = {
-    challenger_win: 14,
-    challenger_loss: -9,
-    challenger_draw: -2,
-    opponent_win: 9,
-    opponent_loss: -14,
-    opponent_draw: 2,
-    challenger_expected: 0.5,
-    opponent_expected: 0.5,
-    weight_division_gap: 0,
-    draw_score: 0.25,
-  };
+  const STAKES = ratingStakes();
 
-  it("shows the viewer's stakes, read once with the viewer as challenger", async () => {
-    mockGetEloStakes.mockResolvedValue(STAKES);
+  it("shows the viewer's stakes, read once against the challenger's id", async () => {
+    mockGetRatingStakes.mockResolvedValue(STAKES);
     const screen = render(
       <ChallengePromptSheet
         challenge={RIVAL}
@@ -508,7 +501,8 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(mockGetEloStakes).toHaveBeenCalledWith(expect.anything(), 1512, 1350, 170, 190);
+    expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "a-9", null);
+    expect(mockGetEloStakes).not.toHaveBeenCalled();
     expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +14");
     expect(screen.getByTestId("challenge-prompt-stakes-loss")).toHaveTextContent("\u25bc \u22129");
     expect(screen.getByText("YOUR STAKES \u00b7 1512")).toBeTruthy();
@@ -517,7 +511,7 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
   });
 
   it("keeps the stakes across a Later and reopen, so the strip does not flicker", async () => {
-    mockGetEloStakes.mockResolvedValue(STAKES);
+    mockGetRatingStakes.mockResolvedValue(STAKES);
     const viewer = { elo: 1512, weight: 170 };
     const screen = render(
       <ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
@@ -529,7 +523,7 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
 
     // Tucked with Later, then reopened from the chip: the strip is there on
     // the very first render, with no fallback line in between.
-    mockGetEloStakes.mockReturnValue(new Promise(() => undefined));
+    mockGetRatingStakes.mockReturnValue(new Promise(() => undefined));
     screen.rerender(
       <ChallengePromptSheet challenge={null} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
     );
@@ -538,7 +532,7 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     );
     expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +14");
     expect(screen.queryByTestId("challenge-prompt-fallback")).toBeNull();
-    // And no second calculate_elo_stakes read for inputs already answered,
+    // And no second get_rating_stakes read for inputs already answered,
     // however many times it is tucked and reopened.
     for (let i = 0; i < 3; i += 1) {
       screen.rerender(
@@ -551,7 +545,7 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(mockGetEloStakes).toHaveBeenCalledTimes(1);
+    expect(mockGetRatingStakes).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +14");
 
     // A different challenger (another rating) never borrows them.
@@ -576,8 +570,8 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     async (_label, bRead) => {
       const viewer = { elo: 1512, weight: 170 };
       const A = { ...RIVAL, challengeId: "ch-a", challengerElo: 1500 };
-      const B = { ...RIVAL, challengeId: "ch-b", challengerName: "Bravo", challengerElo: 1800 };
-      mockGetEloStakes.mockResolvedValueOnce(STAKES);
+      const B = { ...RIVAL, challengeId: "ch-b", challengerId: "b-2", challengerName: "Bravo", challengerElo: 1800 };
+      mockGetRatingStakes.mockResolvedValueOnce(STAKES);
       const screen = render(
         <ChallengePromptSheet challenge={A} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
       );
@@ -586,7 +580,7 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
       });
       expect(screen.getByTestId("challenge-prompt-stakes-win")).toHaveTextContent("\u25b2 +14");
 
-      mockGetEloStakes.mockImplementationOnce(bRead);
+      mockGetRatingStakes.mockImplementationOnce(bRead);
       screen.rerender(
         <ChallengePromptSheet challenge={B} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
       );
@@ -596,12 +590,12 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
         await Promise.resolve();
         await Promise.resolve();
       });
-      expect(mockGetEloStakes).toHaveBeenLastCalledWith(expect.anything(), 1512, 1800, 170, 190);
+      expect(mockGetRatingStakes).toHaveBeenLastCalledWith(expect.anything(), "b-2", null);
       expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
       expect(screen.getByTestId("challenge-prompt-fallback")).toBeTruthy();
 
       // Tucked with Later and reopened: still no borrowed stakes for B.
-      mockGetEloStakes.mockReturnValue(new Promise(() => undefined));
+      mockGetRatingStakes.mockReturnValue(new Promise(() => undefined));
       screen.rerender(
         <ChallengePromptSheet challenge={null} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
       );
@@ -612,8 +606,8 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     },
   );
 
-  it("reuses the stakes for a new challenge only when all four inputs match", async () => {
-    mockGetEloStakes.mockResolvedValueOnce(STAKES);
+  it("reuses the stakes for a new challenge only for the same challenger, ratings and weights", async () => {
+    mockGetRatingStakes.mockResolvedValueOnce(STAKES);
     const viewer = { elo: 1512, weight: 170 };
     const screen = render(
       <ChallengePromptSheet challenge={RIVAL} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
@@ -621,11 +615,11 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    mockGetEloStakes.mockReturnValue(new Promise(() => undefined));
+    mockGetRatingStakes.mockReturnValue(new Promise(() => undefined));
     screen.rerender(
       <ChallengePromptSheet challenge={null} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
     );
-    // Same rating and weight on both sides: the same stakes, by definition.
+    // Same challenger, ratings and weights: the same stakes.
     screen.rerender(
       <ChallengePromptSheet
         challenge={{ ...RIVAL, challengeId: "ch-2" }}
@@ -647,6 +641,28 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
       />,
     );
     expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
+    // Another challenger at the same rating and weight: never reused.
+    screen.rerender(
+      <ChallengePromptSheet
+        challenge={{ ...RIVAL, challengeId: "ch-4", challengerId: "c-3" }}
+        busy={false}
+        onAccept={jest.fn()}
+        onDecline={jest.fn()}
+        viewer={viewer}
+      />,
+    );
+    expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
+    // The viewer's rating changed (a match in between): not reused.
+    screen.rerender(
+      <ChallengePromptSheet
+        challenge={{ ...RIVAL, challengeId: "ch-2" }}
+        busy={false}
+        onAccept={jest.fn()}
+        onDecline={jest.fn()}
+        viewer={{ elo: 1530, weight: 170 }}
+      />,
+    );
+    expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
     // The viewer's weight changed: not reused either.
     screen.rerender(
       <ChallengePromptSheet
@@ -660,13 +676,41 @@ describe("ChallengePromptSheet face-off preview (match-flow redesign)", () => {
     expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
   });
 
+  it("an underdog's draw that gains reads as a gain on the strip; a null response shows the fallback line", async () => {
+    mockGetRatingStakes.mockResolvedValue(ratingStakes({ win: 40, draw: 6, loss: -3 }));
+    const viewer = { elo: 1350, weight: 170 };
+    const screen = render(
+      <ChallengePromptSheet challenge={{ ...RIVAL, challengerElo: 1700 }} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const draw = screen.getByTestId("challenge-prompt-stakes-draw");
+    expect(draw).toHaveTextContent("\u25b2 +6");
+    const dark = paletteFor("dark");
+    const light = paletteFor("light");
+    expect([dark.win, light.win]).toContain(StyleSheet.flatten(draw.props.style).color);
+    screen.unmount();
+
+    mockGetRatingStakes.mockResolvedValue(null);
+    const none = render(
+      <ChallengePromptSheet challenge={{ ...RIVAL, challengeId: "ch-n", challengerId: "n-1" }} busy={false} onAccept={jest.fn()} onDecline={jest.fn()} viewer={viewer} />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mockGetRatingStakes).toHaveBeenLastCalledWith(expect.anything(), "n-1", null);
+    expect(none.queryByTestId("challenge-prompt-stakes")).toBeNull();
+    expect(none.getByTestId("challenge-prompt-fallback")).toBeTruthy();
+  });
+
   it("shows no strip (and never a spinner) without the viewer or when stakes fail", async () => {
-    mockGetEloStakes.mockRejectedValue(new Error("offline"));
+    mockGetRatingStakes.mockRejectedValue(new Error("offline"));
     const screen = render(<Harness challenge={RIVAL} />);
     await act(async () => {
       await Promise.resolve();
     });
-    expect(mockGetEloStakes).not.toHaveBeenCalled();
+    expect(mockGetRatingStakes).not.toHaveBeenCalled();
     expect(screen.queryByTestId("challenge-prompt-stakes")).toBeNull();
     expect(screen.getByText("Accept and you both drop straight into the match.")).toBeTruthy();
   });
@@ -814,11 +858,7 @@ describe("ChallengePromptSheet header at large text sizes", () => {
 
   it("caps every label on the prompt so Accept and Decline keep their size", async () => {
     jest.useFakeTimers({ now: NOW });
-    mockGetEloStakes.mockResolvedValue({
-      challenger_win: 14,
-      challenger_loss: -9,
-      challenger_draw: -2,
-    });
+    mockGetRatingStakes.mockResolvedValue(ratingStakes({ win: 14, loss: -9, draw: -2 }));
     const screen = render(<Sheet onLater={jest.fn()} moreCount={2} viewer={{ elo: 1512, weight: 170 }} />);
     await act(async () => {
       await Promise.resolve();
