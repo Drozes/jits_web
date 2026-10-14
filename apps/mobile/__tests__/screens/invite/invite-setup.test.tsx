@@ -3,7 +3,8 @@
  * once per pending invite (a code attribution counts against the throttle),
  * a wrong or throttled code goes back to code entry before setup, the waiver
  * and the 16+ rule gate saving, an active athlete is sent on, and the banner
- * reads as setup copy (the account already exists).
+ * reads as setup copy (the account already exists). The Terms and Privacy
+ * Policy open in the legal modal (jits-rog5.8).
  *
  * Source: apps/mobile/app/invite-setup.tsx
  */
@@ -14,11 +15,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PENDING_INVITE_KEY, makePendingInvite } from "@/lib/invites/pending-invite";
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 jest.mock("expo-router", () => {
   const RN = require("react-native");
   const R = require("react");
   return {
-    useRouter: () => ({ replace: mockReplace, push: jest.fn() }),
+    useRouter: () => ({ replace: mockReplace, push: mockPush }),
     Redirect: ({ href }: { href: string }) => R.createElement(RN.Text, null, `redirect:${href}`),
   };
 });
@@ -132,6 +134,25 @@ it("saving waits for the waiver", async () => {
   fireEvent.press(screen.getByTestId("invite-setup-waiver"));
   fireEvent.press(screen.getByTestId("identity-next"));
   expect(mockSubmit).toHaveBeenCalledWith(expect.objectContaining({ firstName: "Sam" }));
+});
+
+it("shows the same waiver notice as profile setup: Terms key points with Section 5 first, links, an unticked box", async () => {
+  await withPending({ token: TOKEN }, "universal_link");
+  render(<InviteSetupScreen />);
+  const box = await screen.findByTestId("invite-setup-waiver");
+  expect(box.props.accessibilityState).toMatchObject({ checked: false });
+  expect(screen.getByRole("header", { name: "Key points (please read)" })).toBeTruthy();
+  const [first] = screen.getAllByTestId("legal-list-item");
+  expect(first).toHaveTextContent(/^THESE TERMS INCLUDE AN ASSUMPTION OF RISK, WAIVER AND RELEASE OF LIABILITY \(SECTION 5\)\./);
+  fireEvent.press(screen.getAllByTestId("legal-ref-terms-5")[0]);
+  expect(mockPush).toHaveBeenLastCalledWith("/legal/terms?section=5");
+  mockPush.mockClear();
+  expect(box.props.accessibilityLabel).toMatch(/Assumption of Risk, Waiver and Release of Liability in Section 5/);
+  expect(box.props.accessibilityLabel).toMatch(/Privacy Policy/);
+  expect(screen.queryByText("Read terms")).toBeNull();
+  fireEvent.press(screen.getByTestId("legal-link-terms"));
+  fireEvent.press(screen.getByTestId("legal-link-privacy"));
+  expect(mockPush.mock.calls).toEqual([["/legal/terms"], ["/legal/privacy"]]);
 });
 
 it("blocks an athlete under 16", async () => {

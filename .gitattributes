@@ -1,0 +1,4 @@
+# Legal text is hashed into a version (packages/shared/scripts/sync-legal-docs.mjs):
+# keep it LF in every checkout.
+*.md text eol=lf
+packages/shared/src/legal/documents.generated.ts text eol=lf

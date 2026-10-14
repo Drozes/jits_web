@@ -55,7 +55,7 @@ const HELP_SECTIONS: HelpSection[] = [
     title: "Match Footage & Privacy",
     paragraphs: [
       "You own your match footage. Your recorded matches are in the Film tab, where you can watch them back. Server-side retention on the free tier may be limited; access to your own data is not.",
-      "Your profile and rating are public on the global ladder.",
+      "Your profile and rating are public on the global ladder. How we collect, use and protect your personal information is explained in the Privacy Policy, in Settings.",
     ],
   },
   {

@@ -1,7 +1,9 @@
 import * as React from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { StatePressable } from "@/components/ui/state-pressable";
-import { TOS_TEXT } from "@jits/shared/utils";
+import { TermsKeyPoints } from "@/components/legal/terms-key-points";
+import { LegalLinks } from "@/components/legal/legal-links";
+import { LEGAL_AGREE_LABEL } from "@/lib/legal/legal-copy";
 import { Plate } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
 import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
@@ -13,42 +15,24 @@ interface TosStepProps {
   submittingExternal?: boolean;
 }
 
-interface ParsedBlock {
-  type: "title" | "section" | "paragraph";
-  label?: string;
-  body: string;
-}
-
-function parseEuaBody(raw: string): ParsedBlock[] {
-  const lines = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  const blocks: ParsedBlock[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (i === 0) {
-      blocks.push({ type: "title", body: line });
-      continue;
-    }
-    const sectionMatch = /^(\d+\.\s+[^\n]+)/.exec(line);
-    if (sectionMatch) {
-      const firstLine = sectionMatch[1];
-      const rest = line.slice(firstLine.length).trim();
-      blocks.push({ type: "section", label: firstLine, body: rest });
-    } else {
-      blocks.push({ type: "paragraph", body: line });
-    }
-  }
-  return blocks;
-}
-
 /**
- * EUA / TOS step. Wireframe A3 visual: Plate-wrapped TOS body (scrollable),
- * checkbox row, primary "I Acknowledge" CTA, secondary "Exit" link.
+ * EUA / TOS step. Wireframe A3 visual: a Plate with the Terms' own "Key
+ * points" summary (scrollable), links to the full Terms and the Privacy
+ * Policy (the legal modal), checkbox row, primary "I Acknowledge" CTA,
+ * secondary "Exit" link.
+ *
+ * Why the key points and not the full text here: the full Terms are about
+ * 12k words, too long to read in a 360pt box nested in the wizard's own
+ * ScrollView (and too slow to draw there unvirtualized). The Terms open with
+ * the key points as their "please read" summary, including the waiver in
+ * Section 5, and the full text is one tap away in a virtualized modal.
+ * Recording which version was accepted and the second checkbox are
+ * jits-rog5.2.
  */
 export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) {
   const [agreed, setAgreed] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const isBusy = submitting || submittingExternal;
-  const blocks = React.useMemo(() => parseEuaBody(TOS_TEXT), []);
 
   async function handleContinue() {
     if (!agreed || isBusy) return;
@@ -62,67 +46,29 @@ export function TosStep({ onAccept, onExit, submittingExternal }: TosStepProps) 
 
   return (
     <View className="gap-4">
-      <Plate style={{ maxHeight: 360 }}>
-        <ScrollView
-          nestedScrollEnabled
-          showsVerticalScrollIndicator
-          contentContainerStyle={{ paddingBottom: 4 }}
-        >
-          {blocks.map((block, i) => {
-            if (block.type === "title") {
-              return (
-                <Text
-                  key={i}
-                  className="font-heading text-callout text-ink uppercase tracking-caps mb-3"
-                >
-                  {block.body.toUpperCase()}
-                </Text>
-              );
-            }
-            if (block.type === "section") {
-              return (
-                <View key={i} className="mb-3">
-                  <Text className="font-heading-medium text-body text-ink leading-6">
-                    {block.label}
-                  </Text>
-                  {block.body ? (
-                    <Text className="font-body text-body text-ink-2 leading-6">
-                      {block.body}
-                    </Text>
-                  ) : null}
-                </View>
-              );
-            }
-            return (
-              <Text
-                key={i}
-                className="font-body text-body text-ink-2 leading-6 mb-3"
-              >
-                {block.body}
-              </Text>
-            );
-          })}
-        </ScrollView>
+      <Plate>
+        <TermsKeyPoints maxHeight={328} />
       </Plate>
+
+      <LegalLinks />
 
       <StatePressable
         dim
         accessibilityRole="checkbox"
         accessibilityState={{ checked: agreed }}
         onPress={() => setAgreed((v) => !v)}
-        className="flex-row items-center gap-3 px-1"
+        accessibilityLabel={LEGAL_AGREE_LABEL}
+        className="flex-row items-start gap-3 px-1"
       >
         <View
           className={cn(
-            "h-5 w-5 items-center justify-center rounded-xs border",
+            "mt-0.5 h-5 w-5 items-center justify-center rounded-xs border",
             selectionSurface(agreed),
           )}
         >
           {agreed ? <SelectCheck size={13} /> : null}
         </View>
-        <Text className="font-body text-callout text-ink flex-1">
-          I agree to the End User Agreement
-        </Text>
+        <Text className="font-body text-callout text-ink flex-1 leading-5">{LEGAL_AGREE_LABEL}</Text>
       </StatePressable>
 
       <Button

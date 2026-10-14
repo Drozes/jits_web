@@ -87,9 +87,10 @@ describe("Help & Support copy", () => {
     expect(text).not.toMatch(/harshest/);
   });
 
-  it("does not cite a Privacy Policy the End User Agreement does not link, or a match ID the app never shows", () => {
+  it("points to the Privacy Policy where the app really shows it (Settings, jits-rog5.8), and cites no match ID the app never shows", () => {
     const text = allText();
-    expect(text).not.toMatch(/Privacy Policy/);
+    expect(text).toMatch(/explained in the Privacy Policy, in Settings\./);
+    expect(text).not.toMatch(/End User Agreement/);
     expect(text).not.toMatch(/match ID/i);
   });
 });

@@ -12,12 +12,15 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, Vi
 import { StatePressable } from "@/components/ui/state-pressable";
 import { Redirect, useRouter, type Href } from "expo-router";
 import { recordInviteAttribution } from "@jits/shared/api/invites";
-import { TOS_TEXT, claimFailureView, inviteSetupBanner } from "@jits/shared/utils";
+import { claimFailureView, inviteSetupBanner } from "@jits/shared/utils";
 import { AppHeader } from "@/components/layout/app-header";
 import { Plate } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
 import { SelectCheck, selectionSurface } from "@/components/ui/elo-system/selection";
 import { IdentityStep } from "@/components/profile-setup/identity-step";
+import { LegalLinks } from "@/components/legal/legal-links";
+import { TermsKeyPoints } from "@/components/legal/terms-key-points";
+import { LEGAL_AGREE_LABEL } from "@/lib/legal/legal-copy";
 import { FREE_AGENT_OPTION, type WizardValues } from "@/components/profile-setup/types";
 import { useAuth } from "@/lib/auth/hooks";
 import { supabase } from "@/lib/supabase/client";
@@ -50,7 +53,6 @@ export default function InviteSetupScreen() {
   const { pending, loaded } = usePendingInvite();
   const setup = useSetupData(user?.id ?? null);
   const [waiverAccepted, setWaiverAccepted] = React.useState(false);
-  const [showWaiver, setShowWaiver] = React.useState(false);
   const [values, setValues] = React.useState<WizardValues | null>(null);
 
   // Attribute before anything else (idempotent server side, first write
@@ -150,32 +152,28 @@ export default function InviteSetupScreen() {
         ) : null}
 
         <Plate className="gap-3">
+          {/* The same waiver notice as profile setup (owner decision, jits-rog5.8). */}
+          <TermsKeyPoints maxHeight={280} />
+          <LegalLinks />
           <StatePressable
             dim
             testID="invite-setup-waiver"
             accessibilityRole="checkbox"
             accessibilityState={{ checked: waiverAccepted }}
+            accessibilityLabel={LEGAL_AGREE_LABEL}
             onPress={() => setWaiverAccepted((v) => !v)}
-            className="flex-row items-center gap-3"
+            className="flex-row items-start gap-3"
           >
             <View
               className={cn(
-                "h-5 w-5 items-center justify-center rounded-xs border",
+                "mt-0.5 h-5 w-5 items-center justify-center rounded-xs border",
                 selectionSurface(waiverAccepted),
               )}
             >
               {waiverAccepted ? <SelectCheck size={13} /> : null}
             </View>
-            <Text className="flex-1 font-body text-callout text-ink">
-              I accept the ELO RATED terms and liability waiver.
-            </Text>
+            <Text className="flex-1 font-body text-callout text-ink leading-5">{LEGAL_AGREE_LABEL}</Text>
           </StatePressable>
-          <Button variant="ghost" height={44} label={showWaiver ? "Hide terms" : "Read terms"} onPress={() => setShowWaiver((v) => !v)} />
-          {showWaiver ? (
-            <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled className="rounded-sm bg-surface-2 p-3">
-              <Text className="font-body text-small text-ink-2 leading-5">{TOS_TEXT}</Text>
-            </ScrollView>
-          ) : null}
         </Plate>
 
         {underage ? (

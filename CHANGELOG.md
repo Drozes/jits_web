@@ -2,6 +2,65 @@
 
 ## [Unreleased]
 
+### Legal: one shared source for the Terms and Privacy Policy on web and native; French /terms/fr and /privacy/fr
+
+The new legal texts use constructs the tiny legal Markdown reader did not support, and Quebec requires French versions.
+
+**Added**
+- `apps/web/app/(legal)/terms/fr/page.tsx`, `apps/web/app/(legal)/privacy/fr/page.tsx`: public French pages rendering the repo-root `TERMS.fr.md` and `PRIVACY_POLICY.fr.md` (`lang="fr"` on the article), listed in `apps/web/lib/supabase/public-paths.ts`. Each legal page has a language switch link ("Français" on the English page, "English" on the French page), and all four pages carry `alternates` metadata (canonical plus `en` / `fr`), resolved against `publicSiteOrigin()` by a `metadataBase` in `apps/web/app/(legal)/layout.tsx` (never the per-deployment VERCEL_URL; test `apps/web/app/(legal)/layout.test.ts`).
+- `apps/web/components/legal/legal-nav.tsx`: the (legal) header nav follows the page's language ("Conditions" / "Confidentialité" linking to the French pages on /terms/fr and /privacy/fr).
+
+**Changed**
+- The legal Markdown reader (now `packages/shared/src/legal/markdown.ts`, see below) reads ordered lists (`1. `, with continuation lines; "5.1 **Title.**" stays a paragraph, and only an item numbered 1 interrupts a paragraph, as in CommonMark), GitHub-style pipe tables (header, separator, body rows; a missing separator or one whose cell count differs from the header's degrades to a paragraph) and `*italic*`; new `blockSpans` helper.
+- `apps/web/components/legal/legal-document.tsx`: renders `<ol>` lists, tables in their own `overflow-x-auto` box (no horizontal page scroll on phones; a 36rem minimum width so columns stay readable; small text, bold header row; a focusable region named from its header cells, "Table: Provider, What they do for us, ..." or "Tableau: ...", with a focus-visible ring) and italics; takes `lang` and an optional `alternate` language link.
+- The legal sync script bundles the French files too, and the legal tests (now `packages/shared/src/legal/documents.test.ts` and `markdown.test.ts`) check all four files: sync, titles, ordered lists, tables, italics, numbered clauses, and a guard that no bundled document leaves unsupported Markdown (any `*`, table rows, `\|`) as text. `apps/web/app/(legal)/layout.tsx` uses the new nav (tests: `apps/web/components/legal/legal-nav.test.tsx`); `apps/web/components/legal/legal-document.test.tsx` follows the final English texts (it pinned old headings) and covers the French table region.
+
+**Shared legal documents (jits-rog5.8)**
+
+The repo-root `TERMS.md`, `PRIVACY_POLICY.md`, `TERMS.fr.md` and `PRIVACY_POLICY.fr.md` stay the single source; web and native now render the same parsed blocks from `@jits/shared/legal`, and the placeholder `TOS_TEXT` is gone. Mobile is JS-only (OTA-eligible).
+
+**Added**
+- `packages/shared/src/legal/` (`@jits/shared/legal`, a new `./legal` export; deliberately not re-exported from the root `@jits/shared` barrel, the four documents are about 290 KB of text): `documents.generated.ts` (one constant per document, `TERMS_EN`, `TERMS_FR`, `PRIVACY_EN`, `PRIVACY_FR`, each with `markdown`, `title`, `effectiveDate`, `lastUpdated` and `version`, the first 12 hex characters of the SHA-256 of the text, for recording what was accepted in jits-rog5.2), `types.ts`, `index.ts` (`LEGAL_DOCUMENTS` and re-exports), and `paths.ts` (`@jits/shared/legal/paths`: `LEGAL_WEB_PATHS`, `isLegalDocId()`, `isLegalLang()`, with no document text, for code that only links to the documents). Line endings are normalised to LF before hashing, and a new root `.gitattributes` keeps `*.md` and the generated module LF.
+- `apps/mobile/components/legal/terms-key-points.tsx`: the waiver notice (the Terms' key points in a short scroll box, Section 5 waiver first), shared by profile setup and invite setup.
+- Mobile loads Inter Regular Italic (`Inter_400Regular_Italic` from the already-installed `@expo-google-fonts/inter`, via `useFonts` in `app/_layout.tsx`; a JS asset, OTA-safe) as `font-body-italic`, because iOS does not slant a custom font; legal italics use it. The design system kit's font list does not include it yet.
+- `packages/shared/scripts/sync-legal-docs.mjs` and `npm run legal:sync` (root and `@jits/shared`): bundles the four files and reads the dates from both label styles and both languages; `--check` exits 1 when the module is stale.
+- `apps/mobile/components/legal/legal-document.tsx`: native renderer of the same blocks (headings as accessibility headers, bullets, ordered lists from their own start, quotes, tables in a sideways `ScrollView` at a fixed 168pt column width and named "Table: ..." / "Tableau: ...", bold, italic, an amber mono TBD marker, French text read with a French voice). `LegalDocumentList` virtualizes a whole document with a `FlatList` over its blocks (about 200 per document), so opening the 12k-word Terms never freezes a frame; `LegalBlocks` draws a short excerpt in place.
+- `apps/mobile/app/legal/[doc].tsx`: the Terms or the Privacy Policy as a modal on the ROOT stack (registered in `app/_layout.tsx`, outside `(app)`, so it opens signed out and over profile setup), with the document title, an EN / FR toggle (English by default; French first for Quebec is jits-rog5.3) and a close button. `apps/mobile/lib/legal/legal-copy.ts`: `legalHref()`, the short titles and the agreement label. `apps/mobile/components/legal/legal-links.tsx`: "Read the full Terms of Service" / "Read the Privacy Policy" links into the modal.
+- Settings: a plate with TERMS OF SERVICE and PRIVACY POLICY rows opening the modal (the App Store wants the privacy policy reachable in the app).
+- Tests: `packages/shared/src/legal/documents.test.ts` (staleness per file and of the whole generated module via `--check`, titles, dates, versions stable and distinct, web paths, the Key points excerpt for EN and FR with the waiver bullet first, the stray-markup and TBD guards for all four files) and `markdown.test.ts` (the parser tests moved from web, plus `firstSection`, `tableLabel`); mobile `__tests__/components/legal/legal-document.test.tsx`, `__tests__/app/legal-route.test.tsx`, `__tests__/components/profile-setup/tos-step.test.tsx`, legal cases in `__tests__/screens/invite/invite-setup.test.tsx` and `__tests__/screens/settings-practice-row.test.tsx`; web `apps/web/components/auth/eua-form.test.tsx`.
+
+**Changed**
+- Mobile profile setup Terms step (`components/profile-setup/tos-step.tsx`): shows the Terms' own "Key points (please read)" section (parsed from `TERMS_EN`, waiver bullet at the top of the box) instead of the placeholder text, with links to the full Terms and the Privacy Policy. The single unticked checkbox now reads "I agree to the Terms of Service, including the Assumption of Risk, Waiver and Release of Liability in Section 5, and I have read the Privacy Policy." Two checkboxes and server-side version recording stay with jits-rog5.2.
+- Mobile invite setup (`app/invite-setup.tsx`): the "Read terms" toggle over the placeholder text is replaced by the same waiver notice as profile setup (key points inline, Section 5 first), the same links and the same unticked checkbox and label (owner decision).
+- Mobile setup wizard (`components/profile-setup/setup-wizard.tsx`): the Terms step header reads "Terms of Service" (was "End User Agreement"; test `__tests__/components/profile-setup/setup-wizard-labels.test.tsx`).
+- Help copy: web `/settings/help` links the Privacy Policy (`/privacy`) instead of citing one "linked in the End User Agreement"; mobile Help says the Privacy Policy is in Settings (`__tests__/screens/settings-help.test.tsx` updated).
+- Web `/eua` (`components/auth/eua-form.tsx`, `app/(auth)/eua/page.tsx`): the same Key points excerpt, rendered on the server with the new `LegalExcerpt` and passed in (the document stays out of the client bundle), links to `/terms` and `/privacy` in a new tab above the checkbox, and the same checkbox label as plain text (no links inside the label); the header reads "Terms of Service".
+- Web legal pages and `components/legal/legal-document.tsx` read from `@jits/shared/legal`; `tableLabel` moved to the shared parser.
+- `design/native-screens/build-board-map.py`, `board-map.json`, `README.md`: the shared legal files replace `tos-content.ts` in the drawn-copy allowlist.
+
+**Removed**
+- `packages/shared/src/utils/tos-content.ts` (`TOS_TEXT`), `apps/web/lib/legal/` (`markdown.ts`, `documents.generated.ts`, `documents.test.ts`, now in shared) and `apps/web/scripts/sync-legal-docs.mjs` (now `npm run legal:sync`).
+
+**Legal navigation (jits-rog5.10)**
+
+Both documents are fully navigable on native, and the shared parser gives the web pages the same section anchors and links. Mobile is JS-only (OTA-eligible).
+
+**Added**
+- `packages/shared/src/legal/references.ts` (exported from `@jits/shared/legal`): `sectionKey` / `sectionIndex` (numbered H2s "5.", Privacy H3s "4.6", Terms clause paragraphs "24.3"), `sectionAnchor` ("section-24-3"), `documentOutline(blocks)` (`[{ index, text, level, section }]` for every H2 and H3), `linkReferences` and `parseLegalDocument(doc, markdown)`. A new inline span kind `{ kind: "ref", text, style, target: { doc, section? } }` marks, outside headings only: "Section 5", "Sections 22 and 23", "section 4.6", "SECTION 5", "article 24.3", "articles 5, 22 et 23" (each number that is a section of the same document; a number that is not, such as "section 61 of the Family Law Act" or "article 1477 du Code civil", stays text, and a run followed by "of the" / "du" / "de la" is never linked), and the other document by its exact title ("Privacy Policy" / "Politique de confidentialité" in the Terms, "Terms of Service" / "Conditions d'utilisation" in the Privacy Policy). Tests: `references.test.ts` on all four documents (outline matches the H2/H3 count and block indices, EN and FR number the same sections, linking never changes the text or touches headings, every target resolves, statutes are never linked, the key points' "SECTION 5" / "ARTICLE 5" link to Section 5).
+- Mobile legal modal (`app/legal/[doc].tsx`): a two-row header that fits 320pt (row 1: title, Contents / Sommaire, Close; row 2: a Terms | Privacy switch with radio semantics, French labels "Conditions" / "Confidentialité", and EN | FR); both switches act in place and keep the other choice. Contents opens a panel over the text inside the modal (not a gorhom sheet: its portal sits in the root layout, under the native modal) listing the H2 sections; a tap jumps there with `scrollToIndex`, and a jump to a row not yet measured scrolls near it by the average row height and retries, at most 5 times. `?section=5` opens it at a section. References are tappable (`accessibilityRole="link"`): a section jumps, the other document switches.
+- `legalHref(doc, lang?, section?)` (`apps/mobile/lib/legal/legal-copy.ts`), plus the switch, Contents and Close labels. The key points on profile setup and invite setup link their references into the modal, so the waiver bullet's "SECTION 5" opens the Terms at Section 5.
+- Web: numbered headings and clauses carry stable ids (`/terms#section-5`, `/terms#section-24-3`); references render as links (`#section-N` on the same page, `/privacy` or `/terms` in the page's language for the other document); the /eua excerpt opens them in a new tab (`/terms#section-5`). `LegalDocument` takes a `doc` prop to turn them on. E2E smoke: `/terms#section-5` lands on Section 5.
+
+- The Terms' own "Contents" list links each item to its section (web `#section-N`, native jump), only when every item matches its section's heading.
+- `apps/mobile/components/legal/contents-panel.tsx`: the Contents panel, a modal view for screen readers (`accessibilityViewIsModal`; the text behind it gets `importantForAccessibility="no-hide-descendants"`), with a header that takes accessibility focus when it opens. Android back closes the panel, not the modal. It leaves out the Terms' own in-text "Contents" heading.
+- `apps/mobile/lib/legal/use-list-jump.ts`: the jump with its bounded retry, now cancelled by a newer jump, a document or language switch and unmount, and ignoring a failure for any other row.
+
+**Changed**
+- `apps/mobile/components/legal/legal-document.tsx`: renders reference spans (tappable with `onRef`, plain text without), and `LegalDocumentList` forwards its FlatList ref.
+- The modal header's first row has a minimum (not fixed) height of 52pt, and its labels are capped at 1.3x Dynamic Type like the header status chip (`Chip` gained an optional `maxFontSizeMultiplier`).
+- A document's title inside a clause's own bold heading ("1.6 **Privacy Policy and feature rules.**") is not linked.
+- `PRIVACY_POLICY.md`: "(see 16.3)" reads "(see section 16.3)" in the US sensitive information row, matching the French and linking like it (owner-approved wording fix; the English Privacy Policy version hash changes).
+
 ### Mobile: highlight viewer drops the title (spec 020)
 
 Spec 020 section D (owner decision 2026-10-13): the full-screen reel viewer no longer draws a title line (`vs {opp}` on your own reel, the subject's name on someone else's); the mono date and duration line and Open match / View profile stay. The play / pause VoiceOver label now names whose reel it is. JS-only (OTA-eligible).
@@ -16,6 +75,7 @@ Spec 020 section D (owner decision 2026-10-13): the full-screen reel viewer no l
 
 **Fixed**
 - `apps/mobile/components/highlight-viewer/reel-video.tsx`: VoiceOver read "Your highlight reel, N seconds" on someone else's reel; it now reads "{Name}'s highlight reel, N seconds" ("Highlight reel, N seconds" when the name is missing).
+
 
 ### Mobile: Elo in the header, wordmark + rating on every tab root (epic jits-1ez5)
 
