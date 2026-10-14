@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { StoreBadges } from "@/components/app-links/store-badges";
 import { LegalNav } from "@/components/legal/legal-nav";
 import { publicSiteOrigin } from "@/lib/invites/site-origin";
 
@@ -31,6 +32,11 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-8">{children}</main>
+      <footer className="border-t border-border px-4 py-6">
+        <div className="mx-auto max-w-2xl">
+          <StoreBadges size="sm" heading="Get the app" />
+        </div>
+      </footer>
     </div>
   );
 }

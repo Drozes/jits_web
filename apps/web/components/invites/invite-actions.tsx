@@ -5,11 +5,16 @@ import Link from "next/link";
 import { acceptJoinAction, claimInviteAction, confirmDobAndClaimAction } from "@/app/c/[token]/actions";
 import { withNext } from "@/lib/auth/safe-next-path";
 import { invitePath } from "@/lib/invites/constants";
-import { DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
-import { TRY_AGAIN_OUTCOME, type InviteOutcome } from "@/lib/invites/outcome-copy";
+import { DOB_SAVE_FAILED_COPY, UNDERAGE_COPY } from "@jits/shared/utils";
+import {
+  APP_SETUP_OUTCOME,
+  APP_SIGN_IN_OUTCOME,
+  TRY_AGAIN_OUTCOME,
+  type InviteOutcome,
+} from "@/lib/invites/outcome-copy";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
-import { AppStoreButton, CopyLinkButton, OpenInAppButton, StoreFirstLinks } from "./app-links";
+import { AppFirstLinks, CopyLinkButton, InviteStoreBadges, OpenInAppButton } from "./app-links";
 import { InviteDobStep } from "./invite-dob-step";
 import { InviteOutcomeCard } from "./invite-outcome-card";
 import { GHOST_CTA, PRIMARY_CTA, SECONDARY_CTA } from "./styles";
@@ -25,12 +30,12 @@ interface InviteActionsProps {
 }
 
 /**
- * The action stack. Exactly one red CTA: Accept for an active athlete,
- * Finish setup for a pending one, the App Store for everyone else (and
- * after a web booking, since the match itself is played in the app). While
- * the App Store listing is not public, Open in app takes that red fill
- * (StoreFirstLinks). While the web app is locked, setup and sign-in happen
- * in the app (specs/web-landing/spec.md 7.3).
+ * The action stack. At most one red CTA: Accept for an active athlete,
+ * Finish setup for a pending one (web app unlocked), Try again after a
+ * transient failure, and Open in app everywhere else that has a real next
+ * step (AppFirstLinks). The store badges are never red, live or not. A
+ * dead-end error has no red CTA. While the web app is locked, setup and
+ * sign-in happen in the app (specs/web-landing/spec.md 7.3).
  */
 export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrowser, webAppEnabled }: InviteActionsProps) {
   const [outcome, setOutcome] = useState<InviteOutcome | null>(null);
@@ -83,27 +88,38 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
           {pending ? "Trying again..." : "Try again"}
         </button>
         <OpenInAppButton {...links} />
-        <AppStoreButton {...links} primary={false} />
+        <InviteStoreBadges {...links} />
       </div>
     );
   }
 
-  // The match already exists: it is played in the app, so open it there.
-  if (outcome?.kind === "ready") {
+  // Success (match ready, booked, now friends) or a hand-off to the app
+  // (finish setup or sign in there, while the web app is locked): it all
+  // continues in the app, so Open in app is the one red CTA.
+  if (
+    outcome?.kind === "ready" ||
+    outcome?.kind === "booked" ||
+    outcome?.kind === "friends" ||
+    (outcome?.kind === "error" && isAppHandoff(outcome))
+  ) {
     return (
       <div style={STACK}>
         <InviteOutcomeCard outcome={outcome} />
-        <OpenInAppButton {...links} primary />
-        <AppStoreButton {...links} primary={false} />
+        <AppFirstLinks {...links} />
       </div>
     );
   }
 
-  if (outcome && outcome.kind !== "setup") {
+  // Dead-end error (expired, taken, withdrawn, own link, link off, ...): no
+  // red CTA. An under-16 viewer is blocked from the app too, so they get
+  // neither Open in app nor the store badges.
+  if (outcome?.kind === "error") {
+    const underage = outcome.body === UNDERAGE_COPY;
     return (
       <div style={STACK}>
         <InviteOutcomeCard outcome={outcome} />
-        <StoreFirstLinks {...links} />
+        {!underage && <OpenInAppButton {...links} />}
+        {!underage && <InviteStoreBadges {...links} />}
       </div>
     );
   }
@@ -115,7 +131,7 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
           {pending ? "Accepting..." : kind === "challenge" ? "Accept challenge" : "Accept invite"}
         </button>
         <OpenInAppButton {...links} />
-        <AppStoreButton {...links} primary={false} />
+        <InviteStoreBadges {...links} />
       </div>
     );
   }
@@ -123,7 +139,7 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
   if (!webAppEnabled && (viewer === "pending" || viewer === "no_athlete")) {
     return (
       <div style={STACK}>
-        <StoreFirstLinks {...links} />
+        <AppFirstLinks {...links} />
       </div>
     );
   }
@@ -134,14 +150,14 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
       <div style={STACK}>
         <Link href={href} style={PRIMARY_CTA}>Finish setup to {verb}</Link>
         <OpenInAppButton {...links} />
-        <AppStoreButton {...links} primary={false} />
+        <InviteStoreBadges {...links} />
       </div>
     );
   }
 
   return (
     <div style={STACK}>
-      <StoreFirstLinks {...links} />
+      <AppFirstLinks {...links} />
       <CopyLinkButton {...links} />
       {webAppEnabled && (
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
@@ -161,6 +177,15 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
 function isNextRedirect(err: unknown): boolean {
   const digest = (err as { digest?: unknown } | null)?.digest;
   return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
+}
+
+/**
+ * APP_SETUP_OUTCOME / APP_SIGN_IN_OUTCOME are kind "error" but send the
+ * athlete on to the app. Outcomes cross the server-action boundary as plain
+ * objects, so they are matched by copy, not identity.
+ */
+function isAppHandoff(outcome: { body: string }): boolean {
+  return [APP_SETUP_OUTCOME, APP_SIGN_IN_OUTCOME].some((o) => "body" in o && o.body === outcome.body);
 }
 
 const STACK: React.CSSProperties = { display: "flex", flexDirection: "column", gap: "var(--space-3)" };

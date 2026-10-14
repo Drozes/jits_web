@@ -1,20 +1,19 @@
 import { test, expect, type Page } from "@playwright/test";
-import { isAppStoreLive } from "../lib/app-store";
+import { expectStoreBadges } from "./store-badges";
 
 // Web app lock (specs/web-landing/spec.md). The dev server gets the same env
 // through playwright.config.ts; stop any running dev server before switching.
 const WEB_APP_ENABLED = process.env.NEXT_PUBLIC_WEB_APP_ENABLED === "true";
 const LOCKED_REASON = "web app locked: see specs/web-landing/spec.md";
-// Same rule as the app (trimmed, https only), so the specs and the page agree.
-const STORE_LIVE = isAppStoreLive();
 
-/** The App Store CTA: a link once the listing is public, else the coming-soon state. */
-async function expectAppStoreCta(page: Page) {
-  if (STORE_LIVE) {
-    await expect(page.getByRole("link", { name: /get it on the app store/i })).toBeVisible();
-  } else {
-    await expect(page.getByTestId("app-store-coming-soon")).toBeVisible();
-  }
+/**
+ * Both store badges under "Get the app", and Open in app as the one red CTA
+ * (the badges never take the red fill, live or not).
+ */
+async function expectAppCtas(page: Page) {
+  await expect(page.getByText("Get the app")).toBeVisible();
+  await expectStoreBadges(page);
+  await expect(page.getByRole("link", { name: /open in app/i })).toHaveCSS("background-color", "rgb(230, 57, 70)");
 }
 
 // Fixture tokens resolved by lib/invites/e2e-fixtures.ts when the dev server
@@ -43,7 +42,7 @@ test.describe("Invite landing /c/[token]", () => {
     await expect(page.getByText("1,482 ELO · 172 LBS · Jiu-jitsu match")).toBeVisible();
     await expect(page.getByTestId("invite-code")).toHaveText("K7Q-4M2");
 
-    await expectAppStoreCta(page);
+    await expectAppCtas(page);
     await expect(page.getByRole("link", { name: /open in app/i })).toHaveAttribute(
       "href",
       `elorated://c/${CHALLENGE}`,
@@ -79,14 +78,14 @@ test.describe("Invite landing /c/[token]", () => {
     await expect(page.getByTestId("invite-code")).toHaveCount(0);
   });
 
-  test("unavailable: generic message, App Store, no cookie", async ({ page }) => {
+  test("unavailable: generic message, store badges, no cookie", async ({ page }) => {
     const response = await page.goto(`/c/${UNAVAILABLE}`);
     expect((await response!.allHeaders())["set-cookie"] ?? "").not.toContain("er_invite");
     await expect(page.getByTestId("invite-unavailable")).toBeVisible();
     await expect(
       page.getByText("This invite is no longer available. Ask your training partner for a new one."),
     ).toBeVisible();
-    await expectAppStoreCta(page);
+    await expectAppCtas(page);
   });
 
   test("malformed token reads as unavailable", async ({ page }) => {

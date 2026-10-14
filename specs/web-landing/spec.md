@@ -1,5 +1,7 @@
 # Web landing page and web app lockdown (elorated.com)
 
+> **Superseded in part by jits-77yf (store badges, 2026-10-14, owner decision).** Every App Store CTA in this spec (D4, P3, P4, section 7.1 and 7.2, the `lib/app-store.ts` / `AppStoreCta` modules and the review rule that `appStoreUrl()` is the only reader) is replaced by the official App Store and Google Play badges: `apps/web/lib/app-links.ts` (`APP_STORE_URL`, `PLAY_STORE_URL`, `APP_STORE_ID`, `smartAppBanner()`) and `apps/web/components/app-links/store-badges.tsx`. The section 1 non-goal "No Android / Google Play CTA. No App Store badge artwork" no longer applies. A badge is never the red CTA: on invites "Open in app" takes the red fill (P3's swap rule is retired), and the landing hero has no red CTA. Read the rest of this spec as written.
+
 Status: build-ready spec. Author: PM agent, 2026-10-14. Owner decisions in section 3 are final and are not reopened here.
 Platform: `apps/web` (Next.js 16), plus `packages/shared` constants, four repo-root legal documents, mobile unit tests and docs. No backend change. No mobile runtime code change (the shared constant change reaches mobile later by OTA).
 Branch: `feat/web-landing`, based on `origin/development` at `cc771d9c`. Every implementer reads code at that base, not a stale local `development`.

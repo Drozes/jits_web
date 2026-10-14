@@ -1,9 +1,8 @@
 import { Wordmark } from "@/components/ui/elo-system";
 import type { InAppBrowser, InvitePreview } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
-import { isAppStoreLive } from "@/lib/app-store";
 import { isWebAppEnabled } from "@/lib/web-app-lock";
-import { AppStoreButton, OpenInAppButton, StoreFirstLinks } from "./app-links";
+import { AppFirstLinks, InviteStoreBadges, OpenInAppButton } from "./app-links";
 import { InAppBrowserHint } from "./in-app-browser-hint";
 import { InviteActions } from "./invite-actions";
 import { InviteCodeBlock } from "./invite-code-block";
@@ -89,13 +88,11 @@ function Unavailable({
             <p style={BODY_TEXT}>Already accepted it? Your match is waiting in the app.</p>
             <OpenInAppButton token={token} inAppBrowser={inAppBrowser} primary />
           </div>
-          <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary={false} />
+          <InviteStoreBadges token={token} inAppBrowser={inAppBrowser} />
         </>
-      ) : isAppStoreLive() ? (
-        <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary />
       ) : (
-        // Coming soon cannot be acted on: Open in app is the red CTA (spec P3).
-        <StoreFirstLinks token={token} inAppBrowser={inAppBrowser} />
+        // The badges are never red, so Open in app is the red CTA (spec P3).
+        <AppFirstLinks token={token} inAppBrowser={inAppBrowser} />
       )}
     </section>
   );

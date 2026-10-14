@@ -1,12 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { isAppStoreLive } from "../lib/app-store";
+import { expectStoreBadges } from "./store-badges";
 
 // The locked web app (specs/web-landing/spec.md): "/" is the landing page and
 // everything outside the allow-list redirects to "/". The dev server gets the
 // same env through playwright.config.ts; stop it before switching states.
 const WEB_APP_ENABLED = process.env.NEXT_PUBLIC_WEB_APP_ENABLED === "true";
-// Same rule as the app (trimmed, https only), so the specs and the page agree.
-const STORE_LIVE = isAppStoreLive();
 const ZERO_ID = "00000000-0000-4000-8000-000000000000";
 
 test.skip(WEB_APP_ENABLED, "web app enabled: the lock is off");
@@ -19,7 +17,12 @@ test.describe("Landing page at /", () => {
     await expect(page).toHaveTitle("ELO RATED: Ranked Jiu-Jitsu");
     await expect(page.getByRole("heading", { level: 1, name: "We are ELO RATED. Are you?" })).toBeVisible();
     await expect(page.getByText("What's your number?")).toBeVisible();
-    if (!STORE_LIVE) await expect(page.getByTestId("app-store-coming-soon")).toBeVisible();
+    // Hero download moment and footer: both official badges, never red.
+    const badgeBlocks = page.getByTestId("store-badges");
+    await expect(badgeBlocks).toHaveCount(2);
+    await expectStoreBadges(page, badgeBlocks.first());
+    await expectStoreBadges(page, badgeBlocks.last());
+    await expect(page.locator("main [style*='--accent-cta)']")).toHaveCount(0);
     await expect(page.locator('a[href^="/login"], a[href^="/signup"]')).toHaveCount(0);
     const footer = page.getByRole("navigation", { name: "Legal and support" });
     await expect(footer.getByRole("link", { name: "Terms" })).toHaveAttribute("href", "/terms");
