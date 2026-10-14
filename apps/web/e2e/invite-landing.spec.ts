@@ -26,8 +26,10 @@ test.describe("Invite landing /c/[token]", () => {
     await expect(page.getByText("1,482 ELO · 172 LBS · Jiu-jitsu match")).toBeVisible();
     await expect(page.getByTestId("invite-code")).toHaveText("K7Q-4M2");
 
-    const appStore = page.getByRole("link", { name: /get it on the app store/i });
-    await expect(appStore).toBeVisible();
+    // No listing is live in e2e: both badges are "Coming soon", not links.
+    await expect(page.getByRole("group", { name: "App Store: coming soon" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Google Play: coming soon" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /app store|google play/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /open in app/i })).toHaveAttribute(
       "href",
       `elorated://c/${CHALLENGE}`,
@@ -58,14 +60,15 @@ test.describe("Invite landing /c/[token]", () => {
     await expect(page.getByTestId("invite-code")).toHaveCount(0);
   });
 
-  test("unavailable: generic message, App Store, no cookie", async ({ page }) => {
+  test("unavailable: generic message, store badges, no cookie", async ({ page }) => {
     const response = await page.goto(`/c/${UNAVAILABLE}`);
     expect((await response!.allHeaders())["set-cookie"] ?? "").not.toContain("er_invite");
     await expect(page.getByTestId("invite-unavailable")).toBeVisible();
     await expect(
       page.getByText("This invite is no longer available. Ask your training partner for a new one."),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: /get it on the app store/i })).toBeVisible();
+    await expect(page.getByRole("group", { name: "App Store: coming soon" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Google Play: coming soon" })).toBeVisible();
   });
 
   test("malformed token reads as unavailable", async ({ page }) => {

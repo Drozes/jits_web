@@ -9,8 +9,8 @@ vi.mock("@/app/c/[token]/actions", () => ({
   acceptJoinAction: vi.fn(),
 }));
 vi.mock("./app-links", () => ({
-  AppStoreButton: () => <a href="#store">Get it on the App Store</a>,
-  OpenInAppButton: () => <a href="#app">Open in app</a>,
+  InviteStoreBadges: () => <div role="group" aria-label="App Store: coming soon" />,
+  OpenInAppButton: ({ primary }: { primary?: boolean }) => <a href="#app" data-primary={primary ? "true" : "false"}>Open in app</a>,
   CopyLinkButton: () => <button type="button">Copy link</button>,
 }));
 
@@ -120,5 +120,29 @@ describe("InviteActions: dob_required", () => {
     enterDob("2999-01-01");
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Enter a real date of birth."));
     expect(confirmDobAndClaimAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("InviteActions: CTA hierarchy with the store badges", () => {
+  const RED = "var(--accent-cta)";
+
+  it("signed out: Sign up on web is the one red CTA, the store badges are not", () => {
+    render(<InviteActions token={TOKEN} kind="challenge" inviterFirstName="Alex" viewer="signed_out" inAppBrowser={null} />);
+    const signUp = screen.getByRole("link", { name: /sign up on web/i });
+    expect(signUp.style.background).toBe(RED);
+    expect(signUp.getAttribute("href")).toBe(`/signup?next=${encodeURIComponent(`/c/${TOKEN}`)}`);
+    expect(screen.getByRole("group", { name: "App Store: coming soon" })).toBeTruthy();
+    const red = screen.getAllByRole("link").filter((el) => el.style.background === RED);
+    expect(red).toEqual([signUp]);
+    expect(screen.getByRole("link", { name: /open in app/i }).dataset.primary).toBe("false");
+  });
+
+  it("after a web booking: Open in app is the red CTA, never the App Store", async () => {
+    claimInviteAction.mockResolvedValue(BOOKED);
+    renderActive();
+    fireEvent.click(screen.getByRole("button", { name: /accept challenge/i }));
+    await screen.findByText("Challenge accepted");
+    expect(screen.getByRole("link", { name: /open in app/i }).dataset.primary).toBe("true");
+    expect(screen.getByRole("group", { name: "App Store: coming soon" })).toBeTruthy();
   });
 });

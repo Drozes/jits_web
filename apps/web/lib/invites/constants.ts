@@ -22,15 +22,6 @@ export const INVITE_COOKIE_OPTIONS = {
  */
 export const INVITE_ATTR_COOKIE = "er_invite_attr";
 
-/**
- * App Store listing. The listing is not live yet, so this falls back to the
- * App Store search for the app name until NEXT_PUBLIC_APP_STORE_URL is set.
- * TODO(jits-b3js): set NEXT_PUBLIC_APP_STORE_URL once the listing is public.
- */
-export const APP_STORE_URL =
-  process.env.NEXT_PUBLIC_APP_STORE_URL ||
-  "https://apps.apple.com/search?term=ELO%20RATED";
-
 export function inviteSchemeUrl(token: string): string {
   return `elorated://c/${token}`;
 }

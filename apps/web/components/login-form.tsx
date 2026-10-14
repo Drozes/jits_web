@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { StoreBadges } from "@/components/app-links/store-badges";
 import { Wordmark } from "@/components/ui/elo-system";
 import { createClient } from "@/lib/supabase/client";
 import { EmailInput } from "@/components/auth/email-input";
@@ -243,6 +244,11 @@ export function LoginForm({ next = null }: { next?: string | null }) {
           >
             Forgot password?
           </Link>
+        </div>
+
+        {/* Below every auth path: the official badges, never the red CTA. */}
+        <div style={{ marginTop: "var(--space-8)" }}>
+          <StoreBadges heading="Get the app" align="center" />
         </div>
       </div>
     </div>

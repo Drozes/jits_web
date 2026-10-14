@@ -1,7 +1,7 @@
 import { Wordmark } from "@/components/ui/elo-system";
 import type { InAppBrowser, InvitePreview } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
-import { AppStoreButton, OpenInAppButton } from "./app-links";
+import { InviteStoreBadges, OpenInAppButton } from "./app-links";
 import { InAppBrowserHint } from "./in-app-browser-hint";
 import { InviteActions } from "./invite-actions";
 import { InviteCodeBlock } from "./invite-code-block";
@@ -80,17 +80,15 @@ function Unavailable({
       <p style={{ ...BODY_TEXT, fontSize: "var(--size-body-l)" }}>
         This invite is no longer available. Ask your training partner for a new one.
       </p>
-      {signedIn ? (
-        <>
-          <div data-testid="invite-unavailable-accepted" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-            <p style={BODY_TEXT}>Already accepted it? Your match is waiting in the app.</p>
-            <OpenInAppButton token={token} inAppBrowser={inAppBrowser} primary />
-          </div>
-          <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary={false} />
-        </>
-      ) : (
-        <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary />
+      {signedIn && (
+        <div data-testid="invite-unavailable-accepted" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <p style={BODY_TEXT}>Already accepted it? Your match is waiting in the app.</p>
+          <OpenInAppButton token={token} inAppBrowser={inAppBrowser} primary />
+        </div>
       )}
+      {/* Never red: signed out, the page has no red CTA at all, because a
+          "Coming soon" badge is a placeholder, not an action. */}
+      <InviteStoreBadges token={token} inAppBrowser={inAppBrowser} />
     </section>
   );
 }

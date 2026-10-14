@@ -1,4 +1,17 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+/**
+ * Neither store listing is live in e2e (NEXT_PUBLIC_APP_STORE_URL and
+ * NEXT_PUBLIC_PLAY_STORE_URL unset), so both official badges render as
+ * non-interactive "Coming soon" placeholders, never as store links.
+ */
+async function expectStoreBadgesComingSoon(page: Page) {
+  const badges = page.getByTestId("store-badges").first();
+  await expect(badges.getByText("Get the app")).toBeVisible();
+  await expect(badges.getByRole("group", { name: "App Store: coming soon" })).toBeVisible();
+  await expect(badges.getByRole("group", { name: "Google Play: coming soon" })).toBeVisible();
+  await expect(badges.getByRole("link")).toHaveCount(0);
+}
 
 // Field labels on the branded auth surfaces are uppercased with CSS
 // `text-transform`, which the accessible-name computation applies, so these
@@ -15,6 +28,7 @@ test.describe("Public pages", () => {
     await expect(page.getByPlaceholder("m@example.com")).toBeVisible();
     await expect(page.getByLabel(PASSWORD_FIELD)).toBeVisible();
     await expect(page.getByRole("button", { name: SIGN_IN_CTA })).toBeVisible();
+    await expectStoreBadgesComingSoon(page);
   });
 
   test("login page keeps the SSO and account-recovery paths", async ({
@@ -49,6 +63,7 @@ test.describe("Public pages", () => {
     // cold-compiles the route; the retrying assertion still proves one is live.
     await expect(page.locator('input[type="email"]').first()).toBeVisible();
     await expect(page.locator('input[type="password"]').first()).toBeVisible();
+    await expectStoreBadgesComingSoon(page);
   });
 
   test("forgot password page renders", async ({ page }) => {

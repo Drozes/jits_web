@@ -14,6 +14,7 @@ import { CityAutocomplete } from "@/components/profile-setup/city-autocomplete";
 import { withNext } from "@/lib/auth/safe-next-path";
 import { AppleOAuthButton } from "@/components/auth/apple-oauth-button";
 import { GoogleOAuthButton } from "@/components/auth/google-oauth-button";
+import { StoreBadges } from "@/components/app-links/store-badges";
 
 interface GymOption {
   id: string;
@@ -353,6 +354,10 @@ export function SignUpForm({ gyms, cities, next = null, inviteBanner = null }: S
           </div>
         )}
       </form>
+      {/* Below the form and any SSO buttons; never the red CTA. */}
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "var(--space-3) var(--space-5) var(--space-8)" }}>
+        <StoreBadges heading="Get the app" align="center" />
+      </div>
     </div>
   );
 }

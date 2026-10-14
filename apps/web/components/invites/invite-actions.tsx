@@ -9,10 +9,10 @@ import { DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
 import { TRY_AGAIN_OUTCOME, type InviteOutcome } from "@/lib/invites/outcome-copy";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
-import { AppStoreButton, CopyLinkButton, OpenInAppButton } from "./app-links";
+import { CopyLinkButton, InviteStoreBadges, OpenInAppButton } from "./app-links";
 import { InviteDobStep } from "./invite-dob-step";
 import { InviteOutcomeCard } from "./invite-outcome-card";
-import { GHOST_CTA, PRIMARY_CTA, SECONDARY_CTA } from "./styles";
+import { GHOST_CTA, PRIMARY_CTA } from "./styles";
 
 interface InviteActionsProps {
   token: string;
@@ -24,8 +24,10 @@ interface InviteActionsProps {
 
 /**
  * The action stack. Exactly one red CTA: Accept for an active athlete,
- * Finish setup for a pending one, the App Store for everyone else (and
- * after a web booking, since the match itself is played in the app).
+ * Finish setup for a pending one, Open in app after a web booking (the
+ * match itself is played in the app) and Sign up on web for everyone else.
+ * The store badges are never the red CTA: until a listing is live its
+ * badge is a "Coming soon" placeholder, not an action.
  */
 export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrowser }: InviteActionsProps) {
   const [outcome, setOutcome] = useState<InviteOutcome | null>(null);
@@ -78,28 +80,19 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
           {pending ? "Trying again..." : "Try again"}
         </button>
         <OpenInAppButton {...links} />
-        <AppStoreButton {...links} primary={false} />
+        <InviteStoreBadges {...links} />
       </div>
     );
   }
 
-  // The match already exists: it is played in the app, so open it there.
-  if (outcome?.kind === "ready") {
-    return (
-      <div style={STACK}>
-        <InviteOutcomeCard outcome={outcome} />
-        <OpenInAppButton {...links} primary />
-        <AppStoreButton {...links} primary={false} />
-      </div>
-    );
-  }
-
+  // The match already exists (ready), or the web booking is done: either
+  // way it is played in the app, so opening it there is the one real action.
   if (outcome && outcome.kind !== "setup") {
     return (
       <div style={STACK}>
         <InviteOutcomeCard outcome={outcome} />
-        <AppStoreButton {...links} primary />
-        <OpenInAppButton {...links} />
+        <OpenInAppButton {...links} primary />
+        <InviteStoreBadges {...links} />
       </div>
     );
   }
@@ -111,7 +104,7 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
           {pending ? "Accepting..." : kind === "challenge" ? "Accept challenge" : "Accept invite"}
         </button>
         <OpenInAppButton {...links} />
-        <AppStoreButton {...links} primary={false} />
+        <InviteStoreBadges {...links} />
       </div>
     );
   }
@@ -122,24 +115,26 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
       <div style={STACK}>
         <Link href={href} style={PRIMARY_CTA}>Finish setup to {verb}</Link>
         <OpenInAppButton {...links} />
-        <AppStoreButton {...links} primary={false} />
+        <InviteStoreBadges {...links} />
       </div>
     );
   }
 
+  // Signed out. Signing up on web is the one path that always works (the
+  // store listings may still be "Coming soon"), so it is the red CTA.
   return (
     <div style={STACK}>
-      <AppStoreButton {...links} primary />
+      <Link href={withNext("/signup", next)} style={PRIMARY_CTA}>
+        Sign up on web
+      </Link>
       <OpenInAppButton {...links} />
-      <CopyLinkButton {...links} />
       <div style={{ display: "flex", gap: "var(--space-2)" }}>
-        <Link href={withNext("/signup", next)} style={SECONDARY_CTA}>
-          Sign up on web
-        </Link>
         <Link href={withNext("/login", next)} style={GHOST_CTA}>
           Log in
         </Link>
+        <CopyLinkButton {...links} />
       </div>
+      <InviteStoreBadges {...links} />
     </div>
   );
 }

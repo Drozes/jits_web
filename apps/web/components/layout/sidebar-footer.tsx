@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StoreBadges } from "@/components/app-links/store-badges";
 import { getActiveAthlete } from "@/lib/guards";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getProfilePhotoUrl } from "@/lib/utils";
@@ -19,6 +20,20 @@ export async function SidebarFooter() {
   const athlete = await getActiveAthlete();
   if (!athlete) return null;
 
+  return (
+    <div className="flex flex-col">
+      {/* Compact "Get the app" block above, and separate from, the profile link. */}
+      <div style={ROW_STYLE}>
+        <StoreBadges size="sm" heading="Get the app" />
+      </div>
+      <ProfileRow athlete={athlete} />
+    </div>
+  );
+}
+
+type ActiveAthlete = NonNullable<Awaited<ReturnType<typeof getActiveAthlete>>>;
+
+function ProfileRow({ athlete }: { athlete: ActiveAthlete }) {
   const initials = getInitials(athlete.display_name);
   const photoUrl = getProfilePhotoUrl(athlete.profile_photo_url);
 

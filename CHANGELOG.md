@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Web: official App Store and Google Play badges, "Coming soon" until the listings are live (jits-77yf)
+
+Neither store listing is public yet. Both badges show a dimmed, non-interactive "Coming soon" state until `NEXT_PUBLIC_APP_STORE_URL` / `NEXT_PUBLIC_PLAY_STORE_URL` are set in Vercel (and the site is redeployed, since `NEXT_PUBLIC_*` values are inlined at build time); then they link to the stores with no code change.
+
+**Added**
+- `apps/web/lib/app-links.ts`: `APP_STORE_URL` and `PLAY_STORE_URL` (`string | null`; only an https URL on `apps.apple.com` / `play.google.com` counts, anything else reads as not live), `APP_STORE_ID` (`6774629438`), `ANDROID_PACKAGE`, `parseStoreUrl()` and `smartAppBanner()`. Tests `apps/web/lib/app-links.test.ts`.
+- `apps/web/public/badges/app-store-badge-en-us.svg` (Apple's official "Download on the App Store" black badge, US English, from Apple's marketing tools) and `apps/web/public/badges/google-play-badge-en-us.png` (Google's official "Get it on Google Play" badge, US English, from Google Play's badge page), both unmodified.
+- `apps/web/components/app-links/store-badges.tsx`: `StoreBadges` (sizes `md` 48px and `sm` 40px, Apple's on-screen minimum; Google's built-in padding is cropped so both visible badges match in height; wraps on narrow screens; Apple's quarter-height clear space between them; optional caps heading; `onBadgeClick` hook). A live badge is a new-tab link named "Download ELO RATED on the App Store" / "Get ELO RATED on Google Play"; a badge without a listing is a dimmed `role="group"` (`aria-disabled`) named "App Store: coming soon" / "Google Play: coming soon" with a mono caps "Coming soon" label, never a link. Tests `apps/web/components/app-links/store-badges.test.tsx`.
+- Badges on `/login` and `/signup` (below the form and the SSO buttons, under "Get the app"), a footer on the legal pages (`apps/web/app/(legal)/layout.tsx`, size `sm`), a compact block above the profile link in the desktop sidebar footer (`apps/web/components/layout/sidebar-footer.tsx`, size `sm`) and a "Get the app" plate on Settings (`apps/web/app/(app)/settings/settings-content.tsx`).
+- Apple Smart App Banner: `itunes` metadata in `apps/web/app/layout.tsx`, emitted only once `NEXT_PUBLIC_APP_STORE_URL` is set; `/c/[token]` adds `app-argument` with the invite URL so the banner opens the invite in the app. No Android equivalent (deprecated). Tests `apps/web/app/layout.test.ts`, `apps/web/app/c/[token]/page.test.ts`.
+
+**Changed**
+- Invite landing `/c/[token]`: the "Get it on the App Store" text button is replaced by `InviteStoreBadges` (both stores, `apps/web/components/invites/app-links.tsx`) in every action state and on the unavailable page. An App Store tap still logs `app_store_tapped`; a Google Play tap logs nothing, because jr_be's `log_invite_landing_event` accepts only its fixed step list (a `play_store_tapped` step needs a backend migration).
+- Invite CTA hierarchy (`apps/web/components/invites/invite-actions.tsx`, `invite-landing.tsx`): a store badge is never the red CTA. Signed out, "Sign up on web" is now the red CTA (it was the App Store button); after a web booking, "Open in app" is (it was the App Store button); the signed-out unavailable page has no red CTA. Tests `apps/web/components/invites/invite-actions.test.tsx`, `apps/web/components/invites/app-links.test.tsx`; e2e `apps/web/e2e/invite-landing.spec.ts` and `apps/web/e2e/smoke.spec.ts` (login and signup show both badges as "Coming soon").
+- `apps/web/.env.example` documents both keys with the expected URLs.
+
+**Removed**
+- `APP_STORE_URL` from `apps/web/lib/invites/constants.ts`, with its App Store search fallback (it made the old button link a search page as if the app were out) and the `TODO(jits-b3js)` note.
+
 ### Legal: one shared source for the Terms and Privacy Policy on web and native; French /terms/fr and /privacy/fr
 
 The new legal texts use constructs the tiny legal Markdown reader did not support, and Quebec requires French versions.

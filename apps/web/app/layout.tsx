@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, DM_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { smartAppBanner } from "@/lib/app-links";
 import "./design-system/tokens.css";
 import "./globals.css";
 
@@ -18,6 +19,8 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "ELO RATED",
   },
+  // Apple's Smart App Banner, only once NEXT_PUBLIC_APP_STORE_URL is set.
+  itunes: smartAppBanner(),
 };
 
 export const viewport: Viewport = {
