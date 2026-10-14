@@ -1,7 +1,9 @@
 import { Wordmark } from "@/components/ui/elo-system";
 import type { InAppBrowser, InvitePreview } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
-import { AppStoreButton, OpenInAppButton } from "./app-links";
+import { isAppStoreLive } from "@/lib/app-store";
+import { isWebAppEnabled } from "@/lib/web-app-lock";
+import { AppStoreButton, OpenInAppButton, StoreFirstLinks } from "./app-links";
 import { InAppBrowserHint } from "./in-app-browser-hint";
 import { InviteActions } from "./invite-actions";
 import { InviteCodeBlock } from "./invite-code-block";
@@ -37,6 +39,7 @@ export function InviteLanding({ token, preview, viewer, inAppBrowser }: InviteLa
               inviterFirstName={preview.inviter.first_name}
               viewer={viewer.state}
               inAppBrowser={inAppBrowser}
+              webAppEnabled={isWebAppEnabled()}
             />
             {(viewer.state === "active" || viewer.state === "pending") && (
               <SignedInAs token={token} displayName={viewer.displayName} />
@@ -88,8 +91,11 @@ function Unavailable({
           </div>
           <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary={false} />
         </>
-      ) : (
+      ) : isAppStoreLive() ? (
         <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary />
+      ) : (
+        // Coming soon cannot be acted on: Open in app is the red CTA (spec P3).
+        <StoreFirstLinks token={token} inAppBrowser={inAppBrowser} />
       )}
     </section>
   );

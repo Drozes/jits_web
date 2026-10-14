@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Web: landing page at elorated.com, web app lockdown flag, /support, invite CTAs and domain fixes (epic jits-6si3)
+
+`elorated.com` serves the Vercel project `jits_web` since 2026-10-14. The website is now one public landing page that sends people to the mobile app, and the live web app is locked behind `NEXT_PUBLIC_WEB_APP_ENABLED` (unset means locked; the exact string `"true"` restores today's web app; it is build-time, so a change needs a redeploy). Spec: `specs/web-landing/spec.md`. Mobile: the `WEB_APP_URL` change in `packages/shared` reaches installed apps only through a later production OTA (JS-only, runtime 0.5.0); until then, mobile share links keep pointing at `jitsweb.vercel.app`, which serves the same deployment.
+
+**Added**
+- Landing page: `apps/web/app/welcome/page.tsx` (internal route; only ever served at `/`) and `apps/web/components/landing/` (hero with `apps/web/public/landing/hero.jpg`, how it works, footer with Terms, Privacy, Support and the French legal links).
+- `/support` (`apps/web/app/(legal)/support/page.tsx`), the App Store Support URL: contact `info@elorated.com`, how to delete an account, report a problem, legal links.
+- `apps/web/app/robots.ts` (never disallows `/c/`, so invite link previews keep working).
+- `apps/web/lib/web-app-lock.ts` (`isWebAppEnabled()`, `LANDING_INTERNAL_PATH`).
+- `apps/web/lib/app-store.ts` (`appStoreUrl()`, `isAppStoreLive()`; reads `NEXT_PUBLIC_APP_STORE_URL`, https only) and `apps/web/components/app-store/app-store-cta.tsx` ("Get it on the App Store" link, or a non-link "Coming soon to the App Store" while the URL is unset).
+
+**Changed**
+- Proxy lock gate (`apps/web/lib/supabase/proxy.ts`, `apps/web/lib/supabase/public-paths.ts`): while locked, `/` rewrites to the landing for everyone (no Supabase call), and every path outside `LOCKED_ALLOWED_PATHS` / `LOCKED_ALLOWED_FILES` (legal pages, `/support`, `/c/<token>`, `/.well-known/`, invite telemetry, password reset and auth plumbing, root files) redirects to `/`. `/welcome` always redirects to `/`. `/support` is public in both states.
+- Invite landing CTAs when locked (`apps/web/components/invites/`, `apps/web/app/c/[token]/actions.ts`): no links to `/signup`, `/eua` or `/login`; the App Store CTA and "Open in app" instead, and accept actions return "Finish in the app" / "Accept in the app" outcomes instead of redirecting into blocked routes. "Open in app" takes the red primary styling while the App Store URL is unset.
+- `/forgot-password` hides its Login link and `/error` reads "Back to ELO RATED" (to `/`) while locked.
+- Root metadata (`apps/web/app/layout.tsx`): `metadataBase` uses `publicSiteOrigin()`; description "BJJ matches, filmed and rated."
+- `WEB_APP_URL` (`packages/shared/src/constants.ts`) and `DEFAULT_PUBLIC_ORIGIN` (`apps/web/lib/invites/site-origin.ts`) are `https://elorated.com`; host tests updated, and the two invite link parsing tests keep a labelled legacy-host (`jitsweb.vercel.app`) case.
+- Legal documents' host facts (`TERMS.md`, `PRIVACY_POLICY.md`, `TERMS.fr.md`, `PRIVACY_POLICY.fr.md`): `jitsweb.vercel.app` references now name `https://elorated.com`; no other wording or date changes. `packages/shared/src/legal/documents.generated.ts` regenerated with `npm run legal:sync` (new content versions for all four documents).
+- `CLAUDE.md` production facts: web prod URL is `https://elorated.com`, the lockdown flag and how to restore the web app, Supabase Auth Site URL and redirect allow-list as of 2026-10-14.
+
+**Removed**
+- `APP_STORE_URL` (`apps/web/lib/invites/constants.ts`) and its App Store search fallback; every App Store link goes through `apps/web/lib/app-store.ts`.
+
 ### Mobile 1.0: Sign in with Apple on, version 1.0, permission purpose strings (jits-8s9v)
 
 The first App Store binary offers Google sign-in, so App Review guideline 4.8 needs Sign in with Apple. Native change: needs a TestFlight build (an OTA cannot add the entitlement), and the Supabase prod Apple provider must be on first.

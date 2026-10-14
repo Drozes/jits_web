@@ -2,19 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Suspense } from "react";
-
-const ERROR_MESSAGES: Record<string, string> = {
-  access_denied: "Access was denied. Please try signing in again.",
-  server_error:
-    "Something went wrong on our end. Please try again in a moment.",
-  temporarily_unavailable:
-    "The service is temporarily unavailable. Please try again shortly.",
-  validation_failed:
-    "There was a problem with your request. Please try again.",
-};
-
-const DEFAULT_MESSAGE =
-  "Something unexpected happened. Please try signing in again.";
+import { isWebAppEnabled } from "@/lib/web-app-lock";
+import { errorPageCopy } from "./error-copy";
 
 async function ErrorContent({
   searchParams,
@@ -22,15 +11,13 @@ async function ErrorContent({
   searchParams: Promise<{ error: string }>;
 }) {
   const params = await searchParams;
-  const message = params?.error
-    ? (ERROR_MESSAGES[params.error] ?? DEFAULT_MESSAGE)
-    : DEFAULT_MESSAGE;
+  const { message, backHref, backLabel } = errorPageCopy(isWebAppEnabled(), params?.error);
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">{message}</p>
       <Button asChild className="w-full">
-        <Link href="/login">Back to sign in</Link>
+        <Link href={backHref}>{backLabel}</Link>
       </Button>
     </div>
   );

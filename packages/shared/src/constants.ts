@@ -275,9 +275,9 @@ export const SPLASH_GLOW_STATEMENT = {
 
 export * from "./constants/highlights";
 /**
- * The live web app, for links shared out of the mobile app (a match page).
- * `elorated.com` is not attached to the web deployment yet (jits-x1t2), so
- * links to it 404; the Vercel URL is where the web app actually serves.
- * Change it here, once, when the domain moves.
+ * The public website, for links shared out of the mobile app (a match page).
+ * elorated.com serves the web deployment since 2026-10-14. While the web app
+ * is locked (NEXT_PUBLIC_WEB_APP_ENABLED not "true"), these links open the
+ * landing page.
  */
-export const WEB_APP_URL = "https://jitsweb.vercel.app";
+export const WEB_APP_URL = "https://elorated.com";

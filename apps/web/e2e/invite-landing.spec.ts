@@ -1,4 +1,21 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { isAppStoreLive } from "../lib/app-store";
+
+// Web app lock (specs/web-landing/spec.md). The dev server gets the same env
+// through playwright.config.ts; stop any running dev server before switching.
+const WEB_APP_ENABLED = process.env.NEXT_PUBLIC_WEB_APP_ENABLED === "true";
+const LOCKED_REASON = "web app locked: see specs/web-landing/spec.md";
+// Same rule as the app (trimmed, https only), so the specs and the page agree.
+const STORE_LIVE = isAppStoreLive();
+
+/** The App Store CTA: a link once the listing is public, else the coming-soon state. */
+async function expectAppStoreCta(page: Page) {
+  if (STORE_LIVE) {
+    await expect(page.getByRole("link", { name: /get it on the app store/i })).toBeVisible();
+  } else {
+    await expect(page.getByTestId("app-store-coming-soon")).toBeVisible();
+  }
+}
 
 // Fixture tokens resolved by lib/invites/e2e-fixtures.ts when the dev server
 // runs with E2E_INVITE_FIXTURES=1 (playwright.config.ts sets it).
@@ -26,17 +43,21 @@ test.describe("Invite landing /c/[token]", () => {
     await expect(page.getByText("1,482 ELO · 172 LBS · Jiu-jitsu match")).toBeVisible();
     await expect(page.getByTestId("invite-code")).toHaveText("K7Q-4M2");
 
-    const appStore = page.getByRole("link", { name: /get it on the app store/i });
-    await expect(appStore).toBeVisible();
+    await expectAppStoreCta(page);
     await expect(page.getByRole("link", { name: /open in app/i })).toHaveAttribute(
       "href",
       `elorated://c/${CHALLENGE}`,
     );
     await expect(page.getByRole("button", { name: /copy link/i })).toBeVisible();
-    await expect(page.getByRole("link", { name: /sign up on web/i })).toHaveAttribute(
-      "href",
-      `/signup?next=${encodeURIComponent(`/c/${CHALLENGE}`)}`,
-    );
+    if (WEB_APP_ENABLED) {
+      await expect(page.getByRole("link", { name: /sign up on web/i })).toHaveAttribute(
+        "href",
+        `/signup?next=${encodeURIComponent(`/c/${CHALLENGE}`)}`,
+      );
+    } else {
+      await expect(page.getByRole("link", { name: /sign up on web/i })).toHaveCount(0);
+      await expect(page.getByRole("link", { name: /^log in$/i })).toHaveCount(0);
+    }
     // No in-app browser hint in a normal browser.
     await expect(page.getByTestId("in-app-browser-hint")).toHaveCount(0);
 
@@ -65,7 +86,7 @@ test.describe("Invite landing /c/[token]", () => {
     await expect(
       page.getByText("This invite is no longer available. Ask your training partner for a new one."),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: /get it on the app store/i })).toBeVisible();
+    await expectAppStoreCta(page);
   });
 
   test("malformed token reads as unavailable", async ({ page }) => {
@@ -74,6 +95,7 @@ test.describe("Invite landing /c/[token]", () => {
   });
 
   test("signup on the invite path shows the banner and drops the gym requirement", async ({ page }) => {
+    test.skip(!WEB_APP_ENABLED, LOCKED_REASON);
     await page.goto(`/signup?next=${encodeURIComponent(`/c/${CHALLENGE}`)}`);
     await expect(
       page.getByRole("status").filter({ hasText: "Alex challenged you. Create your account to accept." }),

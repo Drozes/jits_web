@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:unlocked": "NEXT_PUBLIC_WEB_APP_ENABLED=true playwright test",
     "test:e2e:ui": "playwright test --ui",
     "typecheck": "tsc --noEmit",
     "demo:record": "npx playwright test --config demo/playwright.config.ts",

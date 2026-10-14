@@ -9,7 +9,7 @@ import { DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
 import { TRY_AGAIN_OUTCOME, type InviteOutcome } from "@/lib/invites/outcome-copy";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
-import { AppStoreButton, CopyLinkButton, OpenInAppButton } from "./app-links";
+import { AppStoreButton, CopyLinkButton, OpenInAppButton, StoreFirstLinks } from "./app-links";
 import { InviteDobStep } from "./invite-dob-step";
 import { InviteOutcomeCard } from "./invite-outcome-card";
 import { GHOST_CTA, PRIMARY_CTA, SECONDARY_CTA } from "./styles";
@@ -20,14 +20,19 @@ interface InviteActionsProps {
   inviterFirstName: string | null;
   viewer: InviteViewer["state"];
   inAppBrowser: InAppBrowser;
+  /** False while the web app is locked: no links into /login, /signup or /eua. */
+  webAppEnabled: boolean;
 }
 
 /**
  * The action stack. Exactly one red CTA: Accept for an active athlete,
  * Finish setup for a pending one, the App Store for everyone else (and
- * after a web booking, since the match itself is played in the app).
+ * after a web booking, since the match itself is played in the app). While
+ * the App Store listing is not public, Open in app takes that red fill
+ * (StoreFirstLinks). While the web app is locked, setup and sign-in happen
+ * in the app (specs/web-landing/spec.md 7.3).
  */
-export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrowser }: InviteActionsProps) {
+export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrowser, webAppEnabled }: InviteActionsProps) {
   const [outcome, setOutcome] = useState<InviteOutcome | null>(null);
   const [pending, startTransition] = useTransition();
   const links = { token, inAppBrowser, kind };
@@ -98,8 +103,7 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
     return (
       <div style={STACK}>
         <InviteOutcomeCard outcome={outcome} />
-        <AppStoreButton {...links} primary />
-        <OpenInAppButton {...links} />
+        <StoreFirstLinks {...links} />
       </div>
     );
   }
@@ -112,6 +116,14 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
         </button>
         <OpenInAppButton {...links} />
         <AppStoreButton {...links} primary={false} />
+      </div>
+    );
+  }
+
+  if (!webAppEnabled && (viewer === "pending" || viewer === "no_athlete")) {
+    return (
+      <div style={STACK}>
+        <StoreFirstLinks {...links} />
       </div>
     );
   }
@@ -129,17 +141,18 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
 
   return (
     <div style={STACK}>
-      <AppStoreButton {...links} primary />
-      <OpenInAppButton {...links} />
+      <StoreFirstLinks {...links} />
       <CopyLinkButton {...links} />
-      <div style={{ display: "flex", gap: "var(--space-2)" }}>
-        <Link href={withNext("/signup", next)} style={SECONDARY_CTA}>
-          Sign up on web
-        </Link>
-        <Link href={withNext("/login", next)} style={GHOST_CTA}>
-          Log in
-        </Link>
-      </div>
+      {webAppEnabled && (
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <Link href={withNext("/signup", next)} style={SECONDARY_CTA}>
+            Sign up on web
+          </Link>
+          <Link href={withNext("/login", next)} style={GHOST_CTA}>
+            Log in
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
