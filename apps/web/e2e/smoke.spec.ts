@@ -7,8 +7,14 @@ const EMAIL_FIELD = /^email$/i;
 const PASSWORD_FIELD = /^password$/i;
 const SIGN_IN_CTA = /^sign in$/i;
 
+// Web app lock (specs/web-landing/spec.md). The dev server gets the same env
+// through playwright.config.ts; stop any running dev server before switching.
+const WEB_APP_ENABLED = process.env.NEXT_PUBLIC_WEB_APP_ENABLED === "true";
+const LOCKED_REASON = "web app locked: see specs/web-landing/spec.md";
+
 test.describe("Public pages", () => {
   test("login page renders with form fields", async ({ page }) => {
+    test.skip(!WEB_APP_ENABLED, LOCKED_REASON);
     await page.goto("/login");
 
     await expect(page.getByLabel(EMAIL_FIELD)).toBeVisible();
@@ -20,6 +26,7 @@ test.describe("Public pages", () => {
   test("login page keeps the SSO and account-recovery paths", async ({
     page,
   }) => {
+    test.skip(!WEB_APP_ENABLED, LOCKED_REASON);
     await page.goto("/login");
 
     await expect(
@@ -37,6 +44,7 @@ test.describe("Public pages", () => {
   });
 
   test("signup page renders with form fields", async ({ page }) => {
+    test.skip(!WEB_APP_ENABLED, LOCKED_REASON);
     await page.goto("/signup");
 
     await expect(
@@ -62,6 +70,8 @@ test.describe("Public pages", () => {
 });
 
 test.describe("Auth redirects", () => {
+  test.skip(!WEB_APP_ENABLED, LOCKED_REASON);
+
   test("unauthenticated user is redirected from home to login", async ({
     page,
   }) => {
