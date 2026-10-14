@@ -56,6 +56,25 @@ export function playerLabel(durationS: number): string {
   return `Your highlight reel, ${Math.round(durationS)} seconds`;
 }
 
+/** Whose reel the full-screen viewer is playing (spec 020 D). */
+export interface ReelSubject {
+  isOwn: boolean;
+  /** The subject's display name; only read when the reel is not yours. */
+  name: string | null;
+}
+
+/**
+ * The viewer's play / pause label: `playerLabel` for your own reel (and when
+ * the subject is unknown), `{Name}'s highlight reel, N seconds` for someone
+ * else's, `Highlight reel, N seconds` when their name is missing.
+ */
+export function reelPlayerLabel(durationS: number, subject?: ReelSubject | null): string {
+  if (!subject || subject.isOwn) return playerLabel(durationS);
+  const name = subject.name?.trim();
+  const seconds = `${Math.round(durationS)} seconds`;
+  return name ? `${name}'s highlight reel, ${seconds}` : `Highlight reel, ${seconds}`;
+}
+
 export function counterLabel(length: number, max: number): string {
   return `${length}/${max}`;
 }

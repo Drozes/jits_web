@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { VideoView } from "expo-video";
 import { Play } from "lucide-react-native";
 import { darkTokens } from "@/lib/tokens";
-import { playerLabel } from "@/lib/highlight/highlight-copy";
+import { reelPlayerLabel, type ReelSubject } from "@/lib/highlight/highlight-copy";
 import { useReelSlot, useSlotFirstFrame } from "@/lib/highlight/use-reel-player-pool";
 import { ReelPosterImage, type ReelPoster } from "./reel-poster";
 import type { ReelPoolController } from "@/lib/highlight/reel-player-pool";
@@ -19,10 +19,12 @@ const CENTER = { ...StyleSheet.absoluteFillObject, alignItems: "center", justify
  * played and a frame is up (swapped instantly). A tap toggles pause / play;
  * paused shows a still 64 pt play glyph. No native controls, fullscreen or PiP.
  */
-export function ReelVideo({ pool, index, durationS, poster, onPosterError }: {
+export function ReelVideo({ pool, index, durationS, subject, poster, onPosterError }: {
   pool: ReelPoolController;
   index: number;
   durationS: number;
+  /** Whose reel this is (the VoiceOver label); absent reads as your own. */
+  subject?: ReelSubject | null;
   poster: ReelPoster;
   /** The (lane) poster failed to load: the frame falls back to the page's own. */
   onPosterError?: () => void;
@@ -37,7 +39,7 @@ export function ReelVideo({ pool, index, durationS, poster, onPosterError }: {
       <Pressable
         testID="highlight-player-toggle"
         accessibilityRole="button"
-        accessibilityLabel={playerLabel(durationS)}
+        accessibilityLabel={reelPlayerLabel(durationS, subject)}
         accessibilityHint="Plays or pauses the reel"
         onPress={() => pool.toggle(index)}
         style={{ flex: 1 }}

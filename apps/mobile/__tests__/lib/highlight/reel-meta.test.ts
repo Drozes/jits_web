@@ -21,20 +21,24 @@ describe("reel meta", () => {
     expect(reelMetaLine(null, 28)).toBe("0:28");
   });
 
-  it("single-reel: own reel, vs {opp}, Open match to match detail", () => {
+  it("single-reel: own reel, no title, Open match to match detail", () => {
     const m = metaFromDetail(detail);
-    expect(m).toMatchObject({ title: "vs Bea", secondary: "open_match", matchId: "m1" });
+    expect(m).toMatchObject({ secondary: "open_match", matchId: "m1" });
+    expect(m).not.toHaveProperty("title");
     expect(secondaryHref(m)).toBe("/(app)/match-detail/m1");
   });
 
-  it("pager, own item: vs {opp} and Open match", () => {
-    expect(pageMeta(detail, reel(1))).toMatchObject({ title: "vs Bea", secondary: "open_match" });
+  it("pager, own item: Open match, no title", () => {
+    const m = pageMeta(detail, reel(1));
+    expect(m).toMatchObject({ secondary: "open_match" });
+    expect(m).not.toHaveProperty("title");
   });
 
-  it("not yours and not a participant: the subject's name and View profile (C-V5)", () => {
+  it("not yours and not a participant: View profile (C-V5), no title", () => {
     const item = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
     const m = pageMeta(detail, item);
-    expect(m).toMatchObject({ title: "C. Ruiz", secondary: "view_profile" });
+    expect(m).toMatchObject({ secondary: "view_profile" });
+    expect(m).not.toHaveProperty("title");
     expect(secondaryHref(m)).toBe("/(app)/athlete/ath-9");
   });
 
