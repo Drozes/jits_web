@@ -1,6 +1,7 @@
 import * as React from "react";
 import { StyleSheet, View, type LayoutChangeEvent, type ViewStyle } from "react-native";
 import type { HighlightSource } from "@/lib/highlight/use-my-highlight";
+import type { ReelSubject } from "@/lib/highlight/highlight-copy";
 import { VIEWER_COPY } from "./viewer-copy";
 import { SHARE_COPY } from "@/lib/highlight-share";
 import { ViewerMessage, ViewerSkeleton } from "./viewer-states";
@@ -19,6 +20,8 @@ interface ViewerFrameProps {
   /** Needed to play; absent for the loading frame. */
   binding?: ReelBinding | null;
   source: HighlightSource | null;
+  /** Whose reel this is (the player's VoiceOver label); absent reads as your own. */
+  subject?: ReelSubject | null;
   playbackFailed: boolean;
   onRetry: () => void;
 }
@@ -29,7 +32,7 @@ interface ViewerFrameProps {
  * skeleton; the cannot-play note with "Try again" (re-read + re-sign) when
  * playback failed.
  */
-export function ViewerFrame({ binding, source, playbackFailed, onRetry }: ViewerFrameProps) {
+export function ViewerFrame({ binding, source, subject, playbackFailed, onRetry }: ViewerFrameProps) {
   const [size, setSize] = React.useState<{ w: number; h: number } | null>(null);
   const onLayout = React.useCallback((e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -58,7 +61,7 @@ export function ViewerFrame({ binding, source, playbackFailed, onRetry }: Viewer
       />
     );
   } else if (source && binding) {
-    body = <ReelVideo pool={binding.pool} index={binding.index} durationS={source.durationS} poster={poster ?? { url: null, path: null }} onPosterError={lane ? onPosterError : undefined} />;
+    body = <ReelVideo pool={binding.pool} index={binding.index} durationS={source.durationS} subject={subject} poster={poster ?? { url: null, path: null }} onPosterError={lane ? onPosterError : undefined} />;
   } else if (poster?.url) {
     body = <ReelPosterImage poster={poster} onError={lane ? onPosterError : undefined} />;
   } else if (size) {

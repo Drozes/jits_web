@@ -28,6 +28,10 @@ export function ViewerReady({ detail, source, binding }: { detail: HighlightDeta
   const progress = my.progress;
   const playback = progress?.playback ?? null;
   const meta = React.useMemo(() => pageMeta(detail, binding.item), [detail, binding.item]);
+  // The single-reel viewer (no lane item) is always your own reel; a non-own
+  // lane item's `opponentName` carries its subject's name.
+  const item = binding.item;
+  const subject = React.useMemo(() => ({ isOwn: !item || item.isOwn, name: item?.opponentName ?? null }), [item]);
 
   if (!progress || !playback) {
     return <ViewerNoPlayback progress={progress} error={my.progressError} onRetry={my.reload} binding={binding} />;
@@ -42,7 +46,7 @@ export function ViewerReady({ detail, source, binding }: { detail: HighlightDeta
   ) : null;
   return (
     <View className="flex-1">
-      <ViewerFrame binding={binding} source={my.source} playbackFailed={my.playbackFailed} onRetry={my.reload} />
+      <ViewerFrame binding={binding} source={my.source} subject={subject} playbackFailed={my.playbackFailed} onRetry={my.reload} />
       <ReelScrims rail={binding.canManage} />
       <ReelOverlay
         pool={binding.pool}
