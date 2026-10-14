@@ -1,5 +1,5 @@
-/** Interim public host until the elorated.com cutover (jits-x1t2). */
-export const DEFAULT_PUBLIC_ORIGIN = "https://jitsweb.vercel.app";
+/** Public host fallback on a Vercel deploy with no site URL configured. */
+export const DEFAULT_PUBLIC_ORIGIN = "https://elorated.com";
 
 function normalise(value: string | undefined, assumeHttps: boolean): string | null {
   const raw = value?.trim();
@@ -18,9 +18,9 @@ function normalise(value: string | undefined, assumeHttps: boolean): string | nu
  * which sits behind Vercel Deployment Protection (crawlers get a 401) and
  * pins every shared card to one old deployment.
  *
- * Order: NEXT_PUBLIC_SITE_URL (set to https://elorated.com after the domain
- * cutover), then Vercel's production domain, then the interim host on a
- * Vercel deploy, then localhost for local dev and e2e.
+ * Order: NEXT_PUBLIC_SITE_URL (https://elorated.com in production), then
+ * Vercel's production domain, then the default public host on a Vercel
+ * deploy, then localhost for local dev and e2e.
  */
 export function publicSiteOrigin(env: Record<string, string | undefined> = process.env): string {
   return (

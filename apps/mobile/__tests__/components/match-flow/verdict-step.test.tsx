@@ -308,7 +308,7 @@ describe("actions", () => {
     });
     const arg = spy.mock.calls[0][0] as { message: string; url?: string };
     expect(arg.url).toBeUndefined();
-    expect(arg.message).toBe("I just won a match on ELO RATED! New rating: 1526 (+14)\nhttps://jitsweb.vercel.app/matches/M1");
+    expect(arg.message).toBe("I just won a match on ELO RATED! New rating: 1526 (+14)\nhttps://elorated.com/matches/M1");
     expect(arg.message.match(/https:/g)).toHaveLength(1);
     spy.mockRestore();
   });
@@ -320,7 +320,7 @@ describe("actions", () => {
     await act(async () => {
       fireEvent.press(s.getByTestId("summary-share"));
     });
-    expect((spy.mock.calls[0][0] as { message: string }).message).toBe("I just won a match on ELO RATED!\nhttps://jitsweb.vercel.app/matches/M1");
+    expect((spy.mock.calls[0][0] as { message: string }).message).toBe("I just won a match on ELO RATED!\nhttps://elorated.com/matches/M1");
     spy.mockRestore();
   });
 
