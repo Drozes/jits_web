@@ -4,7 +4,7 @@
 
 **Last updated: October 13, 2026**
 
-This Privacy Policy explains how ELO RATED collects, uses, shares, keeps and protects personal information when you use the ELO RATED mobile app, the ELO RATED web app and website, and related services (together, the "Service"). Please read it together with our Terms of Service at https://jitsweb.vercel.app/terms, which contain the licence you give us for your content and the limits on our liability.
+This Privacy Policy explains how ELO RATED collects, uses, shares, keeps and protects personal information when you use the ELO RATED mobile app, the ELO RATED web app and website, and related services (together, the "Service"). Please read it together with our Terms of Service at https://elorated.com/terms, which contain the licence you give us for your content and the limits on our liability.
 
 This Privacy Policy explains our practices; it is not a contract and does not create rights or obligations beyond those provided by applicable privacy law.
 
@@ -31,7 +31,7 @@ The Service is operated by **ELO RATED** ("ELO RATED", "EloRated", "we", "us" or
 This policy applies to personal information we handle through:
 
 - the ELO RATED mobile app for iOS and Android;
-- the ELO RATED web app (currently at jitsweb.vercel.app) and our website at elorated.com, including invite link pages;
+- the ELO RATED website and web app at elorated.com, including invite link pages;
 - our communications with you (for example, support emails and push notifications); and
 - our use of match footage, reels, names, likenesses and ratings on our own social media accounts.
 
