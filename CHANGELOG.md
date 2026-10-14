@@ -25,6 +25,17 @@
 **Removed**
 - `APP_STORE_URL` (`apps/web/lib/invites/constants.ts`) and its App Store search fallback; every App Store link goes through `apps/web/lib/app-store.ts`.
 
+### Mobile 1.0: Sign in with Apple on, version 1.0, permission purpose strings (jits-8s9v)
+
+The first App Store binary offers Google sign-in, so App Review guideline 4.8 needs Sign in with Apple. Native change: needs a TestFlight build (an OTA cannot add the entitlement), and the Supabase prod Apple provider must be on first.
+
+**Changed**
+- `apps/mobile/app.json`: `expo.version` is `1.0` (equal to the App Store Connect version; `runtimeVersion` policy `appVersion`). After this merges, `main` and `development` publish OTAs for runtime 1.0 only, which no device has until the 1.0 build installs; any further 0.5.0 OTA must be published from a 0.5.x branch cut before this change (for example `release/0.5.x` at `cc771d9c`). `ios.usesAppleSignIn: true` and the `expo-apple-authentication` plugin are back, so the build carries `com.apple.developer.applesignin`; the strip plugin `apps/mobile/plugins/with-no-apple-signin.js` is deleted.
+- Purpose strings (guideline 5.1.1), identical in every source that writes them so plugin order cannot change the result: camera "ELO RATED uses your camera to record your matches." (build 25 shipped the image picker's profile picture text), microphone "ELO RATED uses your microphone so your match recordings include audio.", location when in use "ELO RATED uses your location when you go live or challenge someone, so nearby athletes can find you and your match can start on the same mat.", photo library "ELO RATED uses your photo library to save your match highlights." and add-only "ELO RATED saves your match highlights to your photo library.". `expo-location` no longer writes the Always keys (set to `false`) and background location stays off; `expo-secure-store` no longer declares Face ID (`faceIDPermission: false`, the app uses no biometrics).
+- `apps/mobile/lib/env.ts`: `APPLE_SIGN_IN_DEFAULT = true`. `EXPO_PUBLIC_APPLE_SIGN_IN` is now a two-way bundle override (`false` / `0` hides, `true` / `1` shows; `parseBooleanOverride` replaces `parseBooleanFlag`), kept only as an emergency kill switch: hiding Apple while Google is visible on iOS violates guideline 4.8.
+- Login: the Apple button sits above "Continue with Google", and `AppleSignInButton` uses the app button height (`BUTTON_HEIGHT`, 56) instead of 52, so Apple is never less prominent than Google. Signup shows Apple under Continue (it has no Google button).
+- Tests: `apps/mobile/__tests__/app-json-native.test.ts` pins the entitlement, version, plugin options and purpose strings; `apps/mobile/__tests__/screens/auth/apple-sign-in-gate.test.tsx` covers the default-on button, the kill switch, the override parser and Apple before Google on login.
+
 ### Legal: one shared source for the Terms and Privacy Policy on web and native; French /terms/fr and /privacy/fr
 
 The new legal texts use constructs the tiny legal Markdown reader did not support, and Quebec requires French versions.
