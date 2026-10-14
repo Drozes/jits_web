@@ -12,6 +12,19 @@ const ROW_STYLE = {
 } as const;
 
 /**
+ * Compact "Get the app" block above the user footer. Static (no athlete
+ * read), so the rail renders it outside the footer's Suspense boundary.
+ * Centered: in the 232px rail the two sm badges wrap onto two rows.
+ */
+export function SidebarAppBadges() {
+  return (
+    <div style={ROW_STYLE}>
+      <StoreBadges size="sm" heading="Get the app" align="center" />
+    </div>
+  );
+}
+
+/**
  * Sidebar-rail user footer. Fetches the active athlete null-safely (NEVER
  * requireAthlete; this shell must tolerate /eua and /signup where no active
  * athlete exists). Renders nothing when there is no active athlete.
@@ -20,20 +33,6 @@ export async function SidebarFooter() {
   const athlete = await getActiveAthlete();
   if (!athlete) return null;
 
-  return (
-    <div className="flex flex-col">
-      {/* Compact "Get the app" block above, and separate from, the profile link. */}
-      <div style={ROW_STYLE}>
-        <StoreBadges size="sm" heading="Get the app" />
-      </div>
-      <ProfileRow athlete={athlete} />
-    </div>
-  );
-}
-
-type ActiveAthlete = NonNullable<Awaited<ReturnType<typeof getActiveAthlete>>>;
-
-function ProfileRow({ athlete }: { athlete: ActiveAthlete }) {
   const initials = getInitials(athlete.display_name);
   const photoUrl = getProfilePhotoUrl(athlete.profile_photo_url);
 

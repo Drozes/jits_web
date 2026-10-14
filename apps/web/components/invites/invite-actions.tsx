@@ -5,7 +5,7 @@ import Link from "next/link";
 import { acceptJoinAction, claimInviteAction, confirmDobAndClaimAction } from "@/app/c/[token]/actions";
 import { withNext } from "@/lib/auth/safe-next-path";
 import { invitePath } from "@/lib/invites/constants";
-import { DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
+import { DOB_SAVE_FAILED_COPY, UNDERAGE_COPY } from "@jits/shared/utils";
 import { TRY_AGAIN_OUTCOME, type InviteOutcome } from "@/lib/invites/outcome-copy";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
@@ -85,14 +85,29 @@ export function InviteActions({ token, kind, inviterFirstName, viewer, inAppBrow
     );
   }
 
-  // The match already exists (ready), or the web booking is done: either
-  // way it is played in the app, so opening it there is the one real action.
-  if (outcome && outcome.kind !== "setup") {
+  // Success: the match is ready, the web booking is done or the athletes are
+  // now friends. All of it continues in the app, so opening it is the one
+  // real action and the only red CTA.
+  if (outcome?.kind === "ready" || outcome?.kind === "booked" || outcome?.kind === "friends") {
     return (
       <div style={STACK}>
         <InviteOutcomeCard outcome={outcome} />
         <OpenInAppButton {...links} primary />
         <InviteStoreBadges {...links} />
+      </div>
+    );
+  }
+
+  // Error (expired, taken, withdrawn, own link, link off, under 16, ...):
+  // nothing to do here, so no red CTA. An under-16 viewer is blocked from
+  // the app too, so they get neither Open in app nor the store badges.
+  if (outcome?.kind === "error") {
+    const underage = outcome.body === UNDERAGE_COPY;
+    return (
+      <div style={STACK}>
+        <InviteOutcomeCard outcome={outcome} />
+        {!underage && <OpenInAppButton {...links} />}
+        {!underage && <InviteStoreBadges {...links} />}
       </div>
     );
   }

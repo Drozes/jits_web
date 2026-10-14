@@ -22,10 +22,24 @@ export function parseStoreUrl(raw: string | undefined, host: string): string | n
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || url.hostname !== host) return null;
+    // No credentials and no explicit non-default port (":443" normalises away).
+    if (url.username || url.password || url.port) return null;
     return url.href;
   } catch {
     return null;
   }
+}
+
+/**
+ * The App Store listing, as parseStoreUrl, plus: a URL naming a different
+ * app (`/id<digits>` other than APP_STORE_ID) is rejected, so the badge and
+ * the Smart App Banner (which always uses APP_STORE_ID) can never disagree.
+ */
+export function parseAppStoreUrl(raw: string | undefined): string | null {
+  const href = parseStoreUrl(raw, APP_STORE_HOST);
+  if (!href) return null;
+  const id = new URL(href).pathname.match(/\/id(\d+)(?=\/|$)/)?.[1];
+  return id && id !== APP_STORE_ID ? null : href;
 }
 
 /**
@@ -36,7 +50,7 @@ export function parseStoreUrl(raw: string | undefined, host: string): string | n
  * https://apps.apple.com/app/id6774629438 and
  * https://play.google.com/store/apps/details?id=com.elorated.mobile
  */
-export const APP_STORE_URL = parseStoreUrl(process.env.NEXT_PUBLIC_APP_STORE_URL, APP_STORE_HOST);
+export const APP_STORE_URL = parseAppStoreUrl(process.env.NEXT_PUBLIC_APP_STORE_URL);
 export const PLAY_STORE_URL = parseStoreUrl(process.env.NEXT_PUBLIC_PLAY_STORE_URL, PLAY_STORE_HOST);
 
 /**

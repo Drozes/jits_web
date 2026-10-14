@@ -3,10 +3,11 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 const claimInviteAction = vi.fn();
 const confirmDobAndClaimAction = vi.fn();
+const acceptJoinAction = vi.fn();
 vi.mock("@/app/c/[token]/actions", () => ({
   claimInviteAction: (...a: unknown[]) => claimInviteAction(...a),
   confirmDobAndClaimAction: (...a: unknown[]) => confirmDobAndClaimAction(...a),
-  acceptJoinAction: vi.fn(),
+  acceptJoinAction: (...a: unknown[]) => acceptJoinAction(...a),
 }));
 vi.mock("./app-links", () => ({
   InviteStoreBadges: () => <div role="group" aria-label="App Store: coming soon" />,
@@ -15,6 +16,7 @@ vi.mock("./app-links", () => ({
 }));
 
 import { InviteActions } from "./invite-actions";
+import { UNDERAGE_OUTCOME } from "@/lib/invites/outcome-copy";
 
 const TOKEN = "e2eChallengeTokenAAAAA";
 const DOB = {
@@ -135,6 +137,45 @@ describe("InviteActions: CTA hierarchy with the store badges", () => {
     const red = screen.getAllByRole("link").filter((el) => el.style.background === RED);
     expect(red).toEqual([signUp]);
     expect(screen.getByRole("link", { name: /open in app/i }).dataset.primary).toBe("false");
+  });
+
+  /** Every element styled as the Signal Red CTA, plus a mocked primary Open in app. */
+  function redCtas() {
+    const styled = Array.from(document.querySelectorAll<HTMLElement>("a, button")).filter(
+      (el) => el.style.background === RED,
+    );
+    const openPrimary = Array.from(document.querySelectorAll<HTMLElement>('[data-primary="true"]'));
+    return [...styled, ...openPrimary];
+  }
+
+  async function acceptWith(outcome: unknown) {
+    claimInviteAction.mockResolvedValue(outcome);
+    renderActive();
+    fireEvent.click(screen.getByRole("button", { name: /accept challenge/i }));
+  }
+
+  it("an error outcome renders no red CTA (Open in app stays secondary)", async () => {
+    await acceptWith({ kind: "error", title: "Challenge expired", body: "This challenge expired. Ask Alex for a new one." });
+    await screen.findByText("Challenge expired");
+    expect(redCtas()).toHaveLength(0);
+    expect(screen.getByRole("link", { name: /open in app/i }).dataset.primary).toBe("false");
+    expect(screen.getByRole("group", { name: "App Store: coming soon" })).toBeTruthy();
+  });
+
+  it("the underage outcome renders no red CTA, no Open in app and no store badges", async () => {
+    await acceptWith(UNDERAGE_OUTCOME);
+    await screen.findByText("16 and over");
+    expect(redCtas()).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: /open in app/i })).toBeNull();
+    expect(screen.queryByRole("group", { name: /coming soon/i })).toBeNull();
+  });
+
+  it("friends: Open in app is the red CTA", async () => {
+    render(<InviteActions token={TOKEN} kind="join" inviterFirstName="Alex" viewer="active" inAppBrowser={null} />);
+    acceptJoinAction.mockResolvedValue({ kind: "friends", title: "You're friends", body: "You and Alex are now friends." });
+    fireEvent.click(screen.getByRole("button", { name: /accept invite/i }));
+    await screen.findByText("You're friends");
+    expect(screen.getByRole("link", { name: /open in app/i }).dataset.primary).toBe("true");
   });
 
   it("after a web booking: Open in app is the red CTA, never the App Store", async () => {

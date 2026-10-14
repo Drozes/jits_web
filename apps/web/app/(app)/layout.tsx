@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { BottomNavBar } from "@/components/layout/bottom-nav-bar";
 import { SidebarRail } from "@/components/layout/sidebar-rail";
 import {
+  SidebarAppBadges,
   SidebarFooter,
   SidebarFooterSkeleton,
 } from "@/components/layout/sidebar-footer";
@@ -29,9 +30,14 @@ export default function AppLayout({
         <Suspense>
           <SidebarRail
             footer={
-              <Suspense fallback={<SidebarFooterSkeleton />}>
-                <SidebarFooter />
-              </Suspense>
+              <div className="flex flex-col">
+                {/* Outside the athlete Suspense: the badges need no data, so
+                    they are in place on first paint and never shift. */}
+                <SidebarAppBadges />
+                <Suspense fallback={<SidebarFooterSkeleton />}>
+                  <SidebarFooter />
+                </Suspense>
+              </div>
             }
           />
         </Suspense>

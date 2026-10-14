@@ -32,6 +32,11 @@ describe("StoreBadges", () => {
       expect(el.textContent).toBe("Coming soon");
     }
     expect(document.querySelectorAll("a, [tabindex]")).toHaveLength(0);
+    // The official artwork is never dimmed or recoloured, only labelled.
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>("[data-testid=store-badges] *"))) {
+      expect(el.style.opacity).toBe("");
+      expect(el.style.filter).toBe("");
+    }
   });
 
   it("mixes states per store", () => {

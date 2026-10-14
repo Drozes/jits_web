@@ -28,7 +28,7 @@ const GOOGLE = { src: "/badges/google-play-badge-en-us.png", w: 646, h: 250, vis
 
 /**
  * Official "Download on the App Store" and "Get it on Google Play" badges.
- * A store without a live listing renders a dimmed, non-interactive badge
+ * A store without a live listing renders the badge unaltered but non-interactive
  * with a "Coming soon" label instead of a link, so the page never sends
  * anyone to a listing that does not exist. Server-safe (no hooks).
  */
@@ -106,8 +106,10 @@ function Badge({ url, liveName, soonName, space, onClick, children }: BadgeProps
     );
   }
   return (
-    <div role="group" aria-label={soonName} aria-disabled="true" data-store-state="coming-soon" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: space / 2 }}>
-      <span style={{ display: "block", opacity: "var(--opacity-disabled)" }}>{children}</span>
+    // Full opacity: Apple's and Google's rules forbid changing the badge's
+    // colour or transparency, so the "Coming soon" label is the only signal.
+    <div role="group" aria-label={soonName} aria-disabled="true" data-store-state="coming-soon" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: space / 2, cursor: "default" }}>
+      {children}
       <span aria-hidden="true" style={CAPS_LABEL}>Coming soon</span>
     </div>
   );
