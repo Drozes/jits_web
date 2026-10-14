@@ -18,6 +18,7 @@ import {
 } from "@expo-google-fonts/dm-sans";
 import {
   Inter_400Regular,
+  Inter_400Regular_Italic,
   Inter_500Medium,
 } from "@expo-google-fonts/inter";
 import {
@@ -69,6 +70,9 @@ function RootLayout() {
     DMSans_500Medium,
     DMSans_700Bold,
     Inter_400Regular,
+    // Italic spans in the legal documents (jits-rog5.8): RN cannot slant a
+    // custom font on iOS, so the face is loaded (a JS asset, OTA-safe).
+    Inter_400Regular_Italic,
     Inter_500Medium,
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
@@ -142,6 +146,9 @@ function RootLayout() {
                     only stores the token; invite setup is the invitee's one screen. */}
                   <Stack.Screen name="c/[token]" />
                   <Stack.Screen name="invite-setup" />
+                  {/* Terms / Privacy full text (jits-rog5.8). Root level, not in
+                    (app), so it opens signed out and over profile setup. */}
+                  <Stack.Screen name="legal/[doc]" options={{ presentation: "modal" }} />
                 </Stack>
               </AuthProvider>
             </BottomSheetModalProvider>

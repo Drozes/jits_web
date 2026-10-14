@@ -102,22 +102,31 @@
     "06-Setup-Terms.dc.html": {
       "title": "Profile setup 1: Agreement",
       "sources": [
+        "apps/mobile/app/legal/[doc].tsx",
         "apps/mobile/app/profile-setup.tsx",
         "apps/mobile/components/layout/app-header.tsx",
         "apps/mobile/components/layout/header-live-dot.tsx",
+        "apps/mobile/components/legal/contents-panel.tsx",
+        "apps/mobile/components/legal/legal-document.tsx",
+        "apps/mobile/components/legal/legal-links.tsx",
+        "apps/mobile/components/legal/terms-key-points.tsx",
         "apps/mobile/components/profile-setup/setup-wizard.tsx",
         "apps/mobile/components/profile-setup/tos-step.tsx",
         "apps/mobile/components/profile-setup/types.ts",
         "apps/mobile/components/profile-setup/wizard-progress.tsx",
         "apps/mobile/components/ui/elo-system/button.tsx",
+        "apps/mobile/components/ui/elo-system/chip.tsx",
         "apps/mobile/components/ui/elo-system/plate.tsx",
         "apps/mobile/components/ui/elo-system/selection.tsx",
         "apps/mobile/components/ui/elo-system/wordmark.tsx",
         "apps/mobile/components/ui/pressable-scale.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/lib/legal/legal-copy.ts",
         "apps/mobile/lib/profile-setup/validation.ts",
-        "packages/shared/src/utils/tos-content.ts"
+        "packages/shared/src/legal/documents.generated.ts",
+        "packages/shared/src/legal/markdown.ts",
+        "packages/shared/src/legal/references.ts"
       ]
     },
     "07-Setup-Who.dc.html": {
@@ -1685,10 +1694,15 @@
         "apps/mobile/app/(app)/_layout.tsx",
         "apps/mobile/app/(app)/settings/_layout.tsx",
         "apps/mobile/app/(app)/settings/index.tsx",
+        "apps/mobile/app/legal/[doc].tsx",
         "apps/mobile/components/layout/app-header.tsx",
         "apps/mobile/components/layout/header-live-dot.tsx",
         "apps/mobile/components/layout/page-container.tsx",
-        "apps/mobile/components/ui/elo-system/plate.tsx"
+        "apps/mobile/components/legal/contents-panel.tsx",
+        "apps/mobile/components/legal/legal-document.tsx",
+        "apps/mobile/components/ui/elo-system/chip.tsx",
+        "apps/mobile/components/ui/elo-system/plate.tsx",
+        "apps/mobile/lib/legal/legal-copy.ts"
       ]
     },
     "44-Settings-Notifications.dc.html": {
@@ -1893,6 +1907,9 @@
         "apps/mobile/app/invite-setup.tsx",
         "apps/mobile/components/layout/app-header.tsx",
         "apps/mobile/components/layout/header-live-dot.tsx",
+        "apps/mobile/components/legal/legal-document.tsx",
+        "apps/mobile/components/legal/legal-links.tsx",
+        "apps/mobile/components/legal/terms-key-points.tsx",
         "apps/mobile/components/profile-setup/date-of-birth-picker.tsx",
         "apps/mobile/components/profile-setup/elo-form-field.tsx",
         "apps/mobile/components/profile-setup/identity-step.tsx",
@@ -1905,8 +1922,11 @@
         "apps/mobile/components/ui/sheet.tsx",
         "apps/mobile/components/ui/state-pressable.tsx",
         "apps/mobile/components/ui/steel-sheen.tsx",
+        "apps/mobile/lib/legal/legal-copy.ts",
         "apps/mobile/lib/profile-setup/validation.ts",
-        "packages/shared/src/utils/tos-content.ts"
+        "packages/shared/src/legal/documents.generated.ts",
+        "packages/shared/src/legal/markdown.ts",
+        "packages/shared/src/legal/references.ts"
       ]
     },
     "54-Invite-Code.dc.html": {

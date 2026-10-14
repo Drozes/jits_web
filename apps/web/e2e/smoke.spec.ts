@@ -101,4 +101,11 @@ test.describe("Public legal pages", () => {
       await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
     });
   }
+
+  // jits-rog5.10: sections have stable anchors and references link across documents.
+  test("/terms#section-5 lands on Section 5, and the Privacy Policy reference links to /privacy", async ({ page }) => {
+    await page.goto("/terms#section-5");
+    await expect(page.locator("h2#section-5")).toBeInViewport();
+    await expect(page.locator('a[data-ref-doc="privacy"]').first()).toHaveAttribute("href", "/privacy");
+  });
 });
