@@ -4,9 +4,9 @@
 
 **Dernière mise à jour : 13 octobre 2026**
 
-La version française et la version anglaise de la présente politique ont la même valeur. English version: https://jitsweb.vercel.app/privacy
+La version française et la version anglaise de la présente politique ont la même valeur. English version: https://elorated.com/privacy
 
-La présente politique de confidentialité explique comment ELO RATED recueille, utilise, communique, conserve et protège les renseignements personnels lorsque vous utilisez l'application mobile ELO RATED, l'application Web et le site Web ELO RATED ainsi que les services connexes (collectivement, le « Service »). Veuillez la lire conjointement avec nos Conditions d'utilisation, accessibles à https://jitsweb.vercel.app/terms/fr, qui énoncent la licence que vous nous accordez sur votre contenu et les limites de notre responsabilité.
+La présente politique de confidentialité explique comment ELO RATED recueille, utilise, communique, conserve et protège les renseignements personnels lorsque vous utilisez l'application mobile ELO RATED, l'application Web et le site Web ELO RATED ainsi que les services connexes (collectivement, le « Service »). Veuillez la lire conjointement avec nos Conditions d'utilisation, accessibles à https://elorated.com/terms/fr, qui énoncent la licence que vous nous accordez sur votre contenu et les limites de notre responsabilité.
 
 La présente politique de confidentialité explique nos pratiques; elle ne constitue pas un contrat et ne crée pas de droits ni d'obligations au-delà de ceux que prévoit la législation applicable en matière de protection des renseignements personnels.
 
@@ -33,7 +33,7 @@ Le Service est exploité par **ELO RATED** (« ELO RATED », « EloRated »,
 La présente politique s'applique aux renseignements personnels que nous traitons par l'intermédiaire de ce qui suit :
 
 - l'application mobile ELO RATED pour iOS et Android;
-- l'application Web ELO RATED (actuellement à jitsweb.vercel.app) et notre site Web à elorated.com, y compris les pages de liens d'invitation;
+- le site Web et l'application Web ELO RATED à elorated.com, y compris les pages de liens d'invitation;
 - nos communications avec vous (par exemple, les courriels de soutien et les notifications poussées); et
 - notre utilisation de séquences de combat, de montages, des noms, de l'image et de la ressemblance des personnes et des cotes sur nos propres comptes de médias sociaux.
 
