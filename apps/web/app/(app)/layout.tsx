@@ -11,12 +11,15 @@ import { DeploymentCheckBootstrap } from "@/components/layout/deployment-check-b
 import { PushRegistrationBootstrap } from "@/components/layout/push-registration-bootstrap";
 import { ArenaBootstrapGate } from "@/components/arena/arena-bootstrap-gate";
 import { getActiveAthlete } from "@/lib/guards";
+import { redirectHomeWhenLocked } from "@/lib/web-app-lock-guard";
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Locked web app: never mount the app shell (presence, Arena, push).
+  redirectHomeWhenLocked();
   return (
     <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
       {/* >= lg: persistent left rail beside the content column. The rail is a

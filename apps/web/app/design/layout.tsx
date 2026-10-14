@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Sun, Moon } from "lucide-react";
+import { redirectHomeWhenLocked } from "@/lib/web-app-lock-guard";
 
 const navLinks = [
   { href: "/design", label: "Overview" },
@@ -22,6 +23,8 @@ export default function DesignLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Locked web app: the flag is a build-time constant, so the hook order below is stable.
+  redirectHomeWhenLocked();
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
 
