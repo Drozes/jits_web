@@ -10,9 +10,8 @@ import { VIEWER_COPY } from "./viewer-copy";
 
 /**
  * Bottom-left meta of a reel page (spec 8.2): the phase-1 regenerating
- * banner, `vs {opp}` (the subject's name on a reel that is not yours), the
- * mono `OCT 04 · 0:28` line, then Open match (a participant) or View profile
- * (C-V5, anyone else; spec 8.6).
+ * banner, the mono `OCT 04 · 0:28` line, then Open match (a participant) or
+ * View profile (C-V5, anyone else; spec 8.6). No title line (spec 020 D).
  */
 export function ViewerMeta({ progress, meta }: { progress: HighlightProgress | null; meta: ReelMetaInfo }) {
   const router = useRouter();
@@ -26,11 +25,6 @@ export function ViewerMeta({ progress, meta }: { progress: HighlightProgress | n
             <MonoNumbers text={regeneratingBanner(progress.renderTotal)} />
           </Text>
         </View>
-      ) : null}
-      {meta.title ? (
-        <Text testID="viewer-title" pointerEvents="none" className="font-heading text-title" style={{ color: ON_MEDIA.text }} numberOfLines={1}>
-          {meta.title}
-        </Text>
       ) : null}
       {playback ? (
         <Text testID="viewer-meta" pointerEvents="none" className="font-mono text-small uppercase" style={{ color: ON_MEDIA.text2, fontVariant: ["tabular-nums"] }}>

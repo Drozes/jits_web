@@ -29,7 +29,7 @@ export interface ReelItem {
   posterPath: string | null;
   /** Signed poster URL, null when unsigned or signing failed. */
   posterUrl: string | null;
-  /** Display name for the tile caption ("vs {name}" for own reels). */
+  /** Display name for the tile caption and the viewer's VoiceOver label: the opponent on an own reel ("vs {name}"), the reel's subject on a reel that is not yours. */
   opponentName: string | null;
   readyAt: string;
   unseen: boolean;
