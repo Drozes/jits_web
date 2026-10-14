@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Check, Link2, Smartphone } from "lucide-react";
 import { sendLandingEvent } from "@/lib/invites/beacon";
-import { APP_STORE_URL, inviteSchemeUrl } from "@/lib/invites/constants";
+import { AppStoreCta } from "@/components/app-store/app-store-cta";
+import { isAppStoreLive } from "@/lib/app-store";
+import { inviteSchemeUrl } from "@/lib/invites/constants";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import { GHOST_CTA, PRIMARY_CTA, SECONDARY_CTA } from "./styles";
 
@@ -14,16 +16,35 @@ interface LinkProps {
   kind?: InviteKind | null;
 }
 
-/** App Store button. Red only when it is the surface's one primary CTA. */
+/**
+ * App Store button. Red only when it is the surface's one primary CTA; a
+ * neutral non-link "Coming soon" state while the listing is not public.
+ */
 export function AppStoreButton({ token, inAppBrowser, kind = null, primary }: LinkProps & { primary: boolean }) {
   return (
-    <a
-      href={APP_STORE_URL}
-      onClick={() => sendLandingEvent(token, "app_store_tapped", inAppBrowser, kind)}
-      style={primary ? PRIMARY_CTA : SECONDARY_CTA}
-    >
-      Get it on the App Store
-    </a>
+    <AppStoreCta primary={primary} onClick={() => sendLandingEvent(token, "app_store_tapped", inAppBrowser, kind)} />
+  );
+}
+
+/**
+ * The App Store as the stack's primary CTA, then Open in app. While the store
+ * URL is unset the coming-soon state cannot be acted on, so Open in app takes
+ * the red fill and comes first (spec P3: one actionable red CTA per surface).
+ */
+export function StoreFirstLinks(props: LinkProps) {
+  if (isAppStoreLive()) {
+    return (
+      <>
+        <AppStoreButton {...props} primary />
+        <OpenInAppButton {...props} />
+      </>
+    );
+  }
+  return (
+    <>
+      <OpenInAppButton {...props} primary />
+      <AppStoreButton {...props} primary />
+    </>
   );
 }
 
