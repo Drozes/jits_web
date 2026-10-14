@@ -43,7 +43,7 @@ export function StoreFirstLinks(props: LinkProps) {
   return (
     <>
       <OpenInAppButton {...props} primary />
-      <AppStoreButton {...props} primary />
+      <AppStoreButton {...props} primary={false} />
     </>
   );
 }

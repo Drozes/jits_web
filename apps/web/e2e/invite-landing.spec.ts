@@ -1,10 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
+import { isAppStoreLive } from "../lib/app-store";
 
 // Web app lock (specs/web-landing/spec.md). The dev server gets the same env
 // through playwright.config.ts; stop any running dev server before switching.
 const WEB_APP_ENABLED = process.env.NEXT_PUBLIC_WEB_APP_ENABLED === "true";
 const LOCKED_REASON = "web app locked: see specs/web-landing/spec.md";
-const STORE_LIVE = !!process.env.NEXT_PUBLIC_APP_STORE_URL;
+// Same rule as the app (trimmed, https only), so the specs and the page agree.
+const STORE_LIVE = isAppStoreLive();
 
 /** The App Store CTA: a link once the listing is public, else the coming-soon state. */
 async function expectAppStoreCta(page: Page) {

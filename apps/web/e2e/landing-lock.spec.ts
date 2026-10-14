@@ -1,10 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { isAppStoreLive } from "../lib/app-store";
 
 // The locked web app (specs/web-landing/spec.md): "/" is the landing page and
 // everything outside the allow-list redirects to "/". The dev server gets the
 // same env through playwright.config.ts; stop it before switching states.
 const WEB_APP_ENABLED = process.env.NEXT_PUBLIC_WEB_APP_ENABLED === "true";
-const STORE_LIVE = !!process.env.NEXT_PUBLIC_APP_STORE_URL;
+// Same rule as the app (trimmed, https only), so the specs and the page agree.
+const STORE_LIVE = isAppStoreLive();
 const ZERO_ID = "00000000-0000-4000-8000-000000000000";
 
 test.skip(WEB_APP_ENABLED, "web app enabled: the lock is off");
@@ -78,6 +80,13 @@ test.describe("Locked routes", () => {
       expect(new URL(page.url()).pathname).toBe(path);
     });
   }
+
+  test("assetlinks.json is served as JSON with no redirect", async ({ request }) => {
+    const res = await request.get("/.well-known/assetlinks.json", { maxRedirects: 0 });
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).toContain("application/json");
+    expect(Array.isArray(await res.json())).toBe(true);
+  });
 
   test("robots.txt, the manifest and the service worker are served", async ({ request }) => {
     const robots = await request.get("/robots.txt", { maxRedirects: 0 });
