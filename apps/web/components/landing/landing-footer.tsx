@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
+import { StoreBadges } from "@/components/app-links/store-badges";
 import { Wordmark } from "@/components/ui/elo-system";
 import { LANDING_COLUMN } from "./styles";
 
@@ -20,6 +21,7 @@ export function LandingFooter() {
     <footer style={{ background: "var(--bg-primary)", borderTop: "1px solid var(--border-hairline)", paddingTop: "var(--space-8)", paddingBottom: "max(var(--space-8), env(safe-area-inset-bottom))" }}>
       <div style={{ ...LANDING_COLUMN, display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         <Wordmark size="sm" />
+        <StoreBadges size="sm" />
         <nav aria-label="Legal and support" style={{ display: "flex", flexWrap: "wrap", marginLeft: "calc(-1 * var(--space-2))", fontFamily: "var(--font-body)", fontSize: "var(--size-body)" }}>
           <Link href="/terms" className="hover:underline" style={LINK}>Terms</Link>
           <Link href="/privacy" className="hover:underline" style={LINK}>Privacy</Link>

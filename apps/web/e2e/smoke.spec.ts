@@ -1,4 +1,11 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { expectStoreBadges } from "./store-badges";
+
+/** "Get the app" with both official badges (Coming soon until each listing is set). */
+async function expectGetTheApp(page: Page) {
+  await expect(page.getByTestId("store-badges").first().getByText("Get the app")).toBeVisible();
+  await expectStoreBadges(page);
+}
 
 // Field labels on the branded auth surfaces are uppercased with CSS
 // `text-transform`, which the accessible-name computation applies, so these
@@ -21,6 +28,7 @@ test.describe("Public pages", () => {
     await expect(page.getByPlaceholder("m@example.com")).toBeVisible();
     await expect(page.getByLabel(PASSWORD_FIELD)).toBeVisible();
     await expect(page.getByRole("button", { name: SIGN_IN_CTA })).toBeVisible();
+    await expectGetTheApp(page);
   });
 
   test("login page keeps the SSO and account-recovery paths", async ({
@@ -57,6 +65,7 @@ test.describe("Public pages", () => {
     // cold-compiles the route; the retrying assertion still proves one is live.
     await expect(page.locator('input[type="email"]').first()).toBeVisible();
     await expect(page.locator('input[type="password"]').first()).toBeVisible();
+    await expectGetTheApp(page);
   });
 
   test("forgot password page renders", async ({ page }) => {

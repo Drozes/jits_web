@@ -7,7 +7,7 @@ vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }))
 vi.mock("@/lib/guards", () => ({ getActiveAthlete: vi.fn() }));
 vi.mock("@/components/layout/bottom-nav-bar", () => ({ BottomNavBar: () => null }));
 vi.mock("@/components/layout/sidebar-rail", () => ({ SidebarRail: () => null }));
-vi.mock("@/components/layout/sidebar-footer", () => ({ SidebarFooter: () => null, SidebarFooterSkeleton: () => null }));
+vi.mock("@/components/layout/sidebar-footer", () => ({ SidebarAppBadges: () => null, SidebarFooter: () => null, SidebarFooterSkeleton: () => null }));
 vi.mock("@/components/layout/global-notifications-provider", () => ({ GlobalNotificationsProvider: () => null }));
 vi.mock("@/components/layout/online-presence-bootstrap", () => ({ OnlinePresenceBootstrap: () => null }));
 vi.mock("@/components/layout/deployment-check-bootstrap", () => ({ DeploymentCheckBootstrap: () => null }));

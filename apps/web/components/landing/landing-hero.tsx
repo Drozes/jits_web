@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { AppStoreCta } from "@/components/app-store/app-store-cta";
+import { StoreBadges } from "@/components/app-links/store-badges";
 import { Wordmark } from "@/components/ui/elo-system";
 import { LANDING_CAPS, LANDING_COLUMN } from "./styles";
 
@@ -56,8 +56,10 @@ export function LandingHero() {
             BJJ matches, filmed and rated. Go live, roll, confirm the result. Your ELO moves.
           </p>
           <p style={LANDING_CAPS}>NO-GI · SUBMISSION ONLY · EVERY MATCH RANKED</p>
-          <div style={{ maxWidth: 360, marginTop: "var(--space-2)" }}>
-            <AppStoreCta primary />
+          {/* The download moment: both official badges ("Coming soon" until
+              each listing is live). Official artwork, never the red fill. */}
+          <div style={{ marginTop: "var(--space-2)" }}>
+            <StoreBadges heading="Get the app" />
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StoreBadges } from "@/components/app-links/store-badges";
 import { getActiveAthlete } from "@/lib/guards";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getProfilePhotoUrl } from "@/lib/utils";
@@ -9,6 +10,19 @@ const ROW_STYLE = {
   padding: "var(--space-3)",
   borderTop: "1px solid var(--border-hairline)",
 } as const;
+
+/**
+ * Compact "Get the app" block above the user footer. Static (no athlete
+ * read), so the rail renders it outside the footer's Suspense boundary.
+ * Centered: in the 232px rail the two sm badges wrap onto two rows.
+ */
+export function SidebarAppBadges() {
+  return (
+    <div style={ROW_STYLE}>
+      <StoreBadges size="sm" heading="Get the app" align="center" />
+    </div>
+  );
+}
 
 /**
  * Sidebar-rail user footer. Fetches the active athlete null-safely (NEVER

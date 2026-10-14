@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { InviteLanding } from "@/components/invites/invite-landing";
+import { smartAppBanner } from "@/lib/app-links";
+import { INVITE_TOKEN_RE, invitePath } from "@/lib/invites/constants";
 import { invitePageTitle } from "@/lib/invites/format";
 import { getInvitePreviewCached as getInvitePreview } from "@/lib/invites/preview";
 import { publicSiteOrigin } from "@/lib/invites/site-origin";
@@ -20,10 +22,14 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
         ? "A jiu-jitsu challenge. Tap to accept."
         : "Train jiu-jitsu on ELO RATED. Tap to join."
       : "Find out where you stand in jiu-jitsu.";
+  const origin = publicSiteOrigin();
   return {
     // The og:image must resolve on a stable public host that crawlers can
     // fetch, never the per-deployment VERCEL_URL of the root layout.
-    metadataBase: new URL(publicSiteOrigin()),
+    metadataBase: new URL(origin),
+    // Smart App Banner (only once the App Store listing is live): opening the
+    // app from it hands over this invite's URL, so the app lands on it.
+    itunes: smartAppBanner(INVITE_TOKEN_RE.test(token) ? `${origin}${invitePath(token)}` : undefined),
     title,
     description,
     robots: { index: false, follow: false },

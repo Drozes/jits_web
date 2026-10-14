@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { Check, Link2, Smartphone } from "lucide-react";
 import { sendLandingEvent } from "@/lib/invites/beacon";
-import { AppStoreCta } from "@/components/app-store/app-store-cta";
-import { isAppStoreLive } from "@/lib/app-store";
+import { StoreBadges } from "@/components/app-links/store-badges";
 import { inviteSchemeUrl } from "@/lib/invites/constants";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import { GHOST_CTA, PRIMARY_CTA, SECONDARY_CTA } from "./styles";
@@ -17,33 +16,34 @@ interface LinkProps {
 }
 
 /**
- * App Store button. Red only when it is the surface's one primary CTA; a
- * neutral non-link "Coming soon" state while the listing is not public.
+ * Both official store badges under "Get the app" ("Coming soon" until each
+ * listing is live). Never the surface's red CTA: official badge artwork is
+ * never recoloured. An App Store tap logs app_store_tapped; a Google Play
+ * tap logs nothing, because jr_be's log_invite_landing_event accepts only
+ * its fixed step list and a play_store_tapped step needs a backend change.
  */
-export function AppStoreButton({ token, inAppBrowser, kind = null, primary }: LinkProps & { primary: boolean }) {
+export function InviteStoreBadges({ token, inAppBrowser, kind = null }: LinkProps) {
   return (
-    <AppStoreCta primary={primary} onClick={() => sendLandingEvent(token, "app_store_tapped", inAppBrowser, kind)} />
+    <StoreBadges
+      heading="Get the app"
+      align="center"
+      onBadgeClick={(store) => {
+        if (store === "app_store") sendLandingEvent(token, "app_store_tapped", inAppBrowser, kind);
+      }}
+    />
   );
 }
 
 /**
- * The App Store as the stack's primary CTA, then Open in app. While the store
- * URL is unset the coming-soon state cannot be acted on, so Open in app takes
- * the red fill and comes first (spec P3: one actionable red CTA per surface).
+ * Open in app as the stack's red CTA, then the store badges. The badges can
+ * never take the red fill (spec P3's swap rule, applied whether or not the
+ * listing is live), so Open in app always leads.
  */
-export function StoreFirstLinks(props: LinkProps) {
-  if (isAppStoreLive()) {
-    return (
-      <>
-        <AppStoreButton {...props} primary />
-        <OpenInAppButton {...props} />
-      </>
-    );
-  }
+export function AppFirstLinks(props: LinkProps) {
   return (
     <>
       <OpenInAppButton {...props} primary />
-      <AppStoreButton {...props} primary={false} />
+      <InviteStoreBadges {...props} />
     </>
   );
 }

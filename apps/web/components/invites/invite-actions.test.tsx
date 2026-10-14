@@ -11,6 +11,7 @@ vi.mock("@/app/c/[token]/actions", () => ({
 vi.mock("@/lib/invites/beacon", () => ({ sendLandingEvent: vi.fn() }));
 
 import { InviteActions } from "./invite-actions";
+import { APP_SETUP_OUTCOME, APP_SIGN_IN_OUTCOME, UNDERAGE_OUTCOME } from "@/lib/invites/outcome-copy";
 
 const TOKEN = "e2eChallengeTokenAAAAA";
 const DOB = {
@@ -164,21 +165,68 @@ describe("InviteActions: web app unlocked", () => {
   });
 });
 
-describe("InviteActions: one actionable red CTA (spec P3)", () => {
-  it.each([true, false])("store URL unset (web app enabled %s): Open in app is red and comes first", (enabled) => {
-    vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "");
+/** Every element styled as the Signal Red CTA fill. */
+function redCtas(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>("a, button, span, div")).filter(
+    (el) => el.style.background === RED,
+  );
+}
+
+describe("InviteActions: one actionable red CTA, store badges never red (spec P3)", () => {
+  it.each([true, false])("store URLs unset (web app enabled %s): Open in app is red, then the Coming soon badges", (enabled) => {
     renderViewer("signed_out", enabled);
     const open = screen.getByRole("link", { name: "Open in app" });
-    const soon = screen.getByTestId("app-store-coming-soon");
+    const soon = screen.getByRole("group", { name: "App Store: coming soon" });
     expect(open.style.background).toBe(RED);
-    expect(soon.style.background).not.toBe(RED);
+    expect(redCtas()).toEqual([open]);
     expect(open.compareDocumentPosition(soon) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Google Play: coming soon" })).toBeTruthy();
   });
 
-  it("store URL set: the App Store link is red and Open in app is not", () => {
+  it("store URL set: the App Store badge links the listing but Open in app stays the one red CTA", async () => {
+    vi.resetModules();
     vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "https://apps.apple.com/app/id6774629438");
-    renderViewer("signed_out", false);
-    expect(screen.getByRole("link", { name: "Get it on the App Store" }).style.background).toBe(RED);
-    expect(screen.getByRole("link", { name: "Open in app" }).style.background).not.toBe(RED);
+    const { InviteActions: Fresh } = await import("./invite-actions");
+    render(<Fresh token={TOKEN} kind="challenge" inviterFirstName="Alex" viewer="signed_out" inAppBrowser={null} webAppEnabled={false} />);
+    const badge = screen.getByRole("link", { name: "Download ELO RATED on the App Store" });
+    expect(badge).toHaveAttribute("href", "https://apps.apple.com/app/id6774629438");
+    expect(redCtas()).toEqual([screen.getByRole("link", { name: "Open in app" })]);
+  });
+});
+
+describe("InviteActions: outcomes and the red CTA", () => {
+  async function acceptWith(outcome: unknown) {
+    claimInviteAction.mockResolvedValue(outcome);
+    renderActive();
+    fireEvent.click(screen.getByRole("button", { name: /accept challenge/i }));
+  }
+
+  it("after a web booking: Open in app is the one red CTA, then the badges", async () => {
+    await acceptWith(BOOKED);
+    await screen.findByText("Challenge accepted");
+    expect(redCtas()).toEqual([screen.getByRole("link", { name: "Open in app" })]);
+    expect(screen.getByRole("group", { name: "App Store: coming soon" })).toBeTruthy();
+  });
+
+  it.each([APP_SETUP_OUTCOME, APP_SIGN_IN_OUTCOME])("a hand-off to the app ($title) makes Open in app red", async (outcome) => {
+    await acceptWith({ ...outcome });
+    await screen.findByText((outcome as { title: string }).title);
+    expect(redCtas()).toEqual([screen.getByRole("link", { name: "Open in app" })]);
+  });
+
+  it("a dead-end error renders no red CTA (Open in app stays secondary)", async () => {
+    await acceptWith({ kind: "error", title: "Challenge expired", body: "This challenge expired. Ask Alex for a new one." });
+    await screen.findByText("Challenge expired");
+    expect(redCtas()).toHaveLength(0);
+    expect(screen.getByRole("link", { name: "Open in app" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "App Store: coming soon" })).toBeTruthy();
+  });
+
+  it("the underage outcome renders no red CTA, no Open in app and no store badges", async () => {
+    await acceptWith({ ...UNDERAGE_OUTCOME });
+    await screen.findByText("16 and over");
+    expect(redCtas()).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: "Open in app" })).toBeNull();
+    expect(screen.queryByTestId("store-badges")).toBeNull();
   });
 });
