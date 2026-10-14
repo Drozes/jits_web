@@ -25,7 +25,7 @@ const pluginOptions = (name: string) => {
 const CAMERA = "ELO RATED uses your camera to record your matches.";
 const MICROPHONE = "ELO RATED uses your microphone so your match recordings include audio.";
 const LOCATION =
-  "ELO RATED uses your location when you go live, so nearby athletes can find you and challenge you.";
+  "ELO RATED uses your location when you go live or challenge someone, so nearby athletes can find you and your match can start on the same mat.";
 const PHOTOS_READ = "ELO RATED uses your photo library to save your match highlights.";
 const PHOTOS_ADD = "ELO RATED saves your match highlights to your photo library.";
 const EM_DASH = String.fromCharCode(0x2014);
@@ -82,8 +82,21 @@ describe("app.json native config", () => {
     expect(appJson.expo.runtimeVersion.policy).toBe("appVersion");
   });
 
-  it("uses no em dashes or exclamation marks in purpose strings", () => {
-    for (const text of [CAMERA, MICROPHONE, LOCATION, PHOTOS_READ, PHOTOS_ADD]) {
+  it("uses no em dashes or exclamation marks in any purpose string", () => {
+    // Scan app.json itself: every Info.plist string and every plugin option
+    // whose key ends with "Permission", not this file's constants.
+    const texts: string[] = [];
+    for (const value of Object.values(appJson.expo.ios.infoPlist)) {
+      if (typeof value === "string") texts.push(value);
+    }
+    for (const p of appJson.expo.plugins) {
+      if (!Array.isArray(p)) continue;
+      for (const [key, value] of Object.entries(p[1])) {
+        if (key.endsWith("Permission") && typeof value === "string") texts.push(value);
+      }
+    }
+    expect(texts.length).toBeGreaterThanOrEqual(10);
+    for (const text of texts) {
       expect(text.includes(EM_DASH)).toBe(false);
       expect(text.includes("!")).toBe(false);
     }

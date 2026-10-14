@@ -118,7 +118,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "ELO RATED uses your location when you go live, so nearby athletes can find you and challenge you.",
+          "locationWhenInUsePermission": "ELO RATED uses your location when you go live or challenge someone, so nearby athletes can find you and your match can start on the same mat.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
           "isIosBackgroundLocationEnabled": false,
