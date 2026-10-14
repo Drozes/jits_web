@@ -1,40 +1,91 @@
 /**
- * Native config the invites build depends on (jits-b3js.9). These are
+ * Native config the 1.0 App Store binary depends on (jits-8s9v). These are
  * TestFlight-only fields: an OTA cannot carry them.
  */
+import fs from "fs";
+import path from "path";
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const appJson = require("../app.json") as {
   expo: {
     version: string;
-    ios: { usesAppleSignIn?: boolean };
+    runtimeVersion: { policy: string };
+    ios: { usesAppleSignIn?: boolean; infoPlist: Record<string, unknown> };
     plugins: Array<string | [string, Record<string, unknown>]>;
   };
 };
 
 const plugin = (name: string) =>
   appJson.expo.plugins.find((p) => (Array.isArray(p) ? p[0] === name : p === name));
+const pluginOptions = (name: string) => {
+  const p = plugin(name);
+  return (Array.isArray(p) ? p[1] : {}) as Record<string, unknown>;
+};
+
+const CAMERA = "ELO RATED uses your camera to record your matches.";
+const MICROPHONE = "ELO RATED uses your microphone so your match recordings include audio.";
+const LOCATION =
+  "ELO RATED uses your location when you go live, so nearby athletes can find you and challenge you.";
+const PHOTOS_READ = "ELO RATED uses your photo library to save your match highlights.";
+const PHOTOS_ADD = "ELO RATED saves your match highlights to your photo library.";
+const EM_DASH = String.fromCharCode(0x2014);
 
 describe("app.json native config", () => {
-  it("does not request the Sign in with Apple entitlement yet", () => {
-    // Release 2026-10-01: the App Store provisioning profile lacks the Sign
-    // in with Apple capability (EAS build 24 failed on it) and the button is
-    // hidden (APPLE_SIGN_IN_ENABLED=false). Enable the capability on the App
-    // ID, then restore both lines in a native build (jits-22mp).
-    expect(appJson.expo.ios.usesAppleSignIn).toBeUndefined();
-    expect(plugin("expo-apple-authentication")).toBeUndefined();
-    // Expo auto-applies expo-apple-authentication (it adds the entitlement
-    // unconditionally), so this local plugin strips it.
-    expect(plugin("./plugins/with-no-apple-signin")).toBeTruthy();
-  });
-
-  it("explains location as the same-mat check", () => {
-    const loc = plugin("expo-location") as [string, { locationWhenInUsePermission: string }];
-    expect(loc[1].locationWhenInUsePermission).toBe(
-      "ELO RATED uses your location to confirm you and your opponent are on the same mat before a match starts.",
+  it("requests the Sign in with Apple entitlement (guideline 4.8)", () => {
+    expect(appJson.expo.ios.usesAppleSignIn).toBe(true);
+    expect(plugin("expo-apple-authentication")).toBeTruthy();
+    // The 0.5.0 strip plugin is gone for good.
+    expect(plugin("./plugins/with-no-apple-signin")).toBeUndefined();
+    expect(fs.existsSync(path.join(__dirname, "..", "plugins", "with-no-apple-signin.js"))).toBe(
+      false,
     );
   });
 
-  it("is a new runtime (appVersion policy), so OTAs for 0.4.0 never reach it", () => {
-    expect(appJson.expo.version).toBe("0.5.0");
+  it("gives every camera and microphone source the same purpose string", () => {
+    // expo-image-picker and expo-camera both write NSCameraUsageDescription and
+    // NSMicrophoneUsageDescription, and whichever runs last wins (build 25
+    // shipped the image picker's profile picture text). Keep them identical.
+    const { infoPlist } = appJson.expo.ios;
+    expect(infoPlist.NSCameraUsageDescription).toBe(CAMERA);
+    expect(infoPlist.NSMicrophoneUsageDescription).toBe(MICROPHONE);
+    for (const name of ["expo-image-picker", "expo-camera"]) {
+      expect(pluginOptions(name).cameraPermission).toBe(CAMERA);
+      expect(pluginOptions(name).microphonePermission).toBe(MICROPHONE);
+    }
+  });
+
+  it("gives every photo library source the same purpose string", () => {
+    // The app only saves highlight reels (write-only access); expo-image-picker
+    // and expo-media-library both write NSPhotoLibraryUsageDescription.
+    expect(pluginOptions("expo-image-picker").photosPermission).toBe(PHOTOS_READ);
+    expect(pluginOptions("expo-media-library").photosPermission).toBe(PHOTOS_READ);
+    expect(pluginOptions("expo-media-library").savePhotosPermission).toBe(PHOTOS_ADD);
+  });
+
+  it("asks for location only while in use, for going live", () => {
+    const loc = pluginOptions("expo-location");
+    expect(loc.locationWhenInUsePermission).toBe(LOCATION);
+    // false deletes the key; leaving it unset writes a generic default string.
+    expect(loc.locationAlwaysAndWhenInUsePermission).toBe(false);
+    expect(loc.locationAlwaysPermission).toBe(false);
+    expect(loc.isIosBackgroundLocationEnabled).toBe(false);
+    expect(loc.isAndroidBackgroundLocationEnabled).toBe(false);
+  });
+
+  it("does not declare Face ID (the app never uses biometrics)", () => {
+    expect(pluginOptions("expo-secure-store").faceIDPermission).toBe(false);
+  });
+
+  it("is version 1.0 to match App Store Connect, a new runtime (appVersion policy)", () => {
+    // OTAs for 0.5.0 never reach 1.0 and the other way round.
+    expect(appJson.expo.version).toBe("1.0");
+    expect(appJson.expo.runtimeVersion.policy).toBe("appVersion");
+  });
+
+  it("uses no em dashes or exclamation marks in purpose strings", () => {
+    for (const text of [CAMERA, MICROPHONE, LOCATION, PHOTOS_READ, PHOTOS_ADD]) {
+      expect(text.includes(EM_DASH)).toBe(false);
+      expect(text.includes("!")).toBe(false);
+    }
   });
 });

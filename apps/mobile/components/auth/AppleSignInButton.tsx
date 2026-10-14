@@ -5,6 +5,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { toast } from "@/components/ui";
 import { signInWithApple, useAppleSignInAvailable } from "@/lib/auth/apple";
 import { useResolvedColorScheme } from "@/lib/theme/use-theme";
+import { BUTTON_HEIGHT } from "@/components/ui/elo-system/button";
 
 interface AppleSignInButtonProps {
   /** `continue` on signup (the one-tap path), `sign-in` on login. */
@@ -55,7 +56,8 @@ export function AppleSignInButton({ variant = "sign-in", onSignedIn }: AppleSign
             : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
         }
         cornerRadius={4}
-        style={{ width: "100%", height: 52 }}
+        // Same height as the app buttons, so Apple is never smaller than Google.
+        style={{ width: "100%", height: BUTTON_HEIGHT }}
         onPress={onPress}
       />
     </View>
