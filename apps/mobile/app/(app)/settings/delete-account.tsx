@@ -76,9 +76,8 @@ export default function DeleteAccountScreen() {
             This permanently deletes your profile, photos and ELO. Your past matches stay in your opponents&apos; history as a deleted athlete. This can&apos;t be undone.
           </Text>
           <Text className="font-body text-body text-ink-2 leading-relaxed">
-            Your name, profile photo, avatar, current weight, birthday, Instagram, friends, open invites,
-            push devices, and the messages and chat photos you sent are erased, and you leave the
-            rankings. Match records (including weigh-ins, videos and stills) stay with the matches they
+            Your name, profile photo, avatar, current weight, birthday, Instagram, friends, open invites
+            and push devices are erased, and you leave the rankings. Match records (including weigh-ins, videos and stills) stay with the matches they
             belong to, under a deleted athlete.
           </Text>
         </Plate>

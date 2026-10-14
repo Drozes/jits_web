@@ -19,7 +19,7 @@ import { NO_WEIGHT_CHECKS, type WeightChecksHandle } from "./use-match-weight-ch
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { exitMatchTo } from "./exit-to";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
-import { useRecordingOptIn } from "./recording-optin";
+import { useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
 import { useRecordingIntent } from "./recording-intent";
 import { useFaceoffLocationLog } from "./use-faceoff-location-log";
 
@@ -139,7 +139,8 @@ const WEIGHT_GATE_CODES: readonly DomainErrorCode[] = ["WEIGHT_FLAGGED", "WEIGHT
 export function useFaceoff(p: FaceoffParams): Faceoff {
   const router = useRouter();
   const { markExiting } = useMatchSyncContext();
-  const recording = useRecordingOptIn();
+  // Off until the athlete allowed AI processing (5.1.2(i)), whatever was remembered.
+  const recording = useEffectiveRecordingOptIn();
   // Record only (live location fixes 4.6): one silent reading logged as
   // match_start, never awaited by anything below and never asking.
   useFaceoffLocationLog(p.matchId, p.active);

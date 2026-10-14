@@ -69,3 +69,29 @@ describe("Settings legal rows", () => {
     expect(s.getByTestId("link-/legal/privacy")).toBeTruthy();
   });
 });
+
+describe("Settings report, block and AI consent rows (jits-rog5.11)", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { __resetAiConsentForTests } = require("@/lib/moderation/ai-consent") as typeof import("@/lib/moderation/ai-consent");
+  afterEach(() => __resetAiConsentForTests());
+
+  it("links to Blocked athletes", () => {
+    const s = render(<SettingsScreen />);
+    expect(s.getByText("BLOCKED ATHLETES")).toBeTruthy();
+    expect(s.getByTestId("link-/settings/blocked")).toBeTruthy();
+  });
+
+  it("shows AI processing as not given before consent", () => {
+    __resetAiConsentForTests({ athleteId: "me", consentAt: null, known: true });
+    const s = render(<SettingsScreen />);
+    expect(s.getByText("AI PROCESSING")).toBeTruthy();
+    expect(s.getByText("Not given")).toBeTruthy();
+    expect(s.getByTestId("link-/settings/ai-processing")).toBeTruthy();
+  });
+
+  it("shows the date consent was given", () => {
+    __resetAiConsentForTests({ athleteId: "me", consentAt: "2026-10-14T16:00:00Z", known: true });
+    const s = render(<SettingsScreen />);
+    expect(s.getByText("Given Oct 14, 2026")).toBeTruthy();
+  });
+});

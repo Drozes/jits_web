@@ -87,6 +87,7 @@ import { markMatchLocationRequired } from "./match-location-flag";
 import { markMatchProximityRequired } from "./location-flags";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
+import { isBlocked } from "@/lib/moderation/block-store";
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -1253,6 +1254,9 @@ export function useArenaChallenge({
             // a plate nobody will answer. My match peer's is withdrawn
             // quietly instead, see `settleBusyInsert`.
             if (settledRef.current.has(row.id)) return;
+            // Defence in depth (App Review 1.2): the server refuses a
+            // challenge between a blocked pair; never prompt for one anyway.
+            if (isBlocked(row.challenger_id)) return;
             if (entryBlocked()) {
               settleBusyInsert(row);
               return;
@@ -2127,7 +2131,9 @@ export function useArenaChallenge({
         if (
           settledRef.current.has(challengeId) ||
           dismissedRef.current.has(challengeId) ||
-          enteredForRef.current === challengeId
+          enteredForRef.current === challengeId ||
+          // A block stands between us (App Review 1.2): never offered.
+          isBlocked(challengerId)
         ) {
           return "final";
         }

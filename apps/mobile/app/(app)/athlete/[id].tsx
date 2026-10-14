@@ -25,6 +25,9 @@ import { supabase } from "@/lib/supabase/client";
 import { getMatchHistory } from "@jits/shared/api/queries";
 import { matchDetailHref } from "@/lib/match-detail/href";
 import type { MatchHistoryRow } from "@jits/shared/types/composites";
+import { useBlockState } from "@/lib/moderation/block-store";
+import { AthleteModerationSheet, type AthleteSheetMode } from "@/components/moderation/athlete-moderation-sheet";
+import { BlockedAthleteState, MoreActionsButton } from "@/components/moderation/blocked-athlete-state";
 
 function ShareButton({
   athleteId,
@@ -66,6 +69,13 @@ export default function AthleteProfileScreen() {
   const { athlete, isLoading: authLoading } = useRequireAthlete();
   const { data, isLoading, notFound } = useAthleteProfile(id, athlete?.id);
   const [compareOpen, setCompareOpen] = React.useState(false);
+  // Report and block (App Review 1.2): never on your own profile.
+  const [sheetMode, setSheetMode] = React.useState<AthleteSheetMode | null>(null);
+  const blocks = useBlockState();
+  const isSelf = !!athlete && athlete.id === id;
+  const blockedByMe = !!id && blocks.mine.has(id);
+  // Either direction (a deep link to someone who blocked me lands here too).
+  const blocked = !!id && !isSelf && blocks.ids.has(id);
 
   const [recent, setRecent] = React.useState<MatchHistoryRow[]>([]);
   React.useEffect(() => {
@@ -111,64 +121,87 @@ export default function AthleteProfileScreen() {
     );
   }
 
+  const competitorName = data.competitor.display_name || "this athlete";
+
   return (
     <View className="flex-1 bg-surface">
       <AppHeader
         title={data.competitor.display_name ?? "Athlete"}
         back
-        rightAction={<ShareButton athleteId={data.competitor.id} displayName={data.competitor.display_name} />}
+        rightAction={
+          <View className="flex-row items-center gap-2">
+            <ShareButton athleteId={data.competitor.id} displayName={data.competitor.display_name} />
+            {isSelf ? null : <MoreActionsButton onPress={() => setSheetMode("menu")} />}
+          </View>
+        }
       />
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 24 }}
       >
-        <CompetitorHeader
-          athlete={data.competitor}
-          gymName={data.competitorGymName}
-          stats={data.compStats}
-        />
+        {/* A block either way hides the profile itself, not just the actions. */}
+        {blocked ? (
+          <BlockedAthleteState athlete={{ id: data.competitor.id, name: competitorName }} blockedByMe={blockedByMe} />
+        ) : (
+          <>
+            <CompetitorHeader
+              athlete={data.competitor}
+              gymName={data.competitorGymName}
+              stats={data.compStats}
+            />
 
-        {/* No Challenge button here (jits-qwn5): challenges happen in the
-            Arena, and a disabled "coming soon" CTA read as broken. */}
-        <View className="gap-2">
-          <Button
-            variant="secondary"
-            label="Compare Stats"
-            onPress={() => setCompareOpen(true)}
-            icon={(color) => (
-              <View pointerEvents="none">
-                <BarChart3 size={16} color={color} />
-              </View>
-            )}
-          />
-        </View>
-
-        <HeadToHeadCard matches={data.headToHead} />
-
-        <View className="gap-3">
-          <MetaTag>
-            {recent.length > 0 ? `Recent vs ${data.competitor.display_name}` : "No Matches Yet"}
-          </MetaTag>
-          {recent.length > 0 ? (
-            <View className="gap-[1px]">
-              {recent.map((m) => {
-                const name = m.opponent_display_name ?? data.competitor.display_name;
-                // These are the VIEWER's own matches (their history filtered to
-                // this opponent), so the detail screen will let them in.
-                return (
-                  <ParticipantRow
-                    key={m.match_id}
-                    name={`vs ${name}`}
-                    subtitle={formatRelativeDate(m.completed_at)}
-                    onPress={() => router.push(matchDetailHref(m.match_id))}
-                    accessibilityLabel={`Open match vs ${name}`}
-                    action={<HistoryRowAction eloDelta={m.elo_delta} eloAfter={m.elo_after} />}
-                  />
-                );
-              })}
+            {/* No Challenge button here (jits-qwn5): challenges happen in the
+                Arena, and a disabled "coming soon" CTA read as broken. */}
+            <View className="gap-2">
+              <Button
+                variant="secondary"
+                label="Compare Stats"
+                onPress={() => setCompareOpen(true)}
+                icon={(color) => (
+                  <View pointerEvents="none">
+                    <BarChart3 size={16} color={color} />
+                  </View>
+                )}
+              />
             </View>
-          ) : null}
-        </View>
+
+            <HeadToHeadCard matches={data.headToHead} />
+
+            <View className="gap-3">
+              <MetaTag>
+                {recent.length > 0 ? `Recent vs ${data.competitor.display_name}` : "No Matches Yet"}
+              </MetaTag>
+              {recent.length > 0 ? (
+                <View className="gap-[1px]">
+                  {recent.map((m) => {
+                    const name = m.opponent_display_name ?? data.competitor.display_name;
+                    // These are the VIEWER's own matches (their history filtered to
+                    // this opponent), so the detail screen will let them in.
+                    return (
+                      <ParticipantRow
+                        key={m.match_id}
+                        name={`vs ${name}`}
+                        subtitle={formatRelativeDate(m.completed_at)}
+                        onPress={() => router.push(matchDetailHref(m.match_id))}
+                        accessibilityLabel={`Open match vs ${name}`}
+                        action={<HistoryRowAction eloDelta={m.elo_delta} eloAfter={m.elo_after} />}
+                      />
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+          </>
+        )}
       </ScrollView>
+
+      {isSelf ? null : (
+        <AthleteModerationSheet
+          mode={sheetMode}
+          onModeChange={setSheetMode}
+          athlete={{ id: data.competitor.id, name: competitorName }}
+          blockedByMe={blockedByMe}
+        />
+      )}
 
       <CompareStatsModal
         open={compareOpen}

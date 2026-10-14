@@ -88,6 +88,7 @@ describe("claim copy (contract section 7)", () => {
     ["self", "This is your own challenge. Send it to a training partner."],
     ["underage", "You must be 16 or older to compete on ELO RATED."],
     ["inviter_unavailable", "Alex can't take matches right now."],
+    ["blocked", "You can't accept this challenge."],
     [
       "inviter_weekly_cap",
       "Alex has played this week's invite matches. You're now friends, so challenge them from the Arena.",
@@ -176,6 +177,7 @@ describe("claim copy (contract section 7)", () => {
   it("join and signup copy", () => {
     expect(joinFailureMessage("revoked", "Alex")).toBe("This invite link was turned off. Ask Alex for a new one.");
     expect(joinFailureMessage("self", "Alex")).toBe("This is your own invite link.");
+    expect(joinFailureMessage("blocked", "Alex")).toBe("You can't add this athlete as a friend.");
     expect(joinFailureMessage("invalid", "Alex")).toBe(
       "This invite link isn't valid. Ask your training partner to send it again.",
     );

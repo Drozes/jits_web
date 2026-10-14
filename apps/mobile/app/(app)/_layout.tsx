@@ -5,6 +5,7 @@ import { ArenaBootstrap } from "@/lib/arena/arena-bootstrap";
 import { BellBootstrap } from "@/components/notifications/bell-bootstrap";
 import { AppStackTopTracker } from "@/lib/deep-links/tab-root-route";
 import { StackStripFrame } from "@/components/video-status/upload-strip-slots";
+import { ModerationBootstrap } from "@/lib/moderation/moderation-bootstrap";
 
 // Anchor the tab navigator beneath the pushed detail screens (athlete/[id],
 // match/[matchId], video/[id], highlight/[id], settings). Deep links / reloads into those routes otherwise land with an
@@ -70,6 +71,9 @@ export default function AppLayout() {
       {/* Whether a detail screen is pushed over the tabs, so a notification
         tap opens a tab root in place instead of stacking a second one. */}
       <AppStackTopTracker />
+      {/* Blocked athletes and AI processing consent for the signed-in athlete
+        (App Review 1.2 and 5.1.2(i)), read once per session. */}
+      <ModerationBootstrap />
     </>
   );
 }

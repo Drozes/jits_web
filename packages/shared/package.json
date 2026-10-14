@@ -23,6 +23,7 @@
     "./api/match-weight-checks": "./src/api/match-weight-checks.ts",
     "./api/invites": "./src/api/invites.ts",
     "./api/friends": "./src/api/friends.ts",
+    "./api/moderation": "./src/api/moderation.ts",
     "./api/location": "./src/api/location.ts",
     "./api/invite-rpc": "./src/api/invite-rpc.ts",
     "./api/playback-settings": "./src/api/playback-settings.ts",

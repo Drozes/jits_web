@@ -298,8 +298,8 @@ describe("ReelPager", () => {
     expect(utils.getByLabelText("Close")).toBeTruthy();
     expect(utils.getByTestId("viewer-mute")).toBeTruthy();
     expect(mockMarkSeen).not.toHaveBeenCalled();
-    // No rail, so no rail scrim; the bottom scrim stays under the meta.
-    expect(utils.queryByTestId("viewer-rail")).toBeNull();
+    // The rail is only Report (App Review 1.2, jits-rog5.11); no owner rail scrim.
+    expect(utils.getByTestId("viewer-report").props.accessibilityLabel).toBe("Report reel");
     expect(utils.queryByTestId("reel-scrim-rail")).toBeNull();
     expect(utils.getByTestId("reel-scrim-bottom")).toBeTruthy();
     // No title line; VoiceOver names the subject, not "Your" (spec 020 D).

@@ -133,8 +133,12 @@ it("does not claim match records, weigh-ins or videos are erased", () => {
   expect(
     s.getByText(/Match records \(including weigh-ins, videos and stills\) stay with the matches they belong to, under a deleted athlete\./),
   ).toBeTruthy();
-  expect(s.getByText(/the messages and chat photos you sent are erased/)).toBeTruthy();
-  expect(s.getByText(/open invites/)).toBeTruthy();
+  expect(s.getByText(/open invites\s+and push devices are erased/)).toBeTruthy();
+});
+
+it("no longer mentions chat, which the app does not have (jits-rog5.11)", () => {
+  const s = render(<DeleteAccountScreen />);
+  expect(s.queryByText(/chat|messages/i)).toBeNull();
 });
 
 it("uses the destructive button (an outline in negative, WP3), not the accent CTA, for the final delete", () => {

@@ -17,7 +17,9 @@ export type ClaimFailureCode =
   | "dob_required"
   | "underage"
   | "inviter_weekly_cap"
-  | "accuracy_too_low";
+  | "accuracy_too_low"
+  /** A block stands between the pair (jr_be-m2s). */
+  | "blocked";
 
 export type StartBlockedReason =
   | "no_location"
@@ -57,6 +59,9 @@ export interface ClaimOutcomeView {
 }
 
 export const UNDERAGE_COPY = "You must be 16 or older to compete on ELO RATED.";
+
+/** A claim refused because a block stands between the pair (HINT `blocked`, jr_be-m2s). */
+export const CLAIM_BLOCKED_COPY = "You can't accept this challenge.";
 
 /** `dob_required` (contract section 7): an older account has no date of birth. */
 export const DOB_REQUIRED_TITLE = "Confirm your date of birth";
@@ -167,6 +172,8 @@ export function claimFailureView(
         next: "message",
         message: `${alex} has played this week's invite matches. You're now friends, so challenge them from the Arena.`,
       };
+    case "blocked":
+      return { next: "message", message: CLAIM_BLOCKED_COPY };
     case "accuracy_too_low":
       return {
         next: "retry_location",
@@ -277,6 +284,9 @@ export function joinFailureMessage(code: string, inviterName: string): string {
       return "Finish your profile to add friends.";
     case "invalid":
       return "This invite link isn't valid. Ask your training partner to send it again.";
+    case "blocked":
+      // A block stands between the pair (jr_be-m2s).
+      return "You can't add this athlete as a friend.";
     default:
       // A code this build does not know (a newer server).
       return CLAIM_UNKNOWN_COPY;
@@ -285,7 +295,7 @@ export function joinFailureMessage(code: string, inviterName: string): string {
 
 /** Join failure codes this build knows; anything else is retryable. */
 export function isKnownJoinFailure(code: string): boolean {
-  return code === "invalid" || code === "self" || code === "revoked" || code === "claimer_not_active";
+  return code === "invalid" || code === "self" || code === "revoked" || code === "claimer_not_active" || code === "blocked";
 }
 
 /** Signup banner for a signed-out invitee. */
