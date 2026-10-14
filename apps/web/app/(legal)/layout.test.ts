@@ -12,11 +12,11 @@ describe("(legal) layout generateMetadata", () => {
     expect(generateMetadata().metadataBase?.toString()).toBe("https://elorated.com/");
   });
 
-  it("falls back to the interim public host on a Vercel deploy without a site URL", () => {
+  it("falls back to the default public host on a Vercel deploy without a site URL", () => {
     vi.stubEnv("VERCEL", "1");
     vi.stubEnv("VERCEL_URL", "jitsweb-abc123-team.vercel.app");
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
     vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
-    expect(generateMetadata().metadataBase?.toString()).toBe("https://jitsweb.vercel.app/");
+    expect(generateMetadata().metadataBase?.toString()).toBe("https://elorated.com/");
   });
 });

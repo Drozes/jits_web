@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const cookieStore = { delete: vi.fn(), set: vi.fn() };
 vi.mock("next/headers", () => ({ cookies: async () => cookieStore }));
@@ -26,6 +26,7 @@ vi.mock("@jits/shared/api/queries", () => ({ getCurrentAthlete: (...a: unknown[]
 const setMyDateOfBirth = vi.fn();
 vi.mock("@jits/shared/api/invites", () => ({ setMyDateOfBirth: (...a: unknown[]) => setMyDateOfBirth(...a) }));
 
+import { APP_SETUP_OUTCOME, APP_SIGN_IN_OUTCOME } from "@/lib/invites/outcome-copy";
 import { acceptJoinAction, claimInviteAction, confirmDobAndClaimAction, signOutKeepInviteAction } from "./actions";
 
 const TOKEN = "e2eChallengeTokenAAAAA";
@@ -50,7 +51,13 @@ async function redirectOf(p: Promise<unknown>): Promise<string> {
   throw new Error("expected a redirect");
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 beforeEach(() => {
+  // The redirect cases below describe the unlocked web app; the locked ones stub it off.
+  vi.stubEnv("NEXT_PUBLIC_WEB_APP_ENABLED", "true");
   rpc.mockReset();
   signOut.mockReset().mockResolvedValue({ error: null });
   cookieStore.delete.mockReset();
@@ -219,6 +226,33 @@ describe("confirmDobAndClaimAction (dob_required)", () => {
 
   it("refuses a malformed token", async () => {
     expect(await confirmDobAndClaimAction("nope", "1990-05-01")).toMatchObject({ kind: "error", title: "Link not valid" });
+    expect(setMyDateOfBirth).not.toHaveBeenCalled();
+  });
+});
+
+describe("web app locked: actions send the athlete to the app, never into blocked routes", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_WEB_APP_ENABLED", "");
+  });
+
+  it("a signed-out claim returns the accept-in-the-app outcome", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "no", hint: "not_authenticated" } });
+    expect(await claimInviteAction(TOKEN)).toEqual(APP_SIGN_IN_OUTCOME);
+  });
+
+  it("a claim that needs setup returns the finish-in-the-app outcome", async () => {
+    rpc.mockResolvedValue({ data: { ok: false, code: "claimer_not_active", inviter: ALEX }, error: null });
+    expect(await claimInviteAction(TOKEN)).toEqual(APP_SETUP_OUTCOME);
+  });
+
+  it("a signed-out join accept returns the accept-in-the-app outcome", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "no", hint: "not_authenticated" } });
+    expect(await acceptJoinAction(TOKEN, "Alex")).toEqual(APP_SIGN_IN_OUTCOME);
+  });
+
+  it("a signed-out date of birth save returns the accept-in-the-app outcome without saving", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+    expect(await confirmDobAndClaimAction(TOKEN, "1990-05-01")).toEqual(APP_SIGN_IN_OUTCOME);
     expect(setMyDateOfBirth).not.toHaveBeenCalled();
   });
 });

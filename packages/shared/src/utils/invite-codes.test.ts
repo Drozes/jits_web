@@ -39,8 +39,11 @@ describe("extractInviteFromText", () => {
     const msg = buildInviteShareMessage("challenge", `https://elorated.com/c/${TOKEN}`, "K7Q-4M2");
     expect(extractInviteFromText(msg)).toEqual({ token: TOKEN });
   });
-  it("accepts the scheme link and the interim web host", () => {
+  it("accepts the scheme link and the web host", () => {
     expect(extractInviteFromText(`elorated://c/${TOKEN}`)).toEqual({ token: TOKEN });
+    expect(extractInviteFromText(`https://elorated.com/c/${TOKEN}?x=1`)).toEqual({ token: TOKEN });
+  });
+  it("still accepts a link on the legacy host (old links exist)", () => {
     expect(extractInviteFromText(`https://jitsweb.vercel.app/c/${TOKEN}?x=1`)).toEqual({ token: TOKEN });
   });
   it("does not take a longer path segment as a token", () => {

@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+### Web: official App Store and Google Play badges, "Coming soon" until the listings are live (jits-77yf)
+
+Builds on the landing and lockdown work below and replaces its text App Store CTA. Neither store listing is public yet, so both badges show a non-interactive "Coming soon" state (the official artwork at full opacity, never dimmed or recoloured, with a "Coming soon" label) until `NEXT_PUBLIC_APP_STORE_URL` / `NEXT_PUBLIC_PLAY_STORE_URL` are set in Vercel and the site is redeployed (`NEXT_PUBLIC_*` values are inlined at build time). Then they link to the stores with no code change. Owner decision: official badge artwork replaces the spec's styled text button (`specs/web-landing/spec.md` D4, P4), and a badge is never the red CTA, so the spec's P3 swap rule now always gives the red fill to Open in app.
+
+**Added**
+- `apps/web/lib/app-links.ts`, the one store config module: `APP_STORE_URL` and `PLAY_STORE_URL` (`string | null`; only an https URL on `apps.apple.com` / `play.google.com` with no credentials and no non-default port counts, and an App Store URL naming another app id than `6774629438` is rejected so the badge and the Smart App Banner never disagree), `APP_STORE_ID`, `ANDROID_PACKAGE`, `parseStoreUrl()`, `parseAppStoreUrl()`, `smartAppBanner()`. Tests `apps/web/lib/app-links.test.ts`.
+- `apps/web/public/badges/app-store-badge-en-us.svg` (Apple's official "Download on the App Store" black badge, US English, from Apple's marketing tools) and `apps/web/public/badges/google-play-badge-en-us.png` (Google's official "Get it on Google Play" badge, US English, from Google Play's badge page), both unmodified.
+- `apps/web/components/app-links/store-badges.tsx`: `StoreBadges` (sizes `md` 48px and `sm` 40px, Apple's on-screen minimum; Google's built-in padding is cropped so both visible badges match in height; wraps on narrow screens with Apple's quarter-height clear space; optional caps heading; `onBadgeClick` hook). A live badge is a new-tab link named "Download ELO RATED on the App Store" / "Get ELO RATED on Google Play"; a badge without a listing is a `role="group"` (`aria-disabled`) named "App Store: coming soon" / "Google Play: coming soon", never a link. Tests `apps/web/components/app-links/store-badges.test.tsx`.
+- Placements: the landing hero ("Get the app", `md`, the download moment) and the landing footer (`sm`) in `apps/web/components/landing/`; a footer on the (legal) layout (`apps/web/app/(legal)/layout.tsx`, `sm`), which also covers `/support`; and, visible only when the web app is unlocked, `/login` and `/signup` (below the form and SSO buttons), a centered block above the profile link in the desktop sidebar (`SidebarAppBadges` in `apps/web/components/layout/sidebar-footer.tsx`, rendered by `apps/web/app/(app)/layout.tsx` outside the athlete Suspense so it never shifts the profile row) and a "Get the app" plate on Settings.
+- Apple Smart App Banner: `itunes` metadata in `apps/web/app/layout.tsx`, only once `NEXT_PUBLIC_APP_STORE_URL` is set; `/c/[token]` adds `app-argument` with the invite URL on the public origin (`https://elorated.com`). No Android equivalent (deprecated). Tests `apps/web/app/layout.test.ts`, `apps/web/app/c/[token]/page.test.ts`.
+- `apps/web/e2e/store-badges.ts`: a shared, store-aware badge assertion for the smoke, invite and landing-lock specs; `playwright.config.ts` passes `NEXT_PUBLIC_PLAY_STORE_URL` through too.
+
+**Changed**
+- Invite landing `/c/[token]` (`apps/web/components/invites/`): `InviteStoreBadges` ("Get the app", both stores) replaces the App Store CTA in every state, and `AppFirstLinks` (Open in app as the red CTA, then the badges) replaces `StoreFirstLinks`. An App Store tap still logs `app_store_tapped`; a Google Play tap logs nothing, because jr_be's `log_invite_landing_event` accepts only its fixed step list (a `play_store_tapped` step needs a backend migration).
+- Invite outcomes (`apps/web/components/invites/invite-actions.tsx`): Open in app is the red CTA after a success (match ready, booked, now friends) and for the locked hand-offs ("Finish in the app", "Accept in the app"). A dead-end error (expired, taken, withdrawn, own link, link turned off, ...) has no red CTA, with Open in app secondary, and the under-16 outcome shows neither Open in app nor the store badges. Tests `invite-actions.test.tsx`, `invite-landing.test.tsx`, `app-links.test.tsx`; e2e `invite-landing.spec.ts`, `landing-lock.spec.ts`, `smoke.spec.ts`.
+- `apps/web/.env.example` documents both store keys with the expected URLs.
+
+**Removed**
+- `apps/web/lib/app-store.ts` (`appStoreUrl()`, `isAppStoreLive()`) and `apps/web/components/app-store/app-store-cta.tsx` with their tests, folded into `lib/app-links.ts` and `StoreBadges` (labels "Get it on the App Store" / "Coming soon to the App Store" retired).
+
+### Web: landing page at elorated.com, web app lockdown flag, /support, invite CTAs and domain fixes (epic jits-6si3)
+
+`elorated.com` serves the Vercel project `jits_web` since 2026-10-14. The website is now one public landing page that sends people to the mobile app, and the live web app is locked behind `NEXT_PUBLIC_WEB_APP_ENABLED` (unset means locked; the exact string `"true"` restores today's web app; it is build-time, so a change needs a redeploy). Spec: `specs/web-landing/spec.md`. Mobile: the `WEB_APP_URL` change in `packages/shared` reaches installed apps only through a later production OTA (JS-only, runtime 0.5.0); until then, mobile share links keep pointing at `jitsweb.vercel.app`, which serves the same deployment.
+
+**Added**
+- Landing page: `apps/web/app/welcome/page.tsx` (internal route; only ever served at `/`) and `apps/web/components/landing/` (hero with `apps/web/public/landing/hero.jpg`, how it works, footer with Terms, Privacy, Support and the French legal links).
+- `/support` (`apps/web/app/(legal)/support/page.tsx`), the App Store Support URL: contact `info@elorated.com`, how to delete an account, report a problem, legal links.
+- `apps/web/app/robots.ts` (never disallows `/c/`, so invite link previews keep working).
+- `apps/web/lib/web-app-lock.ts` (`isWebAppEnabled()`, `LANDING_INTERNAL_PATH`).
+- App Store CTA helper and component (superseded by the store badges entry above, which removed them).
+
+**Changed**
+- Proxy lock gate (`apps/web/lib/supabase/proxy.ts`, `apps/web/lib/supabase/public-paths.ts`): while locked, `/` rewrites to the landing for everyone (no Supabase call), and every path outside `LOCKED_ALLOWED_PATHS` / `LOCKED_ALLOWED_FILES` (legal pages, `/support`, `/c/<token>`, `/.well-known/`, invite telemetry, password reset and auth plumbing, root files) redirects to `/`. `/welcome` always redirects to `/`. `/support` is public in both states.
+- Invite landing CTAs when locked (`apps/web/components/invites/`, `apps/web/app/c/[token]/actions.ts`): no links to `/signup`, `/eua` or `/login`; the App Store CTA and "Open in app" instead, and accept actions return "Finish in the app" / "Accept in the app" outcomes instead of redirecting into blocked routes. "Open in app" takes the red primary styling while the App Store URL is unset.
+- `/forgot-password` hides its Login link and `/error` reads "Back to ELO RATED" (to `/`) while locked.
+- Root metadata (`apps/web/app/layout.tsx`): `metadataBase` uses `publicSiteOrigin()`; description "BJJ matches, filmed and rated."
+- `WEB_APP_URL` (`packages/shared/src/constants.ts`) and `DEFAULT_PUBLIC_ORIGIN` (`apps/web/lib/invites/site-origin.ts`) are `https://elorated.com`; host tests updated, and the two invite link parsing tests keep a labelled legacy-host (`jitsweb.vercel.app`) case.
+- Legal documents' host facts (`TERMS.md`, `PRIVACY_POLICY.md`, `TERMS.fr.md`, `PRIVACY_POLICY.fr.md`): `jitsweb.vercel.app` references now name `https://elorated.com`; no other wording or date changes. `packages/shared/src/legal/documents.generated.ts` regenerated with `npm run legal:sync` (new content versions for all four documents).
+- `CLAUDE.md` production facts: web prod URL is `https://elorated.com`, the lockdown flag and how to restore the web app, Supabase Auth Site URL and redirect allow-list as of 2026-10-14.
+
+**Removed**
+- `APP_STORE_URL` (`apps/web/lib/invites/constants.ts`) and its App Store search fallback; every store link goes through `apps/web/lib/app-links.ts` (see the store badges entry above).
+
 ### Mobile 1.0: Sign in with Apple on, version 1.0, permission purpose strings (jits-8s9v)
 
 The first App Store binary offers Google sign-in, so App Review guideline 4.8 needs Sign in with Apple. Native change: needs a TestFlight build (an OTA cannot add the entitlement), and the Supabase prod Apple provider must be on first.

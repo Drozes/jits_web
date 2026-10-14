@@ -143,7 +143,7 @@ describe("match challenge weights", () => {
 
 describe("match share URL", () => {
   it("links the live web app's match page (elorated.com is not live, jits-x1t2)", () => {
-    expect(buildShareUrl("match", "M1")).toBe("https://jitsweb.vercel.app/matches/M1");
+    expect(buildShareUrl("match", "M1")).toBe("https://elorated.com/matches/M1");
     expect(buildShareUrl("athlete", "A1")).toBe("https://elorated.com/athlete/A1");
   });
 });

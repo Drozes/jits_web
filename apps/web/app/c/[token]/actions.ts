@@ -7,6 +7,7 @@ import { setMyDateOfBirth } from "@jits/shared/api/invites";
 import { checkDateOfBirth, DOB_INVALID_COPY, DOB_SAVE_FAILED_COPY, UNDERAGE_COPY } from "@jits/shared/utils";
 import { createClient } from "@/lib/supabase/server";
 import { withNext } from "@/lib/auth/safe-next-path";
+import { isWebAppEnabled } from "@/lib/web-app-lock";
 import {
   INVITE_ATTR_COOKIE,
   INVITE_COOKIE,
@@ -15,6 +16,8 @@ import {
   invitePath,
 } from "@/lib/invites/constants";
 import {
+  APP_SETUP_OUTCOME,
+  APP_SIGN_IN_OUTCOME,
   claimOutcome,
   DOB_OUTCOME,
   joinOutcome,
@@ -40,8 +43,18 @@ const TRY_AGAIN = TRY_AGAIN_OUTCOME;
  * /c/<token>, or on the next request once the invite is no longer open.
  */
 function finish(token: string, outcome: InviteOutcome): InviteOutcome {
-  if (outcome.kind === "setup") redirect(withNext("/eua", invitePath(token)));
+  if (outcome.kind === "setup") {
+    // Locked web app (specs/web-landing/spec.md): /eua is blocked, so setup happens in the app.
+    if (!isWebAppEnabled()) return APP_SETUP_OUTCOME;
+    redirect(withNext("/eua", invitePath(token)));
+  }
   return outcome;
+}
+
+/** Signed out: log in on the web, or (locked web app) accept in the app. */
+function signInOutcome(token: string): InviteOutcome {
+  if (!isWebAppEnabled()) return APP_SIGN_IN_OUTCOME;
+  redirect(withNext("/login", invitePath(token)));
 }
 
 type ServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -75,7 +88,7 @@ export async function confirmDobAndClaimAction(token: string, dateOfBirth: strin
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect(withNext("/login", invitePath(token)));
+  if (!user) return signInOutcome(token);
   const athlete = await getCurrentAthlete(supabase, user.id);
   if (!athlete) return dobStep(DOB_SAVE_FAILED_COPY);
   const saved = await setMyDateOfBirth(supabase, athlete.id, dob);
@@ -89,7 +102,7 @@ async function claimWith(supabase: ServerClient, token: string): Promise<InviteO
     p_gateway: "landing_web",
     p_platform: "web",
   });
-  if (error?.hint === "not_authenticated") redirect(withNext("/login", invitePath(token)));
+  if (error?.hint === "not_authenticated") return signInOutcome(token);
   if (error || !data) return TRY_AGAIN;
   return finish(token, claimOutcome(data as ClaimResult));
 }
@@ -106,7 +119,7 @@ export async function acceptJoinAction(
     p_gateway: "landing_web",
     p_platform: "web",
   });
-  if (error?.hint === "not_authenticated") redirect(withNext("/login", invitePath(token)));
+  if (error?.hint === "not_authenticated") return signInOutcome(token);
   if (error || !data) return TRY_AGAIN;
   return finish(token, joinOutcome(data as AcceptJoinResult, inviterName));
 }

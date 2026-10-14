@@ -54,7 +54,7 @@ This summary is here to help you, but it is not a substitute for the full Terms.
 
 ## 1. Acceptance of these Terms
 
-1.1 These Terms of Service (the "**Terms**") are a legally binding agreement between you and ELO RATED. They govern your access to and use of the ELO RATED mobile app, the ELO RATED web app (currently at jitsweb.vercel.app), the website at elorated.com, and all related features, content and services (together, the "**Service**").
+1.1 These Terms of Service (the "**Terms**") are a legally binding agreement between you and ELO RATED. They govern your access to and use of the ELO RATED mobile app, the ELO RATED website and web app at elorated.com, and all related features, content and services (together, the "**Service**").
 
 1.2 **How you accept.** You accept these Terms by checking the box or boxes in the app or on the website stating that you agree to the Terms of Service and to the Assumption of Risk, Waiver and Release in Section 5. We keep a record of your acceptance, including when you accepted and which version of the Terms applied. If you use parts of the Service without an account (for example, viewing an invite page), these Terms apply to that use to the extent the law allows. Section 5 applies once you accept it through the app or website.
 
@@ -64,7 +64,7 @@ This summary is here to help you, but it is not a substitute for the full Terms.
 
 1.5 **If you do not agree, do not use the Service.** Using the Service is voluntary. If you do not accept these Terms, including the waiver and release in Section 5, you must not create an account or use the Service.
 
-1.6 **Privacy Policy and feature rules.** Our Privacy Policy (at https://jitsweb.vercel.app/privacy) is a notice explaining how we handle personal information; it is not part of this contract. Any feature-specific rules we show you in the Service (for example, rules for a particular kind of match) form part of these Terms. If there is a conflict between these Terms and any feature-specific rules, these Terms apply unless the feature-specific rule expressly says otherwise.
+1.6 **Privacy Policy and feature rules.** Our Privacy Policy (at https://elorated.com/privacy) is a notice explaining how we handle personal information; it is not part of this contract. Any feature-specific rules we show you in the Service (for example, rules for a particular kind of match) form part of these Terms. If there is a conflict between these Terms and any feature-specific rules, these Terms apply unless the feature-specific rule expressly says otherwise.
 
 1.7 **Electronic agreement.** You agree that these Terms may be accepted electronically, that your electronic acceptance has the same effect as a handwritten signature, and that we may give you notices and records electronically (in the app, by push notification, or by email to the address on your account).
 
@@ -375,7 +375,7 @@ Some features may be described as beta, preview, early access, experimental or t
 
 ## 19. Privacy
 
-19.1 Our **Privacy Policy** at **https://jitsweb.vercel.app/privacy** explains how we collect, use, share and keep personal information, and your rights, including how to request access, correction or deletion and how to opt out of promotional use and AI training.
+19.1 Our **Privacy Policy** at **https://elorated.com/privacy** explains how we collect, use, share and keep personal information, and your rights, including how to request access, correction or deletion and how to opt out of promotional use and AI training.
 
 19.2 Parts of your profile (including your display name, photo or avatar, gym, weight, rating, rank and record) are visible to other users, and some of it to anyone you send an invite link to. You are responsible for what you choose to make public, share with other users, or post on third-party platforms, and we are not responsible for copies made or re-shared by others.
 

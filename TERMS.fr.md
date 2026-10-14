@@ -6,7 +6,7 @@
 
 **Dernière mise à jour :** 13 octobre 2026
 
-Sous réserve de l'article 28.11 et de la loi applicable, la version française et la version anglaise des présentes conditions ont la même valeur. English version: https://jitsweb.vercel.app/terms
+Sous réserve de l'article 28.11 et de la loi applicable, la version française et la version anglaise des présentes conditions ont la même valeur. English version: https://elorated.com/terms
 
 ## Points clés (à lire attentivement)
 
@@ -56,7 +56,7 @@ Ce résumé vise à vous aider, mais il ne remplace pas le texte intégral des C
 
 ## 1. Acceptation des présentes Conditions
 
-1.1 Les présentes conditions d'utilisation (les « **Conditions** ») constituent une entente juridiquement contraignante entre vous et ELO RATED. Elles régissent votre accès à l'application mobile ELO RATED, à l'application Web ELO RATED (actuellement à l'adresse jitsweb.vercel.app), au site Web elorated.com et à l'ensemble des fonctionnalités, contenus et services connexes (collectivement, le « **Service** »), ainsi que votre utilisation de ceux-ci.
+1.1 Les présentes conditions d'utilisation (les « **Conditions** ») constituent une entente juridiquement contraignante entre vous et ELO RATED. Elles régissent votre accès à l'application mobile ELO RATED, au site Web et à l'application Web ELO RATED à l'adresse elorated.com, et à l'ensemble des fonctionnalités, contenus et services connexes (collectivement, le « **Service** »), ainsi que votre utilisation de ceux-ci.
 
 1.2 **Comment vous acceptez.** Vous acceptez les présentes Conditions en cochant la ou les cases, dans l'application ou sur le site Web, indiquant que vous acceptez les conditions d'utilisation ainsi que l'acceptation des risques, la renonciation et la décharge prévues à l'article 5. Nous conservons une trace de votre acceptation, y compris le moment où vous avez accepté et la version des Conditions qui s'appliquait. Si vous utilisez certaines parties du Service sans compte (par exemple, pour consulter une page d'invitation), les présentes Conditions s'appliquent à cette utilisation dans la mesure permise par la loi. L'article 5 s'applique dès que vous l'acceptez au moyen de l'application ou du site Web.
 
@@ -66,7 +66,7 @@ Ce résumé vise à vous aider, mais il ne remplace pas le texte intégral des C
 
 1.5 **Si vous n'êtes pas d'accord, n'utilisez pas le Service.** L'utilisation du Service est volontaire. Si vous n'acceptez pas les présentes Conditions, y compris la renonciation et la décharge prévues à l'article 5, vous ne devez pas créer de compte ni utiliser le Service.
 
-1.6 **Politique de confidentialité et règles propres aux fonctionnalités.** Notre Politique de confidentialité (à l'adresse https://jitsweb.vercel.app/privacy/fr) est un avis qui explique comment nous traitons les renseignements personnels; elle ne fait pas partie du présent contrat. Les règles propres à une fonctionnalité que nous vous présentons dans le Service (par exemple, les règles d'un type de combat particulier) font partie des présentes Conditions. En cas de conflit entre les présentes Conditions et des règles propres à une fonctionnalité, les présentes Conditions prévalent, sauf si la règle propre à la fonctionnalité prévoit expressément le contraire.
+1.6 **Politique de confidentialité et règles propres aux fonctionnalités.** Notre Politique de confidentialité (à l'adresse https://elorated.com/privacy/fr) est un avis qui explique comment nous traitons les renseignements personnels; elle ne fait pas partie du présent contrat. Les règles propres à une fonctionnalité que nous vous présentons dans le Service (par exemple, les règles d'un type de combat particulier) font partie des présentes Conditions. En cas de conflit entre les présentes Conditions et des règles propres à une fonctionnalité, les présentes Conditions prévalent, sauf si la règle propre à la fonctionnalité prévoit expressément le contraire.
 
 1.7 **Entente électronique.** Vous convenez que les présentes Conditions peuvent être acceptées électroniquement, que votre acceptation électronique a le même effet qu'une signature manuscrite, et que nous pouvons vous transmettre des avis et des documents par voie électronique (dans l'application, par notification poussée ou par courriel à l'adresse associée à votre compte).
 
@@ -377,7 +377,7 @@ Certaines fonctionnalités peuvent être présentées comme des fonctionnalités
 
 ## 19. Protection des renseignements personnels
 
-19.1 Notre **Politique de confidentialité**, à l'adresse **https://jitsweb.vercel.app/privacy/fr**, explique comment nous recueillons, utilisons, communiquons et conservons les renseignements personnels, ainsi que vos droits, y compris la façon de demander l'accès à vos renseignements, leur rectification ou leur suppression, et la façon de vous retirer de l'utilisation promotionnelle et de l'entraînement de l'IA.
+19.1 Notre **Politique de confidentialité**, à l'adresse **https://elorated.com/privacy/fr**, explique comment nous recueillons, utilisons, communiquons et conservons les renseignements personnels, ainsi que vos droits, y compris la façon de demander l'accès à vos renseignements, leur rectification ou leur suppression, et la façon de vous retirer de l'utilisation promotionnelle et de l'entraînement de l'IA.
 
 19.2 Certaines parties de votre profil (y compris votre nom d'affichage, votre photo ou votre avatar, votre club, votre poids, votre cote, votre rang et votre fiche) sont visibles par les autres utilisateurs, et certaines le sont par toute personne à qui vous envoyez un lien d'invitation. Vous êtes responsable de ce que vous choisissez de rendre public, de partager avec d'autres utilisateurs ou de publier sur des plateformes de tiers, et nous ne sommes pas responsables des copies faites ou partagées de nouveau par d'autres.
 
