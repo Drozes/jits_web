@@ -5,8 +5,9 @@
  *
  * NOTE: /design is intentionally NOT public: the design section (incl. the
  * internal /design/board Kanban) is gated behind login.
- * /terms and /privacy are public for store reviewers and Meta's Live-mode
- * check (jits-s6mi.7).
+ * /terms and /privacy (and their French versions /terms/fr and /privacy/fr,
+ * listed explicitly although the prefix rule already covers them) are public
+ * for store reviewers and Meta's Live-mode check (jits-s6mi.7).
  * /c (invite landing + its OG image), /api/invite-events (landing telemetry)
  * and /.well-known (apple-app-site-association) are public for invitees,
  * link-preview crawlers and Apple's CDN (016 invites, contract 6).
@@ -22,6 +23,8 @@ export const PUBLIC_PATHS = [
   "/auth/callback",
   "/terms",
   "/privacy",
+  "/terms/fr",
+  "/privacy/fr",
   "/c",
   "/api/invite-events",
   "/.well-known",

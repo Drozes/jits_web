@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { TOS_TEXT } from "@jits/shared/utils";
+import { LEGAL_WEB_PATHS } from "@jits/shared/legal/paths";
 import {
   isAtLeast16,
   isValidWeight,
@@ -14,12 +15,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CityAutocomplete } from "@/components/profile-setup/city-autocomplete";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { inviteTokenFromNextPath } from "@/lib/invites/next-path";
-
-interface ParsedBlock {
-  type: "title" | "section" | "paragraph";
-  label?: string;
-  body: string;
-}
 
 interface ProfileValues {
   weight: string;
@@ -37,27 +32,15 @@ interface EuaFormProps {
   initialProfile: ProfileValues;
   /** Safe same-origin path to continue to (invite ?next=). */
   next?: string | null;
-}
-
-function parseEuaBody(raw: string): ParsedBlock[] {
-  const lines = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  const blocks: ParsedBlock[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (i === 0) {
-      blocks.push({ type: "title", body: line });
-      continue;
-    }
-    const sectionMatch = /^(\d+\.\s+[^\n]+)/.exec(line);
-    if (sectionMatch) {
-      const firstLine = sectionMatch[1];
-      const rest = line.slice(firstLine.length).trim();
-      blocks.push({ type: "section", label: firstLine, body: rest });
-    } else {
-      blocks.push({ type: "paragraph", body: line });
-    }
-  }
-  return blocks;
+  /**
+   * The Terms' "Key points" section, rendered by the server page
+   * (`<LegalExcerpt>` over `firstSection(TERMS_EN)`), so the ~75 KB document
+   * and its parser stay out of this client component's bundle: this file
+   * imports only `@jits/shared/legal/paths` (no document text). The waiver
+   * bullet (Section 5) is its first item; the full Terms and the Privacy
+   * Policy are linked under it (owner decision, jits-rog5.8).
+   */
+  terms: ReactNode;
 }
 
 /** `invite`: the invite path defers city and uses the contract-7 age copy. */
@@ -85,6 +68,7 @@ export function EuaForm({
   cities,
   initialProfile,
   next = null,
+  terms,
 }: EuaFormProps) {
   const router = useRouter();
   const invite = inviteTokenFromNextPath(next) !== null;
@@ -92,8 +76,6 @@ export function EuaForm({
   const [profile, setProfile] = useState<ProfileValues>(initialProfile);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  const blocks = parseEuaBody(TOS_TEXT);
 
   const onChange = (patch: Partial<ProfileValues>) =>
     setProfile((p) => ({ ...p, ...patch }));
@@ -185,7 +167,7 @@ export function EuaForm({
 
   return (
     <div style={{ minHeight: "100svh", background: "var(--bg-primary)", display: "flex", flexDirection: "column" }}>
-      <AppHeader title={needsProfile ? "Finish Setup" : "End User Agreement"} back />
+      <AppHeader title={needsProfile ? "Finish Setup" : "Terms of Service"} back />
       <div
         style={{
           flex: 1,
@@ -307,40 +289,32 @@ export function EuaForm({
             lineHeight: 1.6,
             maxHeight: "60vh",
           }}
+          role="region"
+          aria-label="Terms of Service: key points"
+          tabIndex={0}
         >
-          {blocks.map((block, i) => {
-            if (block.type === "title") {
-              return (
-                <p key={i} style={{ marginTop: 0 }}>
-                  <strong
-                    style={{
-                      color: "var(--text-primary)",
-                      textTransform: "uppercase",
-                      letterSpacing: "var(--ls-caps)",
-                      fontFamily: "var(--font-heading)",
-                    }}
-                  >
-                    {block.body.toUpperCase()}
-                  </strong>
-                </p>
-              );
-            }
-            if (block.type === "section") {
-              return (
-                <p key={i}>
-                  <strong style={{ color: "var(--text-primary)" }}>{block.label}</strong>
-                  {block.body ? ` ${block.body}` : ""}
-                </p>
-              );
-            }
-            return <p key={i}>{block.body}</p>;
-          })}
+          {terms}
         </Plate>
 
-        <label
+        <p
           style={{
             display: "flex",
-            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "var(--space-4)",
+            margin: "0 0 var(--space-4)",
+            fontFamily: "var(--font-body)",
+            fontSize: "var(--size-body-s)",
+          }}
+        >
+          <LegalLink href={LEGAL_WEB_PATHS.terms.en}>Read the full Terms of Service</LegalLink>
+          <LegalLink href={LEGAL_WEB_PATHS.privacy.en}>Read the Privacy Policy</LegalLink>
+        </p>
+
+        <label
+          data-testid="eua-agree-label"
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
             gap: "var(--space-3)",
             marginBottom: "var(--space-4)",
             color: "var(--text-primary)",
@@ -352,8 +326,13 @@ export function EuaForm({
           <Checkbox
             checked={accepted}
             onCheckedChange={(v: boolean | "indeterminate") => setAccepted(v === true)}
+            style={{ marginTop: 2 }}
           />
-          I agree to the End User Agreement
+          {/* Plain text: a link inside a label would toggle the box or steal the click. */}
+          <span>
+            I agree to the Terms of Service, including the Assumption of Risk, Waiver and Release of Liability in
+            Section 5, and I have read the Privacy Policy.
+          </span>
         </label>
 
         {error && (
@@ -421,6 +400,20 @@ const FIELD_INPUT_STYLE: React.CSSProperties = {
   outline: "none",
   transition: "border-color var(--motion-hover)",
 };
+
+/** Opens in a new tab so the half-filled form is kept. */
+function LegalLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      target="_blank"
+      rel="noopener"
+      style={{ color: "var(--text-primary)", textDecoration: "underline", textUnderlineOffset: 2 }}
+    >
+      {children}
+    </Link>
+  );
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

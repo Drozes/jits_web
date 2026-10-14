@@ -125,8 +125,8 @@ Deliberate choices, so a reviewer can judge them:
   change does not ask for a redraw. A data change that alters what a screen shows usually also changes
   a component, which is mapped.
 - **`@jits/shared` is mapped through an allowlist.** Most of it is API calls, hooks and types, which are
-  skipped, but some shared files hold copy or formatting that is drawn on boards: `utils/tos-content.ts`,
-  `utils/shared.ts`, `utils/milestones.ts`, `utils/key-moments.ts`, `utils/highlight-caption.ts`,
+  skipped, but some shared files hold copy or formatting that is drawn on boards: `legal/documents.generated.ts`,
+  `legal/markdown.ts` and `legal/references.ts` (the Terms key points on the setup step and their links), `utils/shared.ts`, `utils/milestones.ts`, `utils/key-moments.ts`, `utils/highlight-caption.ts`,
   `utils/share.ts`, `utils/match-detection.ts` (`NO_MATCH_COPY`) and `constants/highlights.ts`
   (`SHARED_OK` in the script). Submission names come from the database, so they are not in the repo.
 - **`app.json` is not mapped.** The splash board draws the JS splash (`SplashGlowStatement`), and

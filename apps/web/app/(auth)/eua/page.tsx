@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAthlete } from "@jits/shared/api/queries";
 import { EuaForm } from "@/components/auth/eua-form";
+import { LegalExcerpt } from "@/components/legal/legal-document";
+import { TERMS_EN, firstSection, parseLegalDocument } from "@jits/shared/legal";
 import { safeNextParam, withNext } from "@/lib/auth/safe-next-path";
 
 type SearchParams = Promise<{ next?: string | string[] }>;
@@ -54,6 +56,7 @@ async function EuaContent({ searchParams }: { searchParams: SearchParams }) {
   return (
     <EuaForm
       next={next}
+      terms={<LegalExcerpt blocks={firstSection(parseLegalDocument("terms", TERMS_EN.markdown))} />}
       needsProfile={needsProfile}
       gyms={(gyms ?? []).map((g) => ({ id: g.id, name: g.name }))}
       cities={cities.length > 0 ? cities : ["Toronto", "Vancouver"]}

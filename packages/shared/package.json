@@ -31,6 +31,8 @@
     "./constants/go-live": "./src/constants/go-live.ts",
     "./geo": "./src/geo/index.ts",
     "./hooks": "./src/hooks/index.ts",
+    "./legal": "./src/legal/index.ts",
+    "./legal/paths": "./src/legal/paths.ts",
     "./hooks/*": "./src/hooks/*.ts",
     "./types/*": "./src/types/*.ts",
     "./utils": "./src/utils/index.ts"
@@ -39,7 +41,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run -c vitest.integration.config.ts",
-    "gen:cities": "node scripts/generate-na-cities.mjs"
+    "gen:cities": "node scripts/generate-na-cities.mjs",
+    "legal:sync": "node scripts/sync-legal-docs.mjs"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.94.1",

@@ -1,9 +1,12 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { LEGAL_WEB_PATHS } from "@jits/shared/legal/paths";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 
 type HelpSection = {
   title: string;
-  paragraphs: string[];
+  paragraphs: ReactNode[];
 };
 
 const HELP_SECTIONS: HelpSection[] = [
@@ -26,7 +29,14 @@ const HELP_SECTIONS: HelpSection[] = [
     title: "Match Footage & Privacy",
     paragraphs: [
       "You own your match footage. You can always download it from your profile. Server-side retention on the free tier may be limited; access to your own data is not.",
-      "Your profile and rating are public on the global ladder. Personal data is governed by the Privacy Policy linked in the End User Agreement.",
+      <>
+        Your profile and rating are public on the global ladder. How we collect, use and protect your personal
+        information is explained in our{" "}
+        <Link href={LEGAL_WEB_PATHS.privacy.en} className="underline">
+          Privacy Policy
+        </Link>
+        .
+      </>,
     ],
   },
   {

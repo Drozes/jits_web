@@ -14,7 +14,7 @@ import { FREE_AGENT_OPTION, type WizardStep, type WizardValues } from "./types";
 import { WizardProgress } from "./wizard-progress";
 
 const STEP_LABELS: Record<WizardStep, string> = {
-  tos: "End User Agreement",
+  tos: "Terms of Service",
   identity: "Who Are You",
   training: "Where You Train",
 };
