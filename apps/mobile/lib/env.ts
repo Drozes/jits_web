@@ -65,26 +65,35 @@ export const env = {
 };
 
 /**
- * Sign in with Apple kill switch (jits_web invites release). The prod Supabase
- * Apple provider is not configured yet, so the Apple button stays hidden on
- * the login and signup screens until this is flipped. It is a plain JS
- * constant (not a `feature_flags` row) because those screens render before
+ * Sign in with Apple switch (jits-8s9v). On by default from the 1.0 binary,
+ * which is the first build that ships the `com.apple.developer.applesignin`
+ * entitlement (`ios.usesAppleSignIn` and the `expo-apple-authentication`
+ * plugin in `app.json`). Builds before 1.0 lack the entitlement, so an OTA
+ * cannot enable Apple sign-in on them. It is a plain JS constant (not a
+ * `feature_flags` row) because the login and signup screens render before
  * auth and `feature_flags` is authenticated-only.
  *
- * To enable: set `APPLE_SIGN_IN_DEFAULT` to `true` and ship an OTA (the native
- * module and `ios.usesAppleSignIn` are already in the binary), or bundle with
- * `EXPO_PUBLIC_APPLE_SIGN_IN=true`. The env read is a static
+ * Emergency kill switch only: bundling with `EXPO_PUBLIC_APPLE_SIGN_IN=false`
+ * (or `0`) hides the button in that bundle (an OTA can carry it), and `true`
+ * / `1` forces it on; anything else keeps the default. Turning it off while
+ * Google sign-in is visible on iOS violates App Store guideline 4.8, so it
+ * must not stay off in a store build. The env read is a static
  * `process.env.EXPO_PUBLIC_*` member access so Metro can inline it; if the
- * inlining does not happen the flag safely stays at the default.
+ * inlining does not happen the flag stays at the default.
  */
-const APPLE_SIGN_IN_DEFAULT = false;
+const APPLE_SIGN_IN_DEFAULT = true;
 
-/** `"true"` / `"1"` (case-insensitive, trimmed) enable; anything else is off. */
-export function parseBooleanFlag(raw: string | undefined | null): boolean {
-  if (typeof raw !== "string") return false;
+/**
+ * Tri-state override: `"true"` / `"1"` is true, `"false"` / `"0"` is false
+ * (case-insensitive, trimmed), anything else (unset included) is null.
+ */
+export function parseBooleanOverride(raw: string | undefined | null): boolean | null {
+  if (typeof raw !== "string") return null;
   const value = raw.trim().toLowerCase();
-  return value === "true" || value === "1";
+  if (value === "true" || value === "1") return true;
+  if (value === "false" || value === "0") return false;
+  return null;
 }
 
 export const APPLE_SIGN_IN_ENABLED: boolean =
-  APPLE_SIGN_IN_DEFAULT || parseBooleanFlag(process.env.EXPO_PUBLIC_APPLE_SIGN_IN);
+  parseBooleanOverride(process.env.EXPO_PUBLIC_APPLE_SIGN_IN) ?? APPLE_SIGN_IN_DEFAULT;
