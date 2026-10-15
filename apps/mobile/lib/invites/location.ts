@@ -19,6 +19,7 @@ import { Platform } from "react-native";
 import * as Location from "expo-location";
 import type { LocationReading } from "@jits/shared/api/invites";
 import { takeDevFix } from "@/lib/arena/dev-go-live-hooks";
+import { permissionRequestInFlight, trackPermissionRequest } from "@/lib/permissions/permission-request";
 
 export type ReadingResult =
   | {
@@ -51,17 +52,11 @@ export const REDUCED_PRECISION_ACCURACY_M = 1000;
 const TIMED_OUT = Symbol("timed-out");
 
 /**
- * System permission prompts in flight. On Android the runtime permission
- * dialog pauses the activity, so AppState reports "background" (then
- * "active") while it is up; iOS reports "inactive". Owners that treat a
- * background as "the athlete left" (the Go Live flow, the challenger's
- * one-time ask) ignore transitions while this is set.
+ * System permission prompts in flight (now shared with camera and microphone
+ * requests, `lib/permissions/permission-request.ts`). Re-exported here so the
+ * existing owners and their test mocks keep one import.
  */
-let permissionRequests = 0;
-
-export function permissionRequestInFlight(): boolean {
-  return permissionRequests > 0;
-}
+export { permissionRequestInFlight };
 
 /**
  * `start()`, or `TIMED_OUT` after `ms`. Lazy: with no time left the work is
@@ -165,18 +160,25 @@ export async function readLocationOnce(
     let granted = current.granted;
     let canAskAgain = current.canAskAgain;
     let coarse = current.android?.accuracy === "coarse";
-    if (!granted && opts.ask && canAskAgain) {
-      permissionRequests += 1;
-      let asked: Awaited<ReturnType<typeof Location.requestForegroundPermissionsAsync>> | typeof TIMED_OUT;
-      try {
-        asked = await within(() => Location.requestForegroundPermissionsAsync(), PERMISSION_REQUEST_TIMEOUT_MS);
-      } finally {
-        permissionRequests -= 1;
+    // At most ONE system prompt per call, never a loop: the grant itself, or
+    // (Android 12+) the approximate -> precise upgrade when only approximate
+    // location is granted and the OS can still ask (M4, jits-mafl.2). The
+    // upgrade is never asked right after a first grant came back approximate:
+    // the athlete just chose it, so the next tap asks.
+    const wantsGrant = !granted;
+    const wantsUpgrade = granted && coarse && Platform.OS === "android";
+    if (opts.ask && canAskAgain && (wantsGrant || wantsUpgrade)) {
+      const asked = await trackPermissionRequest(() =>
+        within(() => Location.requestForegroundPermissionsAsync(), PERMISSION_REQUEST_TIMEOUT_MS),
+      );
+      if (asked === TIMED_OUT) {
+        // A hung upgrade dialog keeps the approximate grant: read with it.
+        if (wantsGrant) return { status: "unavailable", reason: "timeout" };
+      } else if (wantsGrant || asked.granted) {
+        granted = asked.granted;
+        canAskAgain = asked.canAskAgain;
+        coarse = asked.android?.accuracy === "coarse";
       }
-      if (asked === TIMED_OUT) return { status: "unavailable", reason: "timeout" };
-      granted = asked.granted;
-      canAskAgain = asked.canAskAgain;
-      coarse = asked.android?.accuracy === "coarse";
     }
     if (!granted) return { status: "denied", canAskAgain: Boolean(canAskAgain) };
     // DEV ONLY (QA): a forced timeout or accuracy for this fix; null in production.

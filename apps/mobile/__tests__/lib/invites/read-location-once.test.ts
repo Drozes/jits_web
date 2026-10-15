@@ -230,3 +230,72 @@ describe("permission request in flight (review B1, S2)", () => {
     expect(permissionRequestInFlight()).toBe(false);
   });
 });
+
+describe("Android approximate -> precise upgrade (jits-mafl.2 M4)", () => {
+  const { permissionRequestInFlight } = jest.requireActual("@/lib/invites/location") as typeof import("@/lib/invites/location");
+  const coarseGrant = { granted: true, canAskAgain: true, android: { accuracy: "coarse" } };
+  const fineGrant = { granted: true, canAskAgain: true, android: { accuracy: "fine" } };
+
+  it("asks once when only approximate is granted, and reads with the new precise grant", async () => {
+    setOS("android");
+    mockGetPermission.mockResolvedValue(coarseGrant);
+    mockRequestPermission.mockResolvedValue(fineGrant);
+    const r = await readLocationOnce({ ask: true, fast: true });
+    expect(mockRequestPermission).toHaveBeenCalledTimes(1);
+    expect(r).toMatchObject({ status: "ok" });
+    expect(r).not.toHaveProperty("reducedPrecision");
+    expect(permissionRequestInFlight()).toBe(false);
+  });
+
+  it("keeping approximate in the upgrade dialog is still reduced precision, with no second ask", async () => {
+    setOS("android");
+    mockGetPermission.mockResolvedValue(coarseGrant);
+    mockRequestPermission.mockResolvedValue(coarseGrant);
+    expect(await readLocationOnce({ ask: true, fast: true })).toMatchObject({ status: "ok", reducedPrecision: true });
+    expect(mockRequestPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds the in-flight counter while the upgrade dialog is up, and balances it", async () => {
+    setOS("android");
+    mockGetPermission.mockResolvedValue(coarseGrant);
+    let release!: (v: unknown) => void;
+    mockRequestPermission.mockReturnValue(new Promise((r) => (release = r)));
+    const p = readLocationOnce({ ask: true, fast: true });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(permissionRequestInFlight()).toBe(true);
+    release(fineGrant);
+    await p;
+    expect(permissionRequestInFlight()).toBe(false);
+  });
+
+  it("a first grant that comes back approximate is not re-asked in the same call", async () => {
+    setOS("android");
+    mockGetPermission.mockResolvedValue({ granted: false, canAskAgain: true });
+    mockRequestPermission.mockResolvedValue(coarseGrant);
+    expect(await readLocationOnce({ ask: true, fast: true })).toMatchObject({ status: "ok", reducedPrecision: true });
+    expect(mockRequestPermission).toHaveBeenCalledTimes(1);
+  });
+
+  it("a hung upgrade dialog reads with the approximate grant after 30 s", async () => {
+    setOS("android");
+    mockGetPermission.mockResolvedValue(coarseGrant);
+    mockRequestPermission.mockReturnValue(new Promise(() => undefined));
+    const p = readLocationOnce({ ask: true, fast: true });
+    await jest.advanceTimersByTimeAsync(PERMISSION_REQUEST_TIMEOUT_MS);
+    expect(await p).toMatchObject({ status: "ok", reducedPrecision: true });
+    expect(permissionRequestInFlight()).toBe(false);
+  });
+
+  it.each([
+    ["without ask: true", { ask: false }, coarseGrant, "android"],
+    ["when the OS can no longer ask", { ask: true }, { ...coarseGrant, canAskAgain: false }, "android"],
+    ["with a precise grant", { ask: true }, fineGrant, "android"],
+    ["on iOS", { ask: true }, coarseGrant, "ios"],
+  ] as const)("never asks %s", async (_c, opts, perm, os) => {
+    setOS(os);
+    mockGetPermission.mockResolvedValue(perm);
+    expect(await readLocationOnce({ ...opts, fast: true })).toMatchObject({ status: "ok" });
+    expect(mockRequestPermission).not.toHaveBeenCalled();
+  });
+});
