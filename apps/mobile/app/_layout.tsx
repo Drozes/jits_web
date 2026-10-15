@@ -31,6 +31,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { darkTokens } from "@/lib/tokens";
 import { Toaster } from "@/components/ui/toast";
 import { PushRegistrationBootstrap } from "@/lib/notifications/push-registration-bootstrap";
+import { ensureAndroidChannel } from "@/lib/notifications/register-push";
 import { SentryUserBootstrap } from "@/lib/error-tracking/sentry-user-bootstrap";
 import { OnlinePresenceBootstrap } from "@/lib/presence/online-presence-bootstrap";
 import { VideoUploadBootstrap } from "@/lib/video/video-upload-bootstrap";
@@ -62,6 +63,11 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // no light flash). A stored user preference (light/dark/system) is re-applied at
 // launch by ThemeProvider's restore(); the Light/Dark/System toggle still works.
 colorScheme.set("dark");
+
+// Android: create the "default" notification channel at startup, not only on
+// push registration, so it exists before any push arrives (the backend sends
+// channelId 'default'). Idempotent, Android only, fire and forget.
+ensureAndroidChannel().catch(() => {});
 
 function RootLayout() {
   const [fontsLoaded] = useFonts({
