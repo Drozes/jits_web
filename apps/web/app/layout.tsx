@@ -2,22 +2,24 @@ import type { Metadata, Viewport } from "next";
 import { Bebas_Neue, DM_Sans, Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { smartAppBanner } from "@/lib/app-links";
+import { publicSiteOrigin } from "@/lib/invites/site-origin";
 import "./design-system/tokens.css";
 import "./globals.css";
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:4983";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(defaultUrl),
+  // The stable public host, never the per-deployment VERCEL_URL (it sits
+  // behind Deployment Protection).
+  metadataBase: new URL(publicSiteOrigin()),
   title: "ELO RATED",
-  description: "Track your jiu-jitsu journey",
+  description: "BJJ matches, filmed and rated.",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "ELO RATED",
   },
+  // Apple's Smart App Banner, only once NEXT_PUBLIC_APP_STORE_URL is set.
+  itunes: smartAppBanner(),
 };
 
 export const viewport: Viewport = {

@@ -127,7 +127,10 @@ export default function LoginScreen() {
               onPress={onSubmit}
               disabled={submitting || (allTouched && formInvalid)}
             />
+            {/* Apple sits above Google at the same height (guideline 4.8). */}
+            {APPLE_SIGN_IN_ENABLED ? <AppleSignInButton /> : null}
             <Button
+              testID="login-google"
               variant="secondary"
               label={
                 googleSubmitting ? "Opening Google..." : "Continue with Google"
@@ -135,7 +138,6 @@ export default function LoginScreen() {
               onPress={onGooglePress}
               disabled={googleSubmitting || submitting}
             />
-            {APPLE_SIGN_IN_ENABLED ? <AppleSignInButton /> : null}
           </Plate>
 
           <View className="gap-3">

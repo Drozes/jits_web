@@ -1,7 +1,8 @@
 import { Wordmark } from "@/components/ui/elo-system";
 import type { InAppBrowser, InvitePreview } from "@/lib/invites/types";
 import type { InviteViewer } from "@/lib/invites/viewer";
-import { AppStoreButton, OpenInAppButton } from "./app-links";
+import { isWebAppEnabled } from "@/lib/web-app-lock";
+import { AppFirstLinks, InviteStoreBadges, OpenInAppButton } from "./app-links";
 import { InAppBrowserHint } from "./in-app-browser-hint";
 import { InviteActions } from "./invite-actions";
 import { InviteCodeBlock } from "./invite-code-block";
@@ -37,6 +38,7 @@ export function InviteLanding({ token, preview, viewer, inAppBrowser }: InviteLa
               inviterFirstName={preview.inviter.first_name}
               viewer={viewer.state}
               inAppBrowser={inAppBrowser}
+              webAppEnabled={isWebAppEnabled()}
             />
             {(viewer.state === "active" || viewer.state === "pending") && (
               <SignedInAs token={token} displayName={viewer.displayName} />
@@ -86,10 +88,11 @@ function Unavailable({
             <p style={BODY_TEXT}>Already accepted it? Your match is waiting in the app.</p>
             <OpenInAppButton token={token} inAppBrowser={inAppBrowser} primary />
           </div>
-          <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary={false} />
+          <InviteStoreBadges token={token} inAppBrowser={inAppBrowser} />
         </>
       ) : (
-        <AppStoreButton token={token} inAppBrowser={inAppBrowser} primary />
+        // The badges are never red, so Open in app is the red CTA (spec P3).
+        <AppFirstLinks token={token} inAppBrowser={inAppBrowser} />
       )}
     </section>
   );

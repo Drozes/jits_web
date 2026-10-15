@@ -43,6 +43,20 @@ export const TRY_AGAIN_OUTCOME: InviteOutcome = {
   body: "We couldn't reach ELO RATED. Check your connection and try again.",
 };
 
+/** Locked web app: setup happens in the app, never on /eua. */
+export const APP_SETUP_OUTCOME: InviteOutcome = {
+  kind: "error",
+  title: "Finish in the app",
+  body: "Finish setting up your profile in the ELO RATED app, then open this invite there.",
+};
+
+/** Locked web app: a signed-out accept is finished in the app, never on /login. */
+export const APP_SIGN_IN_OUTCOME: InviteOutcome = {
+  kind: "error",
+  title: "Accept in the app",
+  body: "You're signed out. Open this invite in the ELO RATED app to accept.",
+};
+
 const BOOKED_BODY = "You're booked. The match starts when you're both on the mat.";
 
 function name(inviter: InviterCard | null | undefined): string {

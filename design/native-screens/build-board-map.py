@@ -247,7 +247,9 @@ LIB_OK = re.compile(
 )
 # packages/shared files whose strings or formatting are drawn on boards.
 SHARED_OK = {SH + p for p in [
-    "utils/tos-content.ts", "utils/shared.ts", "utils/milestones.ts", "utils/key-moments.ts",
+    "legal/documents.generated.ts", "legal/markdown.ts",  # the Terms key points (jits-rog5.8)
+    "legal/references.ts",  # in-text reference links (jits-rog5.10)
+    "utils/shared.ts", "utils/milestones.ts", "utils/key-moments.ts",
     "utils/highlight-caption.ts", "utils/share.ts", "utils/match-detection.ts",  # NO_MATCH_COPY
     "constants/highlights.ts",
 ]}
@@ -349,6 +351,9 @@ def match(*keep):
 # Upload copy and error classes read through lib files (card-status, upload-banner-state) that
 # the walk does not traverse (jits-n2im.22).
 UPLOAD_LIB = [M + "lib/video/upload-copy.ts", M + "lib/video/upload-errors.ts"]
+# The native legal modal and its renderer (jits-rog5.8).
+LEGAL_MODAL = [M + "app/legal/[doc].tsx", M + "components/legal/legal-document.tsx",
+               M + "components/legal/contents-panel.tsx", M + "components/ui/elo-system/chip.tsx"]
 # The Film status view model and its copy, read through hooks the walk does not traverse
 # (use-film-status), for the boards that draw the plate (verdict, match detail) or its badge.
 FILM_STATUS_LIB = [M + "lib/video/film-status.ts", M + "lib/video/video-status-copy.ts"]
@@ -370,7 +375,9 @@ BOARDS = {
     "03-Signup.dc.html": dict(seeds=AUTH + ["app/(auth)/signup.tsx"]),
     "04-Signup-Confirm.dc.html": dict(seeds=AUTH + ["app/(auth)/signup.tsx"]),
     "05-Forgot-Password.dc.html": dict(seeds=AUTH + ["app/(auth)/forgot-password.tsx"]),
-    "06-Setup-Terms.dc.html": dict(seeds=SETUP, exclude=[WHO, WHERE]),
+    # The legal modal opens from the Terms step and the Settings legal rows (jits-rog5.8); it is
+    # navigated to, not imported, so the walk cannot reach it.
+    "06-Setup-Terms.dc.html": dict(seeds=SETUP, exclude=[WHO, WHERE], extra=LEGAL_MODAL),
     "07-Setup-Who.dc.html": dict(seeds=SETUP, exclude=[TOS, WHERE]),
     "08-Setup-Where.dc.html": dict(seeds=SETUP, exclude=[TOS, WHO]),
     "Main.dc.html": dict(seeds=HOME, exclude=[
@@ -443,7 +450,7 @@ BOARDS = {
     "42-Notifications-Panel.dc.html": dict(
         seeds=HOME + ["components/notifications/bell-bootstrap.tsx", "components/notifications/notification-panel.tsx",
                       "lib/notifications/notification-items.ts"]),
-    "43-Settings.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/index.tsx"]),
+    "43-Settings.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/index.tsx"], extra=LEGAL_MODAL),
     "44-Settings-Notifications.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/notifications.tsx"]),
     "45-Feedback.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/feedback.tsx"]),
     "46-Help.dc.html": dict(seeds=SETTINGS + ["app/(app)/settings/help.tsx"]),

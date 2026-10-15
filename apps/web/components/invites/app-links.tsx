@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Check, Link2, Smartphone } from "lucide-react";
 import { sendLandingEvent } from "@/lib/invites/beacon";
-import { APP_STORE_URL, inviteSchemeUrl } from "@/lib/invites/constants";
+import { StoreBadges } from "@/components/app-links/store-badges";
+import { inviteSchemeUrl } from "@/lib/invites/constants";
 import type { InAppBrowser, InviteKind } from "@/lib/invites/types";
 import { GHOST_CTA, PRIMARY_CTA, SECONDARY_CTA } from "./styles";
 
@@ -14,16 +15,36 @@ interface LinkProps {
   kind?: InviteKind | null;
 }
 
-/** App Store button. Red only when it is the surface's one primary CTA. */
-export function AppStoreButton({ token, inAppBrowser, kind = null, primary }: LinkProps & { primary: boolean }) {
+/**
+ * Both official store badges under "Get the app" ("Coming soon" until each
+ * listing is live). Never the surface's red CTA: official badge artwork is
+ * never recoloured. An App Store tap logs app_store_tapped; a Google Play
+ * tap logs nothing, because jr_be's log_invite_landing_event accepts only
+ * its fixed step list and a play_store_tapped step needs a backend change.
+ */
+export function InviteStoreBadges({ token, inAppBrowser, kind = null }: LinkProps) {
   return (
-    <a
-      href={APP_STORE_URL}
-      onClick={() => sendLandingEvent(token, "app_store_tapped", inAppBrowser, kind)}
-      style={primary ? PRIMARY_CTA : SECONDARY_CTA}
-    >
-      Get it on the App Store
-    </a>
+    <StoreBadges
+      heading="Get the app"
+      align="center"
+      onBadgeClick={(store) => {
+        if (store === "app_store") sendLandingEvent(token, "app_store_tapped", inAppBrowser, kind);
+      }}
+    />
+  );
+}
+
+/**
+ * Open in app as the stack's red CTA, then the store badges. The badges can
+ * never take the red fill (spec P3's swap rule, applied whether or not the
+ * listing is live), so Open in app always leads.
+ */
+export function AppFirstLinks(props: LinkProps) {
+  return (
+    <>
+      <OpenInAppButton {...props} primary />
+      <InviteStoreBadges {...props} />
+    </>
   );
 }
 

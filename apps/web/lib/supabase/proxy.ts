@@ -1,13 +1,39 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
-import { isPublicPath } from "./public-paths";
+import { isLockedAllowedFile, isLockedAllowedPath, isPublicPath } from "./public-paths";
+import { isWebAppEnabled, LANDING_INTERNAL_PATH } from "../web-app-lock";
 import { INVITE_ATTR_COOKIE, INVITE_COOKIE, INVITE_COOKIE_OPTIONS } from "../invites/constants";
 import { attributeInviteCookie } from "../invites/cookie-attribution";
 import { INVITE_SKIP_RE, planInviteCookie } from "../invites/cookie-plan";
 import { applyLandingSideEffects, isPrefetch, landingToken } from "../invites/landing-proxy";
 
+/** 307 to "/" with the query string dropped. */
+function redirectHome(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  url.pathname = "/";
+  url.search = "";
+  return NextResponse.redirect(url);
+}
+
 export async function updateSession(request: NextRequest) {
+  // Web app lock gate (specs/web-landing/spec.md): runs before any Supabase call.
+  const { pathname } = request.nextUrl;
+  const isLandingRoute =
+    pathname === LANDING_INTERNAL_PATH || pathname.startsWith(LANDING_INTERNAL_PATH + "/");
+  if (isLandingRoute) return redirectHome(request);
+  if (!isWebAppEnabled()) {
+    if (pathname === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = LANDING_INTERNAL_PATH; // query string kept
+      return NextResponse.rewrite(url);
+    }
+    if (!isLockedAllowedPath(pathname)) return redirectHome(request);
+    // Static root files need no session (and are not in PUBLIC_PATHS, so a
+    // signed-out request would otherwise bounce through /login to "/").
+    if (isLockedAllowedFile(pathname)) return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -53,7 +79,7 @@ export async function updateSession(request: NextRequest) {
   const user = data?.claims;
 
   // The public list (incl. why /design is NOT on it) lives in public-paths.ts.
-  if (!user && !isPublicPath(request.nextUrl.pathname)) {
+  if (!user && !isPublicPath(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -69,7 +95,6 @@ export async function updateSession(request: NextRequest) {
   }
 
   const inviteCookie = request.cookies.get(INVITE_COOKIE)?.value;
-  const { pathname } = request.nextUrl;
   if (
     user &&
     inviteCookie &&

@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { StoreBadges } from "@/components/app-links/store-badges";
 import { Plate } from "@/components/ui/elo-system";
 import { ThemeChips } from "@/components/domain/theme-chips";
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +18,9 @@ export function SettingsContent({ email }: SettingsContentProps) {
       <AccountSection email={email} />
       <PreferencesSection />
       <SupportSection />
+      <Plate style={{ padding: "var(--space-4)" }}>
+        <StoreBadges heading="Get the app" />
+      </Plate>
     </div>
   );
 }

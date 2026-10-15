@@ -59,3 +59,13 @@ describe("Settings delete account row", () => {
     expect(s.getByTestId("link-/settings/delete-account")).toBeTruthy();
   });
 });
+
+describe("Settings legal rows", () => {
+  it("opens the Terms of Service and the Privacy Policy in the legal modal (jits-rog5.8)", () => {
+    const s = render(<SettingsScreen />);
+    expect(s.getByText("TERMS OF SERVICE")).toBeTruthy();
+    expect(s.getByText("PRIVACY POLICY")).toBeTruthy();
+    expect(s.getByTestId("link-/legal/terms")).toBeTruthy();
+    expect(s.getByTestId("link-/legal/privacy")).toBeTruthy();
+  });
+});

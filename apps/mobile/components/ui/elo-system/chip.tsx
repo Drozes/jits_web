@@ -5,6 +5,8 @@ import { selectionSurface } from "./selection";
 
 interface ChipProps extends Omit<PressableProps, "children"> {
   active?: boolean;
+  /** Dynamic Type cap for the label, where the chip sits in a fixed-height bar. */
+  maxFontSizeMultiplier?: number;
   children?: React.ReactNode;
   className?: string;
 }
@@ -16,7 +18,7 @@ interface ChipProps extends Omit<PressableProps, "children"> {
  * to `ink` stands in for the check glyph on this compact control (DESIGN.md
  * Open decision 14).
  */
-export function Chip({ active = false, className, children, ...rest }: ChipProps) {
+export function Chip({ active = false, className, children, maxFontSizeMultiplier, ...rest }: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -30,6 +32,7 @@ export function Chip({ active = false, className, children, ...rest }: ChipProps
       {...rest}
     >
       <Text
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
         className={cn(
           "font-heading text-micro uppercase tracking-caps",
           active ? "text-ink" : "text-ink-2",

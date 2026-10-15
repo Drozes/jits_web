@@ -13,12 +13,12 @@ describe("publicSiteOrigin", () => {
       publicSiteOrigin({
         VERCEL: "1",
         VERCEL_URL: "jitsweb-abc123-team.vercel.app",
-        VERCEL_PROJECT_PRODUCTION_URL: "jitsweb.vercel.app",
+        VERCEL_PROJECT_PRODUCTION_URL: "elorated.com",
       }),
-    ).toBe("https://jitsweb.vercel.app");
+    ).toBe("https://elorated.com");
   });
 
-  it("uses the interim public host on Vercel when nothing else is set", () => {
+  it("uses the default public host on Vercel when nothing else is set", () => {
     expect(publicSiteOrigin({ VERCEL: "1", VERCEL_URL: "jitsweb-abc123-team.vercel.app" })).toBe(DEFAULT_PUBLIC_ORIGIN);
   });
 

@@ -36,3 +36,32 @@ describe("/c/[token] generateMetadata", () => {
     expect(meta.referrer).toBe("no-referrer");
   });
 });
+
+describe("/c/[token] Smart App Banner", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  async function metaWith(appStoreUrl: string | undefined, token = "e2eChallengeTokenAAAAA") {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", appStoreUrl);
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://elorated.com");
+    const page = await import("./page");
+    return page.generateMetadata({ params: Promise.resolve({ token }) });
+  }
+
+  it("is absent while the App Store listing is unset", async () => {
+    expect((await metaWith(undefined)).itunes).toBeUndefined();
+  });
+
+  it("opens this invite in the app once the listing is live", async () => {
+    expect((await metaWith("https://apps.apple.com/app/id6774629438")).itunes).toEqual({
+      appId: "6774629438",
+      appArgument: "https://elorated.com/c/e2eChallengeTokenAAAAA",
+    });
+  });
+
+  it("drops the app argument for a malformed token", async () => {
+    expect((await metaWith("https://apps.apple.com/app/id6774629438", "not-a-token")).itunes).toEqual({
+      appId: "6774629438",
+    });
+  });
+});

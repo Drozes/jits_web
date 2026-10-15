@@ -10,6 +10,7 @@ import { isSentryEnabled, showFeedback } from "@/lib/error-tracking/sentry";
 import { cn } from "@/lib/cn";
 import { clearPendingInvite } from "@/lib/invites/pending-invite";
 import { SIGN_OUT_UPLOAD_TITLE, pendingUploadSignOutMessage } from "@/lib/video/sign-out-guard";
+import { legalHref } from "@/lib/legal/legal-copy";
 
 /**
  * G3 Settings. Mirrors the web settings index: three Plate sections grouping
@@ -67,6 +68,7 @@ export default function SettingsScreen() {
         <AccountPlate email={email} onSignOut={() => void handleSignOut()} />
         <PreferencesPlate />
         <SupportPlate />
+        <LegalPlate />
         {isAdmin ? <AdminPlate /> : null}
         {isSentryEnabled() ? (
           <Text className="font-body text-caption text-ink-3 leading-relaxed px-1">
@@ -129,6 +131,39 @@ function SupportPlate() {
       <RowDivider />
       {/* Replayable any time, whatever the onboarding state. */}
       <SettingsRow href="/practice" label="PRACTICE MATCH" />
+    </Plate>
+  );
+}
+
+/**
+ * The Terms of Service and Privacy Policy, full text, in the legal modal
+ * (jits-rog5.8; the App Store requires the privacy policy to be reachable in
+ * the app).
+ */
+function LegalPlate() {
+  return (
+    <Plate className="p-0 overflow-hidden">
+      <Link href={legalHref("terms")} asChild>
+        <Pressable
+          testID="settings-legal-terms"
+          accessibilityRole="link"
+          className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
+        >
+          <RowLabel>TERMS OF SERVICE</RowLabel>
+          <Chevron />
+        </Pressable>
+      </Link>
+      <RowDivider />
+      <Link href={legalHref("privacy")} asChild>
+        <Pressable
+          testID="settings-legal-privacy"
+          accessibilityRole="link"
+          className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
+        >
+          <RowLabel>PRIVACY POLICY</RowLabel>
+          <Chevron />
+        </Pressable>
+      </Link>
     </Plate>
   );
 }

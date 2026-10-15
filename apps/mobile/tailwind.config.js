@@ -155,6 +155,7 @@ module.exports = {
         "heading-regular": ["DMSans_400Regular"],
         body: ["Inter_400Regular"],
         "body-medium": ["Inter_500Medium"],
+        "body-italic": ["Inter_400Regular_Italic"], // legal document italics (jits-rog5.8)
         mono: ["JetBrainsMono_400Regular"],
         "mono-medium": ["JetBrainsMono_500Medium"],
         "mono-bold": ["JetBrainsMono_700Bold"],

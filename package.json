@@ -13,6 +13,7 @@
     "typecheck:mobile": "npm run typecheck --workspace=@jits/mobile",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "legal:sync": "npm run legal:sync --workspace=@jits/shared",
     "db:types": "cd ../jr_be && supabase gen types typescript --local > ../jits_web/packages/shared/src/types/database.ts",
     "prepare": "husky",
     "match-loop": "tsx tools/match-loop/run.ts",

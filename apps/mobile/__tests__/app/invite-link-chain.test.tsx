@@ -69,7 +69,8 @@ beforeEach(async () => {
 describe.each([
   ["scheme link", `elorated://c/${TOKEN}`, "universal_link"],
   ["universal link", `https://elorated.com/c/${TOKEN}`, "universal_link"],
-  ["interim host QR link", `https://jitsweb.vercel.app/c/${TOKEN}?src=qr`, "qr"],
+  ["QR link", `https://elorated.com/c/${TOKEN}?src=qr`, "qr"],
+  ["legacy host QR link", `https://jitsweb.vercel.app/c/${TOKEN}?src=qr`, "qr"],
 ])("%s", (_label, url, gateway) => {
   it("is not rewritten by +native-intent and routes to app/c/[token]", async () => {
     const mapped = redirectSystemPath({ path: url, initial: true });

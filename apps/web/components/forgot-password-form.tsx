@@ -6,6 +6,7 @@ import { AuthFormShell } from "@/components/auth/auth-form-shell";
 import { EmailInput } from "@/components/auth/email-input";
 import Link from "next/link";
 import { useState } from "react";
+import { isWebAppEnabled } from "@/lib/web-app-lock";
 
 export function ForgotPasswordForm({
   className,
@@ -64,12 +65,15 @@ export function ForgotPasswordForm({
             {isLoading ? "Sending..." : "Send reset email"}
           </Button>
         </div>
-        <div className="mt-4 text-center text-sm">
-          Already have an account?{" "}
-          <Link href="/login" className="underline underline-offset-4">
-            Login
-          </Link>
-        </div>
+        {/* /login is blocked while the web app is locked (specs/web-landing/spec.md). */}
+        {isWebAppEnabled() && (
+          <div className="mt-4 text-center text-sm">
+            Already have an account?{" "}
+            <Link href="/login" className="underline underline-offset-4">
+              Login
+            </Link>
+          </div>
+        )}
       </form>
     </AuthFormShell>
   );
