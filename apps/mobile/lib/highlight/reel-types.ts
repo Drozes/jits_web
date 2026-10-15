@@ -41,6 +41,12 @@ export interface ReelItem {
    * reserved non-own lane sets it from its own read.
    */
   subjectInstagramHandle?: string | null;
+  /**
+   * The athlete the reel is about (its subject); null or absent when unknown.
+   * The block filter in use-reel-lane hides a non-own reel whose subject is
+   * in a block with me (jits-rog5.11), so a shared lane must set it.
+   */
+  subjectAthleteId?: string | null;
 }
 
 /** Maps the caller's own highlight row (get_my_highlights) to a lane item. */

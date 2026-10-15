@@ -18,19 +18,16 @@ import type { ReelBinding } from "./reel-binding";
 import { useReelReport } from "./viewer-report";
 
 /**
- * The reel, following its progress (realtime + 15 s polling while it is
- * moving, re-read on focus and foreground): the LIVE render edge to edge on
- * the page's pooled player (a new version swaps in place), the scrims, the
- * bottom meta (date line, subject's `@handle`) and the right rail (own reels
- * only), the progress bar, and the share / improve sheets. Without a live version a calm state shows until one
- * lands.
+ * The reel, following its progress (realtime + 15 s polling while moving, re-read on focus and foreground): the
+ * LIVE render edge to edge on the page's pooled player (a new version swaps in place), the scrims, the bottom meta
+ * (date line, subject's `@handle`), the right rail (own reels only), the progress bar, and the share / improve
+ * sheets. Without a live version a calm state shows until one lands.
  */
 export function ViewerReady({ detail, source, binding }: { detail: HighlightDetail; source: HighlightShareSourceTag; binding: ReelBinding }) {
   const { my, vs, fb, improve, shareEnabled } = useReelPage(detail, source, binding);
   const progress = my.progress;
   const playback = progress?.playback ?? null;
-  // Own reels (and the single-reel viewer) show the signed-in athlete's handle.
-  // Read without `useAuth` so the viewer never throws outside the provider.
+  // Own reels show the signed-in athlete's handle; read without `useAuth` so the viewer never throws outside the provider.
   const viewerHandle = React.useContext(AuthContext)?.athlete?.instagram_handle ?? null;
   const meta = React.useMemo(() => pageMeta(detail, binding.item, viewerHandle), [detail, binding.item, viewerHandle]);
   // The single-reel viewer (no lane item) is always your own reel; a non-own
