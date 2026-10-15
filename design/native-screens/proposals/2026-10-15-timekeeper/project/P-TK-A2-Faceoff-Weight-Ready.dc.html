@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Current (flag off): face-off weigh-in, opponent weight check, ready check, auto-start</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+body{margin:0;background:#0D0F14;font-family:'Inter',sans-serif;color:#E8EDF2}
+a{color:#EC6A74;text-decoration:none}a:hover{color:#F0556B}
+</style>
+</helmet>
+<div style="width: 3080px; height: 1383px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+<div style="padding: 48px 48px 0; display: flex; flex-direction: column; gap: 10px"><div style="display: flex; flex-direction: row; gap: 12px; align-items: center"><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(245,158,11,0.7); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #F59E0B; white-space: nowrap">Current app · timekeeper_role OFF · today</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Board A2 of 5 · source jits_web origin/development 4a20ee80</span></div><h1 style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 32px; line-height: 40px; color: #E8EDF2">Today: face-off (weigh-in, weight check, ready, auto-start)</h1><p style="margin: 0; max-width: 1100px"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 15px; line-height: 21px; color: #9CA3AF">Each athlete confirms their own weight, then (when this match has weight checks) confirms or flags the opponent&#39;s. A flag holds the match until it is withdrawn, or until the flagged athlete re-weighs and the flagger confirms again. Then both tap I&#39;m ready and both phones start the match on their own.</span></p></div><div style="padding: 32px 48px 48px; display: flex; flex-direction: row; gap: 40px; align-items: flex-start"><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 16px">
+
+  <!-- FaceoffTop (weight phase): top bar + fight card, gap 20 -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div style="height: 44px; display: flex; flex-direction: row; align-items: center">
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start">
+        <a href="13-Arena-Live.dc.html" aria-label="Cancel match" style="height: 44px; display: flex; flex-direction: row; align-items: center; gap: 6px; color: #E8EDF2">
+          <span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Leave</span>
+        </a>
+      </div>
+      <div style="flex-shrink: 1; min-width: 0; display: flex; flex-direction: column; align-items: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">FACE-OFF · WEIGH IN</span>
+      </div>
+      <!-- Right slot: empty (no match-kind tag), mirrors the left slot -->
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end"></div>
+    </div>
+
+    <!-- FightCard -->
+    <div style="display: flex; flex-direction: row; align-items: flex-start">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <div aria-hidden="true" style="height: 176px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-bottom: 3px solid #E63946; border-radius: 2px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 64px; letter-spacing: 1.12px; color: #E8EDF2">MR</span>
+        </div>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 12px; line-height: 16px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #9CA3AF">ELO 1512</span>
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 6px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 36px; line-height: 44px; font-variant-numeric: tabular-nums; color: #E8EDF2">172.5 LBS</span>
+        </div>
+      </div>
+      <div style="width: 40px; height: 176px; display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 30px; line-height: 36px; color: #EC6A74">VS</span>
+      </div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 10px">
+        <div aria-hidden="true" style="width: 100%; height: 176px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 64px; letter-spacing: 1.12px; color: #E8EDF2">DO</span>
+        </div>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 12px; line-height: 16px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #9CA3AF">ELO 1487</span>
+        <div style="height: 44px; display: flex; align-items: center">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 36px; font-variant-numeric: tabular-nums; color: #E8EDF2">171.4 LBS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FaceoffBody (WeighIn), gap 20 -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-top: 1px solid rgba(107,114,128,0.45); border-bottom: 1px solid rgba(107,114,128,0.45)">
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #9CA3AF">1.1 LBS APART · SAME DIVISION</span>
+    </div>
+
+    <!-- StakesStrip -->
+    <div style="height: 56px; box-sizing: border-box; display: flex; flex-direction: row; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px">
+      <div aria-label="WIN +14" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">WIN</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #22C55E">▲ +14</span>
+      </div>
+      <div aria-label="DRAW -2" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border-left: 1px solid rgba(107,114,128,0.45)">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">DRAW</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #F59E0B">▼ −2</span>
+      </div>
+      <div aria-label="LOSS -18" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border-left: 1px solid rgba(107,114,128,0.45)">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">LOSS</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #EC6A74">▼ −18</span>
+      </div>
+    </div>
+
+    <!-- StatusPlates -->
+    <div style="display: flex; flex-direction: row; gap: 12px">
+      <div aria-label="You, weighed in" style="flex: 1; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: #E8EDF2">✓</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #E8EDF2; white-space: nowrap">WEIGHED IN</span>
+      </div>
+      <div aria-label="D. OKAFOR's weight, your check pending" style="flex: 1; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #F59E0B; white-space: nowrap">YOUR CHECK</span>
+      </div>
+    </div>
+
+    <!-- WeightCheckPanel (needsMyVerdict): my check of the opponent's weigh-in, gap 12 -->
+    <div aria-label="Confirm D. Okafor's weight" style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #E8EDF2">D. OKAFOR WEIGHED IN AT 171.4 LBS</span>
+      </div>
+      <a href="22-Ready-Check.dc.html" style="height: 64px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; background: #E63946; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #0D0F14">Confirm</a>
+      <a href="21b-Faceoff-Flagged.dc.html" style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">Doesn't look right</a>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">2a · Weight check</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 21</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Confirm the opponent&#39;s weight</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">After my weigh-in, the opponent plate becomes YOUR CHECK. Confirm or Doesn&#39;t look right calls check_opponent_weight (a competitor checks the opponent only, pending only), stored in match_weight_checks.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/faceoff/faceoff-weight-check.tsx:21 (YOUR CHECK), :90 (WEIGHED IN AT), :95, :102</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/use-faceoff.ts:314 (checkOpponentWeight)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 16px">
+
+  <!-- FaceoffTop (weight phase): top bar + fight card, gap 20 -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div style="height: 44px; display: flex; flex-direction: row; align-items: center">
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start">
+        <a href="13-Arena-Live.dc.html" aria-label="Cancel match" style="height: 44px; display: flex; flex-direction: row; align-items: center; gap: 6px; color: #E8EDF2">
+          <span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Leave</span>
+        </a>
+      </div>
+      <div style="flex-shrink: 1; min-width: 0; display: flex; flex-direction: column; align-items: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">FACE-OFF · WEIGH IN</span>
+      </div>
+      <!-- Right slot: empty (no match-kind tag), mirrors the left slot -->
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end"></div>
+    </div>
+
+    <!-- FightCard -->
+    <div style="display: flex; flex-direction: row; align-items: flex-start">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <div aria-hidden="true" style="height: 176px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-bottom: 3px solid #E63946; border-radius: 2px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 64px; letter-spacing: 1.12px; color: #E8EDF2">MR</span>
+        </div>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 12px; line-height: 16px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #9CA3AF">ELO 1512</span>
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 6px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 36px; line-height: 44px; font-variant-numeric: tabular-nums; color: #E8EDF2">172.5 LBS</span>
+        </div>
+      </div>
+      <div style="width: 40px; height: 176px; display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 30px; line-height: 36px; color: #EC6A74">VS</span>
+      </div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 10px">
+        <div aria-hidden="true" style="width: 100%; height: 176px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 64px; letter-spacing: 1.12px; color: #E8EDF2">DO</span>
+        </div>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 12px; line-height: 16px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #9CA3AF">ELO 1487</span>
+        <div style="height: 44px; display: flex; align-items: center">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 36px; font-variant-numeric: tabular-nums; color: #E8EDF2">171.4 LBS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FaceoffBody (WeighIn), gap 20 -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-top: 1px solid rgba(107,114,128,0.45); border-bottom: 1px solid rgba(107,114,128,0.45)">
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #9CA3AF">1.1 LBS APART · SAME DIVISION</span>
+    </div>
+
+    <!-- StakesStrip -->
+    <div style="height: 56px; box-sizing: border-box; display: flex; flex-direction: row; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px">
+      <div aria-label="WIN +14" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">WIN</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #22C55E">▲ +14</span>
+      </div>
+      <div aria-label="DRAW -2" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border-left: 1px solid rgba(107,114,128,0.45)">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">DRAW</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #F59E0B">▼ −2</span>
+      </div>
+      <div aria-label="LOSS -18" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border-left: 1px solid rgba(107,114,128,0.45)">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">LOSS</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #EC6A74">▼ −18</span>
+      </div>
+    </div>
+
+    <!-- StatusPlates -->
+    <div style="display: flex; flex-direction: row; gap: 12px">
+      <div aria-label="You, weighed in" style="flex: 1; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: #E8EDF2">✓</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #E8EDF2; white-space: nowrap">WEIGHED IN</span>
+      </div>
+      <div aria-label="D. OKAFOR's weight, your check flagged" style="flex: 1; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #F59E0B; white-space: nowrap">YOU FLAGGED</span>
+      </div>
+    </div>
+
+    <!-- WeightCheckPanel (myFlagOpen): my open flag on the opponent's weigh-in, gap 16 -->
+    <div style="display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div role="alert" style="min-height: 44px; box-sizing: border-box; padding: 10px 12px; display: flex; flex-direction: row; align-items: center; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+          <span style="flex: 1; font-family: 'Inter', sans-serif; font-size: 13px; line-height: 17px; color: #F59E0B">You flagged D. Okafor's weight. Match is on hold.</span>
+        </div>
+        <a href="22-Ready-Check.dc.html" style="height: 56px; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); color: #E8EDF2; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase">Withdraw flag</a>
+      </div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">2b · Flagged</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 21b</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">I flagged: match on hold, Withdraw flag</span><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/faceoff/faceoff-weight-check.tsx:21 (YOU FLAGGED), :68, :71</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 16px">
+
+  <!-- FaceoffTop (weight phase): top bar + fight card, gap 20 -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div style="height: 44px; display: flex; flex-direction: row; align-items: center">
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start">
+        <a href="13-Arena-Live.dc.html" aria-label="Cancel match" style="height: 44px; display: flex; flex-direction: row; align-items: center; gap: 6px; color: #E8EDF2">
+          <span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Leave</span>
+        </a>
+      </div>
+      <div style="flex-shrink: 1; min-width: 0; display: flex; flex-direction: column; align-items: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">FACE-OFF · WEIGH IN</span>
+      </div>
+      <!-- Right slot: empty (no match-kind tag), mirrors the left slot -->
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end"></div>
+    </div>
+
+    <!-- FightCard -->
+    <div style="display: flex; flex-direction: row; align-items: flex-start">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <div aria-hidden="true" style="height: 176px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-bottom: 3px solid #E63946; border-radius: 2px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 64px; letter-spacing: 1.12px; color: #E8EDF2">MR</span>
+        </div>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 12px; line-height: 16px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #9CA3AF">ELO 1512</span>
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 6px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 36px; line-height: 44px; font-variant-numeric: tabular-nums; color: #E8EDF2">172.5 LBS</span>
+        </div>
+      </div>
+      <div style="width: 40px; height: 176px; display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 30px; line-height: 36px; color: #EC6A74">VS</span>
+      </div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 10px">
+        <div aria-hidden="true" style="width: 100%; height: 176px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 64px; letter-spacing: 1.12px; color: #E8EDF2">DO</span>
+        </div>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 12px; line-height: 16px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #9CA3AF">ELO 1487</span>
+        <div style="height: 44px; display: flex; align-items: center">
+          <span style="font-family: 'Bebas Neue', sans-serif; font-size: 36px; font-variant-numeric: tabular-nums; color: #E8EDF2">171.4 LBS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FaceoffBody (WeighIn), gap 20 -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+    <div style="height: 32px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-top: 1px solid rgba(107,114,128,0.45); border-bottom: 1px solid rgba(107,114,128,0.45)">
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #9CA3AF">1.1 LBS APART · SAME DIVISION</span>
+    </div>
+
+    <!-- StakesStrip -->
+    <div style="height: 56px; box-sizing: border-box; display: flex; flex-direction: row; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px">
+      <div aria-label="WIN +14" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">WIN</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #22C55E">▲ +14</span>
+      </div>
+      <div aria-label="DRAW -2" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border-left: 1px solid rgba(107,114,128,0.45)">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">DRAW</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #F59E0B">▼ −2</span>
+      </div>
+      <div aria-label="LOSS -18" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border-left: 1px solid rgba(107,114,128,0.45)">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">LOSS</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 16px; line-height: 21px; font-variant-numeric: tabular-nums; color: #EC6A74">▼ −18</span>
+      </div>
+    </div>
+
+    <!-- StatusPlates -->
+    <div style="display: flex; flex-direction: row; gap: 12px">
+      <div aria-label="You, weighed in" style="flex: 1; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: #E8EDF2">✓</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #E8EDF2; white-space: nowrap">WEIGHED IN</span>
+      </div>
+      <div aria-label="D. OKAFOR's weight, your check pending" style="flex: 1; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #F59E0B; white-space: nowrap">YOUR CHECK</span>
+      </div>
+    </div>
+
+    <!-- WeightCheckPanel (mustReweigh + needsMyVerdict): re-weigh first, then my own check, gap 16. The ScrollView continues below the fold. -->
+    <div style="display: flex; flex-direction: column; gap: 16px">
+      <!-- ReweighPrompt (mustReweigh): the flagged athlete's re-weigh, gap 12 -->
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div role="alert" style="min-height: 44px; box-sizing: border-box; padding: 10px 12px; display: flex; flex-direction: row; align-items: center; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+          <span style="flex: 1; font-family: 'Inter', sans-serif; font-size: 13px; line-height: 17px; color: #F59E0B">D. Okafor says your weight doesn't look right. Re-weigh to continue.</span>
+        </div>
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 12px">
+          <input type="text" inputmode="decimal" maxlength="6" value="172.5" aria-label="Your new weight in pounds" style="width: 96px; height: 56px; box-sizing: border-box; padding: 0 10px; margin: 0; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; color: #E8EDF2; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px; outline: none" />
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #9CA3AF">LBS</span>
+          <button type="button" style="margin: 0; border: none; cursor: pointer; font: inherit; flex: 1; height: 56px; background: #E63946; color: #0D0F14; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase">Re-weigh</button>
+        </div>
+      </div>
+      <!-- needsMyVerdict: my check of the opponent's weigh-in, gap 12 -->
+      <div aria-label="Confirm D. Okafor's weight" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; justify-content: center">
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #E8EDF2">D. OKAFOR WEIGHED IN AT 171.4 LBS</span>
+        </div>
+        <a href="22b-Ready-Hold.dc.html" style="height: 64px; background: #E63946; color: #0D0F14; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase">Confirm</a>
+        <button type="button" style="height: 56px; cursor: pointer; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); color: #E8EDF2; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase">Doesn't look right</button>
+      </div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">2c · Flagged athlete</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 21c</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Re-weigh to continue</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">The flagged athlete re-weighs (reweigh_for_match); the flagger then checks the new weight again (Waiting for D. Okafor to check your new weight.).</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/faceoff/faceoff-weight-check.tsx:154 (notice), :180 (Re-weigh), :61 (await recheck)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 16px">
+
+  <!-- FaceoffTop (ready phase): top bar + compressed chip, gap 16 -->
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <div style="height: 44px; display: flex; flex-direction: row; align-items: center">
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start">
+        <a href="13-Arena-Live.dc.html" aria-label="Cancel match" style="height: 44px; display: flex; flex-direction: row; align-items: center; gap: 6px; color: #E8EDF2">
+          <span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Leave</span>
+        </a>
+      </div>
+      <div style="flex-shrink: 1; min-width: 0; display: flex; flex-direction: column; align-items: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; color: #8D929D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">FACE-OFF · READY</span>
+      </div>
+      <!-- Right slot: empty (no match-kind tag), mirrors the left slot -->
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end"></div>
+    </div>
+
+    <!-- FaceoffChip (themed plate) -->
+    <div style="height: 64px; box-sizing: border-box; display: flex; flex-direction: row; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+      <div style="flex: 1; min-width: 0; padding-left: 12px; display: flex; flex-direction: column; justify-content: center; gap: 5px">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+          <span style="width: 4px; height: 4px; background: #E63946; flex-shrink: 0"></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes</span>
+        </div>
+        <span style="padding-left: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #8D929D">1512 · 172.5 LBS</span>
+      </div>
+      <div style="width: 44px; display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 26px; color: #EC6A74">VS</span>
+      </div>
+      <div style="flex: 1; min-width: 0; padding-right: 12px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 5px">
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #8D929D">1487 · 171.4 LBS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MatchRecorderCamera: 16:9 viewfinder card + two hints, gap 8 -->
+  <div style="display: flex; flex-direction: column; gap: 7px">
+    <div style="width: 100%; box-sizing: border-box; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; background: #000000">
+      <img src="/_blob/925d5ee8861ea53d97883ed62678e344" alt="Camera preview (illustrated mock): referee between both athletes on the mat" style="display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #1E222B">
+    </div>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Preview only. Recording starts with the match.</span>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Turn your phone sideways for a wide shot. It locks when the match starts.</span>
+  </div>
+
+  <!-- FaceoffBody (ReadyCheck), gap 16 -->
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <!-- RecordingPanel -->
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="min-height: 56px; box-sizing: border-box; padding: 0 14px; display: flex; flex-direction: row; align-items: center; gap: 12px; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+          <label for="record-toggle" style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">Record from my phone</label>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #E8EDF2">D. OKAFOR RECORDING</span>
+        </div>
+        <button id="record-toggle" type="button" role="switch" aria-checked="true" aria-label="Record from my phone" style="width: 51px; height: 31px; box-sizing: border-box; padding: 2px; border: none; border-radius: 16px; background: #E8EDF2; display: flex; align-items: center; justify-content: flex-end; cursor: pointer">
+          <span style="width: 27px; height: 27px; border-radius: 14px; background: #0D0F14"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Ready StatusPlates -->
+    <div style="display: flex; flex-direction: row; gap: 12px">
+      <div aria-label="You, waiting" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #F59E0B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">YOU · NOT READY</span>
+      </div>
+      <div aria-label="Opponent, ready" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 8px; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: #E8EDF2">✓</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #E8EDF2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">D. OKAFOR · READY</span>
+      </div>
+    </div>
+
+    <!-- Not ready yet: prompt + I'm ready -->
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <span style="align-self: center; font-family: 'Inter', sans-serif; font-size: 13px; line-height: 17px; color: #9CA3AF">Match starts when you both tap ready</span>
+      <a href="23-Countdown.dc.html" style="height: 72px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; background: #E63946; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #0D0F14">I'm ready</a>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">3a · Ready</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 22</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Ready check: I&#39;m ready</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">Ready is broadcast only on channel session-match:&lt;matchId>, repeated every 3 s. The server does not know who is ready.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/faceoff/faceoff-body.tsx:114, 119, 143, 145</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/use-faceoff.ts:224 (broadcastReady)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 16px">
+
+  <!-- FaceoffTop (ready phase): top bar + compressed chip, gap 16 -->
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <div style="height: 44px; display: flex; flex-direction: row; align-items: center">
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start">
+        <a href="13-Arena-Live.dc.html" aria-label="Cancel match" style="height: 44px; display: flex; flex-direction: row; align-items: center; gap: 6px; color: #E8EDF2">
+          <span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Leave</span>
+        </a>
+      </div>
+      <div style="flex-shrink: 1; min-width: 0; display: flex; flex-direction: column; align-items: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; color: #8D929D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">FACE-OFF · READY</span>
+      </div>
+      <!-- Right slot: empty (no match-kind tag), mirrors the left slot -->
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end"></div>
+    </div>
+
+    <!-- FaceoffChip (themed plate) -->
+    <div style="height: 64px; box-sizing: border-box; display: flex; flex-direction: row; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+      <div style="flex: 1; min-width: 0; padding-left: 12px; display: flex; flex-direction: column; justify-content: center; gap: 5px">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+          <span style="width: 4px; height: 4px; background: #E63946; flex-shrink: 0"></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes</span>
+        </div>
+        <span style="padding-left: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #8D929D">1512 · 172.5 LBS</span>
+      </div>
+      <div style="width: 44px; display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 26px; color: #EC6A74">VS</span>
+      </div>
+      <div style="flex: 1; min-width: 0; padding-right: 12px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 5px">
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #8D929D">1487 · 171.4 LBS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MatchRecorderCamera: 16:9 viewfinder card + two hints, gap 8 -->
+  <div style="display: flex; flex-direction: column; gap: 7px">
+    <div style="width: 100%; box-sizing: border-box; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; background: #000000">
+      <img src="/_blob/925d5ee8861ea53d97883ed62678e344" alt="Camera preview (illustrated mock): referee between both athletes on the mat" style="display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #1E222B">
+    </div>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Preview only. Recording starts with the match.</span>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Turn your phone sideways for a wide shot. It locks when the match starts.</span>
+  </div>
+
+  <!-- FaceoffBody (ReadyCheck), gap 16 -->
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <!-- RecordingPanel -->
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="min-height: 56px; box-sizing: border-box; padding: 0 14px; display: flex; flex-direction: row; align-items: center; gap: 12px; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+          <label for="record-toggle" style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">Record from my phone</label>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #E8EDF2">D. OKAFOR RECORDING</span>
+        </div>
+        <button id="record-toggle" type="button" role="switch" aria-checked="true" aria-label="Record from my phone" style="width: 51px; height: 31px; box-sizing: border-box; padding: 2px; border: none; border-radius: 16px; background: #E8EDF2; display: flex; align-items: center; justify-content: flex-end; cursor: pointer">
+          <span style="width: 27px; height: 27px; border-radius: 14px; background: #0D0F14"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Ready StatusPlates -->
+    <div style="display: flex; flex-direction: row; gap: 12px">
+      <div aria-label="You, waiting" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #F59E0B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">YOU · NOT READY</span>
+      </div>
+      <div aria-label="Opponent, waiting" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #F59E0B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">D. OKAFOR · NOT READY</span>
+      </div>
+    </div>
+
+    <!-- ready-weight-hold (faceoff-body.tsx:119-128): WeightCheckPanel, disabled I'm ready, hold line, gap 12 -->
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <!-- WeightCheckPanel (mustReweigh), gap 16 -->
+      <div style="display: flex; flex-direction: column; gap: 16px">
+      <!-- ReweighPrompt (mustReweigh): the flagged athlete's re-weigh, gap 12 -->
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div role="alert" style="min-height: 44px; box-sizing: border-box; padding: 10px 12px; display: flex; flex-direction: row; align-items: center; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span>
+          <span style="flex: 1; font-family: 'Inter', sans-serif; font-size: 13px; line-height: 17px; color: #F59E0B">D. Okafor says your weight doesn't look right. Re-weigh to continue.</span>
+        </div>
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 12px">
+          <input type="text" inputmode="decimal" maxlength="6" value="172.5" aria-label="Your new weight in pounds" style="width: 96px; height: 56px; box-sizing: border-box; padding: 0 10px; margin: 0; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; color: #E8EDF2; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px; outline: none" />
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #9CA3AF">LBS</span>
+          <button type="button" style="margin: 0; border: none; cursor: pointer; font: inherit; flex: 1; height: 56px; background: #E63946; color: #0D0F14; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase">Re-weigh</button>
+        </div>
+      </div>
+      </div>
+      <button type="button" disabled aria-disabled="true" style="height: 72px; opacity: 0.5; border: none; cursor: default; background: #E63946; color: #0D0F14; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase">I'm ready</button>
+      <div style="display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #9CA3AF">MATCH ON HOLD · WEIGHT CHECK</span>
+      </div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">3b · Weight hold</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 22b</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Ready blocked by the weight gate</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">I&#39;m ready stays disabled while a flag or recheck holds the match (or while a check is still owed when opponent_weight_check_required is on: WAITING FOR WEIGHT CHECKS).</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/faceoff/faceoff-body.tsx:125-133 (MATCH ON HOLD · WEIGHT CHECK)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 16px">
+
+  <!-- FaceoffTop (ready phase): top bar + compressed chip, gap 16 -->
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <div style="height: 44px; display: flex; flex-direction: row; align-items: center">
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start">
+        <a href="13-Arena-Live.dc.html" aria-label="Cancel match" style="height: 44px; display: flex; flex-direction: row; align-items: center; gap: 6px; color: #E8EDF2">
+          <span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Leave</span>
+        </a>
+      </div>
+      <div style="flex-shrink: 1; min-width: 0; display: flex; flex-direction: column; align-items: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; color: #8D929D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">FACE-OFF · READY</span>
+      </div>
+      <!-- Right slot: empty (no match-kind tag), mirrors the left slot -->
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end"></div>
+    </div>
+
+    <!-- FaceoffChip (themed plate) -->
+    <div style="height: 64px; box-sizing: border-box; display: flex; flex-direction: row; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+      <div style="flex: 1; min-width: 0; padding-left: 12px; display: flex; flex-direction: column; justify-content: center; gap: 5px">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+          <span style="width: 4px; height: 4px; background: #E63946; flex-shrink: 0"></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes</span>
+        </div>
+        <span style="padding-left: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #8D929D">1512 · 172.5 LBS</span>
+      </div>
+      <div style="width: 44px; display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 26px; color: #EC6A74">VS</span>
+      </div>
+      <div style="flex: 1; min-width: 0; padding-right: 12px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 5px">
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #8D929D">1487 · 171.4 LBS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MatchRecorderCamera: 16:9 viewfinder card + two hints, gap 8 -->
+  <div style="display: flex; flex-direction: column; gap: 7px">
+    <div style="width: 100%; box-sizing: border-box; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; background: #000000">
+      <img src="/_blob/925d5ee8861ea53d97883ed62678e344" alt="Camera preview (illustrated mock): referee between both athletes on the mat" style="display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #1E222B">
+    </div>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Preview only. Recording starts with the match.</span>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Turn your phone sideways for a wide shot. It locks when the match starts.</span>
+  </div>
+
+  <!-- FaceoffBody (ReadyCheck), gap 16 -->
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <!-- RecordingPanel -->
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="min-height: 56px; box-sizing: border-box; padding: 0 14px; display: flex; flex-direction: row; align-items: center; gap: 12px; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+          <label for="record-toggle" style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">Record from my phone</label>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #E8EDF2">D. OKAFOR RECORDING</span>
+        </div>
+        <button id="record-toggle" type="button" role="switch" aria-checked="true" aria-disabled="true" aria-label="Record from my phone" style="opacity: 0.5; width: 51px; height: 31px; box-sizing: border-box; padding: 2px; border: none; border-radius: 16px; background: #E8EDF2; display: flex; align-items: center; justify-content: flex-end; cursor: pointer">
+          <span style="width: 27px; height: 27px; border-radius: 14px; background: #0D0F14"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Ready StatusPlates -->
+    <div style="display: flex; flex-direction: row; gap: 12px">
+      <div aria-label="You, ready" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: #E8EDF2">✓</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #E8EDF2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">YOU · READY</span></div>
+      <div aria-label="Opponent, waiting" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 8px; border: 1px dashed #F59E0B; border-radius: 3px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B; flex-shrink: 0"></span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #F59E0B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">D. OKAFOR · NOT READY</span></div>
+      
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: center; padding: 16px 0"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">WAITING FOR D. OKAFOR...</span></div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">3c · I&#39;m ready</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Derived from code</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Waiting for the opponent</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">The record switch locks once I am ready.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/faceoff/faceoff-body.tsx:114, 149 (WAITING FOR D. OKAFOR...), :185 (switch disabled)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 16px">
+
+  <!-- FaceoffTop (ready phase): top bar + compressed chip, gap 16 -->
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <div style="height: 44px; display: flex; flex-direction: row; align-items: center">
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start">
+        <a href="13-Arena-Live.dc.html" aria-label="Cancel match" style="height: 44px; display: flex; flex-direction: row; align-items: center; gap: 6px; color: #E8EDF2">
+          <span style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Leave</span>
+        </a>
+      </div>
+      <div style="flex-shrink: 1; min-width: 0; display: flex; flex-direction: column; align-items: center">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; color: #8D929D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">FACE-OFF · READY</span>
+      </div>
+      <!-- Right slot: empty (no match-kind tag), mirrors the left slot -->
+      <div style="flex: 1; min-width: 88px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end"></div>
+    </div>
+
+    <!-- FaceoffChip (themed plate) -->
+    <div style="height: 64px; box-sizing: border-box; display: flex; flex-direction: row; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+      <div style="flex: 1; min-width: 0; padding-left: 12px; display: flex; flex-direction: column; justify-content: center; gap: 5px">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+          <span style="width: 4px; height: 4px; background: #E63946; flex-shrink: 0"></span>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes</span>
+        </div>
+        <span style="padding-left: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #8D929D">1512 · 172.5 LBS</span>
+      </div>
+      <div style="width: 44px; display: flex; align-items: center; justify-content: center">
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 26px; color: #EC6A74">VS</span>
+      </div>
+      <div style="flex: 1; min-width: 0; padding-right: 12px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 5px">
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #8D929D">1487 · 171.4 LBS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MatchRecorderCamera: 16:9 viewfinder card + two hints, gap 8 -->
+  <div style="display: flex; flex-direction: column; gap: 7px">
+    <div style="width: 100%; box-sizing: border-box; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; background: #000000">
+      <img src="/_blob/925d5ee8861ea53d97883ed62678e344" alt="Camera preview (illustrated mock): referee between both athletes on the mat" style="display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #1E222B">
+    </div>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Preview only. Recording starts with the match.</span>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Turn your phone sideways for a wide shot. It locks when the match starts.</span>
+  </div>
+
+  <!-- FaceoffBody (ReadyCheck), gap 16 -->
+  <div style="display: flex; flex-direction: column; gap: 16px">
+    <!-- RecordingPanel -->
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="min-height: 56px; box-sizing: border-box; padding: 0 14px; display: flex; flex-direction: row; align-items: center; gap: 12px; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+          <label for="record-toggle" style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">Record from my phone</label>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #E8EDF2">D. OKAFOR RECORDING</span>
+        </div>
+        <button id="record-toggle" type="button" role="switch" aria-checked="true" aria-disabled="true" aria-label="Record from my phone" style="opacity: 0.5; width: 51px; height: 31px; box-sizing: border-box; padding: 2px; border: none; border-radius: 16px; background: #E8EDF2; display: flex; align-items: center; justify-content: flex-end; cursor: pointer">
+          <span style="width: 27px; height: 27px; border-radius: 14px; background: #0D0F14"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Ready StatusPlates -->
+    <div style="display: flex; flex-direction: row; gap: 12px">
+      <div aria-label="You, ready" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: #E8EDF2">✓</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #E8EDF2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">YOU · READY</span></div>
+      <div aria-label="Opponent, ready" style="flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: flex-end; gap: 8px; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; color: #E8EDF2">✓</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #E8EDF2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">D. OKAFOR · READY</span></div>
+      
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: center; padding: 16px 0"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">BOTH READY</span></div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">3d · Both ready</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Derived from code</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">BOTH READY: auto-start on both phones</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">There is no Start button. When myReady, opponentReady and canStart are all true, BOTH devices call start_match; the loser of the race reads the match. The line flips to STARTING MATCH... while the call runs. start_match checks participant, pending and the weight gate only (no readiness check), then writes in_progress and started_at and sends the Match Started push.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/faceoff/faceoff-body.tsx:135-139 (STARTING MATCH...), :149 (BOTH READY)</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/use-faceoff.ts:279-281 (auto-start effect), :242 (startMatch)</span></div></div></div></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":3080,"height":1383}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

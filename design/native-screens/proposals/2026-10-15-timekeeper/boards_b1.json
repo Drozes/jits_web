@@ -1,0 +1,51 @@
+[
+  {
+    "id": "P-TK-B1-Arena-Copy",
+    "file": "P-TK-B1-Arena-Copy.dc.html",
+    "title": "Proposed: Timekeeper mode, Arena with the flag on (TK-AR1, TK-AR2)",
+    "w": 1784,
+    "h": 1405
+  },
+  {
+    "id": "P-TK-B2-Picker",
+    "file": "P-TK-B2-Picker.dc.html",
+    "title": "Proposed: Timekeeper mode, pick a timekeeper (default, search, pending, other athlete, Q12 approval)",
+    "w": 2648,
+    "h": 1403
+  },
+  {
+    "id": "P-TK-B3-Picker-States",
+    "file": "P-TK-B3-Picker-States.dc.html",
+    "title": "Proposed: Timekeeper mode, picker empty, busy, declined, lapsed, accepted, under 2:00",
+    "w": 4376,
+    "h": 1243
+  },
+  {
+    "id": "P-TK-B4-Timekeeper-Ask",
+    "file": "P-TK-B4-Timekeeper-Ask.dc.html",
+    "title": "Proposed: Timekeeper mode, the asked person (push, Timekeep this match?, closed, entering)",
+    "w": 1784,
+    "h": 1352
+  },
+  {
+    "id": "P-TK-B5-Athlete-Faceoff",
+    "file": "P-TK-B5-Athlete-Faceoff.dc.html",
+    "title": "Proposed: Timekeeper mode, athlete face-off with the merged ready",
+    "w": 2216,
+    "h": 1382
+  },
+  {
+    "id": "P-TK-B-Rules",
+    "file": "P-TK-B-Rules.dc.html",
+    "title": "Proposed: Timekeeper mode rules (who can do what, flag OFF vs timekeeper mode, server rule and HINT)",
+    "w": 1440,
+    "h": 3426
+  },
+  {
+    "id": "P-TK-00-Map",
+    "file": "P-TK-00-Map.dc.html",
+    "title": "Proposed: Timekeeper mode map (what changed, decisions, flow, asks, open questions, go/no-go)",
+    "w": 1440,
+    "h": 4334
+  }
+]
