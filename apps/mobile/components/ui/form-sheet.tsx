@@ -2,6 +2,7 @@ import * as React from "react";
 import { BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 import { useSheetSchemeScope } from "@/lib/theme/use-sheet-scheme-scope";
 import { SheetBackdrop, useSheetChrome } from "./sheet";
+import { useSheetBackHandler } from "./use-sheet-back-handler";
 
 export interface FormSheetProps {
   open: boolean;
@@ -43,6 +44,15 @@ export function FormSheet({ open, busy, onClosed, children }: FormSheetProps) {
     },
     [onClosed],
   );
+
+  // Android back: closes like a swipe; while busy it is swallowed, like the swipe (jits-mafl.2 M7).
+  useSheetBackHandler({
+    open,
+    busy,
+    onBack: () => {
+      if (presentedRef.current) ref.current?.dismiss();
+    },
+  });
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => (

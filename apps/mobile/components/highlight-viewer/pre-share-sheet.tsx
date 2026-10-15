@@ -3,6 +3,7 @@ import { BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSheetSchemeScope } from "@/lib/theme/use-sheet-scheme-scope";
 import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
+import { useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
 
 interface PreShareSheetProps {
   open: boolean;
@@ -40,6 +41,8 @@ export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) 
     },
     [onClosed],
   );
+  // Android back closes like a swipe (jits-mafl.2 M7).
+  useSheetBackHandler({ open, onBack: () => presentedRef.current && ref.current?.dismiss() });
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => (

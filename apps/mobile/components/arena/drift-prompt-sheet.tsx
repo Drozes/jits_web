@@ -14,6 +14,7 @@ import { BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from
 import { DRIFT_PROMPT_BODY, DRIFT_PROMPT_TITLE } from "@jits/shared/utils";
 import { Button } from "@/components/ui/elo-system/button";
 import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
+import { useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
 import { useGoLiveLocationSheet } from "@/lib/arena/go-live-location";
 import { useLiveMenuOpen } from "@/lib/arena/arena-store";
 import { answerDriftPrompt, useDriftPrompt } from "@/lib/arena/use-live-drift-check";
@@ -78,6 +79,16 @@ function DriftPromptModal({ blocked, onClosed }: { blocked: boolean; onClosed: (
     },
     [onClosed],
   );
+
+  // Android back = the swipe down: closed without a choice, the athlete stays
+  // live on the old tag (onChange answers "dismiss"); swallowed while busy (jits-mafl.2 M7).
+  useSheetBackHandler({
+    open: show,
+    busy,
+    onBack: () => {
+      if (presentedRef.current) ref.current?.dismiss();
+    },
+  });
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => <SheetBackdrop {...props} pressBehavior={busy ? "none" : "close"} />,

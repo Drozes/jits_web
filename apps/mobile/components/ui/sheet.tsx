@@ -12,6 +12,7 @@ import { useThemedTokens } from "../../lib/theme/use-theme";
 import { ON_MEDIA } from "../../lib/theme/palette";
 import { useSheetAnimationConfigs } from "../../lib/motion/use-modal-animation";
 import type { ColorTokens } from "../../lib/tokens";
+import { useSheetBackHandler } from "./use-sheet-back-handler";
 
 // ---------------------------------------------------------------------------
 // Shared sheet chrome (DESIGN.md, "Sheet"). Every gorhom sheet in the app
@@ -95,6 +96,10 @@ interface SheetContextValue {
   ref: React.RefObject<BottomSheetModal | null>;
   open: () => void;
   close: () => void;
+  /** Presented by `open()` and not closed yet (drives the Android back). */
+  isOpen: boolean;
+  /** The modal reached index -1 (swipe, backdrop, back or `close()`). */
+  onClosed: () => void;
 }
 
 const SheetContext = React.createContext<SheetContextValue | null>(null);
@@ -129,11 +134,16 @@ export function Sheet({ children, controllerRef }: SheetProps) {
   // where the trigger sits. The old inline (non-modal) <BottomSheet> measured its
   // immediate parent, so a trigger placed in AppHeader's ~32px right-action slot
   // collapsed the sheet into a tiny box pinned to the top-right corner.
-  const open = React.useCallback(() => ref.current?.present(), []);
+  const [isOpen, setIsOpen] = React.useState(false);
+  const open = React.useCallback(() => {
+    ref.current?.present();
+    setIsOpen(true);
+  }, []);
   const close = React.useCallback(() => ref.current?.dismiss(), []);
+  const onClosed = React.useCallback(() => setIsOpen(false), []);
   React.useImperativeHandle(controllerRef, () => ({ open, close }), [open, close]);
   return (
-    <SheetContext.Provider value={{ ref, open, close }}>
+    <SheetContext.Provider value={{ ref, open, close, isOpen, onClosed }}>
       {children}
     </SheetContext.Provider>
   );
@@ -166,13 +176,19 @@ export interface SheetContentProps {
 }
 
 export function SheetContent({ className, snapPoints = ["50%", "90%"], children }: SheetContentProps) {
-  const { ref } = useSheetContext();
+  const { ref, close, isOpen, onClosed } = useSheetContext();
   const chrome = useSheetChrome();
+  // Android back closes the sheet instead of the screen behind it (jits-mafl.2 M7).
+  useSheetBackHandler({ open: isOpen, onBack: close });
+  const onChange = React.useCallback((index: number) => {
+    if (index === -1) onClosed();
+  }, [onClosed]);
   return (
     <BottomSheetModal
       ref={ref}
       snapPoints={snapPoints}
       enablePanDownToClose
+      onChange={onChange}
       backdropComponent={renderBackdrop}
       {...chrome}
     >

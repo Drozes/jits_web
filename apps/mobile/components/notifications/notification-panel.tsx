@@ -16,6 +16,7 @@ import {
 import type { NotificationDateGroup } from "@jits/shared/types/notification";
 import { getDateGroup } from "@jits/shared/utils";
 import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
+import { useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
 import { bellItemRoute, type BellItem } from "@/lib/notifications/notification-items";
 import { NotificationRow } from "./notification-item";
 
@@ -60,6 +61,17 @@ export function NotificationPanel({
     else if (wasOpen.current) ref.current?.dismiss();
     wasOpen.current = open;
   }, [open]);
+
+  // Android back closes the panel, once (jits-mafl.2 M7); `open` turning
+  // false after the close must not dismiss again.
+  useSheetBackHandler({
+    open,
+    onBack: () => {
+      if (!wasOpen.current) return;
+      wasOpen.current = false;
+      ref.current?.dismiss();
+    },
+  });
 
   const handleSheetChange = React.useCallback(
     (idx: number) => {

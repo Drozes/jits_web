@@ -24,6 +24,7 @@ import { getEloHistoryResult, type AthleteGuardRow } from "@jits/shared/api/quer
 import type { EloHistoryRow } from "@jits/shared/types/composites";
 import { Button, DeltaChip, Label, Mono, spokenDelta } from "@/components/ui/elo-system";
 import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
+import { useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
 import { SkeletonBlock, SkeletonProvider } from "@/components/ui/skeleton";
 import { useCachedResource } from "@/lib/cache/use-cached-resource";
 import { useDashboardSummary } from "@/lib/dashboard/use-dashboard-summary";
@@ -98,6 +99,16 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
     },
     [onClosed],
   );
+
+  // Android back closes the sheet, once (jits-mafl.2 M7), like openStats.
+  useSheetBackHandler({
+    open,
+    onBack: () => {
+      if (!wasOpen.current) return;
+      wasOpen.current = false;
+      ref.current?.dismiss();
+    },
+  });
 
   const openStats = () => {
     // One dismiss only: the push blurs the tab and the parent sets open to

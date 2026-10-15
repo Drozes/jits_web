@@ -20,6 +20,7 @@ import { ClaimDobStep } from "@/components/invite/claim-dob-step";
 import { useAuth } from "@/lib/auth/hooks";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
 import { useClaimRunner } from "@/lib/invites/use-claim-runner";
+import { useClaimBackGuard } from "@/lib/invites/claim-back-guard";
 import { INVITE_SETUP_HREF } from "@/lib/invites/launch-route";
 import { clearPendingInvite } from "@/lib/invites/pending-invite";
 import { isNewAccountForInvite } from "@/lib/invites/claim-flow";
@@ -42,6 +43,8 @@ export default function InviteClaimScreen() {
     // Flag off: no location prompt, the claim books and Start match starts it.
     readLocationRequired: readMatchLocationRequired,
   });
+  // Android back is held while the claim is in flight (jits-mafl.2 M7).
+  useClaimBackGuard(state.phase);
   const needsConfirm = Boolean(pending?.token) && !newAccount && pending?.gateway !== "paste";
   const [confirmed, setConfirmed] = React.useState(false);
 

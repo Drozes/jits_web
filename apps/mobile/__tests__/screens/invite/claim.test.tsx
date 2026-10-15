@@ -269,3 +269,42 @@ describe("match_location_required off", () => {
     expect(mockClaim).toHaveBeenCalledWith(expect.anything(), expect.anything(), { lat: 1, lng: 2, accuracyM: 10 });
   });
 });
+
+describe("Android hardware back (jits-mafl.2 M7)", () => {
+  type BackListener = () => boolean | null | undefined;
+  let listeners: BackListener[] = [];
+  const pressBack = () => [...listeners].reverse().some((l) => l() === true);
+
+  beforeEach(() => {
+    listeners = [];
+    const { BackHandler } = jest.requireActual("react-native");
+    jest.spyOn(BackHandler, "addEventListener").mockImplementation(((_e: string, fn: BackListener) => {
+      listeners.push(fn);
+      return { remove: () => (listeners = listeners.filter((l) => l !== fn)) };
+    }) as never);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("is let through on the confirm step (nothing in flight)", async () => {
+    await withPending({ token: TOKEN }, "universal_link");
+    render(<InviteClaimScreen />);
+    await screen.findByTestId("claim-confirm");
+    expect(pressBack()).toBe(false);
+  });
+
+  it("is consumed while the claim is in flight, and let through once it settles", async () => {
+    let answer!: (v: unknown) => void;
+    mockReading.mockReturnValue(new Promise((r) => (answer = r)));
+    mockClaim.mockResolvedValue({ ok: true, data: { ok: false, code: "expired", inviter: null } });
+    await withPending({ code: "ABC123" }, "code");
+    render(<InviteClaimScreen />);
+    await screen.findByText("Checking you're on the mat...");
+    expect(pressBack()).toBe(true);
+    answer({ status: "ok", reading: { lat: 1, lng: 2, accuracyM: 10 } });
+    await waitFor(() => expect(mockClaim).toHaveBeenCalled());
+    await waitFor(() => expect(pressBack()).toBe(false));
+  });
+});
