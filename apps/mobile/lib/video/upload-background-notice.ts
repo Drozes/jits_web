@@ -2,6 +2,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import * as Notifications from "expo-notifications";
 import { isBackgroundUploadSupported } from "./upload-capabilities";
 import { hasActiveVideoUploads, subscribeUploadActivity } from "./video-upload-manager";
+import { permissionDialogBackgroundGuard, type PermissionDialogBackgroundGuard } from "@/lib/permissions/permission-request";
 
 /** `data.type` of the notice. It carries no route: a tap just opens the app. */
 export const UPLOAD_BACKGROUNDED_NOTICE_TYPE = "match_upload_backgrounded";
@@ -72,7 +73,15 @@ function post(): void {
     .catch(() => undefined);
 }
 
+/**
+ * An Android permission dialog's "background" is not leaving; Home pressed
+ * with it up posts the notice once it settles (jits-3dc2). Bound with the
+ * listener.
+ */
+let dialog: PermissionDialogBackgroundGuard | null = null;
+
 function onAppState(next: AppStateStatus): void {
+  if (dialog?.ignore(next)) return;
   if (next === "background") {
     if (notifiedThisBackground || !hasActiveVideoUploads()) return;
     notifiedThisBackground = true;
@@ -110,12 +119,15 @@ export function bindUploadBackgroundNotice(): () => void {
     return unbind;
   }
   sweepPresented();
+  dialog = permissionDialogBackgroundGuard(() => onAppState("background"));
   const sub = AppState.addEventListener("change", onAppState) as { remove?: () => void } | undefined;
   const off = subscribeUploadActivity(() => {
     if (!hasActiveVideoUploads()) withdraw();
   });
   unbind = () => {
     sub?.remove?.();
+    dialog?.dispose();
+    dialog = null;
     off();
     withdraw();
     notifiedThisBackground = false;

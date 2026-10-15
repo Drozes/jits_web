@@ -23,6 +23,7 @@ import { useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import { isUuid } from "@jits/shared/utils";
 import { LIVE_SWITCH_COOLDOWN_MS } from "./constants";
+import { permissionDialogBackgroundGuard } from "@/lib/permissions/permission-request";
 import type {
   IncomingChallenge,
   OutgoingChallenge,
@@ -740,7 +741,11 @@ function clearAthleteGoLive(): void {
 }
 
 try {
+  // An Android permission dialog's "background" is not leaving; Home pressed
+  // with it up clears once it settles (jits-3dc2).
+  const dialog = permissionDialogBackgroundGuard(clearAthleteGoLive);
   AppState.addEventListener?.("change", (next) => {
+    if (dialog.ignore(next)) return;
     if (next === "background") clearAthleteGoLive();
   });
 } catch {

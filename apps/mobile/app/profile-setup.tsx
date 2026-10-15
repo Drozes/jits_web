@@ -39,7 +39,7 @@ export default function ProfileSetupScreen() {
       <AppHeader title={headerTitle} />
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
           contentContainerStyle={{

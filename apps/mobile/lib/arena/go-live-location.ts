@@ -355,8 +355,13 @@ export interface ReadOptions {
  * One reading (fast path: last known, Balanced, High), reported as
  * `go_live`. `ask`: the system prompt may show.
  */
-async function readAndReport(ask: boolean, opts: ReadOptions = {}): Promise<ReadOutcome> {
-  const loc = await readLocationOnce({ ask, fast: true, ...(opts.skipLastKnown ? { skipLastKnown: true } : {}) });
+async function readAndReport(ask: boolean, opts: ReadOptions = {}, upgrade = false): Promise<ReadOutcome> {
+  const loc = await readLocationOnce({
+    ask,
+    fast: true,
+    ...(opts.skipLastKnown ? { skipLastKnown: true } : {}),
+    ...(upgrade ? { upgrade: true } : {}),
+  });
   if (loc.status === "denied") return { kind: "denied", canAskAgain: loc.canAskAgain };
   if (loc.status === "unavailable") return loc.reason === "timeout" ? { kind: "timeout" } : { kind: "unavailable" };
   const reading = loc.reading;
@@ -452,7 +457,9 @@ async function locationStep(flow: GoLiveFlow, opts: ReadOptions = {}): Promise<G
     }
     // A background mid-reading resolves the flow at once (the chip goes back
     // to offline), not after the fix and the report finish.
-    const r = await Promise.race([readAndReport(true, opts), flow.abortSignal]);
+    // The tapped Go Live (and the precise sheet's Retry, which loops back
+    // here) may ask for the Android precise-location upgrade (jits-mafl.2 M4).
+    const r = await Promise.race([readAndReport(true, opts, true), flow.abortSignal]);
     if (r === "aborted" || flow.aborted) return end("dismissed", r !== "aborted" && "reading" in r ? r.reading : reading);
     if (r.kind === "ok") {
       closeSheet();

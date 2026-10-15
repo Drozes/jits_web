@@ -45,6 +45,7 @@ jest.mock("lucide-react-native", () => {
   return new Proxy({}, { get: (_t: unknown, p: string) => (p === "__esModule" ? true : stub) });
 });
 
+import { BackHandler } from "react-native";
 import { NotificationPanel } from "@/components/notifications/notification-panel";
 import type { BellItem } from "@/lib/notifications/notification-items";
 
@@ -147,5 +148,60 @@ describe("NotificationPanel sections and rows (jits-dq85.8)", () => {
     fireEvent.press(u.getByText("Alex sent you a challenge"));
     expect(onItemPress).toHaveBeenLastCalledWith(feed[0]);
     expect(onItemPress).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("NotificationPanel Android back mid-present (jits-mafl.2.1)", () => {
+  type BackListener = () => boolean | null | undefined;
+  let listeners: BackListener[] = [];
+  beforeEach(() => {
+    listeners = [];
+    jest.spyOn(BackHandler, "addEventListener").mockImplementation(((_e: string, fn: BackListener) => {
+      listeners.push(fn);
+      return { remove: () => (listeners = listeners.filter((l) => l !== fn)) };
+    }) as never);
+  });
+  afterEach(() => jest.restoreAllMocks());
+  const pressBack = () => [...listeners].reverse().some((l) => l());
+  const onDismiss = () => (mockSheetProps.onDismiss as (() => void) | undefined)?.();
+
+  it("a close reported only by onDismiss closes the panel, so the bell reopens it and back closes it", () => {
+    const onOpenChange = jest.fn();
+    const { rerender } = render(<Harness open onOpenChange={onOpenChange} />);
+    expect(pressBack()).toBe(true);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    act(() => onDismiss());
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    rerender(<Harness open={false} onOpenChange={onOpenChange} />);
+    expect(mockDismiss).toHaveBeenCalledTimes(1); // never a dismiss on a closed sheet
+    expect(pressBack()).toBe(false);
+    rerender(<Harness open onOpenChange={onOpenChange} />);
+    expect(mockPresent).toHaveBeenCalledTimes(2);
+    expect(pressBack()).toBe(true);
+    expect(mockDismiss).toHaveBeenCalledTimes(2);
+  });
+
+  it("a normal close reported twice (onChange(-1), then onDismiss) closes once and never dismisses again", () => {
+    const onOpenChange = jest.fn();
+    const { rerender } = render(<Harness open onOpenChange={onOpenChange} />);
+    act(() => mockOnChange?.(0));
+    pressBack();
+    act(() => mockOnChange?.(-1));
+    act(() => onDismiss());
+    expect(onOpenChange.mock.calls.filter(([o]) => o === false).length).toBeGreaterThanOrEqual(1);
+    expect(onOpenChange).not.toHaveBeenCalledWith(true);
+    rerender(<Harness open={false} onOpenChange={onOpenChange} />);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    expect(pressBack()).toBe(false);
+  });
+
+  it("a dismiss gorhom dropped is re-issued once the panel settles open", () => {
+    const onOpenChange = jest.fn();
+    render(<Harness open onOpenChange={onOpenChange} />);
+    pressBack();
+    act(() => mockOnChange?.(0));
+    expect(mockDismiss).toHaveBeenCalledTimes(2);
+    act(() => mockOnChange?.(-1));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

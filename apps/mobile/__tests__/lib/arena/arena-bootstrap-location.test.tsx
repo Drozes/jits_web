@@ -189,7 +189,8 @@ const RECORDED = {
 const EXPLAIN =
   "ELO RATED uses your location to put you on the mat with athletes near you. We only check it when you go live.";
 /** Rung 4 after rung 3 looked at the OS cache (permission already granted). */
-const FRESH_AFTER_OS_CACHE = { ask: true, fast: true, skipLastKnown: true };
+// The tapped Go Live may ask for the Android precise upgrade (jits-mafl.2 M4).
+const FRESH_AFTER_OS_CACHE = { ask: true, fast: true, skipLastKnown: true, upgrade: true };
 
 beforeEach(() => {
   mockInFlight = false;
@@ -326,7 +327,7 @@ describe("flag ON: Go Live needs a fresh reading", () => {
     expect(mockReading).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText("Continue"));
     expect(await done).toBe(true);
-    expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true });
+    expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true, upgrade: true });
     expect(screen.queryByTestId("go-live-location-explain")).toBeNull();
   });
 
@@ -529,7 +530,7 @@ describe("no reading while live (instant go-live 4.2: the 60 s refresh is gone)"
       const { done } = tapGoLive();
       expect(await done).toBe(true);
       expect(mockOsCache).not.toHaveBeenCalled();
-      expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true });
+      expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true, upgrade: true });
       expect(mockReport).toHaveBeenCalledWith({}, OK_READING.reading);
     });
   });

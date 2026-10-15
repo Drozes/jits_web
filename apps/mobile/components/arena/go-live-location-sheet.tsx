@@ -8,7 +8,7 @@
  * the hardware back answers "Not now", which never takes the athlete live.
  * Fades in, or appears in place under Reduce Motion.
  */
-import { ActivityIndicator, Linking, Modal, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Modal, Platform, Text, View } from "react-native";
 import {
   GO_LIVE_ACCURACY_COPY,
   GO_LIVE_LOCATION_DENIED_COPY,
@@ -16,7 +16,9 @@ import {
   IMPLAUSIBLE_MOVEMENT_COPY,
   LOCATION_UNAVAILABLE_COPY,
   PRECISE_LOCATION_COPY,
+  PRECISE_LOCATION_COPY_ANDROID,
   PRECISE_LOCATION_TITLE,
+  PRECISE_LOCATION_TITLE_ANDROID,
 } from "@jits/shared/utils";
 import { Button } from "@/components/ui/elo-system/button";
 import {
@@ -26,23 +28,33 @@ import {
 } from "@/lib/arena/go-live-location";
 import { useModalAnimation } from "@/lib/motion";
 
-const TITLES: Record<GoLiveLocationPhase, string> = {
+/** Android names the switch differently and keeps it under Apps > Permissions (jits-mafl.2 M4). */
+function preciseCopy(): { title: string; body: string } {
+  return Platform.OS === "android"
+    ? { title: PRECISE_LOCATION_TITLE_ANDROID, body: PRECISE_LOCATION_COPY_ANDROID }
+    : { title: PRECISE_LOCATION_TITLE, body: PRECISE_LOCATION_COPY };
+}
+
+const TITLES: Record<Exclude<GoLiveLocationPhase, "precise">, string> = {
   explain: "Location to go live",
   denied: "Location is off",
   accuracy: "Location too rough",
-  precise: PRECISE_LOCATION_TITLE,
   unavailable: "No location",
   movement: "Location check",
 };
 
-const BODY: Record<GoLiveLocationPhase, string> = {
+const BODY: Record<Exclude<GoLiveLocationPhase, "precise">, string> = {
   explain: GO_LIVE_LOCATION_EXPLAIN_COPY,
   denied: GO_LIVE_LOCATION_DENIED_COPY,
   accuracy: GO_LIVE_ACCURACY_COPY,
-  precise: PRECISE_LOCATION_COPY,
   unavailable: LOCATION_UNAVAILABLE_COPY,
   movement: IMPLAUSIBLE_MOVEMENT_COPY,
 };
+
+function titleFor(phase: GoLiveLocationPhase, purpose: string | undefined): string {
+  if (phase === "precise") return preciseCopy().title;
+  return purpose === "arena" && phase === "explain" ? "Location to start" : TITLES[phase];
+}
 
 /** The states fixed only in Settings: Open Settings, Retry, Not now. */
 const SETTINGS_PHASES: ReadonlySet<GoLiveLocationPhase> = new Set(["denied", "precise"]);
@@ -61,14 +73,14 @@ export function GoLiveLocationSheet() {
             className="w-full max-w-md gap-4 rounded-lg border border-hairline bg-surface-2 p-5"
           >
             <Text accessibilityRole="header" className="font-heading text-title uppercase tracking-caps text-ink">
-              {state.purpose === "arena" && state.phase === "explain" ? "Location to start" : TITLES[state.phase]}
+              {titleFor(state.phase, state.purpose)}
             </Text>
             <Text
               testID="go-live-location-body"
               accessibilityRole={state.phase === "explain" ? undefined : "alert"}
               className="font-body text-callout leading-6 text-ink"
             >
-              {BODY[state.phase]}
+              {state.phase === "precise" ? preciseCopy().body : BODY[state.phase]}
             </Text>
             {state.busy ? (
               <View className="flex-row items-center gap-2" accessibilityLiveRegion="polite">

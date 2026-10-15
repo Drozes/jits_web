@@ -12,6 +12,7 @@ import { supabase } from "../supabase/client";
 import { SecureStoreAdapter } from "../supabase/secure-storage";
 import { setCachedElo } from "../splash/elo-cache";
 import { needsAthleteLoad } from "./athlete-load";
+import { readGoogleSignInResult } from "./google-sign-in-result";
 import { resetLiveOverlayState, takeArenaOfflineBeforeSignOut } from "../arena/arena-store";
 import { loadPersistedLiveIntent } from "../arena/live-intent-persist";
 import { clearShareCache } from "../highlight-share";
@@ -289,11 +290,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         "@react-native-google-signin/google-signin"
       );
       await GoogleSignin.hasPlayServices().catch(() => undefined);
-      const result = await GoogleSignin.signIn();
-      const idToken =
-        (result as { idToken?: string; data?: { idToken?: string } }).idToken ??
-        (result as { data?: { idToken?: string } }).data?.idToken ??
-        null;
+      // v16 resolves a cancel (`{ type: "cancelled" }`) instead of rejecting:
+      // silent, never "no ID token" (jits-mafl.2 M10).
+      const outcome = readGoogleSignInResult(await GoogleSignin.signIn());
+      if (outcome.kind === "cancelled") return { error: null, cancelled: true };
+      const idToken = outcome.idToken;
       if (!idToken) {
         return { error: { message: "Google did not return an ID token." } };
       }

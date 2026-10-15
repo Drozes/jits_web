@@ -31,17 +31,19 @@ jest.mock("@/lib/video/video-upload-manager", () => ({
 
 const mockGetCameraPermission = jest.fn(async () => ({ granted: true, canAskAgain: true }));
 const mockGetMicPermission = jest.fn(async () => ({ granted: true, canAskAgain: true }));
+const mockRequestCamera = jest.fn(async () => ({ granted: true, canAskAgain: true }));
+const mockRequestMic = jest.fn(async () => ({ granted: true, canAskAgain: true }));
 
 jest.mock("expo-camera", () => ({
   CameraView: () => null,
   useCameraPermissions: () => [
     { granted: true, canAskAgain: true },
-    jest.fn(),
+    mockRequestCamera,
     mockGetCameraPermission,
   ],
   useMicrophonePermissions: () => [
     { granted: true, canAskAgain: true },
-    jest.fn(),
+    mockRequestMic,
     mockGetMicPermission,
   ],
 }));
@@ -1244,4 +1246,56 @@ describe("useVideoRecorder render purity", () => {
 
     expect(writesDuringRender).toBe(0);
   });
+});
+
+describe("camera and microphone prompts count as a permission request (jits-3dc2)", () => {
+  it("holds permissionRequestInFlight() across both system prompts, then releases it", async () => {
+    const { permissionRequestInFlight } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    let answerCamera!: () => void;
+    let answerMic!: () => void;
+    mockRequestCamera.mockImplementationOnce(
+      () => new Promise((r) => (answerCamera = () => r({ granted: true, canAskAgain: true }))),
+    );
+    mockRequestMic.mockImplementationOnce(
+      () => new Promise((r) => (answerMic = () => r({ granted: true, canAskAgain: true }))),
+    );
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    let done!: Promise<void>;
+    act(() => {
+      done = result.current.requestPermission();
+    });
+    expect(permissionRequestInFlight()).toBe(true);
+    await act(async () => {
+      answerCamera();
+      await Promise.resolve();
+    });
+    expect(mockRequestMic).toHaveBeenCalledTimes(1);
+    expect(permissionRequestInFlight()).toBe(true);
+    await act(async () => {
+      answerMic();
+      await done;
+    });
+    expect(permissionRequestInFlight()).toBe(false);
+  });
+
+  it("releases it when a prompt throws", async () => {
+    const { permissionRequestInFlight } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    mockRequestCamera.mockRejectedValueOnce(new Error("no activity"));
+    const { result } = renderHook(() => useVideoRecorder("M", "A"));
+    await act(async () => {
+      await expect(result.current.requestPermission()).rejects.toThrow("no activity");
+    });
+    expect(permissionRequestInFlight()).toBe(false);
+  });
+});
+
+// Drop any permission request a test left pending, and its expiry timer.
+afterEach(() => {
+  (
+    jest.requireActual("@/lib/permissions/permission-request") as typeof import("@/lib/permissions/permission-request")
+  ).__resetPermissionRequestsForTests();
 });

@@ -3,6 +3,9 @@ import { BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSheetSchemeScope } from "@/lib/theme/use-sheet-scheme-scope";
 import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
+import { useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
+
+const renderBackdrop = (props: BottomSheetBackdropProps) => <SheetBackdrop {...props} pressBehavior="close" />;
 
 interface PreShareSheetProps {
   open: boolean;
@@ -32,20 +35,28 @@ export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) 
     } else if (presentedRef.current) ref.current?.dismiss();
   }, [open]);
 
+  // Android back closes like a swipe (jits-mafl.2 M7).
+  const back = useSheetBackHandler({
+    open,
+    onBack: () => {
+      if (!presentedRef.current) return false;
+      ref.current?.dismiss();
+      return true;
+    },
+  });
+  // Closed: onChange(-1), or only onDismiss for a close during the present
+  // animation (jits-mafl.2.1). Whichever comes first reports it, once.
+  const handleClosed = React.useCallback(() => {
+    if (!presentedRef.current) return;
+    presentedRef.current = false;
+    onClosed();
+  }, [onClosed]);
   const handleChange = React.useCallback(
     (index: number) => {
-      if (index !== -1 || !presentedRef.current) return;
-      presentedRef.current = false;
-      onClosed();
+      back.onChange(index);
+      if (index === -1) handleClosed();
     },
-    [onClosed],
-  );
-
-  const renderBackdrop = React.useCallback(
-    (props: BottomSheetBackdropProps) => (
-      <SheetBackdrop {...props} pressBehavior="close" />
-    ),
-    [],
+    [back, handleClosed],
   );
 
   return (
@@ -54,6 +65,7 @@ export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) 
       enableDynamicSizing
       enablePanDownToClose
       onChange={handleChange}
+      onDismiss={handleClosed}
       accessible={false} // else the whole sheet is one "Bottom Sheet" leaf to VoiceOver
       backdropComponent={renderBackdrop}
       {...chrome}

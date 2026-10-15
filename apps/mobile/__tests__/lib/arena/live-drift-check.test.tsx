@@ -179,6 +179,39 @@ describe("the hook: active only with every condition", () => {
   });
 });
 
+describe("background (jits-3dc2)", () => {
+  it("a real background drops the prompt; an Android permission dialog's 'background' keeps it", async () => {
+    const { trackPermissionRequest } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    Object.defineProperty(require("react-native").Platform, "OS", { value: "android", configurable: true });
+    let handler: ((s: string) => void) | null = null;
+    const spy = jest.spyOn(AppState, "addEventListener").mockImplementation(((_t: string, fn: (s: string) => void) => {
+      handler = fn;
+      return { remove: jest.fn() };
+    }) as never);
+    mockDriftFlag = true;
+    seedTag();
+    renderHook(() => useLiveDriftCheck({ athleteId: ME, isLive: true, inMatch: false, locationRequired: true }));
+    const prompt = renderHook(() => useDriftPrompt());
+    await act(async () => {
+      await runDriftCheck(ME);
+    });
+    expect(prompt.result.current).not.toBeNull();
+    let answer!: () => void;
+    const request = trackPermissionRequest(() => new Promise<void>((r) => (answer = r)));
+    act(() => handler?.("background"));
+    expect(prompt.result.current).not.toBeNull();
+    answer();
+    await act(async () => {
+      await request;
+    });
+    act(() => handler?.("background"));
+    expect(prompt.result.current).toBeNull();
+    spy.mockRestore();
+  });
+});
+
 describe("one check", () => {
   it("drifted at 501 m net of accuracy: prompts and logs drift_check / drifted with the reading", async () => {
     seedTag();
@@ -326,4 +359,14 @@ describe("the sheet", () => {
     await flush();
     expect(mockPresent).toHaveBeenCalledTimes(1);
   });
+});
+
+// The jits-3dc2 tests run as Android (the dialog guard is Android only): put
+// the platform and the permission-request state back after every test.
+const ORIGINAL_PLATFORM_OS = require("react-native").Platform.OS;
+afterEach(() => {
+  Object.defineProperty(require("react-native").Platform, "OS", { value: ORIGINAL_PLATFORM_OS, configurable: true });
+  (
+    jest.requireActual("@/lib/permissions/permission-request") as typeof import("@/lib/permissions/permission-request")
+  ).__resetPermissionRequestsForTests();
 });

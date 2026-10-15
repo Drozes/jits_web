@@ -47,6 +47,10 @@ import { joinLobby, leaveLobby } from "./use-lobby-presence";
 import type { LiveSwitchDirection } from "./arena-store";
 import { GO_OFFLINE_FAILED_MESSAGE } from "./constants";
 import {
+  permissionDialogBackgroundGuard,
+  type PermissionDialogBackgroundGuard,
+} from "@/lib/permissions/permission-request";
+import {
   abandonTappedGoLive,
   areLiveWritesBlocked,
   getArenaDisplayLive,
@@ -1032,8 +1036,28 @@ export function useArenaLive({
   // Backgrounding is the case web gets wrong: the socket dies on its own and
   // presence lapses, but the flag survives and keeps advertising an athlete
   // who has closed the app.
+  //
+  // An Android system permission dialog (location, camera, microphone)
+  // pauses the activity and reports "background": the athlete is still here,
+  // so it is ignored like iOS "inactive" and they stay live (jits-3dc2). If
+  // they pressed Home with the dialog up, the background branch runs once the
+  // dialog settles (permission-request.ts). The guard lives once per mount
+  // (review N-b): the AppState effect below re-subscribes when its callbacks
+  // change identity, and that must not drop a pending replay. It replays
+  // through a ref to the latest handler.
+  const appStateHandlerRef = React.useRef<(next: AppStateStatus) => void>(() => undefined);
+  const dialogGuardRef = React.useRef<PermissionDialogBackgroundGuard | null>(null);
+  React.useEffect(() => {
+    const guard = permissionDialogBackgroundGuard(() => appStateHandlerRef.current("background"));
+    dialogGuardRef.current = guard;
+    return () => {
+      guard.dispose();
+      if (dialogGuardRef.current === guard) dialogGuardRef.current = null;
+    };
+  }, []);
   React.useEffect(() => {
     const onChange = (next: AppStateStatus) => {
+      if (dialogGuardRef.current?.ignore(next)) return;
       // Clear on "background" only. iOS also reports "inactive" for the
       // notification shade, Control Center, an incoming-call banner, a system
       // alert and a half-swiped app switcher, none of which mean the athlete
@@ -1076,6 +1100,7 @@ export function useArenaLive({
       if (restoreInFlightRef.current > 0) return;
       void restoreLive("foreground");
     };
+    appStateHandlerRef.current = onChange;
     const sub = AppState.addEventListener("change", onChange);
     return () => sub.remove();
   }, [restoreLive, retryFailedClear]);

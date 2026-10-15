@@ -24,6 +24,7 @@ import { getEloHistoryResult, type AthleteGuardRow } from "@jits/shared/api/quer
 import type { EloHistoryRow } from "@jits/shared/types/composites";
 import { Button, DeltaChip, Label, Mono, spokenDelta } from "@/components/ui/elo-system";
 import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
+import { useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
 import { SkeletonBlock, SkeletonProvider } from "@/components/ui/skeleton";
 import { useCachedResource } from "@/lib/cache/use-cached-resource";
 import { useDashboardSummary } from "@/lib/dashboard/use-dashboard-summary";
@@ -90,13 +91,30 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
     wasOpen.current = open;
   }, [open]);
 
+  // Android back closes the sheet (jits-mafl.2 M7). It leaves `wasOpen` set:
+  // a close dropped mid-present is re-issued (jits-mafl.2.1), and the close
+  // itself clears it below, so `open` turning false never dismisses again.
+  const back = useSheetBackHandler({
+    open,
+    onBack: () => {
+      if (!wasOpen.current) return false;
+      ref.current?.dismiss();
+      return true;
+    },
+  });
+
+  // Closed: onChange(-1), or only onDismiss for a close during the present
+  // animation (jits-mafl.2.1), which never reaches onChange(-1).
+  const handleClosed = React.useCallback(() => {
+    wasOpen.current = false;
+    onClosed();
+  }, [onClosed]);
   const onChange = React.useCallback(
     (index: number) => {
-      if (index !== -1) return;
-      wasOpen.current = false;
-      onClosed();
+      back.onChange(index);
+      if (index === -1) handleClosed();
     },
-    [onClosed],
+    [back, handleClosed],
   );
 
   const openStats = () => {
@@ -117,6 +135,7 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
       topInset={insets.top}
       enablePanDownToClose
       onChange={onChange}
+      onDismiss={handleClosed}
       accessible={false}
       backdropComponent={renderBackdrop}
       {...chrome}

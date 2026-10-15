@@ -19,6 +19,7 @@ import {
   useMatchUpload,
 } from "./match-upload-store";
 import { discardLocalClip } from "./recording-file";
+import { trackPermissionRequest } from "@/lib/permissions/permission-request";
 
 /**
  * State machine for the recorder. Mirrors the web hook's `uploadStatus`
@@ -315,10 +316,16 @@ export function useVideoRecorder(
     if (uploadEnabled) setMatchUpload(matchId, { truncation: reason });
   }, [logTag, matchId, uploadEnabled]);
 
-  const requestPermission = React.useCallback(async () => {
-    await requestCameraPermission();
-    await requestMicPermission();
-  }, [requestCameraPermission, requestMicPermission]);
+  // Held as one system permission request, so the Android dialog's
+  // "background" is not read as leaving the app (jits-3dc2).
+  const requestPermission = React.useCallback(
+    () =>
+      trackPermissionRequest(async () => {
+        await requestCameraPermission();
+        await requestMicPermission();
+      }),
+    [requestCameraPermission, requestMicPermission],
+  );
 
   const handleUpload = React.useCallback(async (fileUri: string, timing?: RecordTiming) => {
     if (!uploadEnabled) {

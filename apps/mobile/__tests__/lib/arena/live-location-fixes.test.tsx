@@ -441,7 +441,7 @@ describe("item 1a: canAskAgain branching", () => {
     expect(mockReading).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText("Continue"));
     expect(await tap.done).toBe(true);
-    expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true });
+    expect(mockReading).toHaveBeenCalledWith({ ask: true, fast: true, upgrade: true });
   });
 
   it("a system prompt answered 'deny' that can still ask again goes back to explain, not denied", async () => {
@@ -631,7 +631,7 @@ describe("item 1b: a restore that finds no tag and permission gone", () => {
     expect(mockReading).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText("Continue"));
     await waitFor(() => expect(mockGoLive).toHaveBeenCalledTimes(1));
-    expect(mockReading).toHaveBeenLastCalledWith({ ask: true, fast: true });
+    expect(mockReading).toHaveBeenLastCalledWith({ ask: true, fast: true, upgrade: true });
     await waitFor(() => expect(logged()).toEqual(["ok"]));
   });
 

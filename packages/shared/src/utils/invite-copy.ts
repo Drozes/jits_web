@@ -357,6 +357,15 @@ export const PRECISE_LOCATION_COPY =
   "Settings > ELO RATED > Location > Precise Location. Already on? Move near a window or turn on Wi-Fi, then Retry.";
 
 /**
+ * The Android variant (jits-mafl.2 M4): Android names the switch "Use precise
+ * location" and keeps it under the app's permissions. Retry on Android also
+ * shows the system's precise-location upgrade dialog when the OS still can.
+ */
+export const PRECISE_LOCATION_TITLE_ANDROID = "Use precise location for ELO RATED";
+export const PRECISE_LOCATION_COPY_ANDROID =
+  "Settings > Apps > ELO RATED > Permissions > Location > Use precise location. Already on? Move near a window or turn on Wi-Fi, then Retry.";
+
+/**
  * A live restore the athlete did not tap (cold start, a return from the
  * background after the tag expired) found no valid location tag and
  * location permission gone (an iOS "Allow Once" grant lapses in the

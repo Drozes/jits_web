@@ -28,6 +28,8 @@ import {
   GO_LIVE_LOCATION_EXPLAIN_COPY,
   LOCATION_FIX_FAILED_GO_LIVE_CTA_COPY,
   PRECISE_LOCATION_COPY,
+  PRECISE_LOCATION_COPY_ANDROID,
+  PRECISE_LOCATION_TITLE_ANDROID,
   SERVER_ENDED_LIVE_CTA_COPY,
 } from "../utils/invite-copy";
 
@@ -213,6 +215,10 @@ describe("copy (UX 019, section 4, C3, C6, C7)", () => {
     expect(PRECISE_LOCATION_COPY).toBe(
       "Settings > ELO RATED > Location > Precise Location. Already on? Move near a window or turn on Wi-Fi, then Retry.",
     );
+    expect(PRECISE_LOCATION_TITLE_ANDROID).toBe("Use precise location for ELO RATED");
+    expect(PRECISE_LOCATION_COPY_ANDROID).toBe(
+      "Settings > Apps > ELO RATED > Permissions > Location > Use precise location. Already on? Move near a window or turn on Wi-Fi, then Retry.",
+    );
     expect(LOCATION_FIX_FAILED_GO_LIVE_CTA_COPY).toBe("Couldn't find your location. Tap to go live again.");
     expect(SERVER_ENDED_LIVE_CTA_COPY).toBe("You're offline now. Tap to go live again.");
     expect(DRIFT_PROMPT_TITLE).toBe("Still on the same mat?");
@@ -226,6 +232,8 @@ describe("copy (UX 019, section 4, C3, C6, C7)", () => {
       GO_LIVE_LOCATION_EXPLAIN_COPY,
       GO_LIVE_LOCATION_DENIED_COPY,
       PRECISE_LOCATION_COPY,
+      PRECISE_LOCATION_COPY_ANDROID,
+      PRECISE_LOCATION_TITLE_ANDROID,
       LOCATION_FIX_FAILED_GO_LIVE_CTA_COPY,
       SERVER_ENDED_LIVE_CTA_COPY,
       DRIFT_PROMPT_TITLE,

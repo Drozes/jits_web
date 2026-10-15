@@ -14,6 +14,7 @@ import { BottomSheetModal, BottomSheetView, type BottomSheetBackdropProps } from
 import { DRIFT_PROMPT_BODY, DRIFT_PROMPT_TITLE } from "@jits/shared/utils";
 import { Button } from "@/components/ui/elo-system/button";
 import { SheetBackdrop, useSheetChrome } from "@/components/ui/sheet";
+import { useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
 import { useGoLiveLocationSheet } from "@/lib/arena/go-live-location";
 import { useLiveMenuOpen } from "@/lib/arena/arena-store";
 import { answerDriftPrompt, useDriftPrompt } from "@/lib/arena/use-live-drift-check";
@@ -66,17 +67,34 @@ function DriftPromptModal({ blocked, onClosed }: { blocked: boolean; onClosed: (
     }
   }, [show, hasPrompt, onClosed]);
 
+  // Closed: onChange(-1), or only onDismiss for a close during the present
+  // animation (jits-mafl.2.1); a second report is a no-op.
+  const handleClosed = React.useCallback(() => {
+    if (presentedRef.current) {
+      presentedRef.current = false;
+      // Swiped down or the backdrop: closed without a choice.
+      void answerDriftPrompt("dismiss");
+    }
+    onClosed();
+  }, [onClosed]);
+
+  // Android back = the swipe down: closed without a choice, the athlete stays
+  // live on the old tag (handleClosed answers "dismiss"); swallowed while busy (jits-mafl.2 M7).
+  const back = useSheetBackHandler({
+    open: show,
+    busy,
+    onBack: () => {
+      if (!presentedRef.current) return false;
+      ref.current?.dismiss();
+      return true;
+    },
+  });
   const onChange = React.useCallback(
     (index: number) => {
-      if (index !== -1) return;
-      if (presentedRef.current) {
-        presentedRef.current = false;
-        // Swiped down or the backdrop: closed without a choice.
-        void answerDriftPrompt("dismiss");
-      }
-      onClosed();
+      back.onChange(index);
+      if (index === -1) handleClosed();
     },
-    [onClosed],
+    [back, handleClosed],
   );
 
   const renderBackdrop = React.useCallback(
@@ -90,6 +108,7 @@ function DriftPromptModal({ blocked, onClosed }: { blocked: boolean; onClosed: (
       enableDynamicSizing
       enablePanDownToClose={!busy}
       onChange={onChange}
+      onDismiss={handleClosed}
       accessible={false}
       backdropComponent={renderBackdrop}
       {...chrome}

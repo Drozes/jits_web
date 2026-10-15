@@ -409,6 +409,104 @@ describe("going offline", () => {
     expect(result.current.isLive).toBe(true);
   });
 
+  it("an Android permission dialog's 'background' keeps a live athlete live (jits-3dc2)", async () => {
+    const { trackPermissionRequest } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    Object.defineProperty(require("react-native").Platform, "OS", { value: "android", configurable: true });
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    mockToggleMatchPreferences.mockClear();
+    mockLeaveLobby.mockClear();
+    mockJoinLobby.mockClear();
+    const dialog = deferred<void>();
+    let request!: Promise<void>;
+    await act(async () => {
+      request = trackPermissionRequest(() => dialog.promise);
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(mockLeaveLobby).not.toHaveBeenCalled();
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    expect(result.current.isLive).toBe(true);
+    await act(async () => {
+      dialog.resolve();
+      await request;
+      appStateHandler?.("active");
+      await flush();
+    });
+    // Nothing was taken down, so nothing is put back.
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    expect(mockJoinLobby).not.toHaveBeenCalled();
+    expect(result.current.isLive).toBe(true);
+    // A real background afterwards still goes offline.
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(mockLeaveLobby).toHaveBeenCalled();
+    expect(lastFlagWrite()).toEqual({ lookingForCasual: false, lookingForRanked: false });
+  });
+
+  it("iOS: a background with a permission prompt up is a real Home press and goes offline (review B1)", async () => {
+    const { trackPermissionRequest } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    Object.defineProperty(require("react-native").Platform, "OS", { value: "ios", configurable: true });
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    mockToggleMatchPreferences.mockClear();
+    void trackPermissionRequest(() => new Promise<void>(() => undefined));
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(mockLeaveLobby).toHaveBeenCalled();
+    expect(lastFlagWrite()).toEqual({ lookingForCasual: false, lookingForRanked: false });
+  });
+
+  it("Android: Home pressed with the dialog up goes offline once the dialog settles (review B1)", async () => {
+    const { trackPermissionRequest, SETTLE_REPLAY_DELAY_MS } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    Object.defineProperty(require("react-native").Platform, "OS", { value: "android", configurable: true });
+    const { result, rerender } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    mockToggleMatchPreferences.mockClear();
+    mockLeaveLobby.mockClear();
+    jest.useFakeTimers();
+    try {
+      const dialog = deferred<void>();
+      let request!: Promise<void>;
+      await act(async () => {
+        request = trackPermissionRequest(() => dialog.promise);
+        setAppState("background");
+        appStateHandler?.("background");
+        await flush();
+      });
+      expect(mockLeaveLobby).not.toHaveBeenCalled();
+      // A re-render while the replay is pending must not drop it (review N-b).
+      rerender({ ...ARGS, currentElo: 1300 });
+      // The dialog answers; no further AppState event arrives (Home was pressed).
+      await act(async () => {
+        dialog.resolve();
+        await request;
+        await jest.advanceTimersByTimeAsync(SETTLE_REPLAY_DELAY_MS);
+        await flush();
+      });
+      expect(mockLeaveLobby).toHaveBeenCalled();
+      expect(lastFlagWrite()).toEqual({ lookingForCasual: false, lookingForRanked: false });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("does not write anything on background when not live", async () => {
     mount();
 
@@ -2584,4 +2682,14 @@ describe("round 6", () => {
     expect(result.current.adoptionDeclined()).toBe(false);
     expect(autoLive).not.toHaveBeenCalled();
   });
+});
+
+// The jits-3dc2 tests run as Android (the dialog guard is Android only): put
+// the platform and the permission-request state back after every test.
+const ORIGINAL_PLATFORM_OS = require("react-native").Platform.OS;
+afterEach(() => {
+  Object.defineProperty(require("react-native").Platform, "OS", { value: ORIGINAL_PLATFORM_OS, configurable: true });
+  (
+    jest.requireActual("@/lib/permissions/permission-request") as typeof import("@/lib/permissions/permission-request")
+  ).__resetPermissionRequestsForTests();
 });

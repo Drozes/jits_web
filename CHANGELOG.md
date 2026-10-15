@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Mobile: Android UX fixes (jits-mafl.2, jits-3dc2)
+
+JavaScript only (OTA-eligible); it only matters once an Android build exists.
+
+**Added**
+- `components/ui/use-sheet-back-handler.ts` (`useSheetBackHandler`): while a gorhom sheet this component presented is open, the Android hardware back closes it once (further presses during the close are swallowed) and never reaches the screen behind; swallowed while the sheet is busy. Used by `Sheet` / `SheetContent`, `FormSheet`, the notification panel, the pre-share sheet, the drift prompt (back = swipe down: dismissed, still live) and Your numbers; a guard test keeps every `BottomSheetModal` on it.
+- `lib/permissions/permission-request.ts` (`trackPermissionRequest`, `permissionRequestInFlight`): the system permission prompt counter, shared by location and now the camera and microphone prompts (`lib/video/use-video-recorder.ts`). `lib/invites/location.ts` re-exports `permissionRequestInFlight`.
+- `lib/invites/claim-back-guard.ts`: the claim screen (`app/(app)/invite/claim.tsx`) consumes the Android back while the claim is checking, locating, claiming or saving the date of birth.
+- `lib/layout/android-keyboard-height.ts` (`useAndroidKeyboardHeight`) and `lib/auth/google-sign-in-result.ts` (`readGoogleSignInResult`).
+- `PRECISE_LOCATION_TITLE_ANDROID` / `PRECISE_LOCATION_COPY_ANDROID` (`packages/shared/src/utils/invite-copy.ts`): "Use precise location for ELO RATED" and the Settings > Apps > ELO RATED > Permissions > Location > Use precise location path, shown by the Go Live precise sheet on Android; iOS copy unchanged.
+
+**Fixed**
+- Android approximate location can be upgraded: `readLocationOnce` (`lib/invites/location.ts`) asks once for precise location when only approximate is granted and the OS can still ask, only for the Go Live flow (`upgrade: true`, the tapped Go Live and the precise sheet's Retry; never the challenge accept or match start reading). At most one system prompt per call; a hung dialog reads with the approximate grant.
+- Android permission dialogs no longer take a live athlete offline (jits-3dc2): the AppState "background" a runtime permission dialog emits is ignored while a request is in flight by `use-arena-live` (no go-offline or park), `use-online-presence` (no `app:online` untrack), `arena-store` (keeps the go-live credit), `use-live-drift-check` (keeps the prompt) and `upload-background-notice` (no "left mid-upload" notice). Android only (an iOS "background" with a prompt up is a real Home press); a request stops counting after 30 s; and if the athlete pressed Home with the dialog up, each owner replays its background branch 1 s after the dialog settles (`permissionDialogBackgroundGuard`).
+- Keyboard under Android edge-to-edge: Profile setup, Feedback and Delete account use `KeyboardAvoidingView` behavior `height` on Android (was `undefined`); `SearchSelect` pads its results list by the Android keyboard height (`automaticallyAdjustKeyboardInsets` is iOS-only). A guard test keeps every `KeyboardAvoidingView` on an Android behavior.
+- Cancelling Google sign-in is silent: `@react-native-google-signin` v16 resolves `{ type: "cancelled" }`, which showed "Google did not return an ID token." (`lib/auth/auth-context.tsx`).
+
 ### Mobile: report and block, consent before AI processing, chat leftovers removed (jits-rog5.11, App Review 1.2 and 5.1.2(i))
 
 JavaScript only (ships as an OTA to runtime 1.0). Needs jr_be `20261014300000_report_block_consent` (jr_be-m2s) on prod BEFORE the OTA: `block_athlete`, `unblock_athlete`, `get_my_blocked_athletes`, `get_my_block_ids`, `report_content`, `record_ai_processing_consent` and `athletes.ai_processing_consent_at` / `ai_processing_consent_version`. The consent columns are read by their own query, never through the athlete guard select, so sign-in cannot break on an older backend; the moderation calls fail soft without the migration.

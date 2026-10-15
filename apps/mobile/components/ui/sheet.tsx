@@ -12,6 +12,7 @@ import { useThemedTokens } from "../../lib/theme/use-theme";
 import { ON_MEDIA } from "../../lib/theme/palette";
 import { useSheetAnimationConfigs } from "../../lib/motion/use-modal-animation";
 import type { ColorTokens } from "../../lib/tokens";
+import { useSheetBackHandler } from "./use-sheet-back-handler";
 
 // ---------------------------------------------------------------------------
 // Shared sheet chrome (DESIGN.md, "Sheet"). Every gorhom sheet in the app
@@ -95,6 +96,14 @@ interface SheetContextValue {
   ref: React.RefObject<BottomSheetModal | null>;
   open: () => void;
   close: () => void;
+  /**
+   * The modal is showing or animating in: set when an animation toward an
+   * open index STARTS (onAnimate), cleared on onChange(-1). Drives the Android
+   * back, so it never passes through during the ~300 ms present animation.
+   * Also cleared on onDismiss, the only signal of a close mid-present.
+   */
+  isOpen: boolean;
+  setIsOpen: (open: boolean) => void;
 }
 
 const SheetContext = React.createContext<SheetContextValue | null>(null);
@@ -129,11 +138,15 @@ export function Sheet({ children, controllerRef }: SheetProps) {
   // where the trigger sits. The old inline (non-modal) <BottomSheet> measured its
   // immediate parent, so a trigger placed in AppHeader's ~32px right-action slot
   // collapsed the sheet into a tiny box pinned to the top-right corner.
+  // Driven by the modal itself (onAnimate toward an open index, onChange -1),
+  // so it is true only for a sheet gorhom is actually presenting: a back never
+  // dismisses a sheet that was not presented.
+  const [isOpen, setIsOpen] = React.useState(false);
   const open = React.useCallback(() => ref.current?.present(), []);
   const close = React.useCallback(() => ref.current?.dismiss(), []);
   React.useImperativeHandle(controllerRef, () => ({ open, close }), [open, close]);
   return (
-    <SheetContext.Provider value={{ ref, open, close }}>
+    <SheetContext.Provider value={{ ref, open, close, isOpen, setIsOpen }}>
       {children}
     </SheetContext.Provider>
   );
@@ -166,13 +179,41 @@ export interface SheetContentProps {
 }
 
 export function SheetContent({ className, snapPoints = ["50%", "90%"], children }: SheetContentProps) {
-  const { ref } = useSheetContext();
+  const { ref, close, isOpen, setIsOpen } = useSheetContext();
   const chrome = useSheetChrome();
+  // Android back closes the sheet instead of the screen behind it (jits-mafl.2 M7).
+  const back = useSheetBackHandler({
+    open: isOpen,
+    onBack: () => {
+      close();
+      return true;
+    },
+  });
+  const onChange = React.useCallback(
+    (index: number) => {
+      setIsOpen(index >= 0);
+      back.onChange(index);
+    },
+    [setIsOpen, back],
+  );
+  // A dismiss during the present animation closes without onChange(-1): only
+  // onDismiss says the sheet is gone (jits-mafl.2.1).
+  const onDismiss = React.useCallback(() => setIsOpen(false), [setIsOpen]);
+  // True at the START of the present animation, not its end (review SF1).
+  const onAnimate = React.useCallback(
+    (_from: number, to: number) => {
+      if (to >= 0) setIsOpen(true);
+    },
+    [setIsOpen],
+  );
   return (
     <BottomSheetModal
       ref={ref}
       snapPoints={snapPoints}
       enablePanDownToClose
+      onChange={onChange}
+      onAnimate={onAnimate}
+      onDismiss={onDismiss}
       backdropComponent={renderBackdrop}
       {...chrome}
     >
