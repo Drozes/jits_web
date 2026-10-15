@@ -17,6 +17,7 @@
  */
 import * as React from "react";
 import { acceptJoinInvite, claimChallengeInvite, logInviteEvent, setMyDateOfBirth } from "@jits/shared/api/invites";
+import { invitePlatform } from "@/lib/invites/platform";
 import { CLAIM_BLOCKED_COPY, DOB_REQUIRED_COPY, DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
 import { supabase } from "@/lib/supabase/client";
 import { clearPendingInvite, releasePushDeferral, takeBufferedEvents, type PendingInvite } from "./pending-invite";
@@ -83,6 +84,7 @@ export function useClaimRunner(
       token: pending.token,
       code: pending.code,
       gateway: pending.gateway,
+      platform: invitePlatform(),
       firstTouchAt: pending.first_touch_at,
     };
     const res = await claimChallengeInvite(supabase, input, loc?.status === "ok" ? loc.reading : null);
@@ -125,7 +127,7 @@ export function useClaimRunner(
         setState({ phase: "checking" });
         const joined = await acceptJoinInvite(supabase, pending.token, {
           gateway: pending.gateway,
-          platform: "ios",
+          platform: invitePlatform(),
         });
         if (!joined.ok) {
           setState({ phase: "done", step: { type: "message", message: NETWORK_COPY, terminal: false } });

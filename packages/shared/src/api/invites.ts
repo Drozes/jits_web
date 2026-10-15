@@ -131,7 +131,12 @@ export interface InviteStats {
 }
 
 export type InviteGateway = "universal_link" | "landing_web" | "paste" | "code" | "qr" | "app_clip";
-export type InvitePlatform = "ios" | "web";
+/**
+ * The client platform an invite is attributed to. "android" needs jr_be
+ * migration 20261015100000 (jr_be-ehe) on prod: before it, the server
+ * rejects the value. The default stays "ios" when omitted (back-compat).
+ */
+export type InvitePlatform = "ios" | "android" | "web";
 
 export function parseInviterCard(v: unknown): InviterCard | null {
   const o = obj(v);

@@ -28,6 +28,7 @@ import { useSetupData } from "@/lib/profile-setup/use-setup-data";
 import { useSetupSubmit } from "@/lib/profile-setup/use-setup-submit";
 import { isAtLeast16, isValidDateOfBirth } from "@/lib/profile-setup/validation";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
+import { invitePlatform } from "@/lib/invites/platform";
 import { clearPendingInvite, deferPushUntilFirstMatch, type PendingInvite } from "@/lib/invites/pending-invite";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
@@ -73,6 +74,7 @@ export default function InviteSetupScreen() {
         token: pending.token,
         code: pending.code,
         gateway: pending.gateway,
+        platform: invitePlatform(),
         firstTouchAt: pending.first_touch_at,
       });
       if (!pending.code || !res.ok) return;

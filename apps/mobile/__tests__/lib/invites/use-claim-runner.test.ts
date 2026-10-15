@@ -83,6 +83,40 @@ it("a scanned join QR is attributed as 'qr', not as a universal link", async () 
   expect(mockJoin).toHaveBeenCalledWith(expect.anything(), TOKEN, { gateway: "qr", platform: "ios" });
 });
 
+describe("on Android", () => {
+  const { Platform } = jest.requireActual<typeof import("react-native")>("react-native");
+  const original = Platform.OS;
+  beforeEach(() => Object.defineProperty(Platform, "OS", { configurable: true, get: () => "android" }));
+  afterEach(() => Object.defineProperty(Platform, "OS", { configurable: true, get: () => original }));
+
+  it("attributes the join and the claim to android", async () => {
+    mockJoin.mockResolvedValue(NOT_A_JOIN);
+    mockReading.mockResolvedValue({ status: "denied", canAskAgain: false });
+    mockClaim.mockResolvedValue({
+      ok: true,
+      data: { ok: true, result: "booked", challenge_id: "c1", match_id: null, inviter, start_blocked_reason: "no_location" },
+    });
+    await runWith(makePendingInvite({ token: TOKEN }, "qr"));
+    expect(mockJoin).toHaveBeenCalledWith(expect.anything(), TOKEN, { gateway: "qr", platform: "android" });
+    expect(mockClaim).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ token: TOKEN, platform: "android" }),
+      null,
+    );
+  });
+});
+
+it("the claim is attributed to ios on iOS", async () => {
+  mockJoin.mockResolvedValue(NOT_A_JOIN);
+  mockReading.mockResolvedValue({ status: "denied", canAskAgain: false });
+  mockClaim.mockResolvedValue({
+    ok: true,
+    data: { ok: true, result: "booked", challenge_id: "c1", match_id: null, inviter, start_blocked_reason: "no_location" },
+  });
+  await runWith(makePendingInvite({ token: TOKEN }, "universal_link"));
+  expect(mockClaim).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ platform: "ios" }), null);
+});
+
 it("already_friends right after signup (attribution made the friendship) reads as now friends", async () => {
   mockJoin.mockResolvedValue({ ok: true, data: { ok: true, result: "already_friends", inviter } });
   const pending = makePendingInvite({ token: TOKEN }, "universal_link");

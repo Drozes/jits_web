@@ -9,6 +9,7 @@ import {
   parseInviteEntryPoint,
   parseClaimResult,
   readInvitesEnabled,
+  recordInviteAttribution,
   setMyDateOfBirth,
 } from "./invites";
 import { getMyFriends, parseFriends, sortFriendsFirst } from "./friends";
@@ -185,12 +186,29 @@ describe("listMyOpenChallengeInvites", () => {
   });
 });
 
+describe("recordInviteAttribution platform", () => {
+  it("sends android when given and keeps the ios default when omitted", async () => {
+    const a = client({ data: { ok: true, result: "attributed" }, error: null });
+    await recordInviteAttribution(a.supabase as never, { token: "t", gateway: "universal_link", platform: "android" });
+    expect(a.rpc).toHaveBeenCalledWith("record_invite_attribution", expect.objectContaining({ p_platform: "android" }));
+    const b = client({ data: { ok: true, result: "attributed" }, error: null });
+    await recordInviteAttribution(b.supabase as never, { token: "t", gateway: "universal_link" });
+    expect(b.rpc).toHaveBeenCalledWith("record_invite_attribution", expect.objectContaining({ p_platform: "ios" }));
+  });
+});
+
 describe("acceptJoinInvite", () => {
   it("passes the gateway and platform for attribution", async () => {
     const { supabase, rpc } = client({ data: { ok: true, result: "friends", inviter }, error: null });
     const res = await acceptJoinInvite(supabase as never, "t", { gateway: "qr", platform: "ios" });
     expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: "t", p_gateway: "qr", p_platform: "ios" });
     expect(res.ok && res.data.ok && res.data.result).toBe("friends");
+  });
+
+  it("passes platform android through (jr_be 20261015100000)", async () => {
+    const { supabase, rpc } = client({ data: { ok: true, result: "friends", inviter }, error: null });
+    await acceptJoinInvite(supabase as never, "t", { platform: "android" });
+    expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: "t", p_platform: "android" });
   });
 
   it("sends only the token when no gateway is given (server defaults)", async () => {
