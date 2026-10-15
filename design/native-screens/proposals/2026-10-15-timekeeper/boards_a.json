@@ -1,0 +1,37 @@
+[
+  {
+    "id": "P-TK-A1-Challenge-To-Faceoff",
+    "file": "P-TK-A1-Challenge-To-Faceoff.dc.html",
+    "title": "Current (flag off): challenge accepted to face-off",
+    "w": 1352,
+    "h": 1560
+  },
+  {
+    "id": "P-TK-A2-Faceoff-Weight-Ready",
+    "file": "P-TK-A2-Faceoff-Weight-Ready.dc.html",
+    "title": "Current (flag off): face-off weigh-in, opponent weight check, ready check, auto-start",
+    "w": 3080,
+    "h": 1383
+  },
+  {
+    "id": "P-TK-A3-Live",
+    "file": "P-TK-A3-Live.dc.html",
+    "title": "Current (flag off): countdown, live clock, pause and resume, end",
+    "w": 2216,
+    "h": 1429
+  },
+  {
+    "id": "P-TK-A4-Result-Confirm",
+    "file": "P-TK-A4-Result-Confirm.dc.html",
+    "title": "Current (flag off): claim-first result, waiting, confirm or dispute, verdict",
+    "w": 2216,
+    "h": 1556
+  },
+  {
+    "id": "P-TK-A5-State-Machine",
+    "file": "P-TK-A5-State-Machine.dc.html",
+    "title": "Current (flag off): match state machine, who acts, broadcast vs server",
+    "w": 1440,
+    "h": 943
+  }
+]

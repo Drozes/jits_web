@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Current (flag off): claim-first result, waiting, confirm or dispute, verdict</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+body{margin:0;background:#0D0F14;font-family:'Inter',sans-serif;color:#E8EDF2}
+a{color:#EC6A74;text-decoration:none}a:hover{color:#F0556B}
+</style>
+</helmet>
+<div style="width: 2216px; height: 1556px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+<div style="padding: 48px 48px 0; display: flex; flex-direction: column; gap: 10px"><div style="display: flex; flex-direction: row; gap: 12px; align-items: center"><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(245,158,11,0.7); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #F59E0B; white-space: nowrap">Current app · timekeeper_role OFF · today</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Board A4 of 5 · source jits_web origin/development 4a20ee80</span></div><h1 style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 32px; line-height: 40px; color: #E8EDF2">Today: result and confirm</h1><p style="margin: 0; max-width: 1100px"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 15px; line-height: 21px; color: #9CA3AF">Either athlete records the result; whoever starts first holds the form and the other watches it arrive. The recorder is confirmed automatically, so only the other athlete confirms or disputes. Then both see the verdict.</span></p></div><div style="padding: 32px 48px 48px; display: flex; flex-direction: row; gap: 40px; align-items: flex-start"><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 871px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 871px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 12px">
+  <!-- Step component root (View gap 20) -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+
+    <!-- Header -->
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #9CA3AF">ENDED AT 03:48</span>
+      <h1 style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 30px; line-height: 36px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2">Record result</h1>
+    </div>
+
+    <!-- WinnerChip (winner picked: you) -->
+    <div style="height: 56px; box-sizing: border-box; padding: 0 6px 0 10px; display: flex; flex-direction: row; align-items: center; gap: 10px; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px">
+      <div aria-hidden="true" style="width: 36px; height: 36px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #262A34; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px">
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; color: #E8EDF2">MR</span>
+      </div>
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 4px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">WINNER</span>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes</span>
+      </div>
+      <button type="button" aria-label="Change" style="height: 44px; padding: 0 12px; display: flex; align-items: center; border: none; background: transparent; cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 1.12px; text-transform: uppercase; color: #EC6A74">Change</button>
+    </div>
+
+    <!-- SubmissionGrid -->
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 2.52px; color: #9CA3AF">HOW DID IT END?</span>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <button type="button" aria-pressed="true" style="height: 54px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #262A34; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px; cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #E8EDF2">
+          <span>Rear Naked Choke</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8EDF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+        </button>
+        <button type="button" aria-pressed="false" style="height: 54px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px; cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #E8EDF2">Armbar</button>
+        <button type="button" aria-pressed="false" style="height: 54px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px; cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #E8EDF2">Triangle Choke</button>
+        <button type="button" aria-pressed="false" style="height: 54px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px; cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #E8EDF2">Guillotine Choke</button>
+        <button type="button" aria-pressed="false" style="height: 54px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px; cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #E8EDF2">Kimura</button>
+        <button type="button" aria-pressed="false" style="height: 54px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px; cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #E8EDF2">Heel Hook</button>
+        <button type="button" aria-pressed="false" style="height: 54px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px; cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #E8EDF2">D'Arce Choke</button>
+        <button type="button" aria-pressed="false" style="height: 54px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px; cursor: pointer; text-align: left; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #E8EDF2">Americana</button>
+      </div>
+      <!-- SearchSelect closed trigger -->
+      <button type="button" aria-label="Search all submissions, Search all submissions" style="height: 42px; box-sizing: border-box; padding: 0 14px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px; cursor: pointer; text-align: left">
+        <span style="flex: 1; font-family: 'Inter', sans-serif; font-size: 14px; color: #8D929D">Search all submissions</span>
+        <span aria-hidden="true" style="margin-left: 7px; font-size: 14px; color: #8D929D">⌕</span>
+      </button>
+    </div>
+
+    <!-- FinishTimeField -->
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <label for="finish-time" style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 2.52px; color: #9CA3AF">FINISH TIME</label>
+      <div style="height: 64px; box-sizing: border-box; padding: 0 6px 0 14px; display: flex; flex-direction: row; align-items: center; gap: 12px; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 3px">
+        <input id="finish-time" type="text" value="03:48" placeholder="mm:ss" maxlength="5" aria-label="Finish time" style="width: 104px; min-width: 104px; padding: 0; border: none; outline: none; background: transparent; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 30px; letter-spacing: -0.28px; font-variant-numeric: tabular-nums; color: #E8EDF2">
+        <div style="flex: 1">
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">FROM MATCH CLOCK</span>
+        </div>
+        <button type="button" aria-label="Edit finish time" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; padding: 0; cursor: pointer; color: #9CA3AF">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"></path><path d="m15 5 4 4"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Record result (FightButton primary, 56) -->
+    <a href="29-Verdict.dc.html" style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; background: #E63946; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #0D0F14">Record result</a>
+
+    <!-- Claim note -->
+    <div style="display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px">
+      <span style="width: 6px; height: 6px; border-radius: 3px; background: #E8EDF2; flex-shrink: 0"></span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; line-height: 14px; letter-spacing: 0.56px; font-variant-numeric: tabular-nums; color: #9CA3AF">You're recording for both of you. D. Okafor sees this live.</span>
+    </div>
+  </div>
+
+  <!-- MatchUploadLine (components/match-flow/match-upload-line.tsx), rendered by match-step-renderer.tsx after the step in a View gap 12.
+       State: uploading 23%. You (M. Reyes) recorded the match on 24 (REC); the recorder stops at End and the upload manager moves the job pending -> uploading (status "uploading", progress from tus bytes sent), so mid-upload is the realistic state on the result step; 29 shows it finished. -->
+  <div role="progressbar" aria-label="Your angle: uploading, 23 percent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="23" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 0; flex-shrink: 0">
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 3v12"></path><path d="m17 8-5-5-5 5"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
+      <span style="flex: 1; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #9CA3AF">YOUR ANGLE: UPLOADING</span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; font-variant-numeric: tabular-nums; color: #9CA3AF">23%</span>
+    </div>
+    <div style="height: 2px; width: 100%; background: rgba(107,114,128,0.62)">
+      <div style="height: 2px; width: 23%; background: #9CA3AF"></div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">5a · Recorder</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 25</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">First to tap</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Record result (claim-first)</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">The first athlete to tap a winner or Draw claims the form (an advisory broadcast claim). record_match_result: participant only, in_progress only, loser = the other participant; it completes the match, applies rating v9 and auto-confirms the recorder. It runs through the offline mutationQueue.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/steps/result-step.tsx:104, 113, 148, 155</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/steps/result-form.tsx:163, 236</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/use-result-claim.ts:24 (winningClaim)</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/use-record-result.ts:72 (mutationQueue)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 12px">
+  <!-- Step component root (View gap 20) -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #9CA3AF">MATCH OVER</span>
+
+    <!-- Claimer summary (advances to confirm when the result lands) -->
+    <a href="27-Confirm.dc.html" aria-live="polite" style="display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 0; color: #E8EDF2">
+      <div aria-hidden="true" style="width: 96px; height: 96px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #262A34; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px">
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 30px; letter-spacing: 1.12px; color: #E8EDF2">DO</span>
+      </div>
+      <span style="max-width: 320px; text-align: center; font-family: 'Bebas Neue', sans-serif; font-size: 48px; line-height: 46px; color: #E8EDF2">D. Okafor is recording the result</span>
+      <div aria-hidden="true" style="height: 12px; display: flex; flex-direction: row; align-items: center; gap: 8px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #E8EDF2; opacity: 1"></span>
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #E8EDF2; opacity: 0.6"></span>
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #E8EDF2; opacity: 0.3"></span>
+      </div>
+      <span style="font-family: 'Inter', sans-serif; font-size: 14px; line-height: 18px; text-align: center; color: #9CA3AF">You’ll confirm it in a moment.</span>
+    </a>
+
+    <!-- Match facts plate -->
+    <div style="background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 4px; overflow: hidden">
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr))">
+        <div style="padding: 14px 12px; display: flex; flex-direction: column; gap: 8px">
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">ENDED AT</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; line-height: 22px; font-variant-numeric: tabular-nums; color: #E8EDF2">03:48</span>
+        </div>
+        <div style="padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; border-left: 1px solid rgba(107,114,128,0.45)">
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">CLOCK</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 18px; line-height: 22px; font-variant-numeric: tabular-nums; color: #E8EDF2">05:00</span>
+        </div>
+      </div>
+      <div style="padding: 12px; display: flex; flex-direction: row; justify-content: space-between; border-top: 1px solid rgba(107,114,128,0.45)">
+        <span style="flex: 1; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes vs D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; letter-spacing: 0; font-variant-numeric: tabular-nums; color: #9CA3AF">1512 · 1487</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MatchUploadLine (components/match-flow/match-upload-line.tsx), rendered by match-step-renderer.tsx after the step in a View gap 12.
+       State: uploading 23%. ResultWaiting is returned by ResultStep (steps/result-step.tsx, claim.state === "theirs"), so it sits under the "result" step and the line shows. This is your (M. Reyes) phone, which recorded the match on 24; same moment as 25. -->
+  <div role="progressbar" aria-label="Your angle: uploading, 23 percent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="23" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 0; flex-shrink: 0">
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 3v12"></path><path d="m17 8-5-5-5 5"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
+      <span style="flex: 1; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #9CA3AF">YOUR ANGLE: UPLOADING</span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; font-variant-numeric: tabular-nums; color: #9CA3AF">23%</span>
+    </div>
+    <div style="height: 2px; width: 100%; background: rgba(107,114,128,0.62)">
+      <div style="height: 2px; width: 23%; background: #9CA3AF"></div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">5b · Other athlete</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 26</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Other athlete</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Waiting while the opponent records</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">A claim not heard from for 20 s unlocks this athlete&#39;s form (takeover).</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/steps/result-waiting.tsx:35, 40, 44, 48</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/steps/result-step.tsx:70 (claim.state theirs)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 12px">
+  <!-- Step component root (View gap 20) -->
+  <div style="display: flex; flex-direction: column; gap: 20px">
+
+    <!-- Header -->
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #9CA3AF">RESULT RECORDED BY D. OKAFOR</span>
+      <h1 style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 30px; line-height: 36px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2">Confirm result</h1>
+    </div>
+
+    <!-- Verdict plate -->
+    <div style="background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 4px">
+      <div style="padding: 20px 16px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-direction: row; align-items: center; gap: 10px">
+          <div aria-hidden="true" style="width: 40px; height: 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #262A34; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px">
+            <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; color: #E8EDF2">MR</span>
+          </div>
+          <div style="flex: 1">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">WINNER</span>
+          </div>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 1.68px; color: #9CA3AF">YOU WON</span>
+        </div>
+        <span style="font-family: 'Bebas Neue', sans-serif; font-size: 60px; line-height: 56px; color: #E8EDF2">M. Reyes won</span>
+        <div style="display: flex; flex-direction: row; align-items: center"><span style="font-family: 'Inter', sans-serif; font-size: 16px; line-height: 21px; color: #9CA3AF">by Rear Naked Choke · 03:48</span><span aria-hidden="true" style="display: flex; flex-direction: row; align-items: center; gap: 3px; margin-left: 10px"><span style="width: 3px; height: 14px; border-radius: 1px; background: #E63946"></span><span style="width: 3px; height: 14px; border-radius: 1px; background: #E63946"></span><span style="width: 3px; height: 14px; border-radius: 1px; background: #E63946"></span></span></div>
+      </div>
+      <div style="border-top: 1px solid rgba(107,114,128,0.45); padding: 12px">
+        <!-- RatingBlock "YOUR RATING" -->
+        <div style="height: 64px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 4px">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">YOUR RATING</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 22px; line-height: 26px; font-variant-numeric: tabular-nums; color: #E8EDF2">1512 → 1526</span>
+          </div>
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 26px; line-height: 31px; font-variant-numeric: tabular-nums; color: #22C55E">▲ +14</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status rows -->
+    <div style="background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 4px">
+      <div style="height: 48px; box-sizing: border-box; padding: 0 14px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(107,114,128,0.45)">
+        <span style="flex: 1; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">D. Okafor</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 1.68px; color: #E8EDF2">D. OKAFOR CONFIRMED ✓</span>
+      </div>
+      <div style="height: 48px; box-sizing: border-box; padding: 0 14px; display: flex; flex-direction: row; align-items: center; justify-content: space-between">
+        <span style="flex: 1; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 0.56px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">M. Reyes (you)</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 1.68px; color: #F59E0B">WAITING ON YOU</span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <a href="29-Verdict.dc.html" style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; background: #E63946; border-radius: 3px; color: #0D0F14">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #0D0F14">Confirm result</span>
+      </a>
+      <a href="28-Dispute.dc.html" style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px; color: #E8EDF2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"></path></svg>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">Dispute result</span>
+      </a>
+      <!-- Lock notes -->
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px">
+        <span style="text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 0.56px; color: #E8EDF2">If you leave without disputing, it counts as confirming.</span>
+        <span style="text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; letter-spacing: 0.56px; color: #9CA3AF">Locks automatically in 23 h.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MatchUploadLine (components/match-flow/match-upload-line.tsx), rendered by match-step-renderer.tsx after the step in a View gap 12.
+       State: uploading 71%. Later than 25/26 in the same upload (this phone recorded on 24); it finishes by the verdict on 29. -->
+  <div role="progressbar" aria-label="Your angle: uploading, 71 percent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="71" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 0; flex-shrink: 0">
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 3v12"></path><path d="m17 8-5-5-5 5"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
+      <span style="flex: 1; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #9CA3AF">YOUR ANGLE: UPLOADING</span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; font-variant-numeric: tabular-nums; color: #9CA3AF">71%</span>
+    </div>
+    <div style="height: 2px; width: 100%; background: rgba(107,114,128,0.62)">
+      <div style="height: 2px; width: 71%; background: #9CA3AF"></div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">6a · Non-recorder</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 27</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Other athlete</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Confirm or dispute</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">Only the athlete who did not record lands here: the recorder was auto-confirmed and goes straight to the verdict. Leaving without disputing counts as confirming; auto_confirm_locked_results locks it after 24 h.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/steps/confirm-step.tsx:174, 176, 216, 223, 230, 235</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/match-extras.ts:55, 68</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/match-step-renderer.tsx:162-171 (recorder skips confirm)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 12px">
+
+  <!-- DisputeForm: gap-4 px-1 py-4 (rem 14) -->
+  <div style="display: flex; flex-direction: column; gap: 14px; padding: 14px 3.5px">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 7px">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
+      <div style="margin: 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; text-transform: uppercase; color: #8D929D">Dispute Result</div>
+      <p style="margin: 0; text-align: center; font-family: 'Inter', sans-serif; font-size: 13px; line-height: 17px; color: #9CA3AF">Wrong winner, wrong submission, or it never happened? Tell us. An admin reviews every dispute; ratings stay as recorded until then, and your opponent will see it was disputed.</p>
+    </div>
+
+    <textarea id="dispute-reason" placeholder="What went wrong? (optional)" style="height: 84px; box-sizing: border-box; resize: none; padding: 7px 10.5px; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px; background: #1E222B; font-family: 'Inter', sans-serif; font-size: 13px; color: #E8EDF2; outline: none"></textarea>
+
+    <a href="29-Verdict.dc.html" style="min-height: 44px; box-sizing: border-box; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; padding: 8px 16px; background: #E63946; border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; line-height: 18px; letter-spacing: 1.12px; text-align: center; text-transform: uppercase; color: #0D0F14">Submit Dispute</a>
+
+    <a href="27-Confirm.dc.html" style="display: flex; align-items: center; justify-content: center; padding: 7px 0; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; letter-spacing: 1.68px; text-transform: uppercase; text-decoration: underline; color: #8D929D">Back</a>
+  </div>
+
+  <!-- MatchUploadLine (components/match-flow/match-upload-line.tsx), rendered by match-step-renderer.tsx after the step in a View gap 12.
+       State: uploading 74%. DisputeForm is returned by ConfirmStep (steps/confirm-step.tsx, showDispute), so it sits under the "confirm" step and the line shows; a few seconds after 27, before it finishes on 29. -->
+  <div role="progressbar" aria-label="Your angle: uploading, 74 percent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="74" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 0; flex-shrink: 0">
+    <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M12 3v12"></path><path d="m17 8-5-5-5 5"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
+      <span style="flex: 1; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #9CA3AF">YOUR ANGLE: UPLOADING</span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; font-variant-numeric: tabular-nums; color: #9CA3AF">74%</span>
+    </div>
+    <div style="height: 2px; width: 100%; background: rgba(107,114,128,0.62)">
+      <div style="height: 2px; width: 74%; background: #9CA3AF"></div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">6b · Dispute</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 28</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Dispute form</span><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/steps/dispute-form.tsx:42 (disputeMatchResult), :62, :65, :86</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 1125px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 1125px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+
+  <!-- Full-bleed scroll content at its natural height (unscrolled) -->
+  <div style="flex-shrink: 0; display: flex; flex-direction: column; padding-bottom: 50px">
+
+    <!-- VerdictHero fallback: no opening still yet, both athletes on a plate; caption filmStillCaption(uploaded) -->
+    <div style="height: 360px; flex-shrink: 0; box-sizing: border-box; position: relative; background: #1E222B; border-bottom: 1px solid rgba(107,114,128,0.45); display: flex; flex-direction: column">
+      <div style="flex: 1; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 20px; padding-top: 47px">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+          <div aria-hidden="true" style="width: 104px; height: 104px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #262A34; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px">
+            <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 36px; letter-spacing: 1.12px; color: #E8EDF2">MR</span>
+          </div>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">M. Reyes</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+          <div aria-hidden="true" style="width: 104px; height: 104px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: #262A34; border: 1px solid rgba(107,114,128,0.62); border-radius: 2px">
+            <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 36px; letter-spacing: 1.12px; color: #E8EDF2">DO</span>
+          </div>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">D. Okafor</span>
+        </div>
+      </div>
+      <div style="position: absolute; left: 16px; right: 16px; bottom: 22px; display: flex; flex-direction: column; gap: 8px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #9CA3AF">PROCESSING FILM</span>
+      </div>
+    </div>
+
+    <!-- Body: px 16, marginTop 24, gap 16 -->
+    <div style="padding: 0 16px; margin-top: 24px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <h1 style="margin: 0; font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 96px; line-height: 88px; letter-spacing: 1px; color: #E8EDF2">YOU WON</h1>
+        <span style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 16px; line-height: 21px; color: #E8EDF2">by Rear Naked Choke · 03:48</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; line-height: 14px; letter-spacing: 1.68px; color: #9CA3AF">VS D. OKAFOR</span>
+      </div>
+
+      <!-- RatingBlock (verdict: default "RATING" label) -->
+      <div style="height: 64px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 4px">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: #8D929D">RATING</span>
+          <div style="display: flex; flex-direction: row; align-items: center"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 22px; line-height: 26px; font-variant-numeric: tabular-nums; color: #E8EDF2">1512 → 1526</span><span aria-hidden="true" style="display: flex; flex-direction: row; align-items: center; gap: 3px; margin-left: 10px"><span style="width: 3px; height: 14px; border-radius: 1px; background: #E63946"></span><span style="width: 3px; height: 14px; border-radius: 1px; background: #E63946"></span><span style="width: 3px; height: 14px; border-radius: 1px; background: #E63946"></span></span></div>
+        </div>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 26px; line-height: 31px; font-variant-numeric: tabular-nums; color: #22C55E">▲ +14</span>
+      </div>
+
+      <!-- Rank strip (win with a rank gain) -->
+      <div style="height: 40px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; gap: 10px; border: 1px solid rgba(34,197,94,0.5); border-radius: 4px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 7h6v6"></path><path d="m22 7-8.5 8.5-5-5L2 17"></path></svg>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #E8EDF2; white-space: nowrap">#12 → #11</span>
+      </div>
+
+      <!-- FilmStatusPlate variant="verdict" (title "Film"). State: this phone's upload landed (local job null; no recorder banner, showRecorderBanner is false for a plain "uploaded"). Your angle is server "processing" (match_videos ready/slicing/analyzing) and playable (videoPlayability: only uploading and merging are not), so its tag is Analyzing and the row is the Watch control. D. Okafor's angle is "uploading" at 64%. Phase collecting, yours in and nothing of yours still coming: "Your film is in. Analyzing now." with the Analyzing tag. Fusion off in prod, so no row helpers. No duration on your row: duration_s is ready-only and the just-landed row's duration is not known to be set. -->
+      <!-- Best angle tag not drawn: multi_angle_highlights_enabled is off in prod; shown only when a primary angle is elected among 2+ playable angles -->
+      <section aria-label="Film" style="box-sizing: border-box; background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 4px; padding: 14px 14px 2px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px">
+          <h2 style="margin: 0; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #E8EDF2">FILM</h2>
+          <div aria-label="Analyzing" style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; border: 1px solid rgba(245,158,11,0.7); display: flex; align-items: center">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #F59E0B">ANALYZING</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 14px; line-height: 18px; color: #E8EDF2">Your film is in. Analyzing now.</span>
+        </div>
+        <div style="margin-top: 4px; border-top: 1px solid rgba(107,114,128,0.45); display: flex; flex-direction: column">
+          <!-- Your angle: server processing and playable: the Watch control (onWatch -> videoHref, the player) -->
+          <a href="33-Video-Player.dc.html" aria-label="Watch your angle" style="display: flex; flex-direction: row; align-items: flex-start; gap: 10px; padding: 12px 0; min-height: 44px; box-sizing: border-box; border-bottom: 1px solid rgba(107,114,128,0.45); color: #E8EDF2">
+            <span style="width: 16px; padding-top: 1px; flex-shrink: 0; display: flex">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+            </span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <span style="display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 7px">
+                <span style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 0.56px; color: #E8EDF2">YOUR ANGLE</span>
+              </span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #F59E0B">ANALYZING</span>
+            </span>
+            <span style="align-self: center; display: flex; flex-direction: row; align-items: center; gap: 8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+            </span>
+          </a>
+          <!-- D. Okafor's angle: server uploading 64% (no helper before dispatch) -->
+          <div style="display: flex; flex-direction: row; align-items: flex-start; gap: 10px; padding: 12px 0">
+            <div role="progressbar" aria-label="D. Okafor's angle, Uploading, 64 percent" aria-valuemin="0" aria-valuemax="100" aria-valuenow="64" style="flex: 1; min-width: 0; display: flex; flex-direction: row; align-items: flex-start; gap: 10px">
+              <div style="width: 16px; padding-top: 1px; flex-shrink: 0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"></path><path d="m17 8-5-5-5 5"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path></svg>
+              </div>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                <div style="display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 7px">
+                  <span style="flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; line-height: 17px; letter-spacing: 0.56px; color: #E8EDF2">D. OKAFOR'S ANGLE</span>
+                </div>
+                <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #9CA3AF">UPLOADING</span>
+                <div style="padding-top: 3px">
+                  <div style="height: 2px; width: 100%; background: rgba(107,114,128,0.62)"><div style="height: 2px; width: 64%; background: #9CA3AF"></div></div>
+                </div>
+              </div>
+              <span style="align-self: center; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 13px; line-height: 17px; font-variant-numeric: tabular-nums; color: #9CA3AF">64%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Actions (win): "Watch film" with the Film icon, since fsView.playableVideoIds holds your angle; it opens match detail (matchDetailHref). Invite row not drawn (unchanged from the last sync; it follows the invites_enabled server flag). -->
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <a href="32-Match-Detail.dc.html" style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; background: #E63946; border-radius: 3px; color: #0D0F14">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D0F14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M7 3v18"></path><path d="M3 7.5h4"></path><path d="M3 12h18"></path><path d="M3 16.5h4"></path><path d="M17 3v18"></path><path d="M17 7.5h4"></path><path d="M17 16.5h4"></path></svg>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #0D0F14">Watch film</span>
+        </a>
+        <a href="12-Arena-Offline.dc.html" style="height: 56px; box-sizing: border-box; padding: 0 16px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; background: #1E222B; border: 1px solid rgba(107,114,128,0.62); border-radius: 3px; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2">Back to Arena</a>
+        <button type="button" style="height: 44px; box-sizing: border-box; padding: 0 8px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border: none; background: transparent; cursor: pointer; color: #E8EDF2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"></line><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"></line></svg>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; letter-spacing: 1.12px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Share match</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">7 · Both</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 29</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Verdict summary</span><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/verdict/verdict-step.tsx:169 (YOU WON / YOU LOST / DRAW / DISPUTED), :329 (Share match)</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/arena/constants.ts:51 (Back to Arena)</span></div></div></div></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2216,"height":1556}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

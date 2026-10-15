@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Current (flag off): countdown, live clock, pause and resume, end</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+body{margin:0;background:#0D0F14;font-family:'Inter',sans-serif;color:#E8EDF2}
+a{color:#EC6A74;text-decoration:none}a:hover{color:#F0556B}
+</style>
+</helmet>
+<div style="width: 2216px; height: 1429px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+<div style="padding: 48px 48px 0; display: flex; flex-direction: column; gap: 10px"><div style="display: flex; flex-direction: row; gap: 12px; align-items: center"><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(245,158,11,0.7); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #F59E0B; white-space: nowrap">Current app · timekeeper_role OFF · today</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #8D929D">Board A3 of 5 · source jits_web origin/development 4a20ee80</span></div><h1 style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 32px; line-height: 40px; color: #E8EDF2">Today: live (clock, pause and resume, end, recording)</h1><p style="margin: 0; max-width: 1100px"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 15px; line-height: 21px; color: #9CA3AF">Both athletes see the same broadcast screen and both hold the controls. Pause and resume are real server actions; End is a broadcast, so the server only learns the match is over when someone records the result.</span></p></div><div style="padding: 32px 48px 48px; display: flex; flex-direction: row; gap: 40px; align-items: flex-start"><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #000000; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+
+  <!-- Full-screen camera at the recorded 9:16 aspect (390 x 693, top-aligned) on black -->
+  <img src="/_blob/025725f8efe322baa46f16ccb2047fa9" alt="Camera feed (illustrated mock): athletes touch hands as the referee starts the match" style="position: absolute; left: 0; top: 0; width: 390px; height: 693px; object-fit: cover; background: #1E222B">
+
+  <!-- ON_MEDIA scrim over the whole screen -->
+  <div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.55)"></div>
+
+  <!-- Top row: REC ARMS AT GO (no match-kind tag) -->
+  <div style="position: absolute; left: 16px; right: 16px; top: 59px; height: 28px; display: flex; flex-direction: row; align-items: center; justify-content: space-between">
+    <div style="height: 28px; box-sizing: border-box; padding: 0 10px; display: flex; flex-direction: row; align-items: center; gap: 7px; border: 1px solid #E63946; border-radius: 2px; background: rgba(0,0,0,0.45)">
+      <span style="width: 8px; height: 8px; box-sizing: border-box; border-radius: 4px; border: 1.5px solid #F0556B"></span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 1.68px; color: #F0556B">REC ARMS AT GO</span>
+    </div>
+  </div>
+
+  <!-- Numeral -->
+  <a href="24-Live-Broadcast.dc.html" role="timer" aria-label="Match starts in 2" style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: #FFFFFF">
+    <span style="font-family: 'Bebas Neue', sans-serif; font-size: 240px; line-height: 240px; color: #FFFFFF">2</span>
+  </a>
+
+  <!-- Progress bar + caption (bottom = 34 + 132) -->
+  <div style="position: absolute; left: 48px; right: 48px; bottom: 166px; display: flex; flex-direction: column; align-items: center; gap: 12px">
+    <div style="width: 100%; height: 3px; background: rgba(255,255,255,0.18)">
+      <div style="width: 55%; height: 3px; background: #E63946"></div>
+    </div>
+    <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; letter-spacing: 2.52px; color: rgba(232,237,242,0.72); white-space: nowrap">SYNCED TO SERVER CLOCK · BOTH PHONES</span>
+  </div>
+
+  <!-- FaceoffChip onMedia, height 56 (bottom = 34 + 26) -->
+  <div style="position: absolute; left: 16px; right: 16px; bottom: 60px; height: 56px; box-sizing: border-box; display: flex; flex-direction: row; background: rgba(232,235,240,0.96); border: 1px solid rgba(13,15,20,0.34); border-radius: 3px">
+    <div style="flex: 1; min-width: 0; padding-left: 12px; display: flex; flex-direction: column; justify-content: center; gap: 5px">
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+        <span style="width: 4px; height: 4px; background: #E63946; flex-shrink: 0"></span>
+        <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #0D0F14; white-space: nowrap">M. Reyes</span>
+      </div>
+      <span style="padding-left: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #575C68">1512 · 172.5 LBS</span>
+    </div>
+    <div style="width: 44px; display: flex; align-items: center; justify-content: center">
+      <span style="font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 26px; color: #AC2B34">VS</span>
+    </div>
+    <div style="flex: 1; min-width: 0; padding-right: 12px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 5px">
+      <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 21px; letter-spacing: 0.56px; text-transform: uppercase; color: #0D0F14; white-space: nowrap">D. Okafor</span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 14px; font-variant-numeric: tabular-nums; color: #575C68">1487 · 171.4 LBS</span>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">4a · Countdown</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 23</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Countdown, recording arms at GO</span><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/countdown/countdown.tsx:170 (REC ARMS AT GO / NOT RECORDING), :208</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #000000; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+
+  <!-- Full-screen camera at the recorded 9:16 aspect (390 x 693, top-aligned) on black -->
+  <img src="/_blob/7e05d9a09607827721e6ac4fe4433fb6" alt="Camera feed (illustrated mock): athletes grappling on the mat, referee watching" style="position: absolute; left: 0; top: 0; width: 390px; height: 693px; object-fit: cover; background: #1E222B">
+
+  <!-- Scrims: top (insets.top + 86) and bottom (45% of height) -->
+  <div style="position: absolute; left: 0; right: 0; top: 0; height: 133px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0))"></div>
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 380px; background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.85))"></div>
+
+  <!-- Portrait layout: paddingTop 47 + 12, paddingBottom 34 + 8, paddingHorizontal 16 -->
+  <div style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; box-sizing: border-box; padding: 59px 16px 42px 16px; display: flex; flex-direction: column">
+
+    <!-- HUD row: RecTally (rec); no kind tag on a real match (PRACTICE only) -->
+    <div style="height: 28px; display: flex; flex-direction: row; align-items: center; justify-content: space-between">
+      <div aria-label="Recording, 2 minutes 14 seconds" style="height: 28px; box-sizing: border-box; padding: 0 10px; display: flex; flex-direction: row; align-items: center; gap: 7px; border-radius: 2px; background: #E63946">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #0D0F14"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #0D0F14">REC 02:14</span>
+      </div>
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 8px"></div>
+    </div>
+
+    <div style="flex: 1"></div>
+
+    <!-- Lower third, gap 12 -->
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-direction: column">
+        <!-- AthleteBar (no strip: rounded top) -->
+        <div style="height: 56px; box-sizing: border-box; display: flex; flex-direction: row; background: rgba(232,235,240,0.96); border: 1px solid rgba(13,15,20,0.34); border-bottom: 0; border-top-left-radius: 4px; border-top-right-radius: 4px">
+          <div style="flex: 1; min-width: 0; padding-left: 12px; display: flex; flex-direction: column; justify-content: center; gap: 4px">
+            <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+              <span role="img" aria-label="You" style="width: 4px; height: 4px; background: #E63946; flex-shrink: 0"></span>
+              <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 18px; letter-spacing: 0.56px; color: #0D0F14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">MARCUS REYES</span>
+            </div>
+            <span style="padding-left: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 13px; letter-spacing: 0.56px; font-variant-numeric: tabular-nums; color: #575C68; white-space: nowrap">1512 · 172.5 LBS</span>
+          </div>
+          <div aria-hidden="true" style="width: 44px; display: flex; flex-direction: column; align-items: center; padding-top: 7px; gap: 3px">
+            <span style="font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 19px; letter-spacing: 0.56px; color: #AC2B34">VS</span>
+            <span style="width: 1px; flex-grow: 1; background: #E63946"></span>
+          </div>
+          <div style="flex: 1; min-width: 0; padding-right: 12px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 4px">
+            <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 18px; letter-spacing: 0.56px; color: #0D0F14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">DANA OKAFOR</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 13px; letter-spacing: 0.56px; font-variant-numeric: tabular-nums; color: #575C68; white-space: nowrap">1487 · 171.4 LBS</span>
+          </div>
+        </div>
+
+        <!-- ClockSlab -->
+        <div style="height: 104px; position: relative; display: flex; align-items: center; justify-content: center; background: rgba(13,15,20,0.92); border-bottom-left-radius: 4px; border-bottom-right-radius: 4px">
+          <div style="position: absolute; left: 12px; top: 10px; display: flex; flex-direction: row; align-items: center; gap: 6px">
+            <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 3.5px; background: #22C55E"></span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; color: #22C55E">LIVE</span>
+          </div>
+          <span style="position: absolute; right: 12px; top: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 12px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: rgba(232,237,242,0.62)">OF 05:00</span>
+          <span role="timer" aria-label="2 minutes 46 seconds remaining" style="padding-top: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 88px; line-height: 92px; letter-spacing: -3.52px; font-variant-numeric: tabular-nums; color: #E8EDF2">02:46</span>
+        </div>
+      </div>
+
+      <!-- Controls row, height 64, gap 12 -->
+      <div style="height: 64px; display: flex; flex-direction: row; gap: 12px">
+        <button type="button" aria-label="Pause match clock" style="flex: 1; min-width: 0; height: 64px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.40); background: rgba(255,255,255,0.12); padding: 0; cursor: pointer; color: #FFFFFF">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="14" y="3" width="5" height="18" rx="1"></rect><rect x="5" y="3" width="5" height="18" rx="1"></rect></svg>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; line-height: 16px; letter-spacing: 1.12px; color: #FFFFFF">PAUSE</span>
+        </button>
+        <a href="25-Result-Entry.dc.html" aria-label="Hold to end match" style="flex: 1.4; min-width: 0; height: 64px; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; background: #E63946; color: #0D0F14">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"></rect></svg>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; line-height: 16px; letter-spacing: 1.12px; color: #0D0F14; white-space: nowrap">HOLD TO END</span>
+          <span style="position: absolute; left: 12px; right: 12px; bottom: 10px; height: 2px; background: rgba(13,15,20,0.25)"></span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">4b · Live</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Current app 24</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Live: client clock, PAUSE, HOLD TO END</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">The clock runs on each phone from started_at. Either athlete can pause or hold to end. Each phone that opted in records its own angle (REC mm:ss).</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/live/rec-tally.tsx:17</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/live/clock-slab.tsx:63, 76</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/live/pause-button.tsx:51</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/live/hold-to-end-button.tsx:143</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #000000; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+
+  <!-- Full-screen camera at the recorded 9:16 aspect (390 x 693, top-aligned) on black -->
+  <img src="/_blob/7e05d9a09607827721e6ac4fe4433fb6" alt="Camera feed (illustrated mock): athletes grappling on the mat, referee watching" style="position: absolute; left: 0; top: 0; width: 390px; height: 693px; object-fit: cover; background: #1E222B">
+
+  <!-- Scrims: top (insets.top + 86) and bottom (45% of height) -->
+  <div style="position: absolute; left: 0; right: 0; top: 0; height: 133px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0))"></div>
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 380px; background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.85))"></div>
+
+  <!-- Portrait layout: paddingTop 47 + 12, paddingBottom 34 + 8, paddingHorizontal 16 -->
+  <div style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; box-sizing: border-box; padding: 59px 16px 42px 16px; display: flex; flex-direction: column">
+
+    <!-- HUD row: RecTally (rec); no kind tag on a real match (PRACTICE only) -->
+    <div style="height: 28px; display: flex; flex-direction: row; align-items: center; justify-content: space-between">
+      <div aria-label="Recording, 2 minutes 14 seconds" style="height: 28px; box-sizing: border-box; padding: 0 10px; display: flex; flex-direction: row; align-items: center; gap: 7px; border-radius: 2px; background: #E63946">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #0D0F14"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #0D0F14">REC 02:14</span>
+      </div>
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 8px"></div>
+    </div>
+
+    <div style="flex: 1"></div>
+
+    <!-- Lower third, gap 12 -->
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-direction: column">
+        <!-- StateStrip paused -->
+        <div aria-live="polite" style="height: 32px; box-sizing: border-box; padding: 0 12px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; border-top-left-radius: 4px; border-top-right-radius: 4px; background: #F59E0B"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #0D0F14">PAUSED</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 12px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #0D0F14">CAMERA STILL RECORDING</span></div>
+        <!-- AthleteBar (flat top under the strip) -->
+        <div style="height: 56px; box-sizing: border-box; display: flex; flex-direction: row; background: rgba(232,235,240,0.96); border: 1px solid rgba(13,15,20,0.34); border-bottom: 0">
+          <div style="flex: 1; min-width: 0; padding-left: 12px; display: flex; flex-direction: column; justify-content: center; gap: 4px">
+            <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+              <span role="img" aria-label="You" style="width: 4px; height: 4px; background: #E63946; flex-shrink: 0"></span>
+              <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 18px; letter-spacing: 0.56px; color: #0D0F14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">MARCUS REYES</span>
+            </div>
+            <span style="padding-left: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 13px; letter-spacing: 0.56px; font-variant-numeric: tabular-nums; color: #575C68; white-space: nowrap">1512 · 172.5 LBS</span>
+          </div>
+          <div aria-hidden="true" style="width: 44px; display: flex; flex-direction: column; align-items: center; padding-top: 7px; gap: 3px">
+            <span style="font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 19px; letter-spacing: 0.56px; color: #AC2B34">VS</span>
+            <span style="width: 1px; flex-grow: 1; background: #E63946"></span>
+          </div>
+          <div style="flex: 1; min-width: 0; padding-right: 12px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 4px">
+            <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 18px; letter-spacing: 0.56px; color: #0D0F14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">DANA OKAFOR</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 13px; letter-spacing: 0.56px; font-variant-numeric: tabular-nums; color: #575C68; white-space: nowrap">1487 · 171.4 LBS</span>
+          </div>
+        </div>
+
+        <!-- ClockSlab -->
+        <div style="height: 104px; position: relative; display: flex; align-items: center; justify-content: center; background: rgba(13,15,20,0.92); border-bottom-left-radius: 4px; border-bottom-right-radius: 4px">
+          <div style="position: absolute; left: 12px; top: 10px; display: flex; flex-direction: row; align-items: center; gap: 6px">
+            <span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 3.5px; background: #F59E0B"></span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; color: #F59E0B">PAUSED</span>
+          </div>
+          <span style="position: absolute; right: 12px; top: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 12px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: rgba(232,237,242,0.62)">OF 05:00</span>
+          <span role="timer" aria-label="2 minutes 46 seconds remaining" style="padding-top: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 88px; line-height: 92px; letter-spacing: -3.52px; font-variant-numeric: tabular-nums; color: #E8EDF2">02:46</span>
+        </div>
+      </div>
+
+      <!-- Controls row, height 64, gap 12 -->
+      <div style="height: 64px; display: flex; flex-direction: row; gap: 12px">
+        <button type="button" aria-label="Resume match clock" style="flex: 1; min-width: 0; height: 64px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; border: 1px solid #F59E0B; background: rgba(245,158,11,0.16); padding: 0; cursor: pointer; color: #FFFFFF"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path></svg><span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; line-height: 16px; letter-spacing: 1.12px; color: #FFFFFF">RESUME</span></button>
+        <a href="25-Result-Entry.dc.html" aria-label="Hold to end match" style="flex: 1.4; min-width: 0; height: 64px; position: relative; overflow: hidden; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 10px; border-radius: 3px; background: #E63946; color: #0D0F14">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"></rect></svg>
+          <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; line-height: 16px; letter-spacing: 1.12px; color: #0D0F14; white-space: nowrap">HOLD TO END</span>
+          <span style="position: absolute; left: 12px; right: 12px; bottom: 10px; height: 2px; background: rgba(13,15,20,0.25)"></span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">4c · Paused</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Derived from code</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Paused: amber strip, RESUME</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">pause_match and resume_match are server RPCs guarded by can_control_match (participants only; the timekeeper has been excluded since 20261006100000). The other phone follows by broadcast and a DB re-read.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/live/state-strip.tsx:21-27 (PAUSED, CAMERA STILL RECORDING)</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/live/clock-slab.tsx:65</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/live/pause-button.tsx:39-51</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/use-live-controls.ts:66, 93 (resumeMatch, pauseMatch)</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #0D0F14; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative; padding: 55px 16px 66px 16px; gap: 16px"><div style="padding: 28px 3.5px"><div style="background: #1E222B; border: 1px solid rgba(107,114,128,0.45); border-radius: 4px; padding: 28px 14px; display: flex; flex-direction: column; align-items: center; gap: 14px"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#E8EDF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg><span style="font-family: 'Bebas Neue', sans-serif; font-size: 28px; line-height: 34px; letter-spacing: 1.12px; color: #E8EDF2">MATCH ENDED</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 13px; letter-spacing: 2.52px; text-transform: uppercase; font-variant-numeric: tabular-nums; color: #8D929D">Up next: record the result</span></div></div></div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">4d · I ended</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Derived from code</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Phone that held to end</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">MATCH ENDED, then the result form</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">End is broadcast only (match_ended). The match stays in_progress on the server until a result is recorded. This plate shows for 800 ms.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/use-live-controls.ts:56 (broadcastMatchEnded)</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/steps/end-step.tsx:35, 38</span></div></div></div></div><div style="width: 392px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0"><div style="width: 390px; height: 844px; flex-shrink: 0; position: relative; overflow: hidden; border: 1px solid rgba(107,114,128,0.62); border-radius: 4px; box-sizing: content-box"><div style="width: 390px; height: 844px; box-sizing: border-box; background: #000000; color: #E8EDF2; display: flex; flex-direction: column; overflow: hidden; position: relative">
+
+  <!-- Full-screen camera at the recorded 9:16 aspect (390 x 693, top-aligned) on black -->
+  <img src="/_blob/7e05d9a09607827721e6ac4fe4433fb6" alt="Camera feed (illustrated mock): athletes grappling on the mat, referee watching" style="position: absolute; left: 0; top: 0; width: 390px; height: 693px; object-fit: cover; background: #1E222B">
+
+  <!-- Scrims: top (insets.top + 86) and bottom (45% of height) -->
+  <div style="position: absolute; left: 0; right: 0; top: 0; height: 133px; background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0))"></div>
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 380px; background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.85))"></div>
+
+  <!-- Portrait layout: paddingTop 47 + 12, paddingBottom 34 + 8, paddingHorizontal 16 -->
+  <div style="position: absolute; left: 0; right: 0; top: 0; bottom: 0; box-sizing: border-box; padding: 59px 16px 42px 16px; display: flex; flex-direction: column">
+
+    <!-- HUD row: RecTally (rec); no kind tag on a real match (PRACTICE only) -->
+    <div style="height: 28px; display: flex; flex-direction: row; align-items: center; justify-content: space-between">
+      <div aria-label="Recording, 2 minutes 14 seconds" style="height: 28px; box-sizing: border-box; padding: 0 10px; display: flex; flex-direction: row; align-items: center; gap: 7px; border-radius: 2px; background: #E63946">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #0D0F14"></span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 13px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: #0D0F14">REC 02:14</span>
+      </div>
+      <div style="display: flex; flex-direction: row; align-items: center; gap: 8px"></div>
+    </div>
+
+    <div style="flex: 1"></div>
+
+    <!-- Lower third, gap 12 -->
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 12px">
+      <!-- OpponentEndedPlate -->
+      <div role="alert" style="background: rgba(232,235,240,0.96); border: 1px solid rgba(13,15,20,0.34); border-radius: 4px; padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 6px"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 12px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; color: #575C68">MATCH OVER</span><span style="font-family: 'Bebas Neue', sans-serif; font-size: 40px; line-height: 38px; color: #0D0F14">D. OKAFOR ENDED THE MATCH</span><span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 11px; line-height: 13px; letter-spacing: 0.56px; font-variant-numeric: tabular-nums; color: #575C68">FINAL CLOCK 01:12 OF 05:00</span></div>
+      
+      <div style="display: flex; flex-direction: column">
+        <!-- AthleteBar (no strip: rounded top) -->
+        <div style="height: 56px; box-sizing: border-box; display: flex; flex-direction: row; background: rgba(232,235,240,0.96); border: 1px solid rgba(13,15,20,0.34); border-bottom: 0; border-top-left-radius: 4px; border-top-right-radius: 4px">
+          <div style="flex: 1; min-width: 0; padding-left: 12px; display: flex; flex-direction: column; justify-content: center; gap: 4px">
+            <div style="display: flex; flex-direction: row; align-items: center; gap: 7px">
+              <span role="img" aria-label="You" style="width: 4px; height: 4px; background: #E63946; flex-shrink: 0"></span>
+              <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 18px; letter-spacing: 0.56px; color: #0D0F14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">MARCUS REYES</span>
+            </div>
+            <span style="padding-left: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 13px; letter-spacing: 0.56px; font-variant-numeric: tabular-nums; color: #575C68; white-space: nowrap">1512 · 172.5 LBS</span>
+          </div>
+          <div aria-hidden="true" style="width: 44px; display: flex; flex-direction: column; align-items: center; padding-top: 7px; gap: 3px">
+            <span style="font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 19px; letter-spacing: 0.56px; color: #AC2B34">VS</span>
+            <span style="width: 1px; flex-grow: 1; background: #E63946"></span>
+          </div>
+          <div style="flex: 1; min-width: 0; padding-right: 12px; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 4px">
+            <span style="font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; line-height: 18px; letter-spacing: 0.56px; color: #0D0F14; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">DANA OKAFOR</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 11px; line-height: 13px; letter-spacing: 0.56px; font-variant-numeric: tabular-nums; color: #575C68; white-space: nowrap">1487 · 171.4 LBS</span>
+          </div>
+        </div>
+
+        <!-- ClockSlab -->
+        <div style="height: 104px; position: relative; display: flex; align-items: center; justify-content: center; background: rgba(13,15,20,0.92); border-bottom-left-radius: 4px; border-bottom-right-radius: 4px">
+          <div style="position: absolute; left: 12px; top: 10px; display: flex; flex-direction: row; align-items: center; gap: 6px">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; letter-spacing: 2.52px; color: rgba(232,237,242,0.62)">FINAL</span>
+          </div>
+          <span style="position: absolute; right: 12px; top: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 10px; line-height: 12px; letter-spacing: 1.68px; font-variant-numeric: tabular-nums; color: rgba(232,237,242,0.62)">OF 05:00</span>
+          <span role="timer" aria-label="1 minute 12 seconds remaining" style="padding-top: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 88px; line-height: 92px; letter-spacing: -3.52px; font-variant-numeric: tabular-nums; color: #E8EDF2">01:12</span>
+        </div>
+      </div>
+
+      <!-- Controls: none once the opponent ended (live-broadcast.tsx:163) -->
+    </div>
+  </div>
+</div></div><div style="display: flex; flex-direction: column; gap: 8px; padding: 0 2px"><div style="display: flex; flex-direction: row; gap: 8px; align-items: center; flex-wrap: wrap"><span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; line-height: 14px; letter-spacing: 2.52px; font-variant-numeric: tabular-nums; text-transform: uppercase; color: #E8EDF2">4e · Other phone</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #9CA3AF; white-space: nowrap">Derived from code</span><span style="height: 20px; box-sizing: border-box; padding: 0 7px; border-radius: 2px; display: inline-flex; align-items: center; background: rgba(0,0,0,0.88); border: 1px solid rgba(107,114,128,0.62); font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; line-height: 13px; letter-spacing: 1.68px; text-transform: uppercase; color: #E8EDF2; white-space: nowrap">Other phone</span></div><span style="margin: 0; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 15px; line-height: 19px; color: #E8EDF2">Opponent ended the match</span><p style="margin: 0"><span style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; line-height: 17px; color: #9CA3AF">When the opponent&#39;s match_ended broadcast lands, the clock freezes, the controls go and this plate shows for 1.5 s before the result step.</span></p><div style="display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(107,114,128,0.20)"><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/live/opponent-ended-plate.tsx:37, 45, 51</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/components/match-flow/steps/live-step.tsx:99, 149</span></div><div><span style="font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 10px; line-height: 13px; letter-spacing: 0.4px; font-variant-numeric: tabular-nums; color: #8D929D; white-space: normal; overflow-wrap: anywhere">source: apps/mobile/lib/match-flow/live-view-state.ts:6 (1500 ms)</span></div></div></div></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":2216,"height":1429}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
