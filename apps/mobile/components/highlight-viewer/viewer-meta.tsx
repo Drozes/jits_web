@@ -45,7 +45,7 @@ export function ViewerMeta({ progress, meta }: { progress: HighlightProgress | n
           accessibilityRole="link"
           accessibilityLabel={VIEWER_COPY.instagramLabel(label)}
           accessibilityHint={VIEWER_COPY.instagramHint}
-          hitSlop={10}
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
           onPress={openInstagram}
           className="self-start py-1 active:opacity-70"
         >
