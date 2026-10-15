@@ -5,7 +5,8 @@
  * service. Steps:
  *   1. Ensure a default Android notification channel exists.
  *   2. Request permission (silently if already granted).
- *   3. Fetch the Expo push token (requires a physical device).
+ *   3. Fetch the Expo push token (a physical iOS device; on Android an
+ *      emulator with Google Play services also gets an FCM token).
  *   4. Persist the token via the shared `registerPushDevice` mutation.
  *
  * Returns a discriminated `RegisterPushResult` so callers can surface a
@@ -76,13 +77,28 @@ export type RegisterPushResult =
         | "not_a_device"
         | "permission_denied"
         | "no_project_id"
+        | "token_failed"
         | "register_failed";
       message?: string;
     };
 
-async function ensureAndroidChannel(): Promise<void> {
+/**
+ * The Android notification channel every push is posted to. The id MUST stay
+ * "default": the jr_be push function sends `channelId: 'default'`
+ * (jr_be-hfy), and a push to a channel that does not exist is dropped on
+ * Android 8+.
+ */
+export const ANDROID_CHANNEL_ID = "default";
+
+/**
+ * Creates (or updates) the default Android channel; a no-op elsewhere.
+ * Idempotent, so it runs at startup (`app/_layout.tsx`) as well as on
+ * registration: the channel then exists before any push arrives even when
+ * registration never ran.
+ */
+export async function ensureAndroidChannel(): Promise<void> {
   if (Platform.OS !== "android") return;
-  await Notifications.setNotificationChannelAsync("default", {
+  await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
     name: "Default",
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 250, 250, 250],
@@ -119,7 +135,9 @@ export async function registerForPushNotifications(
   athleteId: string,
 ): Promise<RegisterPushResult> {
   const generation = signOutGeneration;
-  if (!Device.isDevice) {
+  // iOS simulators cannot get a push token. Android emulators with Google
+  // Play services can (FCM), so they register like a device (jits-mafl.1).
+  if (!Device.isDevice && Platform.OS !== "android") {
     return { ok: false, reason: "not_a_device" };
   }
 
@@ -139,7 +157,10 @@ export async function registerForPushNotifications(
   } catch (err) {
     return {
       ok: false,
-      reason: "no_project_id",
+      // `no_project_id` only when there was genuinely no project id to pass;
+      // any other failure (no FCM config, network, Play services) is the
+      // token fetch itself.
+      reason: projectId ? "token_failed" : "no_project_id",
       message: err instanceof Error ? err.message : String(err),
     };
   }

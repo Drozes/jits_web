@@ -33,6 +33,7 @@ import withAndroidBackupRules, {
   DATA_EXTRACTION_RULES,
   DIRECTORY,
   FULL_BACKUP_CONTENT,
+  SECURE_STORE_PREFS,
   setBackupAttributes,
 } from "../../plugins/with-android-backup-rules";
 
@@ -50,6 +51,37 @@ function manifest(): FakeManifest {
   };
 }
 
+/** The body of the one `<tag>...</tag>` section in `xml`. */
+function section(xml: string, tag: string): string {
+  const m = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`));
+  if (!m) throw new Error(`no <${tag}> section`);
+  return m[1];
+}
+
+describe("SecureStore is never backed up (jits-mafl.1)", () => {
+  // Its prefs are encrypted with a Keystore key that is never backed up, so
+  // restored values cannot be decrypted. expo-secure-store's own rules are
+  // replaced by this plugin's (configureAndroidBackup: false in app.json).
+  const EXCLUDE = '<exclude domain="sharedpref" path="SecureStore" />';
+
+  it("is expo-secure-store's prefs file name", () => {
+    expect(SECURE_STORE_PREFS).toBe("SecureStore");
+  });
+
+  it.each([
+    ["cloud-backup", DATA_EXTRACTION_RULES],
+    ["device-transfer", DATA_EXTRACTION_RULES],
+    ["full-backup-content", FULL_BACKUP_CONTENT],
+  ])("is excluded in <%s>", (tag, xml) => {
+    expect(section(xml, tag)).toContain(EXCLUDE);
+  });
+
+  it("adds no <include>, which would turn the rules into an allowlist", () => {
+    expect(DATA_EXTRACTION_RULES).not.toContain("<include");
+    expect(FULL_BACKUP_CONTENT).not.toContain("<include");
+  });
+});
+
 describe("the excluded directory", () => {
   it("is the one recording-file.ts actually parks clips in", () => {
     // The plugin and the runtime agree by construction or not at all: the
@@ -61,23 +93,20 @@ describe("the excluded directory", () => {
 
 describe("data extraction rules (API 31+)", () => {
   it("excludes the directory from cloud backup", () => {
-    expect(DATA_EXTRACTION_RULES).toMatch(
-      /<cloud-backup>\s*<exclude domain="file" path="match-uploads\/" \/>\s*<\/cloud-backup>/,
-    );
+    expect(section(DATA_EXTRACTION_RULES, "cloud-backup")).toContain('<exclude domain="file" path="match-uploads/" />');
   });
 
   it("excludes it from device-to-device transfer too", () => {
     // A separate section on API 31+. Covering only cloud-backup would still
     // copy the parked clip to a new phone during setup.
-    expect(DATA_EXTRACTION_RULES).toMatch(
-      /<device-transfer>\s*<exclude domain="file" path="match-uploads\/" \/>\s*<\/device-transfer>/,
-    );
+    expect(section(DATA_EXTRACTION_RULES, "device-transfer")).toContain('<exclude domain="file" path="match-uploads/" />');
   });
 
   it('uses the "file" domain, which is what filesDir maps to', () => {
     // `Paths.document` is `context.filesDir` on Android. `domain="data"`
     // would silently match nothing.
-    expect(DATA_EXTRACTION_RULES).not.toMatch(/domain="(?!file")/);
+    expect(DATA_EXTRACTION_RULES).not.toMatch(/domain="(?!file"|sharedpref")/);
+    expect(DATA_EXTRACTION_RULES).not.toMatch(/domain="(?!file")[^"]*" path="match-uploads/);
   });
 
   it("is well-formed XML with the declaration Android requires", () => {
@@ -88,8 +117,8 @@ describe("data extraction rules (API 31+)", () => {
 describe("full backup content (API 23-30)", () => {
   it("excludes the same directory", () => {
     // Shipping only the API 31+ file leaves every older device unprotected.
-    expect(FULL_BACKUP_CONTENT).toMatch(
-      /<full-backup-content>\s*<exclude domain="file" path="match-uploads\/" \/>\s*<\/full-backup-content>/,
+    expect(section(FULL_BACKUP_CONTENT, "full-backup-content")).toContain(
+      '<exclude domain="file" path="match-uploads/" />',
     );
   });
 

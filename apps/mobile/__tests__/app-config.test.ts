@@ -40,6 +40,10 @@ const ENV_KEYS = [
   "SENTRY_AUTH_TOKEN",
   "EAS_BUILD",
   "EAS_BUILD_PROFILE",
+  "EAS_BUILD_PLATFORM",
+  "GOOGLE_SERVICES_JSON",
+  "EXPO_PUBLIC_SUPABASE_URL",
+  "EXPO_PUBLIC_SUPABASE_ANON_KEY",
 ] as const;
 type EnvSnapshot = Record<string, string | undefined>;
 let savedEnv: EnvSnapshot;
@@ -111,5 +115,54 @@ describe("app.config.js", () => {
     expect(process.env.UPDATE_NOTICE).toBe(before.UPDATE_NOTICE);
     expect(process.env.EAS_BUILD).toBe(before.EAS_BUILD);
     expect(snapshotEnv()).toEqual(before);
+  });
+});
+
+describe("android.googleServicesFile (jits-mafl.1, FCM)", () => {
+  const LOCAL = path.join(__dirname, "..", "google-services.json");
+  function withLocalFile(present: boolean) {
+    const real = fs.existsSync;
+    jest.spyOn(fs, "existsSync").mockImplementation((p) => (p === LOCAL ? present : real(p)));
+  }
+
+  it("uses the EAS file env var GOOGLE_SERVICES_JSON first", () => {
+    withLocalFile(true);
+    process.env.GOOGLE_SERVICES_JSON = "/home/expo/workingdir/google-services.json";
+    const out = appConfig({ config: fixture() });
+    expect(out.android).toEqual({
+      package: "com.elorated.mobile",
+      permissions: ["CAMERA"],
+      googleServicesFile: "/home/expo/workingdir/google-services.json",
+    });
+  });
+
+  it("falls back to ./google-services.json when that file exists", () => {
+    withLocalFile(true);
+    const out = appConfig({ config: fixture() }) as unknown as { android: Record<string, unknown> };
+    expect(out.android.googleServicesFile).toBe("./google-services.json");
+  });
+
+  it("omits the key with neither (local expo config, iOS exports)", () => {
+    withLocalFile(false);
+    const out = appConfig({ config: fixture() }) as unknown as { android: Record<string, unknown> };
+    expect(out.android).not.toHaveProperty("googleServicesFile");
+    expect(out.android).toEqual(fixture().android);
+  });
+
+  it("throws only on a production Android EAS build with neither", () => {
+    withLocalFile(false);
+    process.env.EXPO_PUBLIC_SUPABASE_URL = "https://x.supabase.co";
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = "anon";
+    process.env.EAS_BUILD = "true";
+    process.env.EAS_BUILD_PLATFORM = "android";
+    process.env.EAS_BUILD_PROFILE = "production";
+    expect(() => appConfig({ config: fixture() })).toThrow(/google-services\.json/);
+
+    process.env.EAS_BUILD_PROFILE = "preview";
+    expect(() => appConfig({ config: fixture() })).not.toThrow();
+
+    process.env.EAS_BUILD_PLATFORM = "ios";
+    process.env.EAS_BUILD_PROFILE = "production";
+    expect(() => appConfig({ config: fixture() })).not.toThrow();
   });
 });

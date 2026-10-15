@@ -72,8 +72,8 @@ function addQueriedSchemes(infoPlist) {
  *
  * `<queries>` is a direct child of `<manifest>`, a sibling of
  * `<application>`, and the manifest may already carry `<queries>` blocks
- * merged in from libraries (`expo-file-system`, `expo-sharing` and
- * `expo-image-picker` each contribute one). So this appends a `<package>`
+ * merged in from libraries (`expo-file-system` and `expo-sharing` each
+ * contribute one). So this appends a `<package>`
  * entry into the first existing block rather than replacing anything, and
  * does nothing when the entry is already there.
  */

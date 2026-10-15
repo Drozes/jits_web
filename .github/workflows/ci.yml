@@ -61,3 +61,4 @@ jobs:
           cache: npm
       - run: npm ci
       - run: cd apps/mobile && npx expo export --platform ios --no-bytecode
+      - run: cd apps/mobile && npx expo export --platform android --no-bytecode

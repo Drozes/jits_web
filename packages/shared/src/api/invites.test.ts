@@ -9,6 +9,7 @@ import {
   parseInviteEntryPoint,
   parseClaimResult,
   readInvitesEnabled,
+  recordInviteAttribution,
   setMyDateOfBirth,
 } from "./invites";
 import { getMyFriends, parseFriends, sortFriendsFirst } from "./friends";
@@ -44,7 +45,7 @@ describe("claimChallengeInvite", () => {
       },
       error: null,
     });
-    const res = await claimChallengeInvite(supabase as never, { token: "t", gateway: "universal_link" }, {
+    const res = await claimChallengeInvite(supabase as never, { token: "t", gateway: "universal_link", platform: "ios" }, {
       lat: 43.6,
       lng: -79.4,
       accuracyM: 20,
@@ -62,7 +63,7 @@ describe("claimChallengeInvite", () => {
 
   it("a returned failure is data, not an error, and keeps the inviter", async () => {
     const { supabase } = client({ data: { ok: false, code: "expired", inviter, attempts_left: null }, error: null });
-    const res = await claimChallengeInvite(supabase as never, { code: "K7Q4M2", gateway: "code" }, null);
+    const res = await claimChallengeInvite(supabase as never, { code: "K7Q4M2", gateway: "code", platform: "ios" }, null);
     expect(res.ok).toBe(true);
     if (res.ok && !res.data.ok) {
       expect(res.data.code).toBe("expired");
@@ -72,7 +73,7 @@ describe("claimChallengeInvite", () => {
 
   it("surfaces the RAISE hint on error (supabase-js resolves, never rejects)", async () => {
     const { supabase } = client({ data: null, error: { message: "bad", hint: "invalid_arguments" } });
-    const res = await claimChallengeInvite(supabase as never, { gateway: "paste" }, null);
+    const res = await claimChallengeInvite(supabase as never, { gateway: "paste", platform: "ios" }, null);
     expect(res).toEqual({ ok: false, error: { hint: "invalid_arguments", message: "bad" } });
   });
 });
@@ -185,6 +186,16 @@ describe("listMyOpenChallengeInvites", () => {
   });
 });
 
+describe("recordInviteAttribution platform", () => {
+  it("sends the platform it is given (required, no silent ios default)", async () => {
+    for (const platform of ["android", "ios"] as const) {
+      const c = client({ data: { ok: true, result: "attributed" }, error: null });
+      await recordInviteAttribution(c.supabase as never, { token: "t", gateway: "universal_link", platform });
+      expect(c.rpc).toHaveBeenCalledWith("record_invite_attribution", expect.objectContaining({ p_platform: platform }));
+    }
+  });
+});
+
 describe("acceptJoinInvite", () => {
   it("passes the gateway and platform for attribution", async () => {
     const { supabase, rpc } = client({ data: { ok: true, result: "friends", inviter }, error: null });
@@ -193,10 +204,16 @@ describe("acceptJoinInvite", () => {
     expect(res.ok && res.data.ok && res.data.result).toBe("friends");
   });
 
-  it("sends only the token when no gateway is given (server defaults)", async () => {
+  it("passes platform android through (jr_be 20261015100000)", async () => {
+    const { supabase, rpc } = client({ data: { ok: true, result: "friends", inviter }, error: null });
+    await acceptJoinInvite(supabase as never, "t", { platform: "android" });
+    expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: "t", p_platform: "android" });
+  });
+
+  it("omits the gateway when none is given (server default)", async () => {
     const { supabase, rpc } = client({ data: { ok: false, code: "invalid" }, error: null });
-    await acceptJoinInvite(supabase as never, "t");
-    expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: "t" });
+    await acceptJoinInvite(supabase as never, "t", { platform: "ios" });
+    expect(rpc).toHaveBeenCalledWith("accept_join_invite", { p_token: "t", p_platform: "ios" });
   });
 });
 

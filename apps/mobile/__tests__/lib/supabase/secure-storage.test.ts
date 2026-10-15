@@ -41,6 +41,9 @@ jest.mock("react-native", () => ({
 
 import * as SecureStore from "expo-secure-store";
 import { SecureStoreAdapter } from "@/lib/supabase/secure-storage";
+// The mocked Platform object, mutable per test (the native-error cases flip OS).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const mockPlatform = (require("react-native") as { Platform: { OS: string } }).Platform;
 
 const KEY = "sb-auth-token";
 
@@ -170,5 +173,125 @@ describe("SecureStoreAdapter (chunked)", () => {
     expect(SecureStore.setItemAsync).toHaveBeenCalled();
     expect(SecureStore.getItemAsync).toHaveBeenCalled();
     expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
+  });
+});
+
+describe("SecureStoreAdapter native read errors (jits-mafl.1)", () => {
+  // A read must never reject (that wedges the auth gate). Only an Android
+  // DecryptException (a value that can never decrypt) is deleted; any other
+  // error (iOS keychain locked in the background, a transient Android error)
+  // reads as null and keeps the session for the next launch.
+  const getMock = SecureStore.getItemAsync as jest.Mock;
+  const deleteMock = SecureStore.deleteItemAsync as jest.Mock;
+  const decrypt = () =>
+    Object.assign(new Error("Could not decrypt the value for key 'sb-auth-token.1' under keychain 'key_v1'. Caused by: x"), {
+      code: "ERR_DECRYPT",
+    });
+  const LOCKED = Object.assign(new Error("User interaction is not allowed."), { code: "ERR_KEY_CHAIN" });
+
+  function failReadsOf(keys: string[], err: Error) {
+    const real = getMock.getMockImplementation()!;
+    getMock.mockImplementation(async (k: string) => {
+      if (keys.includes(k)) throw err;
+      return real(k);
+    });
+  }
+  afterEach(() => {
+    mockPlatform.OS = "ios";
+    getMock.mockImplementation(async (key: string) =>
+      Object.prototype.hasOwnProperty.call(mockStore, key) ? mockStore[key] : null,
+    );
+    deleteMock.mockImplementation(async (key: string) => {
+      delete mockStore[key];
+    });
+  });
+
+  it("iOS: a locked-keychain read is null and deletes nothing", async () => {
+    await SecureStoreAdapter.setItem(KEY, "e".repeat(7000));
+    const before = { ...mockStore };
+    jest.clearAllMocks();
+    failReadsOf([`${KEY}.1`], LOCKED);
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(deleteMock).not.toHaveBeenCalled();
+    expect(mockStore).toEqual(before);
+  });
+
+  it("iOS: even a 'Could not decrypt' message deletes nothing", async () => {
+    await SecureStoreAdapter.setItem(KEY, "e".repeat(3000));
+    const before = { ...mockStore };
+    failReadsOf([`${KEY}.meta`], decrypt());
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(mockStore).toEqual(before);
+  });
+
+  it("Android: a non-decrypt error is null and deletes nothing", async () => {
+    mockPlatform.OS = "android";
+    await SecureStoreAdapter.setItem(KEY, "e".repeat(7000));
+    const before = { ...mockStore };
+    jest.clearAllMocks();
+    failReadsOf([`${KEY}.0`], Object.assign(new Error("An error occurred when accessing the keystore: busy"), { code: "ERR_KEY_STORE" }));
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(deleteMock).not.toHaveBeenCalled();
+    expect(mockStore).toEqual(before);
+  });
+
+  it("Android: a DecryptException on a chunk purges every chunk, the meta and the legacy key", async () => {
+    mockPlatform.OS = "android";
+    await SecureStoreAdapter.setItem(KEY, "e".repeat(7000));
+    mockStore[KEY] = "legacy";
+    failReadsOf([`${KEY}.1`], decrypt());
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(mockStore).toEqual({});
+  });
+
+  it("Android: matched by code alone or by message alone", async () => {
+    mockPlatform.OS = "android";
+    for (const err of [
+      Object.assign(new Error("other wording"), { code: "ERR_DECRYPT" }),
+      new Error("Could not decrypt the value for key 'x'"),
+    ]) {
+      await SecureStoreAdapter.setItem(KEY, "f".repeat(5000));
+      getMock.mockImplementation(async (k: string) => {
+        if (k === `${KEY}.meta`) throw err;
+        return Object.prototype.hasOwnProperty.call(mockStore, k) ? mockStore[k] : null;
+      });
+      await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+      // Unreadable meta: the bounded sweep clears the chunks.
+      expect(mockStore).toEqual({});
+      getMock.mockImplementation(async (k: string) =>
+        Object.prototype.hasOwnProperty.call(mockStore, k) ? mockStore[k] : null,
+      );
+    }
+  });
+
+  it("Android: an unreadable legacy single key that will not decrypt is deleted", async () => {
+    mockPlatform.OS = "android";
+    mockStore[KEY] = "legacy";
+    failReadsOf([KEY], decrypt());
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(mockStore).toEqual({});
+  });
+
+  it("Android: a failing delete during the purge still resolves null and deletes the rest", async () => {
+    mockPlatform.OS = "android";
+    await SecureStoreAdapter.setItem(KEY, "g".repeat(5000));
+    failReadsOf([`${KEY}.0`], decrypt());
+    deleteMock.mockImplementation(async (k: string) => {
+      if (k === `${KEY}.1`) throw new Error("delete failed");
+      delete mockStore[k];
+    });
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(Object.keys(mockStore)).toEqual([`${KEY}.1`]);
+  });
+
+  it("removeItem never throws on an unreadable meta or a failed delete", async () => {
+    await SecureStoreAdapter.setItem(KEY, "h".repeat(5000));
+    failReadsOf([`${KEY}.meta`], LOCKED);
+    deleteMock.mockImplementation(async (k: string) => {
+      if (k === `${KEY}.0`) throw new Error("delete failed");
+      delete mockStore[k];
+    });
+    await expect(SecureStoreAdapter.removeItem(KEY)).resolves.toBeUndefined();
+    expect(Object.keys(mockStore)).toEqual([`${KEY}.0`]);
   });
 });

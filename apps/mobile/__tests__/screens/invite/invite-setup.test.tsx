@@ -84,6 +84,8 @@ it("attributes once, even when the user object changes identity (token refresh)"
   await withPending({ token: TOKEN }, "universal_link");
   const view = render(<InviteSetupScreen />);
   await waitFor(() => expect(mockAttribution).toHaveBeenCalledTimes(1));
+  // Attributed to the device platform (jits-mafl.1): ios under the test preset.
+  expect(mockAttribution).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ platform: "ios" }));
   mockAuth.user = { id: "u1", user_metadata: {} };
   view.rerender(<InviteSetupScreen />);
   await screen.findByTestId("invite-setup-banner");

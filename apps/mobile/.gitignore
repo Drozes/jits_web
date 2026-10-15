@@ -41,3 +41,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Firebase config for Android push: supply it on EAS as the file env var
+# GOOGLE_SERVICES_JSON (app.config.js). A local copy is for local builds only;
+# never commit it (gitignored files are also not uploaded to EAS builders).
+/google-services.json

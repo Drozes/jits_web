@@ -11,6 +11,11 @@ const appJson = require("../app.json") as {
     version: string;
     runtimeVersion: { policy: string };
     ios: { usesAppleSignIn?: boolean; infoPlist: Record<string, unknown> };
+    android: {
+      permissions: string[];
+      blockedPermissions?: string[];
+      intentFilters: Array<{ autoVerify?: boolean; data: Array<{ scheme: string; host: string; pathPrefix?: string }> }>;
+    };
     plugins: Array<string | [string, Record<string, unknown>]>;
   };
 };
@@ -42,22 +47,19 @@ describe("app.json native config", () => {
   });
 
   it("gives every camera and microphone source the same purpose string", () => {
-    // expo-image-picker and expo-camera both write NSCameraUsageDescription and
+    // infoPlist and expo-camera both write NSCameraUsageDescription and
     // NSMicrophoneUsageDescription, and whichever runs last wins (build 25
-    // shipped the image picker's profile picture text). Keep them identical.
+    // shipped the old image picker's profile picture text). Keep them identical.
     const { infoPlist } = appJson.expo.ios;
     expect(infoPlist.NSCameraUsageDescription).toBe(CAMERA);
     expect(infoPlist.NSMicrophoneUsageDescription).toBe(MICROPHONE);
-    for (const name of ["expo-image-picker", "expo-camera"]) {
-      expect(pluginOptions(name).cameraPermission).toBe(CAMERA);
-      expect(pluginOptions(name).microphonePermission).toBe(MICROPHONE);
-    }
+    expect(pluginOptions("expo-camera").cameraPermission).toBe(CAMERA);
+    expect(pluginOptions("expo-camera").microphonePermission).toBe(MICROPHONE);
   });
 
   it("gives every photo library source the same purpose string", () => {
-    // The app only saves highlight reels (write-only access); expo-image-picker
-    // and expo-media-library both write NSPhotoLibraryUsageDescription.
-    expect(pluginOptions("expo-image-picker").photosPermission).toBe(PHOTOS_READ);
+    // The app only saves highlight reels (write-only access);
+    // expo-media-library writes both photo library strings.
     expect(pluginOptions("expo-media-library").photosPermission).toBe(PHOTOS_READ);
     expect(pluginOptions("expo-media-library").savePhotosPermission).toBe(PHOTOS_ADD);
   });
@@ -95,10 +97,68 @@ describe("app.json native config", () => {
         if (key.endsWith("Permission") && typeof value === "string") texts.push(value);
       }
     }
-    expect(texts.length).toBeGreaterThanOrEqual(10);
+    expect(texts.length).toBeGreaterThanOrEqual(7);
     for (const text of texts) {
       expect(text.includes(EM_DASH)).toBe(false);
       expect(text.includes("!")).toBe(false);
     }
+  });
+
+  it("does not ship the unused expo-image-picker, expo-av or expo-video-thumbnails (jits-mafl.1)", () => {
+    expect(plugin("expo-image-picker")).toBeUndefined();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pkg = require("../package.json") as { dependencies: Record<string, string> };
+    for (const dep of ["expo-image-picker", "expo-av", "expo-video-thumbnails"]) {
+      expect(pkg.dependencies).not.toHaveProperty(dep);
+    }
+  });
+});
+
+describe("app.json Android config (jits-mafl.1)", () => {
+  const { android } = appJson.expo;
+
+  it("App Links claim exactly /c/ and /athlete, verified (jits-d3hb dropped /session)", () => {
+    expect(android.intentFilters).toHaveLength(1);
+    const [filter] = android.intentFilters;
+    expect(filter.autoVerify).toBe(true);
+    expect(filter.data).toEqual([
+      { scheme: "https", host: "elorated.com", pathPrefix: "/c/" },
+      { scheme: "https", host: "elorated.com", pathPrefix: "/athlete" },
+    ]);
+  });
+
+  it("blocks the photo, video, audio and overlay permissions Google Play would flag", () => {
+    expect([...(android.blockedPermissions ?? [])].sort()).toEqual(
+      [
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+      ].sort(),
+    );
+    // Saving a reel on API 32 and below still needs WRITE_EXTERNAL_STORAGE.
+    expect(android.blockedPermissions).not.toContain("android.permission.WRITE_EXTERNAL_STORAGE");
+  });
+
+  it("expo-media-library declares no granular read permissions", () => {
+    expect(pluginOptions("expo-media-library").granularPermissions).toEqual([]);
+  });
+
+  it("our backup rules plugin is the single owner of the Android backup XML", () => {
+    expect(pluginOptions("expo-secure-store").configureAndroidBackup).toBe(false);
+    expect(plugin("./plugins/with-android-backup-rules")).toBeTruthy();
+  });
+
+  it("notifications use the monochrome icon, the brand red and the 'default' channel", () => {
+    const opts = pluginOptions("expo-notifications");
+    expect(opts.icon).toBe("./assets/notification-icon.png");
+    expect(fs.existsSync(path.join(__dirname, "..", "assets", "notification-icon.png"))).toBe(true);
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { darkTokens } = require("../lib/tokens") as { darkTokens: { accentCta: string } };
+    expect(String(opts.color).toLowerCase()).toBe(darkTokens.accentCta.toLowerCase());
+    expect(opts.defaultChannel).toBe("default");
   });
 });

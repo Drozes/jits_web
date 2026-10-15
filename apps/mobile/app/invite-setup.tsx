@@ -1,11 +1,8 @@
 /**
- * One-screen setup for an invitee (jr_be spec 016, AC2.4 and AC2.5).
- *
- * Attribution is written first, at the first authenticated moment, so it
- * survives stalling here. Then one screen: waiver, first and last name
- * (prefilled from the account), gender, date of birth (16+), weight. Free
- * agent is set automatically and city is deferred. Saving activates the
- * profile and returns to `app/index.tsx`, which runs the claim.
+ * One-screen setup for an invitee (jr_be spec 016, AC2.4 and AC2.5). Attribution is written first, at the first
+ * authenticated moment, so it survives stalling here. Then one screen: waiver, first and last name (prefilled from
+ * the account), gender, date of birth (16+), weight. Free agent is set automatically and city is deferred. Saving
+ * activates the profile and returns to `app/index.tsx`, which runs the claim.
  */
 import * as React from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
@@ -28,6 +25,7 @@ import { useSetupData } from "@/lib/profile-setup/use-setup-data";
 import { useSetupSubmit } from "@/lib/profile-setup/use-setup-submit";
 import { isAtLeast16, isValidDateOfBirth } from "@/lib/profile-setup/validation";
 import { usePendingInvite } from "@/lib/invites/use-pending-invite";
+import { invitePlatform } from "@/lib/invites/platform";
 import { clearPendingInvite, deferPushUntilFirstMatch, type PendingInvite } from "@/lib/invites/pending-invite";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { cn } from "@/lib/cn";
@@ -73,6 +71,7 @@ export default function InviteSetupScreen() {
         token: pending.token,
         code: pending.code,
         gateway: pending.gateway,
+        platform: invitePlatform(),
         firstTouchAt: pending.first_touch_at,
       });
       if (!pending.code || !res.ok) return;

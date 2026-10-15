@@ -131,7 +131,13 @@ export interface InviteStats {
 }
 
 export type InviteGateway = "universal_link" | "landing_web" | "paste" | "code" | "qr" | "app_clip";
-export type InvitePlatform = "ios" | "web";
+/**
+ * The client platform an invite is attributed to. "android" needs jr_be
+ * migration 20261015100000 (jr_be-ehe) on prod: before it, the server
+ * rejects the value. Required on every invitee call so a caller cannot
+ * silently fall back to the server default ("ios").
+ */
+export type InvitePlatform = "ios" | "android" | "web";
 
 export function parseInviterCard(v: unknown): InviterCard | null {
   const o = obj(v);
@@ -266,7 +272,7 @@ export interface InviteInput {
   token?: string | null;
   code?: string | null;
   gateway: InviteGateway;
-  platform?: InvitePlatform;
+  platform: InvitePlatform;
   firstTouchAt?: string | null;
 }
 
@@ -275,7 +281,7 @@ function inputArgs(input: InviteInput): Record<string, unknown> {
     p_token: input.token ?? null,
     p_code: input.code ?? null,
     p_gateway: input.gateway,
-    p_platform: input.platform ?? "ios",
+    p_platform: input.platform,
     p_first_touch_at: input.firstTouchAt ?? null,
   };
 }
@@ -287,12 +293,13 @@ export function recordInviteAttribution(supabase: Client, input: InviteInput) {
 /**
  * Accept a join invite. `gateway` and `platform` attribute the accept and
  * its `join_accepted` event (a QR scan or a pasted link is not a universal
- * link); omitted, the server's defaults apply (`universal_link`, `ios`).
+ * link). `platform` is required; an omitted gateway takes the server default
+ * (`universal_link`).
  */
 export function acceptJoinInvite(
   supabase: Client,
   token: string,
-  opts: { gateway?: InviteGateway; platform?: InvitePlatform } = {},
+  opts: { gateway?: InviteGateway; platform: InvitePlatform },
 ) {
   const args: Record<string, unknown> = { p_token: token };
   if (opts.gateway) args.p_gateway = opts.gateway;
