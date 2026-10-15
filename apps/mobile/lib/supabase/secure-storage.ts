@@ -78,6 +78,17 @@ const splitIntoChunks = (value: string): string[] => {
  */
 const PURGE_FALLBACK_CHUNKS = 16;
 
+/**
+ * expo-secure-store's Android `DecryptException` (SecureStoreExceptions.kt):
+ * coded `ERR_DECRYPT` (expo-modules-core infers the code from the class
+ * name), message "Could not decrypt the value for key ...". Android only.
+ */
+export function isUndecryptable(err: unknown): boolean {
+  if (Platform.OS !== "android" || typeof err !== "object" || err === null) return false;
+  const { code, message } = err as { code?: unknown; message?: unknown };
+  return code === "ERR_DECRYPT" || (typeof message === "string" && /Could not decrypt/.test(message));
+}
+
 /** Deletes one key; a failed delete never throws (best effort). */
 async function deleteQuietly(key: string): Promise<void> {
   try {
@@ -129,13 +140,17 @@ export const SecureStoreAdapter = {
         parts.push(part);
       }
       return parts.join("");
-    } catch {
-      // The native read threw: on Android this is a value that cannot be
-      // decrypted any more (its Keystore key is gone, e.g. prefs restored
-      // from a backup onto a new device or after a reinstall; jits-mafl.1).
-      // It will never decrypt, so drop it and read as signed out instead of
-      // wedging the auth gate on a rejected promise.
-      await purge(key, knownCount);
+    } catch (err) {
+      // Never reject: a rejected read wedges the auth gate. Read as no session.
+      // Delete ONLY a value that can never decrypt (an Android DecryptException,
+      // e.g. prefs restored from a backup onto a device whose Keystore key
+      // differs; jits-mafl.1). Anything else may be transient and must keep
+      // the session: on iOS a keychain read while the device is locked
+      // (errSecInteractionNotAllowed, the background token refresh) throws
+      // and the session is still good at the next launch. expo-secure-store
+      // itself already returns null and deletes for a missing Keystore key,
+      // KeyPermanentlyInvalidated and BadPadding.
+      if (isUndecryptable(err)) await purge(key, knownCount);
       return null;
     }
   },
