@@ -28,6 +28,7 @@ import {
 } from "@expo-google-fonts/jetbrains-mono";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import { ThemeProvider } from "@/lib/theme";
+import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { darkTokens } from "@/lib/tokens";
 import { Toaster } from "@/components/ui/toast";
 import { PushRegistrationBootstrap } from "@/lib/notifications/push-registration-bootstrap";
@@ -125,6 +126,16 @@ function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <OrientationBootstrap />
         <ThemeProvider>
+          {/*
+            App-wide status bar (jits-mafl.2.2): icons follow the APP theme, dark
+            on light and light on dark. Mounted first, so it is the lowest entry
+            in the StatusBar stack: a screen that mounts its own (full-screen
+            video, the camera, a photo hero) wins while it is up, and this one
+            returns when it leaves. Light over the dark launch reveal. Without
+            it, screens with no StatusBar fell back to Android's default (light
+            icons), invisible on the light theme.
+          */}
+          <ThemedStatusBar overMedia={!revealDone} />
           <SafeAreaProvider>
             {/*
               BottomSheetModalProvider hosts the portal that all <BottomSheetModal>
