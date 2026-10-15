@@ -15,6 +15,7 @@ import { FightersList } from "@/components/leaderboard/fighters-list";
 import { GymsList } from "@/components/leaderboard/gyms-list";
 import { useFirstLoadEntering } from "@/lib/motion";
 import { useRankClimb } from "@/lib/leaderboard/use-rank-climb";
+import { useBlockState, withoutBlocked } from "@/lib/moderation/block-store";
 
 type TabValue = "fighters" | "gyms";
 
@@ -48,13 +49,17 @@ export default function LeaderboardScreen() {
     return "all";
   });
 
+  // Nobody in a block with me shows on my ladder (App Review 1.2); their
+  // rank numbers stay the server's, so the list may skip one.
+  const blockIds = useBlockState().ids;
   const filteredAthletes = React.useMemo(() => {
     if (!athletes) return [];
-    if (genderFilter === "all") return athletes;
-    return athletes.filter((a) =>
+    const visible = withoutBlocked(athletes, (a) => a.id, blockIds);
+    if (genderFilter === "all") return visible;
+    return visible.filter((a) =>
       genderFilter === "male" ? a.gender === "M" : a.gender === "F",
     );
-  }, [athletes, genderFilter]);
+  }, [athletes, genderFilter, blockIds]);
 
   const currentUserAthlete = React.useMemo(() => {
     if (!athletes) return null;

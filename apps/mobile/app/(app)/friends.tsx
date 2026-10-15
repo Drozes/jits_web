@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase/client";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
 import { notifyFriendsChanged } from "@/lib/invites/use-friend-ids";
+import { useBlockState, withoutBlocked } from "@/lib/moderation/block-store";
 
 export default function FriendsScreen() {
   const router = useRouter();
@@ -23,6 +24,12 @@ export default function FriendsScreen() {
   const { athlete } = useAuth();
   const [friends, setFriends] = React.useState<FriendCard[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  // A block ends the friendship on the server; hide them before the re-read lands.
+  const blockIds = useBlockState().ids;
+  const visibleFriends = React.useMemo(
+    () => (friends ? withoutBlocked(friends, (f) => f.athlete_id, blockIds) : friends),
+    [friends, blockIds],
+  );
 
   const load = React.useCallback(async () => {
     const res = await getMyFriends(supabase);
@@ -71,13 +78,13 @@ export default function FriendsScreen() {
           <Text accessibilityRole="alert" className="font-body text-callout text-ink-2">{error}</Text>
           <Button variant="secondary" label="Try again" onPress={() => void load()} />
         </View>
-      ) : friends === null ? (
+      ) : visibleFriends === null ? (
         <View className="items-center py-16">
           <ActivityIndicator color={tokens.textSecondary} accessibilityLabel="Loading friends" />
         </View>
       ) : (
         <FlatList
-          data={friends}
+          data={visibleFriends}
           keyExtractor={(f) => f.athlete_id}
           contentContainerStyle={{ padding: 16, gap: 8 }}
           ListEmptyComponent={

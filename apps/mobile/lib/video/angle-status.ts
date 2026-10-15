@@ -35,6 +35,7 @@ export interface AngleStatus {
 export const ANGLE_TAG = {
   uploading: "Uploading",
   paused: "Paused",
+  needsOk: "Needs your OK",
   processing: "Processing",
   analyzing: "Analyzing",
   ready: "Ready to watch",
@@ -58,6 +59,8 @@ export interface LocalAngleJob {
   message?: string | null;
   /** A terminal failure with the clip still on this phone: Discard is offered (deck 12). */
   discardable?: boolean;
+  /** Paused for the athlete's AI processing consent (jits-rog5.11). */
+  needsConsent?: boolean;
 }
 
 export interface AngleStatusContext {
@@ -77,6 +80,9 @@ function pct(progress: number | null | undefined): number | null {
  * names the state; it never says "Uploading" over a paused or failed job.
  */
 function localStatus(job: LocalAngleJob): AngleStatus {
+  if (job.status === "paused" && job.needsConsent) {
+    return { tag: ANGLE_TAG.needsOk, tone: "waiting", right: null, percent: null, helper: null };
+  }
   if (job.status === "paused") {
     return { tag: ANGLE_TAG.paused, tone: "waiting", right: null, percent: null, helper: null };
   }
@@ -175,5 +181,6 @@ export function localAngleJob(
     message: entry.status === "paused" || entry.status === "error" ? (entry.error ?? null) : null,
     // A missing clip has nothing left to drop (uploadBannerActions).
     discardable: terminal && entry.errorClass !== "file_missing",
+    ...(entry.status === "paused" && entry.errorClass === "needs_consent" ? { needsConsent: true } : {}),
   };
 }

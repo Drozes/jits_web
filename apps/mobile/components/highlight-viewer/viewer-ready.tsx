@@ -14,6 +14,7 @@ import { SwipeHint } from "./swipe-hint";
 import { useReelPage } from "./use-reel-page";
 import { VIEWER_COPY } from "./viewer-copy";
 import type { ReelBinding } from "./reel-binding";
+import { useReelReport } from "./viewer-report";
 
 /**
  * The reel, following its progress (realtime + 15 s polling while it is
@@ -32,6 +33,7 @@ export function ViewerReady({ detail, source, binding }: { detail: HighlightDeta
   // lane item's `opponentName` carries its subject's name.
   const item = binding.item;
   const subject = React.useMemo(() => ({ isOwn: !item || item.isOwn, name: item?.opponentName ?? null }), [item]);
+  const { onReport, sheet: reportSheet } = useReelReport(subject.isOwn, detail.highlightId, binding);
 
   if (!progress || !playback) {
     return <ViewerNoPlayback progress={progress} error={my.progressError} onRetry={my.reload} binding={binding} />;
@@ -65,10 +67,12 @@ export function ViewerReady({ detail, source, binding }: { detail: HighlightDeta
             onShare={vs.openSheet}
             onSave={vs.save}
             onImprove={improve}
+            onReport={onReport}
           />
         }
       />
       <ViewerSheets canManage={binding.canManage} shareEnabled={shareEnabled} vs={vs} fb={fb} progress={progress} />
+      {reportSheet}
     </View>
   );
 }

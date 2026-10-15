@@ -26,11 +26,6 @@ const TOGGLES: {
     description: "New, accepted, declined, and expiring challenges",
   },
   {
-    key: "enable_chat",
-    label: "CHAT MESSAGES",
-    description: "New messages in conversations",
-  },
-  {
     key: "enable_matches",
     label: "MATCHES",
     description: "Match start notifications",

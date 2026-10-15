@@ -72,6 +72,7 @@ import { FaceoffProvider } from "@/components/match-flow/faceoff/faceoff-context
 import { FaceoffTop } from "@/components/match-flow/faceoff/faceoff-top";
 import { FaceoffBody } from "@/components/match-flow/faceoff/faceoff-body";
 import { __resetRecordingOptInForTests, getRecordingOptIn } from "@/lib/match-flow/recording-optin";
+import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 import { __resetRecordingIntentForTests } from "@/lib/match-flow/recording-intent";
 
 const ME = { display_name: "Kai Reyes", current_elo: 1512 };
@@ -129,6 +130,8 @@ beforeEach(() => {
   mockHandlers = {};
   mockGetEloStakes.mockResolvedValue(STAKES);
   __resetRecordingOptInForTests(false);
+  // A consented athlete: the "Before you film" gate has its own suite.
+  __resetAiConsentForTests({ athleteId: "me-1", consentAt: "2026-10-14T12:00:00Z", known: true });
   mockReadLocation.mockResolvedValue({ status: "denied", canAskAgain: true });
 });
 
@@ -266,6 +269,27 @@ describe("ready check", () => {
     expect(getRecordingOptIn()).toBe(true);
     expect(mockSend.broadcastRecordingOptIn).toHaveBeenLastCalledWith("me-1", true);
     expect(s.queryByTestId("faceoff-camera-off")).toBeNull();
+  });
+
+  it("without AI processing consent, turning recording on asks first (Before you film) and records nothing", () => {
+    __resetAiConsentForTests({ athleteId: "me-1", consentAt: null, known: true });
+    __resetRecordingOptInForTests(true);
+    const s = render(<Harness phase="ready" />);
+    // A toggle remembered ON reads OFF until the athlete allows.
+    expect(s.getByTestId("faceoff-record-toggle").props.value).toBe(false);
+    act(() => {
+      fireEvent(s.getByTestId("faceoff-record-toggle"), "valueChange", true);
+    });
+    expect(s.getByTestId("ai-consent-sheet")).toBeTruthy();
+    expect(s.getByText("Before you film")).toBeTruthy();
+    expect(s.getByText("Allow and film")).toBeTruthy();
+    expect(s.getByText("Not now")).toBeTruthy();
+    expect(s.getByTestId("faceoff-record-toggle").props.value).toBe(false);
+    act(() => {
+      fireEvent.press(s.getByTestId("ai-consent-not-now"));
+    });
+    expect(getRecordingOptIn()).toBe(false);
+    expect(s.queryByTestId("ai-consent-sheet")).toBeNull();
   });
 
   it("shows the opponent's choice, and warns when nobody records", () => {

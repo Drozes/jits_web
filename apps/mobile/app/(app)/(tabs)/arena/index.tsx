@@ -28,6 +28,7 @@ import { BrandHeader } from "@/components/layout/brand-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { useLobbyIds, useLobbyKnown } from "@/lib/arena/use-lobby-presence";
 import { useArenaRoster } from "@/lib/arena/use-arena-roster";
+import { useBlockState, withoutBlocked } from "@/lib/moderation/block-store";
 import { useRosterLobbySync } from "@/lib/arena/use-roster-lobby-sync";
 import { goLiveWithFeedback, goOfflineWithFeedback } from "@/lib/arena/go-live-feedback";
 import { useChallengeDeepLink } from "@/lib/arena/use-challenge-deep-link";
@@ -138,7 +139,7 @@ export default function ArenaScreen() {
   const confirm = useMatchToConfirm(athlete?.id ?? null);
 
   const {
-    competitors,
+    competitors: rosterCompetitors,
     challengedIds,
     isLoading,
     isRefreshing,
@@ -149,6 +150,13 @@ export default function ArenaScreen() {
     refresh,
     refreshQuietly,
   } = useArenaRoster(athlete?.current_elo ?? 0);
+  // Defence in depth (App Review 1.2): the server already keeps a blocked
+  // pair apart; nobody in a block with me is listed or suggested here.
+  const blockIds = useBlockState().ids;
+  const competitors = React.useMemo(
+    () => withoutBlocked(rosterCompetitors, (c) => c.id, blockIds),
+    [rosterCompetitors, blockIds],
+  );
 
   const rosterIds = React.useMemo(() => competitors.map((c) => c.id), [competitors]);
   // Unfocused (another tab or a pushed profile), read nothing; catch up on return.

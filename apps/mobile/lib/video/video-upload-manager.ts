@@ -57,6 +57,7 @@ import {
   trackRunStart,
   trackUploaded,
 } from "./upload-telemetry";
+import { aiConsentGivenAtMs, hasAiConsentFor, isAiConsentKnownFor } from "@/lib/moderation/ai-consent";
 
 /**
  * The single retry / resume authority for match-video uploads.
@@ -1390,6 +1391,33 @@ function surfaceFailedJob(job: PendingUploadJob): void {
   });
 }
 
+/** A job of mine waiting on AI processing consent: paused (Needs your OK), Try again and Discard offered. */
+function surfaceConsentWait(job: PendingUploadJob): void {
+  const existing = getMatchUpload(job.matchId);
+  if (existing?.status === "paused" && existing.errorClass === "needs_consent") return;
+  setMatchUpload(job.matchId, {
+    status: "paused",
+    error: describeUploadFailure("needs_consent").message,
+    errorClass: "needs_consent",
+    storagePath: job.storagePath,
+    truncation: job.truncation,
+    bytesTotal: job.fileSizeBytes,
+    progress: job.phase === "row" ? 1 : ratio(job.bytesUploaded, job.fileSizeBytes),
+    videoId: null,
+  });
+}
+
+/**
+ * The retention window, counted from the later of the job's creation and
+ * the athlete's consent: a clip that waited for consent gets its full week
+ * from the moment the athlete allowed it.
+ */
+function isExpiredSinceConsent(job: PendingUploadJob, athleteId: string | null): boolean {
+  const consentAt = aiConsentGivenAtMs(athleteId);
+  const from = consentAt != null && consentAt > job.createdAt ? consentAt : job.createdAt;
+  return isJobExpired({ ...job, createdAt: from });
+}
+
 /**
  * Expire a job past the retention window. Claimed synchronously (see
  * `abandonClaims`). Another athlete's job is only cleaned up LOCALLY: its
@@ -1420,12 +1448,32 @@ function sweepJob(job: PendingUploadJob): Promise<void> | null {
   // it there would pull the file out from under a live upload.
   if (runners.has(job.matchId)) return null;
   const mine = owner != null && job.uploaderAthleteId === owner;
-  if (isJobExpired(job)) return expireJob(job, mine);
   // Another athlete's job never runs under this session (jits-n2im.6). It
   // stays on disk and resumes when that athlete signs back in.
-  if (!mine) return null;
+  if (!mine) return isJobExpired(job) ? expireJob(job, false) : null;
+  // AI processing consent (5.1.2(i), jits-rog5.11), for this owner only.
+  const consented = hasAiConsentFor(owner);
+  // An otherwise uploadable clip waiting for consent never expires; with
+  // consent its window counts from the consent (a clip that waited gets a
+  // full week from the OK). A failure that waits for the athlete keeps the
+  // usual window.
+  const waitingForConsent = !consented && !job.needsUser;
+  if (!waitingForConsent && (consented ? isExpiredSinceConsent(job, owner) : isJobExpired(job))) {
+    return expireJob(job, true);
+  }
+  // A failure that waits for the athlete keeps its own state (and Discard
+  // for a terminal one), consent or not; Try again asks for consent then.
   if (job.needsUser) {
     surfaceFailedJob(job);
+    return null;
+  }
+  // No consent: surfaced as paused (Needs your OK) so every Try again
+  // control shows and asks for it, never launched. Nothing is said until
+  // this athlete's consent is known (cache or server), so a consented
+  // athlete never sees it from a cold-start race; the bootstrap sweeps
+  // again once it is known.
+  if (!consented) {
+    if (isAiConsentKnownFor(owner)) surfaceConsentWait(job);
     return null;
   }
   // `attempt` is reset here on purpose: a resume is triggered by a real
@@ -1451,6 +1499,8 @@ async function resumeOne(matchId: string): Promise<void> {
     clearRetryTimer(matchId);
     return;
   }
+  // The consent gate is in sweepJob: a retry timer, or a resume after a
+  // mid-session withdrawal, surfaces the clip as waiting instead of running it.
   await sweepJob(job);
 }
 
@@ -1571,7 +1621,7 @@ export async function resumeMatchVideoUploads(): Promise<void> {
 }
 
 /** Why a Try again did or did not start a run (each gets its own message, m8). */
-export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "other_athlete";
+export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "other_athlete" | "needs_consent";
 
 /**
  * The athlete's Try again (jits-n2im.3): run a parked or failed job NOW,
@@ -1583,6 +1633,7 @@ export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "oth
 export async function retryMatchVideoUpload(matchId: string): Promise<RetryResult> {
   if (runners.has(matchId)) return "running";
   if (!owner) return "signed_out";
+  if (!hasAiConsentFor(owner)) return "needs_consent";
   const job = await loadUploadJob(matchId);
   if (!job) return "no_job";
   if (job.uploaderAthleteId !== owner) return "other_athlete";

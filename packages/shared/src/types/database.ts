@@ -200,6 +200,39 @@ export type Database = {
           },
         ]
       }
+      athlete_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "athlete_blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "athlete_blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       athlete_friendship_removals: {
         Row: {
           athlete_a: string
@@ -399,6 +432,8 @@ export type Database = {
       athletes: {
         Row: {
           activated_at: string | null
+          ai_processing_consent_at: string | null
+          ai_processing_consent_version: string | null
           auth_user_id: string | null
           avatar_url: string | null
           city: string | null
@@ -429,6 +464,8 @@ export type Database = {
         }
         Insert: {
           activated_at?: string | null
+          ai_processing_consent_at?: string | null
+          ai_processing_consent_version?: string | null
           auth_user_id?: string | null
           avatar_url?: string | null
           city?: string | null
@@ -459,6 +496,8 @@ export type Database = {
         }
         Update: {
           activated_at?: string | null
+          ai_processing_consent_at?: string | null
+          ai_processing_consent_version?: string | null
           auth_user_id?: string | null
           avatar_url?: string | null
           city?: string | null
@@ -597,6 +636,73 @@ export type Database = {
           value?: Json
         }
         Relationships: []
+      }
+      content_reports: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          reason: string
+          reported_athlete_id: string | null
+          reporter_id: string
+          resolution_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason: string
+          reported_athlete_id?: string | null
+          reporter_id: string
+          resolution_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          reason?: string
+          reported_athlete_id?: string | null
+          reporter_id?: string
+          resolution_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_reports_reported_athlete_id_fkey"
+            columns: ["reported_athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversation_participants: {
         Row: {
@@ -3866,6 +3972,7 @@ export type Database = {
         Returns: number
       }
       _inviter_card: { Args: { p_athlete: string }; Returns: Json }
+      _is_blocked_pair: { Args: { p_a: string; p_b: string }; Returns: boolean }
       _issue_timekeeper_code: {
         Args: { p_by: string; p_match_id: string }
         Returns: {
@@ -3925,6 +4032,10 @@ export type Database = {
           rate_window: string
           retention: string
         }[]
+      }
+      _lock_athlete_pair: {
+        Args: { p_a: string; p_b: string }
+        Returns: undefined
       }
       _log_invite_event: {
         Args: {
@@ -4137,6 +4248,26 @@ export type Database = {
           primary_gym_name: string
         }[]
       }
+      admin_list_content_reports: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: {
+          created_at: string
+          details: string
+          id: string
+          reason: string
+          reported_athlete_id: string
+          reported_display_name: string
+          reported_open_reports: number
+          reporter_display_name: string
+          reporter_id: string
+          resolution_note: string
+          reviewed_at: string
+          reviewed_by: string
+          status: string
+          target_id: string
+          target_type: string
+        }[]
+      }
       admin_list_invite_attributions: {
         Args: { p_limit?: number; p_since: string }
         Returns: Json
@@ -4195,6 +4326,10 @@ export type Database = {
         Args: { p_athlete_id: string; p_gym_id: string }
         Returns: undefined
       }
+      admin_resolve_content_report: {
+        Args: { p_note?: string; p_report_id: string; p_status: string }
+        Returns: undefined
+      }
       admin_search_athletes: {
         Args: { p_query: string }
         Returns: {
@@ -4247,6 +4382,7 @@ export type Database = {
         }
         Returns: Json
       }
+      block_athlete: { Args: { p_athlete_id: string }; Returns: undefined }
       calculate_elo_stakes: {
         Args: {
           challenger_elo: number
@@ -4576,6 +4712,15 @@ export type Database = {
       get_match_video_status: { Args: { p_match_id: string }; Returns: Json }
       get_match_videos: { Args: { p_match_id: string }; Returns: Json }
       get_match_weight_checks: { Args: { p_match_id: string }; Returns: Json }
+      get_my_block_ids: { Args: never; Returns: string[] }
+      get_my_blocked_athletes: {
+        Args: never
+        Returns: {
+          athlete_id: string
+          blocked_at: string
+          display_name: string
+        }[]
+      }
       get_my_bookings: { Args: never; Returns: Json }
       get_my_friends: { Args: never; Returns: Json }
       get_my_highlights: {
@@ -4629,6 +4774,10 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_conversation_participant: {
+        Args: { p_conversation_id: string }
+        Returns: boolean
+      }
+      is_direct_conversation_blocked: {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
@@ -4756,6 +4905,10 @@ export type Database = {
       reap_stuck_highlights: { Args: never; Returns: number }
       reap_stuck_match_plans: { Args: { p_now?: string }; Returns: number }
       reap_stuck_slicing_videos: { Args: never; Returns: number }
+      record_ai_processing_consent: {
+        Args: { p_version?: string }
+        Returns: string
+      }
       record_invite_attribution: {
         Args: {
           p_code?: string
@@ -4779,6 +4932,15 @@ export type Database = {
       refresh_invite_code: { Args: { p_invite_id: string }; Returns: Json }
       remove_friend: { Args: { p_athlete_id: string }; Returns: Json }
       remove_match_timekeeper: { Args: { p_match_id: string }; Returns: Json }
+      report_content: {
+        Args: {
+          p_details?: string
+          p_reason: string
+          p_target_id: string
+          p_target_type: string
+        }
+        Returns: string
+      }
       report_match_presence: {
         Args: {
           p_accuracy_m: number
@@ -4984,6 +5146,7 @@ export type Database = {
         }
         Returns: Json
       }
+      unblock_athlete: { Args: { p_athlete_id: string }; Returns: undefined }
       validate_highlight_segments: {
         Args: { p_segments: Json; p_source_duration_s: number }
         Returns: number

@@ -1,6 +1,7 @@
 import { Alert } from "react-native";
 import { shortName } from "@/lib/film-room/format";
 import { hasPendingMatchUploads } from "./upload-control";
+import { hasAiConsent } from "@/lib/moderation/ai-consent";
 
 export const SIGN_OUT_UPLOAD_TITLE = "Film still uploading";
 
@@ -9,9 +10,11 @@ export const SIGN_OUT_UPLOAD_TITLE = "Film still uploading";
  * initial + last name (house style). Only resumable uploads reach it: a
  * terminal failure is not counted (m7), so "it will finish" is true.
  */
-export function signOutUploadMessage(displayName: string | null | undefined): string {
+export function signOutUploadMessage(displayName: string | null | undefined, needsConsent = false): string {
   const who = displayName?.trim() ? ` as ${shortName(displayName.trim())}` : "";
-  return `Your match film hasn't finished uploading. Sign out anyway? It will finish the next time you sign in${who}.`;
+  // A clip waiting for AI processing consent (jits-rog5.11) only uploads once allowed.
+  const when = needsConsent ? ", once you allow AI processing" : "";
+  return `Your match film hasn't finished uploading. Sign out anyway? It will finish the next time you sign in${who}${when}.`;
 }
 
 /**
@@ -29,7 +32,7 @@ export async function pendingUploadSignOutMessage(
   } catch {
     pending = false;
   }
-  return pending ? signOutUploadMessage(displayName) : null;
+  return pending ? signOutUploadMessage(displayName, !hasAiConsent()) : null;
 }
 
 /**

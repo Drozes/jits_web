@@ -157,10 +157,12 @@ import {
   UPLOAD_JOB_PREFIX,
   type PendingUploadJob,
   loadUploadJob,
+  savePendingAbandon,
 } from "@/lib/video/upload-persistence";
 import { getMatchUpload, resetMatchUploadStore } from "@/lib/video/match-upload-store";
 import { describeUploadFailure } from "@/lib/video/upload-errors";
 import { __resetUploadTelemetry } from "@/lib/video/upload-telemetry";
+import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 
 const SIZE = 600_000_000;
 
@@ -206,6 +208,8 @@ let warnSpy: jest.SpyInstance;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Consented: resume and retry wait for AI processing consent (jits-rog5.11, own suite below).
+  __resetAiConsentForTests({ athleteId: "A1", consentAt: "2020-01-01T00:00:00Z", known: true });
   mockStore.clear();
   mockNetListeners.length = 0;
   mockNetConnected.current = true;
@@ -544,6 +548,82 @@ describe("a failed match_videos write never destroys the uploaded bytes", () => 
 });
 
 describe("resuming persisted jobs", () => {
+  it("without AI processing consent a queued job is surfaced as paused (Try again shows) but never launched (jits-rog5.11)", async () => {
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: null, known: true });
+    seedJob({ uploadUrl: "https://up/abc", bytesUploaded: 300_000_000 });
+
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+    expect(await loadUploadJob("M1")).not.toBeNull();
+    expect(getMatchUpload("M1")).toMatchObject({ status: "paused", errorClass: "needs_consent" });
+    expect(await retryMatchVideoUpload("M1")).toBe("needs_consent");
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: new Date().toISOString(), known: true });
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+  });
+
+  it("with consent not known yet (cold start) nothing is said: no Needs your OK flash for a consented athlete", async () => {
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: null, known: false });
+    seedJob();
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+    expect(getMatchUpload("M1")).toBeNull();
+  });
+
+  it("a failure waiting for the athlete keeps its own state (and Discard) without consent", async () => {
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: null, known: true });
+    seedJob({ needsUser: true, errorClass: "too_large" });
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(getMatchUpload("M1")).toMatchObject({ status: "error", errorClass: "too_large" });
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+  });
+
+  it("a clip waiting for consent can be discarded without consenting", async () => {
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: null, known: true });
+    seedJob();
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(await discardMatchVideoUpload("M1")).toBe(true);
+    expect(await loadUploadJob("M1")).toBeNull();
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+  });
+
+  it("the server-side abandon retries still run without consent (cleanup, not an upload)", async () => {
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: null, known: true });
+    await savePendingAbandon({ videoId: "VID-X", uploaderAthleteId: "A1", matchId: "M9", storagePath: "M9/A1/1.mp4", phase: "row", createdAt: Date.now() });
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockReadKey).toHaveBeenCalledWith("VID-X");
+  });
+
+  it("another athlete's consent never uploads my clip (account switch)", async () => {
+    __resetAiConsentForTests({ athleteId: "B2", consentAt: "2020-01-01T00:00:00Z", known: true });
+    seedJob();
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+    expect(await retryMatchVideoUpload("M1")).toBe("needs_consent");
+  });
+
+  it("a clip older than the retention window survives while it waits, and gets a full window from the consent", async () => {
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: null, known: true });
+    seedJob({ createdAt: Date.now() - UPLOAD_JOB_MAX_AGE_MS - 60_000 });
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(await loadUploadJob("M1")).not.toBeNull();
+
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: new Date().toISOString(), known: true });
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+  });
+
   it("resumes a phase 'bytes' job from its persisted upload URL", async () => {
     seedJob({ uploadUrl: "https://up/abc", bytesUploaded: 300_000_000 });
 
@@ -1185,6 +1265,27 @@ describe("the foreground retry timer (jits-n2im.3)", () => {
 
     expect(mockUploadFileResumable.mock.calls.length).toBe(parkedCalls + 1);
     expect(getMatchUpload("M1")).toMatchObject({ status: "uploaded" });
+  });
+
+  it("a retry timer after consent is withdrawn launches nothing and shows Needs your OK (jits-rog5.11)", async () => {
+    jest.useFakeTimers();
+    setAppState("active");
+    mockUploadFileResumable.mockRejectedValue(new Error("Network request failed"));
+    const running = startMatchVideoUpload(START);
+    for (let i = 0; i < UPLOAD_MAX_ATTEMPTS * 2; i++) {
+      jest.advanceTimersByTime(1);
+      await microtasks();
+    }
+    await running;
+    expect(getMatchUpload("M1")?.status).toBe("paused");
+    const parkedCalls = mockUploadFileResumable.mock.calls.length;
+
+    // Withdrawn on the server, read back mid-session.
+    __resetAiConsentForTests({ athleteId: "A1", consentAt: null, known: true });
+    jest.advanceTimersByTime(FOREGROUND_RETRY_BASE_MS);
+    for (let i = 0; i < 5; i++) await microtasks();
+    expect(mockUploadFileResumable.mock.calls.length).toBe(parkedCalls);
+    expect(getMatchUpload("M1")).toMatchObject({ status: "paused", errorClass: "needs_consent" });
   });
 
   it("backs off: a job that parks again waits twice as long next time", async () => {
