@@ -73,6 +73,7 @@ import { SteelSheen } from "@/components/ui/steel-sheen";
 import { duration, easing, haptics, useModalAnimation, useReduceMotion } from "@/lib/motion";
 import { ModalToaster } from "@/components/ui/toast";
 import { OfflineBanner } from "@/components/offline-banner";
+import { InfoPlate } from "@/components/arena/arena-plates";
 
 /**
  * No text on the prompt grows past this Dynamic Type multiple. The card has a
@@ -184,6 +185,12 @@ interface ChallengePromptSheetProps {
    * missing rating): no strip. Arena challenges are ranked-only.
    */
   viewer?: { elo: number | null; weight: number | null };
+  /**
+   * The challenger is in the viewer's own Online & close list (jr_be spec 023
+   * section 8.4): their band, for the "Maybe a different mat" plate. Null or
+   * omitted: no plate (on the mat, not listed, or no nearby reading).
+   */
+  closeBand?: { label: string; spoken: string } | null;
 }
 
 /** What the card shows: frozen while the modal fades out after a null. */
@@ -192,6 +199,7 @@ interface Shown {
   stakes: EloStakes | null;
   moreCount: number;
   viewerElo: number | null;
+  closeBand: { label: string; spoken: string } | null;
 }
 
 export function ChallengePromptSheet({
@@ -202,6 +210,7 @@ export function ChallengePromptSheet({
   onLater,
   moreCount = 0,
   viewer,
+  closeBand = null,
 }: ChallengePromptSheetProps) {
   const p = usePalette();
   // "Sheet / modal present": fades in, appears in place under Reduce Motion.
@@ -273,13 +282,14 @@ export function ChallengePromptSheet({
       prev.challenge === challenge &&
       prev.stakes === stakes &&
       prev.moreCount === moreCount &&
-      prev.viewerElo === viewerElo
+      prev.viewerElo === viewerElo &&
+      prev.closeBand === closeBand
         ? prev
-        : { challenge, stakes, moreCount, viewerElo },
+        : { challenge, stakes, moreCount, viewerElo, closeBand },
     );
-  }, [challenge, stakes, moreCount, viewerElo]);
+  }, [challenge, stakes, moreCount, viewerElo, closeBand]);
   const shown: Shown | null = challenge
-    ? { challenge, stakes, moreCount, viewerElo }
+    ? { challenge, stakes, moreCount, viewerElo, closeBand }
     : lastShown;
 
   const visible = challenge !== null;
@@ -484,6 +494,13 @@ export function ChallengePromptSheet({
                     Accept and you both drop straight into the match.
                   </Text>
                 )}
+
+                {shown.closeBand ? (
+                  <DifferentMatPlate
+                    name={shortName(shown.challenge.challengerName)}
+                    band={shown.closeBand}
+                  />
+                ) : null}
 
                 {shown.moreCount > 0 ? (
                   <Text
@@ -816,5 +833,24 @@ function AcceptSweep({ accepted, fill }: { accepted: boolean; fill: string }) {
         />
       )}
     </View>
+  );
+}
+
+/**
+ * "Maybe a different mat" (jr_be spec 023 section 8.4): the challenger shows
+ * up in the viewer's Online & close list, not on their mat. Indoor GPS is
+ * often far off, so it is a gentle check, never a block: no button, neutral
+ * rail, and Accept / Decline are unchanged.
+ */
+function DifferentMatPlate({ name, band }: { name: string; band: { label: string; spoken: string } }) {
+  const tail = "Indoor GPS can be off by a lot, so check you're at the same gym before you roll.";
+  return (
+    <InfoPlate
+      testID="challenge-prompt-different-mat"
+      title="Maybe a different mat"
+      body={`${name} shows up ${band.label} from you. ${tail}`}
+      accessibilityLabel={`Maybe a different mat. ${name} shows up ${band.spoken} from you. ${tail}`}
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
+    />
   );
 }

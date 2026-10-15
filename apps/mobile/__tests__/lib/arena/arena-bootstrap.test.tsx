@@ -132,6 +132,7 @@ jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({
 }));
 
 import { ArenaBootstrap, RECONNECTING_GRACE_MS } from "@/lib/arena/arena-bootstrap";
+import { __setLatestNearbyForTests } from "@/lib/arena/use-arena-nearby";
 import { Toaster, __resetToastTrackingForTests, toast } from "@/components/ui/toast";
 import { PROMPT_INPUT_GUARD_MS, REOPEN_SURFACE_GRACE_MS } from "@/lib/arena/constants";
 import { renderHook } from "@testing-library/react-native";
@@ -288,6 +289,32 @@ describe("ArenaBootstrap", () => {
     expect(mockAccept).toHaveBeenCalled();
     fireEvent.press(getByLabelText("Decline challenge"));
     expect(mockDecline).toHaveBeenCalled();
+  });
+
+  it("the prompt says Maybe a different mat only for a challenger in my close list (jr_be spec 023 C6)", () => {
+    const view = (onMat: string[], close: [string, number][]) => ({
+      mode: "nearby" as const,
+      onTheMat: new Set(onMat),
+      close: new Map(
+        close.map(([id, m]) => [id, { athleteId: id, band: `under_${m}m` as const, bandMaxM: m, canChallenge: true }]),
+      ),
+      ranges: null,
+    });
+    mockIncoming = RIVAL;
+    __setLatestNearbyForTests(view([], [["a-9", 3000]]));
+    const r = render(<ArenaBootstrap />);
+    expect(r.getByTestId("challenge-prompt-different-mat")).toBeTruthy();
+    expect(
+      r.getByText("Rival shows up < 3 km from you. Indoor GPS can be off by a lot, so check you're at the same gym before you roll."),
+    ).toBeTruthy();
+    // On my mat, someone else close, or a fallback read: no plate.
+    act(() => __setLatestNearbyForTests(view(["a-9"], [])));
+    expect(r.queryByTestId("challenge-prompt-different-mat")).toBeNull();
+    act(() => __setLatestNearbyForTests(view([], [["a-1", 1000]])));
+    expect(r.queryByTestId("challenge-prompt-different-mat")).toBeNull();
+    act(() => __setLatestNearbyForTests({ mode: "fallback" }));
+    expect(r.queryByTestId("challenge-prompt-different-mat")).toBeNull();
+    act(() => __setLatestNearbyForTests(null));
   });
 
   it("keeps a failed Accept's toast on screen after the prompt closes", () => {

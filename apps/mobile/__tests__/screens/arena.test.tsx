@@ -329,6 +329,7 @@ import { MAT_CONTROL_BAR_HEIGHT } from "@/components/arena/mat-board";
 import ArenaScreen from "@/app/(app)/(tabs)/arena/index";
 import { publishBellBadge, resetBellStore } from "@/lib/notifications/bell-store";
 import { __resetArenaNearbyForTests } from "@/lib/arena/use-arena-nearby";
+import { closeBandMeters } from "@jits/shared/api/location";
 
 // ---- fixtures ----
 
@@ -2054,8 +2055,22 @@ describe("Arena Booked strip and match_location_required", () => {
 });
 
 describe("Arena nearby: On the mat by proximity and Online & close (016 addendum)", () => {
+  /**
+   * A view as the hook builds it from a server BEFORE jr_be spec 023: no
+   * `band_max_m`, no `can_challenge` (so false), no `ranges`.
+   */
   function nearby(onMat: string[], close: [string, string][]) {
-    return { mode: "nearby", onTheMat: new Set(onMat), close: new Map(close) };
+    return {
+      mode: "nearby",
+      onTheMat: new Set(onMat),
+      close: new Map(
+        close.map(([id, band]) => [
+          id,
+          { athleteId: id, band, bandMaxM: closeBandMeters(band) ?? 0, canChallenge: false },
+        ]),
+      ),
+      ranges: null,
+    };
   }
 
   beforeEach(() => {
@@ -2075,14 +2090,15 @@ describe("Arena nearby: On the mat by proximity and Online & close (016 addendum
     mockNearbyView = nearby(["a-1"], [["a-2", "under_500m"], ["a-3", "under_2km"]]);
     const r = render(<ArenaScreen />);
     // One row on my mat: the chip's number, not the five live in the lobby.
-    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith({ count: 1 });
+    // The close count rides along (jr_be spec 023 8.5).
+    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith({ count: 1, close: 2 });
     mockNearbyView = { mode: "fallback" };
     r.rerender(<ArenaScreen />);
     expect(mockPublishNearbyCount).toHaveBeenLastCalledWith(null);
     // And leaving the Arena hands the chip back to the lobby count.
     mockNearbyView = nearby(["a-1"], []);
     r.rerender(<ArenaScreen />);
-    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith({ count: 1 });
+    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith({ count: 1, close: 0 });
     r.unmount();
     expect(mockPublishNearbyCount).toHaveBeenLastCalledWith(null);
   });
@@ -2112,7 +2128,9 @@ describe("Arena nearby: On the mat by proximity and Online & close (016 addendum
     // Collapsed by default: the header with its count, no rows.
     const header = r.getByTestId("arena-online-close-header");
     expect(header.props.accessibilityRole).toBe("button");
-    expect(header.props.accessibilityLabel).toBe("Online and close, 2 athletes");
+    expect(header.props.accessibilityLabel).toBe("Online and close, 2 athletes, under 2 kilometers");
+    // A server before spec 023 sends no ranges: today's radius.
+    expect(within(header).getByText("< 2 km")).toBeTruthy();
     expect(header.props.accessibilityState).toEqual({ expanded: false });
     expect(r.getByText("Online & close · 2")).toBeTruthy();
     expect(r.queryByTestId("arena-mat-row-a-2")).toBeNull();
@@ -2193,7 +2211,9 @@ describe("Arena nearby: On the mat by proximity and Online & close (016 addendum
     expect(r.queryByTestId("arena-closest-cta")).toBeNull();
     expect(r.queryByTestId("arena-on-the-mat")).toBeNull();
     expect(r.getByText("Online & close · 1")).toBeTruthy();
-    expect(r.getByTestId("arena-online-close-header").props.accessibilityLabel).toBe("Online and close, 1 athlete");
+    expect(r.getByTestId("arena-online-close-header").props.accessibilityLabel).toBe(
+      "Online and close, 1 athlete, under 2 kilometers",
+    );
   });
 
   it("the friends-first label is kept in nearby mode", () => {
@@ -2221,6 +2241,151 @@ describe("Arena nearby: On the mat by proximity and Online & close (016 addendum
     mockNearbyView = nearby(["a-1"], [["a-2", "under_500m"]]);
     const r = render(<ArenaScreen />);
     expect(r.getByTestId("arena-invite-actions")).toBeTruthy();
+  });
+});
+
+describe("Arena ranges: server-driven bands and ROLL on Online & close (jr_be spec 023)", () => {
+  const RANGES = { sameMatM: 600, closeRadiusM: 3000, bandEdgesM: [1000, 3000] };
+  const BAND_3KM = { maxM: 3000, label: "< 3 km", spoken: "under 3 kilometers" };
+  /** A view from the 023 server: band_max_m, can_challenge and ranges. */
+  function nearby023(onMat: string[], close: [string, number, boolean][]) {
+    return {
+      mode: "nearby",
+      onTheMat: new Set(onMat),
+      close: new Map(
+        close.map(([id, m, can]) => [
+          id,
+          { athleteId: id, band: m % 1000 === 0 ? `under_${m / 1000}km` : `under_${m}m`, bandMaxM: m, canChallenge: can },
+        ]),
+      ),
+      ranges: RANGES,
+    };
+  }
+
+  beforeEach(() => {
+    mockIsLive = true;
+    mockLocationRequired = true;
+    mockRoster.competitors = [
+      competitor({ id: "a-1", displayName: "Alpha", eloDiff: 300 }),
+      competitor({ id: "a-2", displayName: "Bravo", eloDiff: 10 }),
+      competitor({ id: "a-3", displayName: "Charlie", eloDiff: 50 }),
+      competitor({ id: "a-4", displayName: "Delta", eloDiff: 20 }),
+    ];
+    mockLobbyIds = new Set(["a-1", "a-2", "a-3", "a-4"]);
+  });
+
+  it("C3: two bands from the server, ordered by meters then name; the header reads < 3 km from ranges", () => {
+    mockNearbyView = nearby023(["a-1"], [["a-4", 3000, false], ["a-3", 1000, false], ["a-2", 3000, false]]);
+    const r = render(<ArenaScreen />);
+    const header = r.getByTestId("arena-online-close-header");
+    expect(within(header).getByText("< 3 km")).toBeTruthy();
+    expect(header.props.accessibilityLabel).toBe("Online and close, 3 athletes, under 3 kilometers");
+    fireEvent.press(header);
+    const section = r.getByTestId("arena-online-close");
+    const hidden = { includeHiddenElements: true };
+    expect(within(section).getByTestId("arena-close-band-a-3", hidden)).toHaveTextContent("< 1 km");
+    expect(within(section).getByTestId("arena-close-band-a-2", hidden)).toHaveTextContent("< 3 km");
+    const ids = within(section)
+      .getAllByTestId(/^arena-mat-row-/)
+      .map((n) => n.props.testID);
+    expect(ids).toEqual(["arena-mat-row-a-3", "arena-mat-row-a-2", "arena-mat-row-a-4"]);
+    expect(r.getByLabelText(/^Bravo, ELO 1300, .*under 3 kilometers$/)).toBeTruthy();
+  });
+
+  it("C4: can_challenge true shows ROLL, and a tap sends at once with the band", () => {
+    mockNearbyView = nearby023(["a-1"], [["a-2", 3000, true], ["a-3", 1000, false]]);
+    const r = render(<ArenaScreen />);
+    fireEvent.press(r.getByTestId("arena-online-close-header"));
+    const section = r.getByTestId("arena-online-close");
+    // Challengeable: the normal ROLL, no "Not on your mat" hint.
+    expect(within(section).queryByTestId("arena-not-on-mat-a-2")).toBeNull();
+    fireEvent.press(r.getByLabelText("Challenge Bravo"));
+    expect(mockSendChallenge).toHaveBeenCalledTimes(1);
+    expect(mockSendChallenge).toHaveBeenCalledWith("a-2", "Bravo", { closeBand: BAND_3KM });
+    // Not challengeable: today's hint, no ROLL.
+    expect(within(section).getByTestId("arena-not-on-mat-a-3")).toHaveTextContent("Not on your mat");
+    expect(r.queryByLabelText("Challenge Charlie")).toBeNull();
+  });
+
+  it("C4: a close row is disabled when ROLL is locked (a challenge already out)", () => {
+    mockChallenge.outgoing = { challengeId: "o-1", opponentId: "a-1", opponentName: "Alpha", closeBand: null };
+    mockNearbyView = nearby023(["a-1"], [["a-2", 1000, true]]);
+    const r = render(<ArenaScreen />);
+    fireEvent.press(r.getByTestId("arena-online-close-header"));
+    fireEvent.press(r.getByLabelText("Challenge Bravo"));
+    expect(mockSendChallenge).not.toHaveBeenCalled();
+  });
+
+  it("C4: offline, a challengeable close row offers going live, like an On the mat row", () => {
+    mockIsLive = false;
+    mockNearbyView = nearby023([], [["a-2", 1000, true], ["a-3", 1000, false]]);
+    const r = render(<ArenaScreen />);
+    fireEvent.press(r.getByTestId("arena-online-close-header"));
+    const section = r.getByTestId("arena-online-close");
+    expect(within(section).queryByTestId("arena-not-on-mat-a-2")).toBeNull();
+    expect(within(section).getByTestId("arena-not-on-mat-a-3")).toBeTruthy();
+    expect(r.queryByLabelText("Challenge Bravo")).toBeNull();
+  });
+
+  it("C2: a server before 023 (can_challenge absent) keeps every close row unchallengeable", () => {
+    mockNearbyView = {
+      mode: "nearby",
+      onTheMat: new Set(["a-1"]),
+      close: new Map([["a-2", { athleteId: "a-2", band: "under_2km", bandMaxM: 2000, canChallenge: false }]]),
+      ranges: null,
+    };
+    const r = render(<ArenaScreen />);
+    fireEvent.press(r.getByTestId("arena-online-close-header"));
+    expect(r.getByTestId("arena-not-on-mat-a-2")).toHaveTextContent("Not on your mat");
+    expect(r.queryByLabelText("Challenge Bravo")).toBeNull();
+    expect(within(r.getByTestId("arena-online-close-header")).getByText("< 2 km")).toBeTruthy();
+  });
+
+  it("C7: nobody else on my mat with some close reads N NEARBY; Closest Match stays On the mat only", () => {
+    mockNearbyView = nearby023([], [["a-2", 1000, true], ["a-3", 3000, true]]);
+    const r = render(<ArenaScreen />);
+    expect(r.getByTestId("arena-mat-counts").props.children).toBe("2 NEARBY");
+    expect(mockPublishNearbyCount).toHaveBeenLastCalledWith({ count: 0, close: 2 });
+    // The Closest Match never suggests a close athlete.
+    expect(r.queryByTestId("arena-closest-cta")).toBeNull();
+    expect(r.getByText("Nobody else on the mat")).toBeTruthy();
+    // Nobody close either: unchanged.
+    mockNearbyView = nearby023([], []);
+    r.rerender(<ArenaScreen />);
+    expect(r.getByTestId("arena-mat-counts").props.children).toBe("NOBODY ELSE ON MAT");
+  });
+
+  it("C5: the waiting strip says possibly a different mat after ROLL on a close row", () => {
+    mockChallenge.outgoing = { challengeId: "o-1", opponentId: "a-2", opponentName: "Bravo", closeBand: BAND_3KM };
+    mockNearbyView = nearby023(["a-1"], [["a-2", 3000, true]]);
+    const r = render(<ArenaScreen />);
+    const line = r.getByTestId("arena-strip-waiting-close");
+    expect(line).toHaveTextContent("Possibly on a different mat · < 3 km");
+    expect(line.props.accessibilityLabel).toBe("Possibly on a different mat, under 3 kilometers away.");
+    // Its red stays off: the strip keeps its neutral rail.
+    expect(r.getByTestId("arena-strip-waiting").props.className).not.toMatch(/border-l-cta/);
+  });
+
+  it("C5: a challenge from the mat shows no such line, even if the opponent later shows up close", () => {
+    mockChallenge.outgoing = { challengeId: "o-1", opponentId: "a-2", opponentName: "Bravo", closeBand: null };
+    mockNearbyView = nearby023([], [["a-2", 3000, true]]);
+    const r = render(<ArenaScreen />);
+    expect(r.getByTestId("arena-strip-waiting")).toBeTruthy();
+    expect(r.queryByTestId("arena-strip-waiting-close")).toBeNull();
+  });
+
+  it("C5: a restored challenge (band unknown) derives the line from the current close list", () => {
+    mockChallenge.outgoing = { challengeId: "o-1", opponentId: "a-2", opponentName: "Bravo" };
+    mockNearbyView = nearby023(["a-1"], [["a-2", 1000, true]]);
+    const r = render(<ArenaScreen />);
+    expect(r.getByTestId("arena-strip-waiting-close")).toHaveTextContent("Possibly on a different mat · < 1 km");
+    // On my mat now, or no nearby reading: no line.
+    mockNearbyView = nearby023(["a-2"], []);
+    r.rerender(<ArenaScreen />);
+    expect(r.queryByTestId("arena-strip-waiting-close")).toBeNull();
+    mockNearbyView = { mode: "fallback" };
+    r.rerender(<ArenaScreen />);
+    expect(r.queryByTestId("arena-strip-waiting-close")).toBeNull();
   });
 });
 

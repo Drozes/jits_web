@@ -29,15 +29,18 @@ import {
   ARENA_NEARBY_DEBOUNCE_MS,
   ARENA_NEARBY_REFRESH_MS,
   BROWSE_MIN_INTERVAL_MS,
+  NEARBY_SNAPSHOT_MAX_AGE_MS,
   __resetArenaNearbyForTests,
   useArenaNearby,
+  useNearbyCloseRow,
   type UseArenaNearbyInput,
 } from "@/lib/arena/use-arena-nearby";
 
 const OK_READING = { status: "ok", reading: { lat: 43.6, lng: -79.4, accuracyM: 12 } };
+const CLOSE_ROW = { athleteId: "a-2", band: "under_1km", bandMaxM: 1000, canChallenge: false };
 const NEARBY = {
   ok: true,
-  data: { mode: "nearby", onTheMat: ["a-1"], close: [{ athleteId: "a-2", band: "under_1km" }] },
+  data: { mode: "nearby", onTheMat: ["a-1"], close: [CLOSE_ROW], ranges: null },
 };
 
 let appStateHandlers: ((s: string) => void)[] = [];
@@ -94,7 +97,19 @@ describe("useArenaNearby: modes", () => {
     expect(result.current.mode).toBe("nearby");
     if (result.current.mode !== "nearby") throw new Error("mode");
     expect([...result.current.onTheMat]).toEqual(["a-1"]);
-    expect(result.current.close.get("a-2")).toBe("under_1km");
+    expect(result.current.close.get("a-2")).toEqual(CLOSE_ROW);
+    expect(result.current.ranges).toBeNull();
+  });
+
+  it("keeps the spec 023 row fields and ranges", async () => {
+    const ranges = { sameMatM: 600, closeRadiusM: 3000, bandEdgesM: [1000, 3000] };
+    const row = { athleteId: "a-3", band: "under_3km", bandMaxM: 3000, canChallenge: true };
+    mockNearby.mockResolvedValue({ ok: true, data: { mode: "nearby", onTheMat: [], close: [row], ranges } });
+    const { result } = mount();
+    await flush();
+    if (result.current.mode !== "nearby") throw new Error("mode");
+    expect(result.current.close.get("a-3")).toEqual(row);
+    expect(result.current.ranges).toEqual(ranges);
   });
 
   it.each(["flag_off", "no_location"])("%s falls back to today's list", async (mode) => {
@@ -266,5 +281,50 @@ describe("useArenaNearby: the server's mode is the flag (M1 kill switch)", () =>
     mount();
     await flush();
     await expect(flag.readMatchLocationRequired()).resolves.toBe(true);
+  });
+});
+
+describe("useNearbyCloseRow: the app-wide latest close list (jr_be spec 023 8.4)", () => {
+  function mountBoth(id: string) {
+    return renderHook(
+      (p: UseArenaNearbyInput) => ({ view: useArenaNearby(p), row: useNearbyCloseRow(id) }),
+      { initialProps: BASE },
+    );
+  }
+
+  it("is the athlete's close row after a nearby read", async () => {
+    const { result } = mountBoth("a-2");
+    await flush();
+    expect(result.current.row).toEqual(CLOSE_ROW);
+  });
+
+  it("is null for an athlete on my mat or not listed", async () => {
+    const onMat = mountBoth("a-1");
+    await flush();
+    expect(onMat.result.current.row).toBeNull();
+    onMat.unmount();
+    const other = mountBoth("zz");
+    await flush();
+    expect(other.result.current.row).toBeNull();
+  });
+
+  it("is null after a fallback read and before any read", async () => {
+    const reader = renderHook(() => useNearbyCloseRow("a-2"));
+    expect(reader.result.current).toBeNull();
+    mockNearby.mockResolvedValue({ ok: true, data: { mode: "flag_off", onTheMat: [], close: [], ranges: null } });
+    const { result } = mountBoth("a-2");
+    await flush();
+    expect(result.current.row).toBeNull();
+  });
+
+  it("concludes nothing from a read older than the max age", async () => {
+    const { result, rerender } = mountBoth("a-2");
+    await flush();
+    expect(result.current.row).toEqual(CLOSE_ROW);
+    // Away from the Arena (no reads), the list goes stale.
+    rerender({ ...BASE, focused: false });
+    await advance(NEARBY_SNAPSHOT_MAX_AGE_MS + 1);
+    rerender({ ...BASE, focused: false, lobbyKey: "x" });
+    expect(result.current.row).toBeNull();
   });
 });
