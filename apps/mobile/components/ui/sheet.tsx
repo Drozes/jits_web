@@ -96,7 +96,11 @@ interface SheetContextValue {
   ref: React.RefObject<BottomSheetModal | null>;
   open: () => void;
   close: () => void;
-  /** The modal is showing: its onChange reported index >= 0 and not -1 since (drives the Android back). */
+  /**
+   * The modal is showing or animating in: set when an animation toward an
+   * open index STARTS (onAnimate), cleared on onChange(-1). Drives the Android
+   * back, so it never passes through during the ~300 ms present animation.
+   */
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
 }
@@ -133,8 +137,9 @@ export function Sheet({ children, controllerRef }: SheetProps) {
   // where the trigger sits. The old inline (non-modal) <BottomSheet> measured its
   // immediate parent, so a trigger placed in AppHeader's ~32px right-action slot
   // collapsed the sheet into a tiny box pinned to the top-right corner.
-  // Driven by the modal's own onChange (index >= 0 open, -1 closed), so it is
-  // true only for a sheet that is actually showing.
+  // Driven by the modal itself (onAnimate toward an open index, onChange -1),
+  // so it is true only for a sheet gorhom is actually presenting: a back never
+  // dismisses a sheet that was not presented.
   const [isOpen, setIsOpen] = React.useState(false);
   const open = React.useCallback(() => ref.current?.present(), []);
   const close = React.useCallback(() => ref.current?.dismiss(), []);
@@ -184,12 +189,20 @@ export function SheetContent({ className, snapPoints = ["50%", "90%"], children 
     },
   });
   const onChange = React.useCallback((index: number) => setIsOpen(index >= 0), [setIsOpen]);
+  // True at the START of the present animation, not its end (review SF1).
+  const onAnimate = React.useCallback(
+    (_from: number, to: number) => {
+      if (to >= 0) setIsOpen(true);
+    },
+    [setIsOpen],
+  );
   return (
     <BottomSheetModal
       ref={ref}
       snapPoints={snapPoints}
       enablePanDownToClose
       onChange={onChange}
+      onAnimate={onAnimate}
       backdropComponent={renderBackdrop}
       {...chrome}
     >

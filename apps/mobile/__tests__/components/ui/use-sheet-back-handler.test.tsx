@@ -21,13 +21,18 @@ import { act, fireEvent, render, renderHook } from "@testing-library/react-nativ
 const mockPresent = jest.fn();
 const mockDismiss = jest.fn();
 let mockOnChange: ((i: number) => void) | null = null;
+let mockOnAnimate: ((from: number, to: number) => void) | null = null;
 jest.mock("@gorhom/bottom-sheet", () => {
   const R = require("react");
   const RN = require("react-native");
   const BottomSheetModal = R.forwardRef(
-    (props: { children?: React.ReactNode; onChange?: (i: number) => void }, ref: unknown) => {
+    (
+      props: { children?: React.ReactNode; onChange?: (i: number) => void; onAnimate?: (f: number, t: number) => void },
+      ref: unknown,
+    ) => {
       R.useImperativeHandle(ref, () => ({ present: mockPresent, dismiss: mockDismiss }));
       mockOnChange = props.onChange ?? null;
+      mockOnAnimate = props.onAnimate ?? null;
       return R.createElement(RN.View, { testID: "gorhom-sheet" }, props.children);
     },
   );
@@ -48,6 +53,7 @@ let listeners: BackListener[] = [];
 beforeEach(() => {
   jest.clearAllMocks();
   mockOnChange = null;
+  mockOnAnimate = null;
   listeners = [];
   jest.spyOn(BackHandler, "addEventListener").mockImplementation(((_e: string, fn: BackListener) => {
     listeners.push(fn);
@@ -159,12 +165,24 @@ describe("Sheet / SheetContent", () => {
     );
   }
 
-  it("isOpen follows the modal's onChange, not the present() call", () => {
+  it("isOpen follows the modal (onChange), not the present() call", () => {
     const screen = render(<Harness />);
     fireEvent.press(screen.getByText("Open"));
     expect(pressBack()).toBe(false);
     act(() => mockOnChange?.(0));
     expect(pressBack()).toBe(true);
+  });
+
+  it("review SF1: back is consumed from the START of the present animation (onAnimate), before onChange", () => {
+    const screen = render(<Harness />);
+    fireEvent.press(screen.getByText("Open"));
+    act(() => mockOnAnimate?.(-1, 0));
+    expect(pressBack()).toBe(true);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    // The close animation (toward -1) does not reopen it; onChange(-1) clears it.
+    act(() => mockOnAnimate?.(0, -1));
+    act(() => mockOnChange?.(-1));
+    expect(pressBack()).toBe(false);
   });
 
   it("never presented: back passes through", () => {
