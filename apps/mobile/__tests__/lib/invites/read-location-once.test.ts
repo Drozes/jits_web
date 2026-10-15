@@ -240,7 +240,7 @@ describe("Android approximate -> precise upgrade (jits-mafl.2 M4)", () => {
     setOS("android");
     mockGetPermission.mockResolvedValue(coarseGrant);
     mockRequestPermission.mockResolvedValue(fineGrant);
-    const r = await readLocationOnce({ ask: true, fast: true });
+    const r = await readLocationOnce({ ask: true, fast: true, upgrade: true });
     expect(mockRequestPermission).toHaveBeenCalledTimes(1);
     expect(r).toMatchObject({ status: "ok" });
     expect(r).not.toHaveProperty("reducedPrecision");
@@ -251,7 +251,7 @@ describe("Android approximate -> precise upgrade (jits-mafl.2 M4)", () => {
     setOS("android");
     mockGetPermission.mockResolvedValue(coarseGrant);
     mockRequestPermission.mockResolvedValue(coarseGrant);
-    expect(await readLocationOnce({ ask: true, fast: true })).toMatchObject({ status: "ok", reducedPrecision: true });
+    expect(await readLocationOnce({ ask: true, fast: true, upgrade: true })).toMatchObject({ status: "ok", reducedPrecision: true });
     expect(mockRequestPermission).toHaveBeenCalledTimes(1);
   });
 
@@ -260,7 +260,7 @@ describe("Android approximate -> precise upgrade (jits-mafl.2 M4)", () => {
     mockGetPermission.mockResolvedValue(coarseGrant);
     let release!: (v: unknown) => void;
     mockRequestPermission.mockReturnValue(new Promise((r) => (release = r)));
-    const p = readLocationOnce({ ask: true, fast: true });
+    const p = readLocationOnce({ ask: true, fast: true, upgrade: true });
     await Promise.resolve();
     await Promise.resolve();
     expect(permissionRequestInFlight()).toBe(true);
@@ -273,7 +273,7 @@ describe("Android approximate -> precise upgrade (jits-mafl.2 M4)", () => {
     setOS("android");
     mockGetPermission.mockResolvedValue({ granted: false, canAskAgain: true });
     mockRequestPermission.mockResolvedValue(coarseGrant);
-    expect(await readLocationOnce({ ask: true, fast: true })).toMatchObject({ status: "ok", reducedPrecision: true });
+    expect(await readLocationOnce({ ask: true, fast: true, upgrade: true })).toMatchObject({ status: "ok", reducedPrecision: true });
     expect(mockRequestPermission).toHaveBeenCalledTimes(1);
   });
 
@@ -281,17 +281,18 @@ describe("Android approximate -> precise upgrade (jits-mafl.2 M4)", () => {
     setOS("android");
     mockGetPermission.mockResolvedValue(coarseGrant);
     mockRequestPermission.mockReturnValue(new Promise(() => undefined));
-    const p = readLocationOnce({ ask: true, fast: true });
+    const p = readLocationOnce({ ask: true, fast: true, upgrade: true });
     await jest.advanceTimersByTimeAsync(PERMISSION_REQUEST_TIMEOUT_MS);
     expect(await p).toMatchObject({ status: "ok", reducedPrecision: true });
     expect(permissionRequestInFlight()).toBe(false);
   });
 
   it.each([
-    ["without ask: true", { ask: false }, coarseGrant, "android"],
-    ["when the OS can no longer ask", { ask: true }, { ...coarseGrant, canAskAgain: false }, "android"],
-    ["with a precise grant", { ask: true }, fineGrant, "android"],
-    ["on iOS", { ask: true }, coarseGrant, "ios"],
+    ["without ask: true", { ask: false, upgrade: true }, coarseGrant, "android"],
+    ["without upgrade: true (the challenge accept / match start readings)", { ask: true }, coarseGrant, "android"],
+    ["when the OS can no longer ask", { ask: true, upgrade: true }, { ...coarseGrant, canAskAgain: false }, "android"],
+    ["with a precise grant", { ask: true, upgrade: true }, fineGrant, "android"],
+    ["on iOS", { ask: true, upgrade: true }, coarseGrant, "ios"],
   ] as const)("never asks %s", async (_c, opts, perm, os) => {
     setOS(os);
     mockGetPermission.mockResolvedValue(perm);

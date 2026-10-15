@@ -152,8 +152,14 @@ async function fastFix(skipLastKnown = false): Promise<Location.LocationObject |
   return failed ? "error" : "timeout";
 }
 
+/**
+ * `upgrade` (Android 12+): with only approximate location granted, ask once
+ * for precise. Only the Go Live flow passes it (its first reading and the
+ * precise sheet's Retry); the challenge accept / match start readings never
+ * do, so a dialog cannot stall a match start (review S2, jits-mafl.2).
+ */
 export async function readLocationOnce(
-  opts: { ask: boolean; fast?: boolean; skipLastKnown?: boolean } = { ask: true },
+  opts: { ask: boolean; fast?: boolean; skipLastKnown?: boolean; upgrade?: boolean } = { ask: true },
 ): Promise<ReadingResult> {
   try {
     const current = await Location.getForegroundPermissionsAsync();
@@ -161,12 +167,13 @@ export async function readLocationOnce(
     let canAskAgain = current.canAskAgain;
     let coarse = current.android?.accuracy === "coarse";
     // At most ONE system prompt per call, never a loop: the grant itself, or
-    // (Android 12+) the approximate -> precise upgrade when only approximate
-    // location is granted and the OS can still ask (M4, jits-mafl.2). The
-    // upgrade is never asked right after a first grant came back approximate:
-    // the athlete just chose it, so the next tap asks.
+    // (Android 12+, `upgrade` callers only) the approximate -> precise
+    // upgrade when only approximate location is granted and the OS can still
+    // ask (M4, jits-mafl.2). The upgrade is never asked right after a first
+    // grant came back approximate: the athlete just chose it, so the next
+    // tap asks.
     const wantsGrant = !granted;
-    const wantsUpgrade = granted && coarse && Platform.OS === "android";
+    const wantsUpgrade = opts.upgrade === true && granted && coarse && Platform.OS === "android";
     if (opts.ask && canAskAgain && (wantsGrant || wantsUpgrade)) {
       const asked = await trackPermissionRequest(() =>
         within(() => Location.requestForegroundPermissionsAsync(), PERMISSION_REQUEST_TIMEOUT_MS),
