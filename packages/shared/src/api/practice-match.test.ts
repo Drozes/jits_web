@@ -59,4 +59,8 @@ describe("ATHLETE_GUARD_SELECT", () => {
     expect(ATHLETE_GUARD_SELECT).toContain("practice_match_offered_at");
     expect(ATHLETE_GUARD_SELECT).toContain("practice_match_completed_at");
   });
+
+  it("includes the Instagram handle the reel viewer shows", () => {
+    expect(ATHLETE_GUARD_SELECT).toContain("instagram_handle");
+  });
 });
