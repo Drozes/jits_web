@@ -50,7 +50,9 @@ export function FormSheet({ open, busy, onClosed, children }: FormSheetProps) {
     open,
     busy,
     onBack: () => {
-      if (presentedRef.current) ref.current?.dismiss();
+      if (!presentedRef.current) return false;
+      ref.current?.dismiss();
+      return true;
     },
   });
 

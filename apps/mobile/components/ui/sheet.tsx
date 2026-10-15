@@ -96,10 +96,9 @@ interface SheetContextValue {
   ref: React.RefObject<BottomSheetModal | null>;
   open: () => void;
   close: () => void;
-  /** Presented by `open()` and not closed yet (drives the Android back). */
+  /** The modal is showing: its onChange reported index >= 0 and not -1 since (drives the Android back). */
   isOpen: boolean;
-  /** The modal reached index -1 (swipe, backdrop, back or `close()`). */
-  onClosed: () => void;
+  setIsOpen: (open: boolean) => void;
 }
 
 const SheetContext = React.createContext<SheetContextValue | null>(null);
@@ -134,16 +133,14 @@ export function Sheet({ children, controllerRef }: SheetProps) {
   // where the trigger sits. The old inline (non-modal) <BottomSheet> measured its
   // immediate parent, so a trigger placed in AppHeader's ~32px right-action slot
   // collapsed the sheet into a tiny box pinned to the top-right corner.
+  // Driven by the modal's own onChange (index >= 0 open, -1 closed), so it is
+  // true only for a sheet that is actually showing.
   const [isOpen, setIsOpen] = React.useState(false);
-  const open = React.useCallback(() => {
-    ref.current?.present();
-    setIsOpen(true);
-  }, []);
+  const open = React.useCallback(() => ref.current?.present(), []);
   const close = React.useCallback(() => ref.current?.dismiss(), []);
-  const onClosed = React.useCallback(() => setIsOpen(false), []);
   React.useImperativeHandle(controllerRef, () => ({ open, close }), [open, close]);
   return (
-    <SheetContext.Provider value={{ ref, open, close, isOpen, onClosed }}>
+    <SheetContext.Provider value={{ ref, open, close, isOpen, setIsOpen }}>
       {children}
     </SheetContext.Provider>
   );
@@ -176,13 +173,17 @@ export interface SheetContentProps {
 }
 
 export function SheetContent({ className, snapPoints = ["50%", "90%"], children }: SheetContentProps) {
-  const { ref, close, isOpen, onClosed } = useSheetContext();
+  const { ref, close, isOpen, setIsOpen } = useSheetContext();
   const chrome = useSheetChrome();
   // Android back closes the sheet instead of the screen behind it (jits-mafl.2 M7).
-  useSheetBackHandler({ open: isOpen, onBack: close });
-  const onChange = React.useCallback((index: number) => {
-    if (index === -1) onClosed();
-  }, [onClosed]);
+  useSheetBackHandler({
+    open: isOpen,
+    onBack: () => {
+      close();
+      return true;
+    },
+  });
+  const onChange = React.useCallback((index: number) => setIsOpen(index >= 0), [setIsOpen]);
   return (
     <BottomSheetModal
       ref={ref}

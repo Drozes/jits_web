@@ -40,12 +40,16 @@ describe("readGoogleSignInResult", () => {
 
 describe("signInWithGoogle wiring", () => {
   const src = fs.readFileSync(path.resolve(__dirname, "../../../lib/auth/auth-context.tsx"), "utf8");
+  const body = src.slice(src.indexOf("const signInWithGoogle"), src.indexOf("const signUp"));
 
-  it("returns a silent cancel for the cancelled outcome before any ID token check", () => {
-    const cancel = src.indexOf('if (outcome.kind === "cancelled") return { error: null, cancelled: true };');
-    const noToken = src.indexOf("Google did not return an ID token.");
+  it("maps the signIn() resolution through readGoogleSignInResult", () => {
+    expect(body).toMatch(/readGoogleSignInResult\(\s*await\s+GoogleSignin\.signIn\(\)\s*\)/);
+  });
+
+  it("a cancelled outcome returns a silent cancel before any ID token check", () => {
+    const cancel = body.search(/kind\s*===\s*["']cancelled["'][\s\S]{0,80}?cancelled:\s*true/);
+    const noToken = body.search(/did not return an ID token/);
     expect(cancel).toBeGreaterThan(-1);
     expect(noToken).toBeGreaterThan(cancel);
-    expect(src).toContain("readGoogleSignInResult(await GoogleSignin.signIn())");
   });
 });

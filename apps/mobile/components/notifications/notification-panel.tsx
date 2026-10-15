@@ -67,9 +67,10 @@ export function NotificationPanel({
   useSheetBackHandler({
     open,
     onBack: () => {
-      if (!wasOpen.current) return;
+      if (!wasOpen.current) return false;
       wasOpen.current = false;
       ref.current?.dismiss();
+      return true;
     },
   });
 

@@ -71,7 +71,7 @@ function pressBack(): boolean {
 
 describe("useSheetBackHandler", () => {
   it("registers nothing while closed", () => {
-    const onBack = jest.fn();
+    const onBack = jest.fn(() => true);
     renderHook(() => useSheetBackHandler({ open: false, onBack }));
     expect(listeners).toHaveLength(0);
     expect(pressBack()).toBe(false);
@@ -79,7 +79,7 @@ describe("useSheetBackHandler", () => {
   });
 
   it("while open: consumes the back and calls onBack once per opening", () => {
-    const onBack = jest.fn();
+    const onBack = jest.fn(() => true);
     const { rerender } = renderHook(({ open }: { open: boolean }) => useSheetBackHandler({ open, onBack }), {
       initialProps: { open: true },
     });
@@ -95,7 +95,7 @@ describe("useSheetBackHandler", () => {
   });
 
   it("while busy: consumes the back without closing, then closes once not busy", () => {
-    const onBack = jest.fn();
+    const onBack = jest.fn(() => true);
     const { rerender } = renderHook(({ busy }: { busy: boolean }) => useSheetBackHandler({ open: true, busy, onBack }), {
       initialProps: { busy: true },
     });
@@ -106,10 +106,19 @@ describe("useSheetBackHandler", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  it("an onBack that started no close (false) is called again on the next press", () => {
+    const onBack = jest.fn().mockReturnValueOnce(false).mockReturnValue(true);
+    renderHook(() => useSheetBackHandler({ open: true, onBack }));
+    expect(pressBack()).toBe(true);
+    expect(pressBack()).toBe(true);
+    expect(pressBack()).toBe(true);
+    expect(onBack).toHaveBeenCalledTimes(2);
+  });
+
   it("calls the latest onBack and removes its listener on unmount", () => {
-    const first = jest.fn();
-    const second = jest.fn();
-    const { rerender, unmount } = renderHook(({ fn }: { fn: () => void }) => useSheetBackHandler({ open: true, onBack: fn }), {
+    const first = jest.fn(() => true);
+    const second = jest.fn(() => true);
+    const { rerender, unmount } = renderHook(({ fn }: { fn: () => boolean }) => useSheetBackHandler({ open: true, onBack: fn }), {
       initialProps: { fn: first },
     });
     rerender({ fn: second });
@@ -121,8 +130,8 @@ describe("useSheetBackHandler", () => {
   });
 
   it("stacked sheets: the one opened last closes first", () => {
-    const lower = jest.fn();
-    const upper = jest.fn();
+    const lower = jest.fn(() => true);
+    const upper = jest.fn(() => true);
     renderHook(() => useSheetBackHandler({ open: true, onBack: lower }));
     const top = renderHook(({ open }: { open: boolean }) => useSheetBackHandler({ open, onBack: upper }), {
       initialProps: { open: true },
@@ -150,6 +159,14 @@ describe("Sheet / SheetContent", () => {
     );
   }
 
+  it("isOpen follows the modal's onChange, not the present() call", () => {
+    const screen = render(<Harness />);
+    fireEvent.press(screen.getByText("Open"));
+    expect(pressBack()).toBe(false);
+    act(() => mockOnChange?.(0));
+    expect(pressBack()).toBe(true);
+  });
+
   it("never presented: back passes through", () => {
     render(<Harness />);
     expect(pressBack()).toBe(false);
@@ -160,6 +177,7 @@ describe("Sheet / SheetContent", () => {
     const screen = render(<Harness />);
     fireEvent.press(screen.getByText("Open"));
     expect(mockPresent).toHaveBeenCalledTimes(1);
+    act(() => mockOnChange?.(0));
     expect(pressBack()).toBe(true);
     expect(pressBack()).toBe(true);
     expect(mockDismiss).toHaveBeenCalledTimes(1);
@@ -170,6 +188,7 @@ describe("Sheet / SheetContent", () => {
   it("closed by a swipe: back passes through and never dismisses a closed sheet", () => {
     const screen = render(<Harness />);
     fireEvent.press(screen.getByText("Open"));
+    act(() => mockOnChange?.(0));
     act(() => mockOnChange?.(-1));
     expect(pressBack()).toBe(false);
     expect(mockDismiss).not.toHaveBeenCalled();
@@ -216,16 +235,17 @@ describe("guard: every gorhom sheet handles the Android back", () => {
     }
     return out;
   }
-  const files = ["app", "components"]
+  const files = ["app", "components", "lib"]
     .flatMap((d) => walk(path.join(ROOT, d)))
     .map((full) => ({ rel: path.relative(ROOT, full).split(path.sep).join("/"), src: fs.readFileSync(full, "utf8") }))
-    .filter((f) => /<BottomSheetModal\s/.test(f.src));
+    // Comments stripped: a `<BottomSheetModal>` mention in prose is not a sheet.
+    .filter((f) => /<BottomSheet(Modal)?[\s>]/.test(f.src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")));
 
   it("finds the sheets", () => {
     expect(files.length).toBeGreaterThanOrEqual(6);
   });
 
-  it("each file that renders a BottomSheetModal calls useSheetBackHandler", () => {
+  it("each file that renders a BottomSheet or BottomSheetModal calls useSheetBackHandler", () => {
     expect(files.filter((f) => !/useSheetBackHandler\(/.test(f.src)).map((f) => f.rel)).toEqual([]);
   });
 });

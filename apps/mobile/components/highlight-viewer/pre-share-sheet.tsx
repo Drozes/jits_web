@@ -42,7 +42,14 @@ export function PreShareSheet({ open, onClosed, children }: PreShareSheetProps) 
     [onClosed],
   );
   // Android back closes like a swipe (jits-mafl.2 M7).
-  useSheetBackHandler({ open, onBack: () => presentedRef.current && ref.current?.dismiss() });
+  useSheetBackHandler({
+    open,
+    onBack: () => {
+      if (!presentedRef.current) return false;
+      ref.current?.dismiss();
+      return true;
+    },
+  });
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => (

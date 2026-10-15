@@ -13,6 +13,9 @@ export function isClaimInFlight(phase: RunnerState["phase"]): boolean {
   return phase === "checking" || phase === "locating" || phase === "claiming" || phase === "saving_dob";
 }
 
+/** The longest the back is held in one in-flight phase (review N4). */
+export const CLAIM_BACK_HOLD_MAX_MS = 30_000;
+
 /**
  * The route's `gestureEnabled: false` (`app/(app)/_layout.tsx`) stops only the
  * iOS swipe; Android's hardware back still popped the claim mid-flight. This
@@ -24,6 +27,12 @@ export function useClaimBackGuard(phase: RunnerState["phase"]): void {
   React.useEffect(() => {
     if (!inFlight) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => true);
-    return () => sub.remove();
-  }, [inFlight]);
+    // Watchdog: a phase that never settles must not trap the athlete on this
+    // screen. Each new in-flight phase restarts it.
+    const watchdog = setTimeout(() => sub.remove(), CLAIM_BACK_HOLD_MAX_MS);
+    return () => {
+      clearTimeout(watchdog);
+      sub.remove();
+    };
+  }, [inFlight, phase]);
 }

@@ -104,9 +104,10 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
   useSheetBackHandler({
     open,
     onBack: () => {
-      if (!wasOpen.current) return;
+      if (!wasOpen.current) return false;
       wasOpen.current = false;
       ref.current?.dismiss();
+      return true;
     },
   });
 

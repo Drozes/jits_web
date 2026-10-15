@@ -86,7 +86,9 @@ function DriftPromptModal({ blocked, onClosed }: { blocked: boolean; onClosed: (
     open: show,
     busy,
     onBack: () => {
-      if (presentedRef.current) ref.current?.dismiss();
+      if (!presentedRef.current) return false;
+      ref.current?.dismiss();
+      return true;
     },
   });
 

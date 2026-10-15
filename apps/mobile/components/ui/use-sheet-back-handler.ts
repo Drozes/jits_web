@@ -14,11 +14,12 @@ export interface SheetBackHandlerOptions {
   busy?: boolean;
   /**
    * Closes the sheet the way a swipe down or a backdrop tap would (normally
-   * `ref.current?.dismiss()`, or the sheet's own cancel path). Called at most
-   * once per opening: further presses while the sheet animates out are
-   * consumed and ignored, so gorhom is never dismissed twice.
+   * `ref.current?.dismiss()`, or the sheet's own cancel path) and returns
+   * true when it STARTED a close. After a true, further presses while the
+   * sheet animates out are consumed and ignored, so gorhom is never
+   * dismissed twice; after a false, the next press calls it again.
    */
-  onBack: () => void;
+  onBack: () => boolean;
 }
 
 /**
@@ -51,8 +52,7 @@ export function useSheetBackHandler({ open, busy = false, onBack }: SheetBackHan
     let closing = false;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (closing || busyRef.current) return true;
-      closing = true;
-      onBackRef.current();
+      if (onBackRef.current()) closing = true;
       return true;
     });
     return () => sub.remove();

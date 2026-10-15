@@ -8,7 +8,7 @@
  * Source: apps/mobile/app/(app)/invite/claim.tsx
  */
 import * as React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PENDING_INVITE_KEY, makePendingInvite } from "@/lib/invites/pending-invite";
 
@@ -306,5 +306,23 @@ describe("Android hardware back (jits-mafl.2 M7)", () => {
     answer({ status: "ok", reading: { lat: 1, lng: 2, accuracyM: 10 } });
     await waitFor(() => expect(mockClaim).toHaveBeenCalled());
     await waitFor(() => expect(pressBack()).toBe(false));
+  });
+
+  it("a phase that never settles releases the back after 30 s (watchdog)", async () => {
+    const { CLAIM_BACK_HOLD_MAX_MS } = jest.requireActual("@/lib/invites/claim-back-guard") as typeof import("@/lib/invites/claim-back-guard");
+    mockReading.mockReturnValue(new Promise(() => undefined));
+    await withPending({ code: "ABC123" }, "code");
+    jest.useFakeTimers();
+    try {
+      render(<InviteClaimScreen />);
+      await screen.findByText("Checking you're on the mat...");
+      expect(pressBack()).toBe(true);
+      act(() => {
+        jest.advanceTimersByTime(CLAIM_BACK_HOLD_MAX_MS);
+      });
+      expect(pressBack()).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
