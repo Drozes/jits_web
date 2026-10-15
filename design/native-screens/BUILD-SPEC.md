@@ -126,7 +126,7 @@ Hard rules:
 ## Shared chrome (draw it identically everywhere; verify against code)
 
 - AppHeader (`components/layout/app-header.tsx`): 56pt bar [back | caps title | LIVE pill + right action].
-- BrandHeader (`components/layout/brand-header.tsx`): wordmark variant, on Home and Rankings.
+- BrandHeader (`components/layout/brand-header.tsx`): on every tab root (Home, Arena, Film, Rankings, Profile) since jits-1ez5: the wordmark, a 1px hairline-strong rule with 10pt each side, then the rating (`header-elo.tsx`, mono 700 16 ink) on the wordmark baseline; no visible tab title; right side the status chip then the bell; side padding max(16, inset). TabHeader was deleted.
 - EloTabBar (`components/layout/elo-tab-bar.tsx`): surface-2 bg, hairline top, 4 equal columns Home / Arena /
   Rankings / Profile (lucide Home, Swords, Trophy, User at 18px), labels DM Sans Bold 10 uppercase caps tracking,
   active = ink + 2px #E63946 top border, inactive ink-3. Only on tab screens.

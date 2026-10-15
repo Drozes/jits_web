@@ -140,6 +140,10 @@ Both documents are fully navigable on native, and the shared parser gives the we
 - A document's title inside a clause's own bold heading ("1.6 **Privacy Policy and feature rules.**") is not linked.
 - `PRIVACY_POLICY.md`: "(see 16.3)" reads "(see section 16.3)" in the US sensitive information row, matching the French and linking like it (owner-approved wording fix; the English Privacy Policy version hash changes).
 
+## OTA "Highlight viewer drops the title" (runtime 0.5.0), 2026-10-14
+
+Production OTA group `88d790c9-b611-4bef-a1d9-e15ca49ef2ba` (iOS `01a13ac9-32c0-7296-aad3-8a9d4ac5bf91`, Android `01a13ac9-32c0-7c36-93d4-c4b4040c4348`) from jits_web `main` `56c0ef2c` (release PR #83 of development `9323a2d4`, feature PR #82), published from a clean worktree so local `.env` files could not leak in. JS-only, non-critical (`updateCriticalIndex` unchanged). Needs the jr_be spec 020 backend, live on prod since 2026-10-14T00:59:56Z (reels now carry the name only, the result on the frame, the centred watermark and the 4 s endcard; every existing prod reel was re-rendered; `multi_angle_highlights_enabled` turned on). Rollback target: "ELO in the header" group `bcbc74ea-3164-4bd6-b030-655193b3d5bc`.
+
 ### Mobile: highlight viewer drops the title (spec 020)
 
 Spec 020 section D (owner decision 2026-10-13): the full-screen reel viewer no longer draws a title line (`vs {opp}` on your own reel, the subject's name on someone else's); the mono date and duration line and Open match / View profile stay. The play / pause VoiceOver label now names whose reel it is. JS-only (OTA-eligible).
@@ -155,6 +159,9 @@ Spec 020 section D (owner decision 2026-10-13): the full-screen reel viewer no l
 **Fixed**
 - `apps/mobile/components/highlight-viewer/reel-video.tsx`: VoiceOver read "Your highlight reel, N seconds" on someone else's reel; it now reads "{Name}'s highlight reel, N seconds" ("Highlight reel, N seconds" when the name is missing).
 
+## OTA "ELO in the header" (runtime 0.5.0), 2026-10-09
+
+Production OTA group `bcbc74ea-3164-4bd6-b030-655193b3d5bc` (iOS `01a1225b-9979-7309-bbf5-1b91bdc33dc2`, Android `01a1225b-9979-7073-9f74-868479146baa`) from jits_web `main` `cb06ce8a` (release PR #79 of #78). JS-only, non-critical. Heading added 2026-10-14; the release was recorded in CLAUDE.md by PR #80.
 
 ### Mobile: Elo in the header, wordmark + rating on every tab root (epic jits-1ez5)
 
