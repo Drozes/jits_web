@@ -28,7 +28,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import { useSyncExternalStore } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../supabase/client";
-import { permissionRequestInFlight } from "@/lib/permissions/permission-request";
+import { permissionDialogBackgroundGuard } from "@/lib/permissions/permission-request";
 
 interface AppOnlinePayload {
   athlete_id: string;
@@ -254,7 +254,11 @@ export function useOnlinePresence(
 
     run();
 
+    // An Android permission dialog's "background" is not leaving; Home
+    // pressed with it up untracks once it settles (jits-3dc2).
+    const dialog = permissionDialogBackgroundGuard(() => handleAppStateChange("background"));
     const handleAppStateChange = (next: AppStateStatus) => {
+      if (dialog.ignore(next)) return;
       if (next === "active") {
         if (gaveUp && !cancelled && !channel) {
           gaveUp = false;
@@ -268,9 +272,7 @@ export function useOnlinePresence(
         // moments the app is still open. Untracking there spent presence calls
         // against the 5 per 30s channel limit (jits-fa9x) and blinked the
         // green dot for everyone watching. The lobby draws the same line
-        // (`lib/arena/use-arena-live.ts`). An Android system permission
-        // dialog reports "background" too and is not leaving (jits-3dc2).
-        if (permissionRequestInFlight()) return;
+        // (`lib/arena/use-arena-live.ts`).
         void untrack();
       }
     };
@@ -280,6 +282,7 @@ export function useOnlinePresence(
     return () => {
       cancelled = true;
       sub.remove();
+      dialog.dispose();
       if (retryTimer) clearTimeout(retryTimer);
       if (deadChannel) {
         if (deadChannel.state !== "closed") deadChannel.teardown();

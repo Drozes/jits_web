@@ -184,6 +184,7 @@ describe("background (jits-3dc2)", () => {
     const { trackPermissionRequest } = jest.requireActual(
       "@/lib/permissions/permission-request",
     ) as typeof import("@/lib/permissions/permission-request");
+    Object.defineProperty(require("react-native").Platform, "OS", { value: "android", configurable: true });
     let handler: ((s: string) => void) | null = null;
     const spy = jest.spyOn(AppState, "addEventListener").mockImplementation(((_t: string, fn: (s: string) => void) => {
       handler = fn;
@@ -358,4 +359,14 @@ describe("the sheet", () => {
     await flush();
     expect(mockPresent).toHaveBeenCalledTimes(1);
   });
+});
+
+// The jits-3dc2 tests run as Android (the dialog guard is Android only): put
+// the platform and the permission-request state back after every test.
+const ORIGINAL_PLATFORM_OS = require("react-native").Platform.OS;
+afterEach(() => {
+  Object.defineProperty(require("react-native").Platform, "OS", { value: ORIGINAL_PLATFORM_OS, configurable: true });
+  (
+    jest.requireActual("@/lib/permissions/permission-request") as typeof import("@/lib/permissions/permission-request")
+  ).__resetPermissionRequestsForTests();
 });

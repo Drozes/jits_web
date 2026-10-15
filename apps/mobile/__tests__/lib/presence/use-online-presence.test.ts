@@ -194,6 +194,7 @@ describe("useOnlinePresence", () => {
     const { trackPermissionRequest } = jest.requireActual(
       "@/lib/permissions/permission-request",
     ) as typeof import("@/lib/permissions/permission-request");
+    Object.defineProperty(require("react-native").Platform, "OS", { value: "android", configurable: true });
     const { unmount } = mount();
     await settle();
     const channel = mockChannels[0];
@@ -220,6 +221,48 @@ describe("useOnlinePresence", () => {
     });
     expect(channel.untrack).toHaveBeenCalledTimes(1);
     unmount();
+  });
+
+  it("Android: Home pressed with the dialog up untracks once it settles; iOS never ignores (review B1)", async () => {
+    const { trackPermissionRequest, SETTLE_REPLAY_DELAY_MS } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    const RN = require("react-native");
+    Object.defineProperty(RN.Platform, "OS", { value: "android", configurable: true });
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await subscribed(channel);
+    jest.useFakeTimers();
+    try {
+      let answer!: () => void;
+      let request!: Promise<void>;
+      await act(async () => {
+        request = trackPermissionRequest(() => new Promise<void>((r) => (answer = r)));
+        Object.defineProperty(RN.AppState, "currentState", { value: "background", configurable: true, writable: true });
+        appStateHandler?.("background");
+      });
+      expect(channel.untrack).not.toHaveBeenCalled();
+      await act(async () => {
+        answer();
+        await request;
+        await jest.advanceTimersByTimeAsync(SETTLE_REPLAY_DELAY_MS);
+      });
+      expect(channel.untrack).toHaveBeenCalledTimes(1);
+
+      // iOS: a background with a prompt up is a real one.
+      Object.defineProperty(RN.Platform, "OS", { value: "ios", configurable: true });
+      await act(async () => {
+        appStateHandler?.("active");
+        void trackPermissionRequest(() => new Promise<void>(() => undefined));
+        appStateHandler?.("background");
+      });
+      expect(channel.untrack).toHaveBeenCalledTimes(2);
+    } finally {
+      jest.useRealTimers();
+      Object.defineProperty(RN.AppState, "currentState", { value: "active", configurable: true, writable: true });
+      unmount();
+    }
   });
 
   it("rebuilds a server-closed channel and tracks on the new one", async () => {
@@ -355,4 +398,14 @@ describe("useOnlinePresence", () => {
 
     unmount();
   });
+});
+
+// The jits-3dc2 tests run as Android (the dialog guard is Android only): put
+// the platform and the permission-request state back after every test.
+const ORIGINAL_PLATFORM_OS = require("react-native").Platform.OS;
+afterEach(() => {
+  Object.defineProperty(require("react-native").Platform, "OS", { value: ORIGINAL_PLATFORM_OS, configurable: true });
+  (
+    jest.requireActual("@/lib/permissions/permission-request") as typeof import("@/lib/permissions/permission-request")
+  ).__resetPermissionRequestsForTests();
 });
