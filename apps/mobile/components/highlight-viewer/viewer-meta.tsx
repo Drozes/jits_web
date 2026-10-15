@@ -1,22 +1,30 @@
 import * as React from "react";
-import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { Linking, Pressable, Text, View } from "react-native";
 import type { HighlightProgress } from "@jits/shared/api/highlights";
+import { formatInstagramHandle, instagramProfileUrl } from "@jits/shared/utils";
 import { regeneratingBanner } from "@/lib/highlight/highlight-copy";
-import { reelMetaLine, secondaryHref, type ReelMetaInfo } from "@/lib/highlight/reel-meta";
+import { reelMetaLine, type ReelMetaInfo } from "@/lib/highlight/reel-meta";
 import { ON_MEDIA } from "@/lib/theme/palette";
 import { MonoNumbers } from "@/components/match-detail/highlight/mono-numbers";
 import { VIEWER_COPY } from "./viewer-copy";
 
 /**
  * Bottom-left meta of a reel page (spec 8.2): the phase-1 regenerating
- * banner, the mono `OCT 04 · 0:28` line, then Open match (a participant) or
- * View profile (C-V5, anyone else; spec 8.6). No title line (spec 020 D).
+ * banner, the mono `OCT 04 · 0:28` line, then the reel subject's Instagram
+ * handle as a small tappable `@handle` that opens their Instagram profile
+ * (owner decision 2026-10-14; it replaced Open match / View profile). No
+ * handle, no line. No title line (spec 020 D).
  */
 export function ViewerMeta({ progress, meta }: { progress: HighlightProgress | null; meta: ReelMetaInfo }) {
-  const router = useRouter();
   const playback = progress?.playback ?? null;
-  const href = secondaryHref(meta);
+  const handle = meta.instagramHandle;
+  const url = instagramProfileUrl(handle);
+  const label = formatInstagramHandle(handle);
+  const openInstagram = React.useCallback(() => {
+    if (!url) return;
+    // iOS hands the universal link to the Instagram app when it is installed.
+    Linking.openURL(url).catch(() => {});
+  }, [url]);
   return (
     <View pointerEvents="box-none" className="gap-1">
       {progress?.phase === "regenerating" ? (
@@ -31,16 +39,18 @@ export function ViewerMeta({ progress, meta }: { progress: HighlightProgress | n
           {reelMetaLine(meta.dateIso, playback.durationS)}
         </Text>
       ) : null}
-      {href ? (
+      {url ? (
         <Pressable
-          testID={meta.secondary === "open_match" ? "viewer-open-match" : "viewer-view-profile"}
+          testID="viewer-instagram-handle"
           accessibilityRole="link"
-          hitSlop={10}
-          onPress={() => router.push(href as never)}
-          className="self-start py-2 active:opacity-70"
+          accessibilityLabel={VIEWER_COPY.instagramLabel(label)}
+          accessibilityHint={VIEWER_COPY.instagramHint}
+          hitSlop={{ top: 12, bottom: 12, left: 10, right: 10 }}
+          onPress={openInstagram}
+          className="self-start py-1 active:opacity-70"
         >
-          <Text className="font-heading text-callout uppercase tracking-caps" style={{ color: ON_MEDIA.text }}>
-            {meta.secondary === "open_match" ? VIEWER_COPY.openMatch : VIEWER_COPY.viewProfile}
+          <Text className="font-body text-small" style={{ color: ON_MEDIA.text }}>
+            {label}
           </Text>
         </Pressable>
       ) : null}

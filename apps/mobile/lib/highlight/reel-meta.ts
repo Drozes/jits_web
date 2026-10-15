@@ -1,14 +1,16 @@
 import type { HighlightDetail } from "@jits/shared/api/highlight-share";
 import { shortDate } from "@/lib/film-room/format";
-import { matchDetailHref } from "@/lib/match-detail/href";
-import { reelSecondaryAction, type ReelItem } from "./reel-types";
+import type { ReelItem } from "./reel-types";
 
-/** The bottom-left meta of a full-screen reel page (spec 8.2, 8.6). */
+/**
+ * The bottom-left meta of a full-screen reel page (spec 8.2): the date and the
+ * reel subject's Instagram handle. Owner decision 2026-10-14: the viewer has
+ * no Open match / View profile action; the `@handle` line replaced it.
+ */
 export interface ReelMetaInfo {
   dateIso: string | null;
-  matchId: string;
-  secondary: "open_match" | "view_profile" | null;
-  subjectAthleteId: string | null;
+  /** The subject's stored handle (no @), or null when unset or unknown. */
+  instagramHandle: string | null;
 }
 
 /** "0:28": whole seconds, minutes unpadded. */
@@ -23,43 +25,21 @@ export function reelMetaLine(dateIso: string | null, durationS: number | null | 
   return date ? `${date} · ${reelDuration(durationS)}` : reelDuration(durationS);
 }
 
-/** A lane item (pager). */
-export function metaFromItem(item: ReelItem): ReelMetaInfo {
-  return {
-    dateIso: item.readyAt,
-    matchId: item.matchId,
-    secondary: reelSecondaryAction(item),
-    subjectAthleteId: item.subjectAthleteId ?? null,
-  };
-}
-
-/** The single-reel viewer: always the athlete's own reel, so always Open match. */
-export function metaFromDetail(detail: HighlightDetail): ReelMetaInfo {
-  return {
-    dateIso: detail.caption?.playedAt ?? null,
-    matchId: detail.matchId,
-    secondary: "open_match",
-    subjectAthleteId: null,
-  };
-}
-
-export function secondaryHref(meta: ReelMetaInfo): string | null {
-  if (meta.secondary === "open_match") return matchDetailHref(meta.matchId);
-  if (meta.secondary === "view_profile" && meta.subjectAthleteId) return `/(app)/athlete/${encodeURIComponent(meta.subjectAthleteId)}`;
-  return null;
+function cleanHandle(handle: string | null | undefined): string | null {
+  const h = handle?.trim();
+  return h ? h : null;
 }
 
 /**
- * A page's meta: the detail read (match date) plus, in the pager, the lane
- * item's ownership-driven secondary action.
+ * A page's meta: the detail read (match date) plus the subject's handle. The
+ * single-reel viewer (no lane item) and an own lane item are the signed-in
+ * athlete's reel, so they take `viewerHandle` (their live profile); a non-own
+ * lane item carries its own `subjectInstagramHandle`.
  */
-export function pageMeta(detail: HighlightDetail, item?: ReelItem | null): ReelMetaInfo {
-  const fromDetail = metaFromDetail(detail);
-  if (!item) return fromDetail;
-  const fromItem = metaFromItem(item);
+export function pageMeta(detail: HighlightDetail, item?: ReelItem | null, viewerHandle?: string | null): ReelMetaInfo {
+  const own = !item || item.isOwn;
   return {
-    ...fromDetail,
-    secondary: fromItem.secondary,
-    subjectAthleteId: fromItem.subjectAthleteId,
+    dateIso: detail.caption?.playedAt ?? null,
+    instagramHandle: cleanHandle(own ? viewerHandle : item.subjectInstagramHandle),
   };
 }

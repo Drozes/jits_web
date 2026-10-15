@@ -16,7 +16,6 @@ export function reelItem(id: string, over: Partial<ReelItem> = {}): ReelItem {
     opponentName: "D. Okafor",
     readyAt: "2026-10-06T10:00:00Z",
     unseen: false,
-    viewerIsParticipant: true,
     ...over,
   };
 }

@@ -28,7 +28,7 @@ export interface ReelBinding {
   showHint?: boolean;
   /** Pager only: C-V2 "You're all caught up" shows on this (last) page. */
   caughtUp?: boolean;
-  /** Pager only: the lane item (ownership, VoiceOver subject, Open match / View profile). */
+  /** Pager only: the lane item (ownership, VoiceOver subject, the subject's Instagram handle). */
   item?: ReelItem | null;
   /** The lane's signed cover, shown while the page loads (pager only). */
   poster?: { url: string | null; path: string | null } | null;

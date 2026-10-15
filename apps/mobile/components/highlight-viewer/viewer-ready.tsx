@@ -2,6 +2,7 @@ import * as React from "react";
 import { Text, View } from "react-native";
 import type { HighlightDetail, HighlightShareSourceTag } from "@jits/shared/api/highlight-share";
 import { pageMeta } from "@/lib/highlight/reel-meta";
+import { AuthContext } from "@/lib/auth/auth-context";
 import { ON_MEDIA } from "@/lib/theme/palette";
 import { ViewerFrame } from "./viewer-frame";
 import { ViewerMeta } from "./viewer-meta";
@@ -20,15 +21,18 @@ import { useReelReport } from "./viewer-report";
  * The reel, following its progress (realtime + 15 s polling while it is
  * moving, re-read on focus and foreground): the LIVE render edge to edge on
  * the page's pooled player (a new version swaps in place), the scrims, the
- * bottom meta and the right rail (own reels only), the progress bar, and the
- * share / improve sheets. Without a live version a calm state shows until one
+ * bottom meta (date line, subject's `@handle`) and the right rail (own reels
+ * only), the progress bar, and the share / improve sheets. Without a live version a calm state shows until one
  * lands.
  */
 export function ViewerReady({ detail, source, binding }: { detail: HighlightDetail; source: HighlightShareSourceTag; binding: ReelBinding }) {
   const { my, vs, fb, improve, shareEnabled } = useReelPage(detail, source, binding);
   const progress = my.progress;
   const playback = progress?.playback ?? null;
-  const meta = React.useMemo(() => pageMeta(detail, binding.item), [detail, binding.item]);
+  // Own reels (and the single-reel viewer) show the signed-in athlete's handle.
+  // Read without `useAuth` so the viewer never throws outside the provider.
+  const viewerHandle = React.useContext(AuthContext)?.athlete?.instagram_handle ?? null;
+  const meta = React.useMemo(() => pageMeta(detail, binding.item, viewerHandle), [detail, binding.item, viewerHandle]);
   // The single-reel viewer (no lane item) is always your own reel; a non-own
   // lane item's `opponentName` carries its subject's name.
   const item = binding.item;
