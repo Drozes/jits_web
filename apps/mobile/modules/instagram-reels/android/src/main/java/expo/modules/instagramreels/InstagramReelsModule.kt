@@ -18,17 +18,17 @@ import java.io.File
  * THE MECHANISM, matching Meta's single-media sample on the Android
  * Sharing-to-Reels page: an `Intent` with the custom action
  * `com.instagram.share.ADD_TO_REEL`, the clip set as the intent's DATA via
- * `setDataAndType(uri, "image/* video/*")`, the same URI also in
+ * `setDataAndType(uri, "image/\* video/\*")`, the same URI also in
  * `Intent.EXTRA_STREAM`, and the registered Facebook App ID in
  * `com.instagram.platform.extra.APPLICATION_ID` (required since January
  * 2023). Instagram opens its Reels composer with the clip loaded.
  *
  * WHY `setDataAndType` AND NOT `setType`. Meta publishes two samples on
  * that page and they are not interchangeable. The single-media one, which
- * is this path, uses `setDataAndType` with the combined `"image/* video/*"`
+ * is this path, uses `setDataAndType` with the combined `"image/\* video/\*"`
  * type; only the `ADD_TO_REEL_MULTIPLE` variant uses a bare `setType`.
  * Taking the multiple-media form for a single clip deviates twice at once:
- * the URI leaves `intent.data`, and the MIME string narrows to `video/*`.
+ * the URI leaves `intent.data`, and the MIME string narrows to `video/\*`.
  * `setPackage` makes the intent explicit at PACKAGE level but it is still
  * matched against Instagram's intent filters, so both of those feed
  * resolution. If that filter is declared with `<data>` rather than a bare
@@ -277,15 +277,15 @@ class InstagramReelsModule : Module() {
     internal const val STICKER_ASSET_EXTRA = "interactive_asset_uri"
     /**
      * Exactly the string in Meta's single-media sample, and deliberately
-     * not narrowed to `"video/*"`.
+     * not narrowed to `"video/\*"`.
      *
      * The two are NOT interchangeable: `IntentFilter.findMimeType` takes
      * `type.substring(0, type.indexOf('/'))`, so this string tests as
-     * `"image"` and a bare `"video/*"` tests as `"video"`. What makes
+     * `"image"` and a bare `"video/\*"` tests as `"video"`. What makes
      * verbatim positively right rather than merely deferential is that Meta
      * publishes BOTH strings against this same `ADD_TO_REEL` action on the
      * same page: the combined form in the single-media sample and
-     * `"video/*"` in the sticker example. For both of Meta's own samples to
+     * `"video/\*"` in the sticker example. For both of Meta's own samples to
      * work, Instagram's filter has to accept both.
      */
     internal const val MEDIA_MIME = "image/* video/*"
