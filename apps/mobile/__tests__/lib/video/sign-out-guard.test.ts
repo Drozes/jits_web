@@ -10,6 +10,7 @@ import {
   pendingUploadSignOutMessage,
   signOutUploadMessage,
 } from "@/lib/video/sign-out-guard";
+import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 
 const control = {
   retry: jest.fn(async () => "started" as const),
@@ -23,6 +24,7 @@ let alertSpy: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
   __setUploadControl(control);
+  __resetAiConsentForTests({ athleteId: "me", consentAt: "2026-10-14T12:00:00Z", known: true });
   alertSpy = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
 });
 
@@ -83,4 +85,12 @@ describe("Try again refused (m8)", () => {
     expect(retryRefusedCopy("started")).toBeNull();
     expect(retryRefusedCopy("running")).toBeNull();
   });
+});
+
+it("a clip waiting for AI processing consent: the warning says it uploads once allowed (jits-rog5.11)", async () => {
+  __resetAiConsentForTests({ athleteId: "me", consentAt: null, known: true });
+  control.hasPending.mockResolvedValueOnce(true);
+  expect(await pendingUploadSignOutMessage("Ana Silva")).toBe(
+    "Your match film hasn't finished uploading. Sign out anyway? It will finish the next time you sign in as A. Silva, once you allow AI processing.",
+  );
 });

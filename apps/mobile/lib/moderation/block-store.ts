@@ -78,8 +78,17 @@ export async function loadBlocks(athleteId: string | null): Promise<boolean> {
     : setTimeout(() => {
         if (gen === generation && !state.settled) set({ ...state, settled: true });
       }, BLOCKS_SETTLE_TIMEOUT_MS);
-  const [ids, mine] = await Promise.all([getMyBlockIds(moderationClient()), getMyBlockedAthletes(moderationClient())]);
-  if (settleTimer) clearTimeout(settleTimer);
+  let ids: Awaited<ReturnType<typeof getMyBlockIds>>;
+  let mine: Awaited<ReturnType<typeof getMyBlockedAthletes>>;
+  try {
+    [ids, mine] = await Promise.all([getMyBlockIds(moderationClient()), getMyBlockedAthletes(moderationClient())]);
+  } catch (err) {
+    const failed = { ok: false as const, error: { hint: "unknown", message: err instanceof Error ? err.message : String(err) } };
+    ids = failed;
+    mine = failed;
+  } finally {
+    if (settleTimer) clearTimeout(settleTimer);
+  }
   if (gen !== generation) return false;
   if (!ids.ok && !mine.ok) {
     if (!state.settled) set({ ...state, settled: true });

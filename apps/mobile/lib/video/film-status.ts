@@ -237,6 +237,8 @@ function localRow(job: LocalAngleJob, keepOpen: string): RowBody {
       return body(ROW_TAG.uploading, "progress", keepOpen, { percent: p });
     }
     case "paused":
+      // Waiting for AI processing consent: Try again asks for it, and offers to delete the clip.
+      if (job.needsConsent) return body(ROW_TAG.needsOk, "waiting", ROW_HELPER.needsOk, { action: "retry", paused: true });
       return body(ROW_TAG.paused, "waiting", job.message ?? null, { action: "retry", paused: true });
     default:
       if (job.terminal) {

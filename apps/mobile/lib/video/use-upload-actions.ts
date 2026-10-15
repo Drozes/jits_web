@@ -39,19 +39,6 @@ export function retryRefusedCopy(result: RetryMatchUploadResult): string | null 
  * by the verdict card, match detail and the Film Room card.
  */
 export function useUploadActions(matchId: string): { retry: () => void; discard: () => void } {
-  const retry = React.useCallback(() => {
-    const run = () =>
-      void retryMatchUpload(matchId).then((result) => {
-        if (result === "needs_consent") {
-          askConsentToUpload(run);
-          return;
-        }
-        const refused = retryRefusedCopy(result);
-        if (refused) toast.error(refused);
-      });
-    run();
-  }, [matchId]);
-
   const discard = React.useCallback(() => {
     Alert.alert(DISCARD_TITLE, DISCARD_BODY, [
       { text: "Keep", style: "cancel" },
@@ -59,18 +46,33 @@ export function useUploadActions(matchId: string): { retry: () => void; discard:
     ]);
   }, [matchId]);
 
+  const retry = React.useCallback(() => {
+    const run = () =>
+      void retryMatchUpload(matchId).then((result) => {
+        if (result === "needs_consent") {
+          askConsentToUpload(run, discard);
+          return;
+        }
+        const refused = retryRefusedCopy(result);
+        if (refused) toast.error(refused);
+      });
+    run();
+  }, [matchId, discard]);
+
   return { retry, discard };
 }
 
 /**
- * A clip recorded before the consent prompt existed (jits-rog5.11): Try
- * again asks first. Allow records consent and uploads; Not now keeps the
- * clip parked on this phone.
+ * A clip waiting for AI processing consent (jits-rog5.11): Try again asks
+ * first. Allow records consent and uploads; Not now keeps the clip parked
+ * on this phone; Delete clip drops it without consenting (through the
+ * usual Discard confirm).
  */
-export function askConsentToUpload(onAllowed: () => void): void {
+export function askConsentToUpload(onAllowed: () => void, onDelete: () => void): void {
   Alert.alert(AI_CONSENT_COPY.uploadTitle, AI_CONSENT_COPY.body, [
     { text: AI_CONSENT_COPY.notNow, style: "cancel", onPress: () => toast.info(AI_CONSENT_COPY.uploadParked) },
     { text: AI_CONSENT_COPY.privacyLink, onPress: () => router.push(legalHref("privacy", undefined, "4")) },
+    { text: AI_CONSENT_COPY.deleteClip, style: "destructive", onPress: onDelete },
     {
       text: AI_CONSENT_COPY.allowUpload,
       onPress: () =>

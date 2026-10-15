@@ -101,7 +101,7 @@ export function MatchFlowWizard({
   // The verdict turns its status bar back to the theme once its hero scrolls away.
   const wizardScroll = useWizardScrollSource();
   // "Record from my phone" only counts with AI processing consent (5.1.2(i)).
-  const recording = useEffectiveRecordingOptIn();
+  const recording = useEffectiveRecordingOptIn(currentAthleteId);
   const { match, submissionTypes, isLoading, error, refresh, applyMatch } =
     useMatchDetails(matchId);
   const isParticipant =

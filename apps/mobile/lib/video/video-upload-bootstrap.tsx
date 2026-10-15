@@ -32,9 +32,12 @@ import { useAiConsent } from "@/lib/moderation/ai-consent";
 export function VideoUploadBootstrap() {
   const { athlete } = useAuth();
   const athleteId = athlete?.id ?? null;
-  // Uploads wait for AI processing consent (jits-rog5.11); the moment it is
-  // known or given, the parked jobs resume.
-  const consented = useAiConsent().consentAt !== null;
+  // Uploads wait for AI processing consent (jits-rog5.11). The sweep runs
+  // again once this athlete's consent is known (a clip waiting for it is
+  // then shown as Needs your OK) and again once it is given (it uploads).
+  const consent = useAiConsent();
+  const consentKnown = consent.known && consent.athleteId === athleteId;
+  const consented = consentKnown && consent.consentAt !== null;
 
   // Reported once per launch, and deliberately NOT gated on auth: it is a
   // fact about the binary, and an error raised before sign-in should carry
@@ -92,8 +95,8 @@ export function VideoUploadBootstrap() {
   }, [athleteId]);
 
   React.useEffect(() => {
-    if (athleteId && consented) void resumeMatchVideoUploads();
-  }, [athleteId, consented]);
+    if (athleteId && consentKnown) void resumeMatchVideoUploads();
+  }, [athleteId, consentKnown, consented]);
 
   return null;
 }

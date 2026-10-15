@@ -2,7 +2,7 @@ import * as React from "react";
 import { supabase } from "@/lib/supabase/client";
 import { setMatchRecordingIntent } from "@jits/shared/api/match-video-upload";
 import { getRecordingOptIn, hydrateRecordingOptIn } from "./recording-optin";
-import { hasAiConsent } from "@/lib/moderation/ai-consent";
+import { hasAiConsentFor } from "@/lib/moderation/ai-consent";
 
 /**
  * "Record from my phone", persisted to the server (jits-n2im.14).
@@ -92,7 +92,7 @@ export function useRecordingIntent(
     if (!active || !matchId || !athleteId) return;
     let cancelled = false;
     void hydrateRecordingOptIn().then(() => {
-      if (!cancelled) void persistRecordingIntent(athleteId, matchId, getRecordingOptIn() && hasAiConsent());
+      if (!cancelled) void persistRecordingIntent(athleteId, matchId, getRecordingOptIn() && hasAiConsentFor(athleteId));
     });
     return () => {
       cancelled = true;

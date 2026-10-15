@@ -86,6 +86,7 @@ export const AI_CONSENT_COPY = {
   allow: "Allow and film",
   uploadTitle: "Before you upload",
   allowUpload: "Allow and upload",
+  deleteClip: "Delete clip",
   uploadParked: "Your clip stays on this phone until you allow it.",
   notNow: "Not now",
   declinedNote: "No film this time. Your match still counts.",

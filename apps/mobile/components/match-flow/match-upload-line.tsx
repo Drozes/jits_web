@@ -14,6 +14,7 @@ const ICONS: Record<CompactLineModel["kind"], typeof Upload> = {
   preparing: Loader,
   uploading: Upload,
   paused: Pause,
+  needsOk: Pause,
   failed: AlertTriangle,
   terminal: Minus,
   uploaded: Check,

@@ -145,7 +145,7 @@ const COPY: Record<UploadErrorClass, Omit<UploadFailureCopy, "klass">> = {
   needs_consent: {
     disposition: "paused",
     terminal: false,
-    message: "Allow AI processing to upload this clip. Tap Try again.",
+    message: "Allow AI processing to upload this clip.",
   },
 };
 

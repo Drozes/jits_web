@@ -2,6 +2,7 @@ import * as React from "react";
 import { AccessibilityInfo } from "react-native";
 import { NavigationContext } from "@react-navigation/native";
 import type { UploadBannerState } from "./upload-banner-state";
+import { ROW_HELPER, STRIP_COPY } from "./video-status-copy";
 
 /**
  * What a screen reader should hear for a state, or null for nothing.
@@ -12,6 +13,7 @@ export function uploadAnnouncement(state: Pick<UploadBannerState, "kind" | "mess
     case "uploading":
       return "Uploading match video";
     case "paused":
+      if (state.errorClass === "needs_consent") return `${STRIP_COPY.needsOk}. ${state.message ?? ROW_HELPER.needsOk}`;
       return state.message ? `Upload paused. ${state.message}` : "Upload paused";
     case "uploaded":
       return state.truncation ? "Match video uploaded, but the clip stops before the end of the match" : "Match video uploaded";

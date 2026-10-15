@@ -40,17 +40,18 @@ afterEach(() => __setUploadControl(null));
 it("a clip waiting for consent shows Try again, which asks first and uploads on Allow", async () => {
   // What the sweep writes for a parked clip on a cold start without consent.
   act(() => {
-    setMatchUpload("M1", { status: "error", errorClass: "needs_consent", error: describeUploadFailure("needs_consent").message });
+    setMatchUpload("M1", { status: "paused", errorClass: "needs_consent", error: describeUploadFailure("needs_consent").message });
   });
   const s = render(<MatchUploadLine matchId="M1" />);
   const line = s.getByTestId("match-upload-line");
   expect(line.props.accessibilityRole).toBe("button");
+  expect(s.getByText("YOUR ANGLE: NEEDS YOUR OK")).toBeTruthy();
 
   await act(async () => fireEvent.press(line));
   const [title, , buttons] = (Alert.alert as jest.Mock).mock.calls[0];
   expect(title).toBe("Before you upload");
 
-  await act(async () => (buttons as { text: string; onPress?: () => void }[])[2].onPress?.());
+  await act(async () => (buttons as { text: string; onPress?: () => void }[]).find((b) => b.text === "Allow and upload")?.onPress?.());
   expect(mockGive).toHaveBeenCalledTimes(1);
   expect(mockControlRetry).toHaveBeenCalledTimes(2);
   expect(mockControlRetry).toHaveBeenLastCalledWith("M1");
@@ -59,5 +60,5 @@ it("a clip waiting for consent shows Try again, which asks first and uploads on 
 it("the waiting state reads as paused, never as a dead end", () => {
   const copy = describeUploadFailure("needs_consent");
   expect(copy).toMatchObject({ disposition: "paused", terminal: false });
-  expect(copy.message).toBe("Allow AI processing to upload this clip. Tap Try again.");
+  expect(copy.message).toBe("Allow AI processing to upload this clip.");
 });

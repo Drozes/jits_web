@@ -140,7 +140,7 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   const router = useRouter();
   const { markExiting } = useMatchSyncContext();
   // Off until the athlete allowed AI processing (5.1.2(i)), whatever was remembered.
-  const recording = useEffectiveRecordingOptIn();
+  const recording = useEffectiveRecordingOptIn(p.meId);
   // Record only (live location fixes 4.6): one silent reading logged as
   // match_start, never awaited by anything below and never asking.
   useFaceoffLocationLog(p.matchId, p.active);

@@ -49,7 +49,9 @@ export interface UploadBannerState {
 
 /** The upload actions a banner state offers (jits-n2im.3 / .5). */
 export function uploadBannerActions(state: UploadBannerState): { retry: boolean; discard: boolean } {
-  if (state.kind === "paused") return { retry: true, discard: false };
+  // Waiting for AI processing consent (jits-rog5.11): the clip can also be
+  // dropped without consenting.
+  if (state.kind === "paused") return { retry: true, discard: state.errorClass === "needs_consent" };
   if (state.kind !== "error" || state.errorClass == null) return { retry: false, discard: false };
   // A terminal failure cannot be fixed by retrying. A missing file has
   // already been dropped, so there is nothing to discard either.

@@ -10,6 +10,7 @@ import { isBackgroundUploadSupported } from "@/lib/video/upload-capabilities";
 import { useUploadAnnouncements } from "@/lib/video/use-upload-announcements";
 import { DISCARD_LABEL, TRY_AGAIN_A11Y, TRY_AGAIN_LABEL } from "@/lib/video/use-upload-actions";
 import { formatUploadSize, keepOpenCopy, UPLOAD_TAG } from "@/lib/video/upload-copy";
+import { STRIP_COPY } from "@/lib/video/video-status-copy";
 
 /**
  * Exactly the state `deriveUploadBannerState` produces, plus the two
@@ -151,7 +152,7 @@ export function UploadProgressBanner({ onRetry, onDiscard, ...state }: UploadPro
       <View testID="upload-status-banner" className="w-full gap-1.5 rounded-xs bg-surface-3 border border-attention px-3 py-2">
         <View className="w-full flex-row items-center gap-2">
           <PauseCircle size={14} color={p.amber} />
-          <Text className="flex-1 font-mono tabular-nums text-micro text-attention uppercase tracking-caps-l">{UPLOAD_TAG.paused}</Text>
+          <Text className="flex-1 font-mono tabular-nums text-micro text-attention uppercase tracking-caps-l">{state.errorClass === "needs_consent" ? STRIP_COPY.needsOk : UPLOAD_TAG.paused}</Text>
           {pct ? (
             <Text testID="upload-progress-percent" className="font-mono text-micro text-ink-2 tabular-nums">
               {pct}

@@ -57,7 +57,7 @@ import {
   trackRunStart,
   trackUploaded,
 } from "./upload-telemetry";
-import { aiConsentGivenAtMs, hasAiConsentFor } from "@/lib/moderation/ai-consent";
+import { aiConsentGivenAtMs, hasAiConsentFor, isAiConsentKnownFor } from "@/lib/moderation/ai-consent";
 
 /**
  * The single retry / resume authority for match-video uploads.
@@ -1391,12 +1391,12 @@ function surfaceFailedJob(job: PendingUploadJob): void {
   });
 }
 
-/** A job of mine waiting on AI processing consent: paused, Try again offered. */
+/** A job of mine waiting on AI processing consent: paused (Needs your OK), Try again and Discard offered. */
 function surfaceConsentWait(job: PendingUploadJob): void {
   const existing = getMatchUpload(job.matchId);
-  if (existing?.status === "error" && existing.errorClass === "needs_consent") return;
+  if (existing?.status === "paused" && existing.errorClass === "needs_consent") return;
   setMatchUpload(job.matchId, {
-    status: "error",
+    status: "paused",
     error: describeUploadFailure("needs_consent").message,
     errorClass: "needs_consent",
     storagePath: job.storagePath,
@@ -1448,19 +1448,32 @@ function sweepJob(job: PendingUploadJob): Promise<void> | null {
   // it there would pull the file out from under a live upload.
   if (runners.has(job.matchId)) return null;
   const mine = owner != null && job.uploaderAthleteId === owner;
-  // No AI processing consent (5.1.2(i), jits-rog5.11): my clip is surfaced
-  // as paused so every Try again control shows (and asks for consent), but
-  // never launched, and never expired while it waits.
-  if (mine && !hasAiConsentFor(owner)) {
-    surfaceConsentWait(job);
-    return null;
-  }
-  if (mine ? isExpiredSinceConsent(job, owner) : isJobExpired(job)) return expireJob(job, mine);
   // Another athlete's job never runs under this session (jits-n2im.6). It
   // stays on disk and resumes when that athlete signs back in.
-  if (!mine) return null;
+  if (!mine) return isJobExpired(job) ? expireJob(job, false) : null;
+  // AI processing consent (5.1.2(i), jits-rog5.11), for this owner only.
+  const consented = hasAiConsentFor(owner);
+  // An otherwise uploadable clip waiting for consent never expires; with
+  // consent its window counts from the consent (a clip that waited gets a
+  // full week from the OK). A failure that waits for the athlete keeps the
+  // usual window.
+  const waitingForConsent = !consented && !job.needsUser;
+  if (!waitingForConsent && (consented ? isExpiredSinceConsent(job, owner) : isJobExpired(job))) {
+    return expireJob(job, true);
+  }
+  // A failure that waits for the athlete keeps its own state (and Discard
+  // for a terminal one), consent or not; Try again asks for consent then.
   if (job.needsUser) {
     surfaceFailedJob(job);
+    return null;
+  }
+  // No consent: surfaced as paused (Needs your OK) so every Try again
+  // control shows and asks for it, never launched. Nothing is said until
+  // this athlete's consent is known (cache or server), so a consented
+  // athlete never sees it from a cold-start race; the bootstrap sweeps
+  // again once it is known.
+  if (!consented) {
+    if (isAiConsentKnownFor(owner)) surfaceConsentWait(job);
     return null;
   }
   // `attempt` is reset here on purpose: a resume is triggered by a real
@@ -1481,13 +1494,13 @@ function sweepJob(job: PendingUploadJob): Promise<void> | null {
 /** Resume one persisted job if it is still owed and runnable. */
 async function resumeOne(matchId: string): Promise<void> {
   if (!owner || runners.has(matchId)) return;
-  // A retry timer or a mid-session withdrawal never resumes without consent
-  // (sweepJob below surfaces it as waiting instead).
   const job = await loadUploadJob(matchId);
   if (!job) {
     clearRetryTimer(matchId);
     return;
   }
+  // The consent gate is in sweepJob: a retry timer, or a resume after a
+  // mid-session withdrawal, surfaces the clip as waiting instead of running it.
   await sweepJob(job);
 }
 

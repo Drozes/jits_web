@@ -140,6 +140,11 @@ export function hasAiConsentFor(athleteId: string | null | undefined): boolean {
   return !!athleteId && state.athleteId === athleteId && state.consentAt !== null;
 }
 
+/** The cache or the server has answered for this athlete (given or not). */
+export function isAiConsentKnownFor(athleteId: string | null | undefined): boolean {
+  return !!athleteId && state.athleteId === athleteId && state.known;
+}
+
 /** When this athlete's current consent was given (ms), or null. */
 export function aiConsentGivenAtMs(athleteId: string | null | undefined): number | null {
   if (!hasAiConsentFor(athleteId) || !state.consentAt) return null;
@@ -151,11 +156,11 @@ export function useAiConsent(): AiConsentState {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
 }
 
-/** "Record from my phone", but only once the athlete allowed AI processing. */
-export function useEffectiveRecordingOptIn(): boolean {
+/** "Record from my phone", but only once THIS athlete allowed AI processing. */
+export function useEffectiveRecordingOptIn(athleteId: string | null | undefined): boolean {
   const optIn = useRecordingOptIn();
-  const { consentAt } = useAiConsent();
-  return optIn && consentAt !== null;
+  const s = useAiConsent();
+  return optIn && !!athleteId && s.athleteId === athleteId && s.consentAt !== null;
 }
 
 /** Tests only. */

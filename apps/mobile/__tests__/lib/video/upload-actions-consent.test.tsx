@@ -17,8 +17,9 @@ jest.mock("@/components/ui/toast", () => ({
 const mockRetry = jest.fn();
 jest.mock("@/lib/video/upload-control", () => ({
   retryMatchUpload: (...a: unknown[]) => mockRetry(...a),
-  discardMatchUpload: jest.fn(),
+  discardMatchUpload: (...a: unknown[]) => mockDiscard(...a),
 }));
+const mockDiscard = jest.fn();
 const mockGive = jest.fn();
 jest.mock("@/lib/moderation/ai-consent", () => ({ giveAiConsent: () => mockGive() }));
 
@@ -42,13 +43,13 @@ it("asks Before you upload, with what is shared", async () => {
   const [title, body] = (Alert.alert as jest.Mock).mock.calls[0];
   expect(title).toBe("Before you upload");
   expect(body).toMatch(/with your display name, rating and weight division, is sent to Google Gemini/);
-  expect(buttons().map((b) => b.text)).toEqual(["Not now", "Read the Privacy Policy", "Allow and upload"]);
+  expect(buttons().map((b) => b.text)).toEqual(["Not now", "Read the Privacy Policy", "Delete clip", "Allow and upload"]);
 });
 
 it("Allow and upload records consent, then retries", async () => {
   const { result } = renderHook(() => useUploadActions("M1"));
   await act(async () => result.current.retry());
-  await act(async () => buttons()[2].onPress?.());
+  await act(async () => buttons()[3].onPress?.());
   expect(mockGive).toHaveBeenCalledTimes(1);
   expect(mockRetry).toHaveBeenCalledTimes(2);
 });
@@ -67,4 +68,15 @@ it("the privacy link opens the policy at section 4", async () => {
   await act(async () => result.current.retry());
   act(() => buttons()[1].onPress?.());
   expect(mockPush).toHaveBeenCalledWith("/legal/privacy?section=4");
+});
+
+it("Delete clip drops it without consenting, through the usual Discard confirm", async () => {
+  const { result } = renderHook(() => useUploadActions("M1"));
+  await act(async () => result.current.retry());
+  act(() => buttons()[2].onPress?.());
+  const [title] = (Alert.alert as jest.Mock).mock.calls.at(-1);
+  expect(title).toBe("Discard this recording?");
+  await act(async () => buttons().find((b) => b.text === "Discard")?.onPress?.());
+  expect(mockDiscard).toHaveBeenCalledWith("M1");
+  expect(mockGive).not.toHaveBeenCalled();
 });

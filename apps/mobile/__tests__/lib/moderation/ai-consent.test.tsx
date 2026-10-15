@@ -110,7 +110,7 @@ describe("recording needs consent", () => {
   it("a toggle remembered ON reads OFF until consent is given", async () => {
     __resetRecordingOptInForTests(true);
     await loadAiConsent("me");
-    const { result } = renderHook(() => useEffectiveRecordingOptIn());
+    const { result } = renderHook(() => useEffectiveRecordingOptIn("me"));
     expect(result.current).toBe(false);
     await act(async () => {
       await giveAiConsent();
