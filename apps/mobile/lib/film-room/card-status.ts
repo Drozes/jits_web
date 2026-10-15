@@ -27,7 +27,7 @@ export { uploadingLabel };
  */
 export type CardStatus =
   | { kind: "uploading"; progress: number | null }
-  | { kind: "paused"; progress: number | null }
+  | { kind: "paused"; progress: number | null; needsConsent?: boolean }
   | { kind: "upload_failed"; terminal: boolean }
   | { kind: "processing" }
   | { kind: "failed" }
@@ -85,7 +85,11 @@ export function deriveCardStatus(
   // This phone still owes the server its clip (jits-n2im.4 item 4). Said
   // even when the other athlete's angle is already up: it is still true,
   // and it is the only place the Film Room can offer the Retry.
-  if (upload?.status === "paused") return { kind: "paused", progress: upload.progress };
+  if (upload?.status === "paused") {
+    return upload.errorClass === "needs_consent"
+      ? { kind: "paused", progress: upload.progress, needsConsent: true }
+      : { kind: "paused", progress: upload.progress };
+  }
   if (upload?.status === "error") {
     return { kind: "upload_failed", terminal: isTerminalUploadClass(upload.errorClass) };
   }
@@ -155,7 +159,7 @@ export function statusBadgeLabel(status: CardStatus): string | null {
     case "failed":
       return "FAILED";
     case "paused":
-      return "UPLOAD PAUSED";
+      return status.needsConsent ? CARD_BADGE.needsOk : "UPLOAD PAUSED";
     case "upload_failed":
       // The deck's one label for my own failed upload (m3).
       return "DIDN'T UPLOAD";

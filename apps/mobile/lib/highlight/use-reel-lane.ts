@@ -22,6 +22,7 @@ import {
   type BuildingReel,
   type ReelCursor,
 } from "./reel-lane";
+import { useBlockState, withoutBlocked } from "@/lib/moderation/block-store";
 
 /** Poster URLs are signed for an hour... */
 const POSTER_TTL_S = 3600;
@@ -380,8 +381,15 @@ export function useReelLane(
     return toBuilding(fallback, fallbackPosters);
   }, [state.clipsEnabled, state.inFlightSupported, state.inFlight, fallback, fallbackPosters]);
 
+  // A reel about someone in a block with me never shows (App Review 1.2);
+  // own reels have me as their subject, so only shared lanes are affected.
+  const blockIds = useBlockState().ids;
+  const items = React.useMemo(
+    () => withoutBlocked(state.items, (i) => (i.isOwn ? null : (i.subjectAthleteId ?? null)), blockIds),
+    [state.items, blockIds],
+  );
   return {
-    items: state.items,
+    items,
     inFlight,
     clipsEnabled: state.clipsEnabled,
     loading: !state.loaded && (pending || (!!athleteId && error === null)),

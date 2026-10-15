@@ -11,6 +11,8 @@ import { cn } from "@/lib/cn";
 import { clearPendingInvite } from "@/lib/invites/pending-invite";
 import { SIGN_OUT_UPLOAD_TITLE, pendingUploadSignOutMessage } from "@/lib/video/sign-out-guard";
 import { legalHref } from "@/lib/legal/legal-copy";
+import { useAiConsent } from "@/lib/moderation/ai-consent";
+import { AI_CONSENT_COPY, aiConsentStatus } from "@/lib/moderation/moderation-copy";
 
 /**
  * G3 Settings. Mirrors the web settings index: three Plate sections grouping
@@ -28,6 +30,8 @@ type SettingsRoute =
   | "/settings/help"
   | "/settings/admin"
   | "/settings/delete-account"
+  | "/settings/blocked"
+  | "/settings/ai-processing"
   | "/practice";
 
 export default function SettingsScreen() {
@@ -113,9 +117,29 @@ function AccountPlate({
 }
 
 function PreferencesPlate() {
+  const { consentAt } = useAiConsent();
   return (
     <Plate className="p-0 overflow-hidden">
       <SettingsRow href="/settings/notifications" label="NOTIFICATIONS" />
+      <RowDivider />
+      {/* Report and block (App Review 1.2): unblock lives here. */}
+      <SettingsRow href="/settings/blocked" label="BLOCKED ATHLETES" />
+      <RowDivider />
+      {/* What the athlete agreed to before filming (App Review 5.1.2(i)). */}
+      <Link href={"/settings/ai-processing" as Href} asChild>
+        <Pressable
+          testID="settings-ai-processing"
+          accessibilityRole="link"
+          accessibilityLabel={`${AI_CONSENT_COPY.settingsRow}, ${aiConsentStatus(consentAt)}`}
+          className="flex-row items-center justify-between px-4 py-3 min-h-11 active:bg-surface-4"
+        >
+          <RowLabel>{AI_CONSENT_COPY.settingsRow.toUpperCase()}</RowLabel>
+          <View className="flex-row items-center gap-3">
+            <RowValue>{aiConsentStatus(consentAt)}</RowValue>
+            <Chevron />
+          </View>
+        </Pressable>
+      </Link>
     </Plate>
   );
 }

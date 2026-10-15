@@ -2,7 +2,8 @@ import * as React from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
 import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
-import { setRecordingOptIn } from "@/lib/match-flow/recording-optin";
+import { useAiConsentGate } from "@/lib/moderation/use-ai-consent-gate";
+import { AiConsentSheet } from "@/components/moderation/ai-consent-sheet";
 import { useRecordingSpaceWarning } from "@/lib/video/recording-space";
 import { usePalette } from "@/lib/theme/palette";
 import { Switch } from "@/components/ui/switch";
@@ -158,6 +159,8 @@ function RecordingPanel({ oppName, durationSeconds }: { oppName: string; duratio
   const p = usePalette();
   // Said before recording starts, not as a failed recording (jits-n2im.6).
   const lowSpace = useRecordingSpaceWarning(f.recording, durationSeconds);
+  // "Before you film" stands in front of the first ON (5.1.2(i)).
+  const consent = useAiConsentGate();
   const nobody = !f.recording && f.opponentRecording === false;
   const oppLabel =
     f.opponentRecording == null ? `${oppName} · CHOOSING` : f.opponentRecording ? `${oppName} RECORDING` : `${oppName} NOT RECORDING`;
@@ -180,9 +183,10 @@ function RecordingPanel({ oppName, durationSeconds }: { oppName: string; duratio
           label="Record from my phone"
           value={f.recording}
           disabled={f.myReady}
-          onValueChange={setRecordingOptIn}
+          onValueChange={consent.onRecordingChange}
         />
       </View>
+      <AiConsentSheet {...consent.sheet} />
       {nobody ? (
         <View
           testID="faceoff-nobody-recording"

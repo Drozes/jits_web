@@ -1,13 +1,14 @@
 import * as React from "react";
 import { View } from "react-native";
 import { Download, Send, SlidersHorizontal } from "lucide-react-native";
+import { ViewerReportRail } from "./viewer-report";
 import { HIGHLIGHT_COPY } from "@/lib/highlight/highlight-copy";
 import { SHARE_COPY, type SharePath } from "@/lib/highlight-share";
 import { ReelRailButton, SettingsRailItem } from "./reel-rail-button";
 import { VIEWER_COPY } from "./viewer-copy";
 
 export interface ViewerActionsProps {
-  /** `canManageReel`: false (not the athlete's reel) renders no rail at all. */
+  /** `canManageReel`: false (not the athlete's reel) renders only Report, if offered. */
   canManage: boolean;
   /** `highlight_share_enabled`: false removes Share and Save entirely. */
   shareEnabled: boolean;
@@ -21,6 +22,7 @@ export interface ViewerActionsProps {
   onShare: () => void;
   onSave: () => void;
   onImprove: () => void;
+  onReport?: () => void;
 }
 
 /** Save is offered (the permission note under the meta follows the same rule). */
@@ -33,12 +35,10 @@ export function showsSave(p: Pick<ViewerActionsProps, "canManage" | "shareEnable
  * "Share to Instagram" on the Reels path, "Share reel" on the share sheet;
  * absent when sharing is off or no share path exists), Save to Photos, and
  * Improve this reel, with Settings (C-V9) after Save when the Photos
- * permission was refused. A reel that is not the athlete's offers none of them, so
- * no rail renders at all (owner decision 2026-10-06, spec 8.6).
- */
+ * permission was refused. Not the athlete's reel: only Report (spec 8.6, jits-rog5.11). */
 export function ViewerActions(props: ViewerActionsProps) {
   const { canManage, shareEnabled, primaryPath, saving } = props;
-  if (!canManage) return null;
+  if (!canManage) return props.onReport ? <ViewerReportRail onPress={props.onReport} /> : null;
   const showShare = shareEnabled && primaryPath !== null;
   return (
     <View testID="viewer-rail" pointerEvents="box-none" className="items-center gap-5">

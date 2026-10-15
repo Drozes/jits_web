@@ -354,6 +354,7 @@ jest.mock("@/components/ui/elo-system", () => {
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import { resetMatchUploadStore } from "@/lib/video/match-upload-store";
 import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin";
+import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 
 // ---- fixtures ----
 
@@ -426,6 +427,8 @@ beforeEach(() => {
   mockGetMatchConfirmations.mockResolvedValue([]);
   // "Record from my phone" is ON for these (it is OFF on first use).
   __resetRecordingOptInForTests(true);
+  // Consented: recording also needs AI processing consent (jits-rog5.11).
+  __resetAiConsentForTests({ athleteId: "me-1", consentAt: "2026-10-14T12:00:00Z", known: true });
 });
 
 afterEach(() => {

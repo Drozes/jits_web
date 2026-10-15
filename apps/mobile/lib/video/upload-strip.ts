@@ -69,6 +69,11 @@ export function deriveUploadStrip(
     const percent = many ? combinedPercent(visible) : pct(top.progress);
     return { kind: "uploading", matchId: top.matchId, label, helper: null, percent, tone: "progress", retry: false, details: false, a11y: STRIP_COPY.a11yUploading(label, percent) };
   }
+  if (top.status === "paused" && top.errorClass === "needs_consent") {
+    // Waiting for the athlete's AI processing OK (jits-rog5.11): attention
+    // tone, Try again asks for it (and offers to delete the clip).
+    return { kind: "paused", matchId: top.matchId, label: STRIP_COPY.needsOk, helper: top.error ?? ROW_HELPER.needsOk, percent: null, tone: "waiting", retry: true, details: false, a11y: STRIP_COPY.a11yNeedsOk };
+  }
   if (top.status === "paused") {
     return { kind: "paused", matchId: top.matchId, label: STRIP_COPY.paused, helper: top.error ?? null, percent: null, tone: "waiting", retry: true, details: false, a11y: STRIP_COPY.a11yPaused };
   }
@@ -82,7 +87,7 @@ export function deriveUploadStrip(
 
 /** The compact line under End / Result / Confirm (deck section 3), or null with no job. */
 export interface CompactLineModel {
-  kind: "preparing" | "uploading" | "paused" | "failed" | "terminal" | "uploaded";
+  kind: "preparing" | "uploading" | "paused" | "needsOk" | "failed" | "terminal" | "uploaded";
   text: string;
   percent: number | null;
   tone: AngleTone;
@@ -97,6 +102,7 @@ export function deriveCompactLine(entry: MatchUploadEntry | null, copy: Record<C
     case "uploading":
       return { kind: "uploading", text: copy.uploading, percent: pct(entry.progress), tone: "progress", retry: false };
     case "paused":
+      if (entry.errorClass === "needs_consent") return { kind: "needsOk", text: copy.needsOk, percent: null, tone: "waiting", retry: true };
       return { kind: "paused", text: copy.paused, percent: null, tone: "waiting", retry: true };
     case "uploaded":
       return { kind: "uploaded", text: copy.uploaded, percent: null, tone: "done", retry: false };

@@ -28,6 +28,7 @@ jest.mock("expo-router", () => {
 jest.mock("@/lib/theme/use-theme", () => ({ useThemedTokens: () => ({}) }));
 jest.mock("@/lib/arena/arena-bootstrap", () => ({ ArenaBootstrap: () => null }));
 jest.mock("@/components/notifications/bell-bootstrap", () => ({ BellBootstrap: () => null }));
+jest.mock("@/lib/moderation/moderation-bootstrap", () => ({ ModerationBootstrap: () => null }));
 const mockViewer = jest.fn((_p: unknown) => null);
 jest.mock("@/components/highlight-viewer/viewer-screen", () => ({
   ViewerScreen: (p: unknown) => mockViewer(p),

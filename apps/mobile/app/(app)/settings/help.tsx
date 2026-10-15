@@ -23,7 +23,10 @@ import { Plate } from "@/components/ui/elo-system";
  *  - ELO: 1000 for everyone, +50 phantom per IBJJF division gap for the
  *    expected score only, submission or draw, draws cost both and the
  *    favorite more (`record_match_result`, `calculate_elo_stakes`);
- *  - footage: no download UI, recorded matches are in the Film tab (C-H1).
+ *  - footage: no download UI, recorded matches are in the Film tab (C-H1);
+ *  - support: info@elorated.com, the address elorated.com/support publishes;
+ *    Report on a profile, a match video or a reel, Block on a profile, and
+ *    Settings, Blocked athletes (jits-rog5.11).
  */
 type HelpSection = {
   title: string;
@@ -62,7 +65,9 @@ const HELP_SECTIONS: HelpSection[] = [
     title: "Report a Problem",
     paragraphs: [
       "Spotted a wrong result, a dispute that wasn't resolved, or an opponent breaking the rules? Send a feedback note from Settings, Feedback.",
-      "For urgent issues (safety, abuse, account compromise), email support@elorated.com with your opponent's name and the date of the match.",
+      "To report a user or content, use Report on their profile or video, or email info@elorated.com with their display name, the match and what happened. We review every report within 24 hours.",
+      "To block an athlete, open their profile, tap More, then Block athlete. You can unblock in Settings, Blocked athletes.",
+      "For urgent issues (safety, abuse, account compromise), email info@elorated.com. If anyone is in immediate danger, contact local emergency services.",
     ],
   },
 ];

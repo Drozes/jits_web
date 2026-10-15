@@ -118,6 +118,8 @@ export const ROW_TAG = {
   notUploaded: "Not uploaded",
   uploading: "Uploading",
   paused: "Paused",
+  /** This phone's clip waits for the athlete's AI processing consent (jits-rog5.11). */
+  needsOk: "Needs your OK",
   didntUpload: "Didn't upload",
   processing: "Processing",
   /** Bytes in, analysis running: it plays (wave 2 tag). */
@@ -135,6 +137,7 @@ export const ROW_TAG = {
 export const ROW_HELPER = {
   // 2a, this phone's own job.
   uploadDidntFinish: "The upload didn't finish.",
+  needsOk: "Allow AI processing to upload this clip.",
   clipGone: "The clip isn't on this phone anymore.",
   noMatchMine: "We couldn't see a match in this clip.",
   mineFailedUsesOther: (name: string) => `Your ${TERM} uses ${name}'s angle.`,
@@ -163,11 +166,13 @@ export const STRIP_COPY = {
   uploading: "Uploading match video",
   uploadingMany: (n: number) => `Uploading ${n} match videos`,
   paused: "Upload paused",
+  needsOk: "Needs your OK",
   failed: "Didn't upload",
   uploaded: "Match video uploaded",
   details: "Details",
   a11yUploading: (label: string, pct: number | null) => (pct != null ? `${label}, ${pct} percent. Opens the match.` : `${label}. Opens the match.`),
   a11yPaused: "Upload paused. Opens the match.",
+  a11yNeedsOk: "Your match video needs your OK to upload. Opens the match.",
   a11yFailed: "Your match video didn't upload. Opens the match.",
   a11yTerminal: (helper: string) => `Your match video didn't upload. ${helper} Details.`,
   a11yUploaded: "Match video uploaded.",
@@ -178,6 +183,7 @@ export const COMPACT_COPY = {
   preparing: "Your angle: preparing upload",
   uploading: "Your angle: uploading",
   paused: "Your angle: paused",
+  needsOk: "Your angle: needs your OK",
   failed: "Your angle: didn't upload",
   /** Grey: the same words, nothing to do. */
   terminal: "Your angle: didn't upload",
@@ -201,6 +207,7 @@ export const CARD_BADGE = {
   building: `BUILDING ${TERM.toUpperCase()}`,
   uploading: "UPLOADING",
   noFilm: "NO FILM",
+  needsOk: "NEEDS YOUR OK",
 } as const;
 
 /**
@@ -211,6 +218,7 @@ const ROW_ANNOUNCE: Record<string, string> = {
   [ROW_TAG.notUploaded]: "isn't uploaded",
   [ROW_TAG.uploading]: "is uploading",
   [ROW_TAG.paused]: "is paused",
+  [ROW_TAG.needsOk]: "needs your OK to upload",
   [ROW_TAG.didntUpload]: "didn't upload",
   [ROW_TAG.processing]: "is processing",
   [ROW_TAG.analyzing]: "is being analyzed",

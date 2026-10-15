@@ -8,7 +8,7 @@ import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
-import { useRecordingOptIn } from "@/lib/match-flow/recording-optin";
+import { useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
 import { useMatchWeights } from "@/lib/match-flow/use-match-weights";
 import { useMatchWeightChecks } from "@/lib/match-flow/use-match-weight-checks";
 import { WizardError, WizardLoading } from "./wizard-status";
@@ -100,7 +100,8 @@ export function MatchFlowWizard({
   const palette = usePalette();
   // The verdict turns its status bar back to the theme once its hero scrolls away.
   const wizardScroll = useWizardScrollSource();
-  const recording = useRecordingOptIn();
+  // "Record from my phone" only counts with AI processing consent (5.1.2(i)).
+  const recording = useEffectiveRecordingOptIn(currentAthleteId);
   const { match, submissionTypes, isLoading, error, refresh, applyMatch } =
     useMatchDetails(matchId);
   const isParticipant =

@@ -17,7 +17,7 @@
  */
 import * as React from "react";
 import { acceptJoinInvite, claimChallengeInvite, logInviteEvent, setMyDateOfBirth } from "@jits/shared/api/invites";
-import { DOB_REQUIRED_COPY, DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
+import { CLAIM_BLOCKED_COPY, DOB_REQUIRED_COPY, DOB_SAVE_FAILED_COPY } from "@jits/shared/utils";
 import { supabase } from "@/lib/supabase/client";
 import { clearPendingInvite, releasePushDeferral, takeBufferedEvents, type PendingInvite } from "./pending-invite";
 import { readLocationOnce } from "./location";
@@ -87,7 +87,12 @@ export function useClaimRunner(
     };
     const res = await claimChallengeInvite(supabase, input, loc?.status === "ok" ? loc.reading : null);
     if (!res.ok) {
-      setState({ phase: "done", step: { type: "message", message: NETWORK_COPY, terminal: false } });
+      // A block between the pair (jr_be-m2s) ends the invite; anything else may be the network.
+      const blocked = res.error.hint === "blocked";
+      setState({
+        phase: "done",
+        step: { type: "message", message: blocked ? CLAIM_BLOCKED_COPY : NETWORK_COPY, terminal: blocked },
+      });
       return;
     }
     // Only a flag-off server books with `start_available`: the owner turned

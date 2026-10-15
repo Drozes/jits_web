@@ -104,7 +104,13 @@ import ProfileStatsScreen from "@/app/(app)/(tabs)/profile/stats";
 import AthleteProfileScreen from "@/app/(app)/athlete/[id]";
 import { getMatchHistory } from "@jits/shared/api/queries";
 
-beforeEach(() => mockPush.mockClear());
+import { __resetBlocksForTests } from "@/lib/moderation/block-store";
+
+beforeEach(() => {
+  mockPush.mockClear();
+  // The block sets have been read (the profile waits for them).
+  __resetBlocksForTests({ athleteId: "me", loaded: true, settled: true });
+});
 
 describe("match history rows open the match detail screen", () => {
   it("Stats full history", async () => {

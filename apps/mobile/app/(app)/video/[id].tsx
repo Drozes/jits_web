@@ -1,5 +1,6 @@
 import * as React from "react";
-import { AccessibilityInfo, ActivityIndicator, Text, View } from "react-native";
+import { AccessibilityInfo, ActivityIndicator, Pressable, Text, View } from "react-native";
+import { Flag } from "lucide-react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -28,6 +29,8 @@ import { ANGLE_LABEL, couldNotLoadAngle, switchAnnouncement } from "@/lib/video/
 import { shortName } from "@/lib/film-room/format";
 import { ON_MEDIA } from "@/lib/theme/palette";
 import { TABULAR, TRACKING, typeStep } from "@/lib/typography";
+import { ContentReportSheet, type ReportTarget } from "@/components/moderation/content-report-sheet";
+import { MODERATION_COPY } from "@/lib/moderation/moderation-copy";
 
 /** A moment stays "current" (chip lit) this long after its time. */
 const CURRENT_HOLD_S = 10;
@@ -258,12 +261,29 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
     ? `${shortName(view.me.display_name)} vs ${shortName(view.opponent?.display_name)}`
     : "Match film";
 
+  // Report (App Review 1.2): only an angle another athlete recorded.
+  const [reportTarget, setReportTarget] = React.useState<ReportTarget | null>(null);
+  const shownAngle = angleOf(activeId);
+  const reportableId = shownAngle && !shownAngle.is_mine ? shownAngle.id : null;
+
   const topBar = (
     <View className="flex-row items-center" style={{ position: "absolute", left: 4, right: 16, top: insets.top + 8, height: 44, gap: 6 }}>
       <FilmBackButton label="Go back" icon="close" fallback="/" color={ON_MEDIA.white} />
       <Text numberOfLines={1} className="flex-1 font-heading uppercase" style={[typeStep("callout"), { letterSpacing: TRACKING.caps, color: ON_MEDIA.white }]}>
         {title}
       </Text>
+      {reportableId ? (
+        <Pressable
+          testID="player-report"
+          accessibilityRole="button"
+          accessibilityLabel={MODERATION_COPY.reportVideo}
+          onPress={() => setReportTarget({ type: "match_video", id: reportableId })}
+          className="items-center justify-center active:opacity-70"
+          style={{ width: 44, height: 44 }}
+        >
+          <Flag size={20} color={ON_MEDIA.white} strokeWidth={2} />
+        </Pressable>
+      ) : null}
     </View>
   );
 
@@ -401,6 +421,7 @@ function PlayerBody({ id, start, approximate }: { id: string | undefined; start:
           {topBar}
         </View>
       )}
+      <ContentReportSheet target={reportTarget} onClose={() => setReportTarget(null)} />
       <HarnessMarker testID="video-player-state" label={`Video state: ${stateLabel}`} />
     </ForceDarkTheme>
   );

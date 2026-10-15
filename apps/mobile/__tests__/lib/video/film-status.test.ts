@@ -159,6 +159,7 @@ describe("rows: your angle on the recording phone (2a, the local job wins)", () 
     ["failed again after Try again", { status: "error", message: "Still can't upload. Check your connection." }, { tag: "Didn't upload", tone: "negative", helper: "Still can't upload. Check your connection.", action: "retry", percent: null }],
     ["failed, terminal, clip gone (grey, nothing to do)", { status: "error", terminal: true, discardable: false, message: "The clip isn't on this phone anymore." }, { tag: "Didn't upload", tone: "info", helper: "The clip isn't on this phone anymore.", action: null, percent: null }],
     ["failed, terminal, clip here (Discard)", { status: "error", terminal: true, discardable: true, message: "This clip is too big to upload (2 GB max)." }, { tag: "Didn't upload", tone: "info", helper: "This clip is too big to upload (2 GB max).", action: "discard", percent: null }],
+    ["waiting for AI processing consent (jits-rog5.11): attention, Try again asks", { status: "paused", needsConsent: true, message: "Allow AI processing to upload this clip." }, { tag: "Needs your OK", tone: "waiting", helper: "Allow AI processing to upload this clip.", action: "retry", percent: null }],
   ];
   it.each(cases)("%s", (_n, job, want) => {
     // The server still says uploading at 10%: the local job is fresher.

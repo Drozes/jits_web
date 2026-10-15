@@ -1,7 +1,11 @@
 import * as React from "react";
 import { Alert } from "react-native";
 import { toast } from "@/components/ui/toast";
+import { router } from "expo-router";
 import { discardMatchUpload, retryMatchUpload, type RetryMatchUploadResult } from "./upload-control";
+import { giveAiConsent } from "@/lib/moderation/ai-consent";
+import { AI_CONSENT_COPY } from "@/lib/moderation/moderation-copy";
+import { legalHref } from "@/lib/legal/legal-copy";
 
 /** The deck's label for every retry control (convention 4). */
 export const TRY_AGAIN_LABEL = "Try again";
@@ -35,13 +39,6 @@ export function retryRefusedCopy(result: RetryMatchUploadResult): string | null 
  * by the verdict card, match detail and the Film Room card.
  */
 export function useUploadActions(matchId: string): { retry: () => void; discard: () => void } {
-  const retry = React.useCallback(() => {
-    void retryMatchUpload(matchId).then((result) => {
-      const refused = retryRefusedCopy(result);
-      if (refused) toast.error(refused);
-    });
-  }, [matchId]);
-
   const discard = React.useCallback(() => {
     Alert.alert(DISCARD_TITLE, DISCARD_BODY, [
       { text: "Keep", style: "cancel" },
@@ -49,5 +46,40 @@ export function useUploadActions(matchId: string): { retry: () => void; discard:
     ]);
   }, [matchId]);
 
+  const retry = React.useCallback(() => {
+    const run = () =>
+      void retryMatchUpload(matchId).then((result) => {
+        if (result === "needs_consent") {
+          askConsentToUpload(run, discard);
+          return;
+        }
+        const refused = retryRefusedCopy(result);
+        if (refused) toast.error(refused);
+      });
+    run();
+  }, [matchId, discard]);
+
   return { retry, discard };
+}
+
+/**
+ * A clip waiting for AI processing consent (jits-rog5.11): Try again asks
+ * first. Allow records consent and uploads; Not now keeps the clip parked
+ * on this phone; Delete clip drops it without consenting (through the
+ * usual Discard confirm).
+ */
+export function askConsentToUpload(onAllowed: () => void, onDelete: () => void): void {
+  Alert.alert(AI_CONSENT_COPY.uploadTitle, AI_CONSENT_COPY.body, [
+    { text: AI_CONSENT_COPY.notNow, style: "cancel", onPress: () => toast.info(AI_CONSENT_COPY.uploadParked) },
+    { text: AI_CONSENT_COPY.privacyLink, onPress: () => router.push(legalHref("privacy", undefined, "4")) },
+    { text: AI_CONSENT_COPY.deleteClip, style: "destructive", onPress: onDelete },
+    {
+      text: AI_CONSENT_COPY.allowUpload,
+      onPress: () =>
+        void giveAiConsent().then((ok) => {
+          if (ok) onAllowed();
+          else toast.error(AI_CONSENT_COPY.failed);
+        }),
+    },
+  ]);
 }

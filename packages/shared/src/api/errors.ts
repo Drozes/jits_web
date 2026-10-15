@@ -64,6 +64,7 @@ export type DomainErrorCode =
   | "PROXIMITY_REQUIRED"
   | "PROXIMITY_FAILED"
   | "NOT_AUTHORIZED"
+  | "BLOCKED"
   | "RLS_VIOLATION"
   | "RPC_MISSING"
   | "UNKNOWN";
@@ -182,6 +183,12 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     athlete_not_found: {
       code: "ATHLETE_NOT_FOUND",
       message: "That athlete could not be found.",
+    },
+    // A block between the pair (jr_be-m2s): the server refuses a challenge
+    // either way.
+    blocked: {
+      code: "BLOCKED",
+      message: "You can't challenge this athlete.",
     },
     gym_not_found: {
       code: "GYM_NOT_FOUND",

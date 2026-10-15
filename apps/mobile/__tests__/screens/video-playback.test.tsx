@@ -787,6 +787,15 @@ describe("MatchVideoScreen Film Room controls", () => {
     expect(lastPlayer().play).toHaveBeenCalled();
   });
 
+  it("offers Report only on an angle another athlete recorded (jits-rog5.11)", async () => {
+    const own = await renderLoadedPlayer();
+    expect(own.queryByTestId("player-report")).toBeNull();
+    own.unmount();
+    mockId = "vid-2";
+    const other = await renderLoadedPlayer();
+    expect(other.getByTestId("player-report").props.accessibilityLabel).toBe("Report video");
+  });
+
   it("loads the match from the recording's match id and titles the player", async () => {
     const utils = await renderLoadedPlayer();
     expect(mockUseMatchDetail).toHaveBeenCalledWith(MATCH);

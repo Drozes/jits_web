@@ -19,7 +19,9 @@ export { ReelPager } from "./reel-pager";
  * the pager's pages, no swipe. A video surface: the dark "void" tokens in
  * both themes (`ForceDarkTheme`, like the match video player) and a light
  * status bar. Always the athlete's own reel (`get_highlight_detail` reads
- * only the caller's), so every owner action is offered.
+ * only the caller's), so every owner action is offered. When shared reels
+ * ship, a deep link to a reel that is not yours must set `canManage` false
+ * and pass the lane item, so the page offers Report instead (jits-rog5.11).
  */
 export function ViewerScreen({ id, source }: { id: string | undefined; source: HighlightShareSourceTag }) {
   const close = useViewerClose();
