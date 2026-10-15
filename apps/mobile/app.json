@@ -166,6 +166,7 @@
       ],
       "@react-native-community/datetimepicker",
       "./plugins/with-android-backup-rules",
+      "./plugins/with-write-storage-max-sdk",
       "./plugins/with-instagram-reels"
     ],
     "extra": {

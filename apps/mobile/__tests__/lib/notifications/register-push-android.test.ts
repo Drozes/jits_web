@@ -85,6 +85,9 @@ describe("registerForPushNotifications", () => {
     const res = await registerForPushNotifications(SB, "a1");
     expect(res).toEqual({ ok: true, token: "ExponentPushToken[emu]" });
     expect(mockSetChannel).toHaveBeenCalledWith("default", expect.anything());
+    // The channel exists before the token is fetched (Android 13+ ties the
+    // notification permission prompt to a channel existing).
+    expect(mockSetChannel.mock.invocationCallOrder[0]).toBeLessThan(mockGetToken.mock.invocationCallOrder[0]);
   });
 
   it("an iOS simulator is still not_a_device", async () => {
