@@ -884,13 +884,12 @@ def b_rules():
         "Before the start the server verifies ONLY the recording intent: written ON at accept, set_match_recording_intent refuses turning it off (timekeeper_must_record), start_match refuses without it (timekeeper_not_recording). Camera ready is checked on the phone only.",
         "After the match the server verifies ONLY whether an upload arrived. It never knows that the camera was actually rolling.",
         "Camera failure mid-match: the match continues (TK-L3, TK-L4); the client reports the gap (timekeeper_recording_gaps); athletes' optional angles still count.",
-        "No usable timekeeper angle when the 24 h footage settle window closes (from completed_at), or a terminal upload failure: the match is flagged for admin review in the server-only match_timekeeper_footage_flags. Signal only: result, rating and dispute window stand; athletes see nothing. One push nudge TK-N8 at 2 h (Q14).",
+        "No usable timekeeper angle when the 24 h footage settle window closes (from completed_at), or a terminal upload failure: the match is flagged for admin review in the server-only match_timekeeper_footage_flags. Signal only: result, rating and dispute window stand; athletes see nothing. One push nudge TK-N8 at 2 h (Q14, owner decided 2026-10-15).",
     ])
     pend = bullets([
         "Q1: a timekeeper Doesn't look right blocks the start until that athlete re-weighs and the timekeeper confirms again, as today's athlete flag (recommended yes). Drawn on P-TK-B5 frame 5 and P-TK-B6.",
         "Q12: the other athlete approves the pick with one tap (TK-P25 to TK-P27; the picker waits with TK-P28) inside the same 10 minutes, before the request is sent; also for mid-match replacements and code joins (recommended yes; requested_by and approved_by recorded). Drawn on P-TK-B2 frames 5 and 6.",
         "Q3b offline and Q3c stall rules (recommended yes).",
-        "Q14: missing timekeeper footage leaves the result and rating standing, with an admin flag (recommended yes).",
     ])
     grid = (f'<div style="padding: 24px 48px 48px; display: flex; flex-direction: column; gap: 20px">'
             f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{callout("The 10-minute rule (D9)", ten, AMBER)}{callout("The snapshot and client-capability rule (D1, review M1)", snap, INK, w=440)}</div>'
@@ -960,7 +959,7 @@ def b00():
         "Athlete face-off: weigh-in unchanged; ready merges the opponent weight check (Weight looks right, I'm ready), stored server side.",
         "The timekeeper confirms each athlete's weight and alone can Start, pause, resume, end the clock (new end_match_clock; the server also ends it at match duration) and record the result.",
         "Athletes keep their camera, see a read-only clock, then confirm or dispute; the recorder is no longer auto-confirmed.",
-        "D12: the timekeeper MUST record the match (consent at Accept, record row locked on, Start waits for their camera, upload required; missing footage = admin flag, Q14). Athletes' recording stays optional.",
+        "D12: the timekeeper MUST record the match (consent at Accept, record row locked on, Start waits for their camera, upload required; missing footage = admin flag, Q14 decided). Athletes' recording stays optional.",
         "An explicit Leave pauses the clock; an OFFLINE timekeeper (60 s heartbeat gap) starts a 10-minute wait without pausing; cancel only if nobody takes over. After the clock ends there is no Leave; a result stall goes to admin review.",
         "Arena copy changes in two lines when the flag is known ON (TK-AR1, TK-AR2).",
     ], 13)
@@ -975,11 +974,11 @@ def b00():
            ("D9", "Timekeeper missing or dropped out: the match waits; after 10 minutes it is cancelled."),
            ("D10", "Alpha 2026-10-17: ON only if certain, else ship dark with the alpha flag OFF; nothing may block flag OFF."),
            ("D11", "Flag-OFF changes may be shown only as optional and separate (board P-TK-C1)."),
-           ("D12", "The timekeeper is REQUIRED to record the match on video; athletes stay optional (D8 unchanged).")]
+           ("D12", "The timekeeper is REQUIRED to record the match on video; athletes stay optional (D8 unchanged). Missing timekeeper footage flags admin review; the result stands (Q14, owner 2026-10-15).")]
     decisions = kv([(mono(k, 11, INK, 700, 0.56, False), v) for k, v in dec], 44) + (
         f'<div style="margin-top: 6px; padding: 10px; border: 1px dashed {RED_RULE}; border-radius: 3px; display: flex; flex-direction: column; gap: 6px">{TAG_PENDING}'
         f'{body("Coordinator assumption: a timekeeper Doesn" + chr(39) + "t look right blocks the start until that athlete re-weighs and the timekeeper confirms again, as today" + chr(39) + "s athlete flag (Q1).", 12, INK2)}'
-        f'{body("Also owner-pending: Q3b (offline), Q3c (stalls), Q4 (code/QR link in the picker), Q6 (cancelled-match video), Q8 and Q11 (phase 2), Q12 (opponent approves the timekeeper), Q13 (Arena copy with an older app on the other side), Q14 (missing timekeeper footage).", 12, INK2)}</div>')
+        f'{body("Also owner-pending: Q3b (offline), Q3c (stalls), Q4 (code/QR link in the picker), Q6 (cancelled-match video), Q8 and Q11 (phase 2), Q12 (opponent approves the timekeeper), Q13 (Arena copy with an older app on the other side).", 12, INK2)}</div>')
     be = kv([(mono(k, 11, INK, 700, 0.56, False), v) for k, v in [
         ("BE-1", "requires_timekeeper, timekeeper_deadline_at, ended_at; snapshot with p_client_supports_timekeeper DEFAULT false and the both-clients rule; guard; timekeeper_busy at creation."),
         ("BE-2", "_set_match_timekeeper core; match_timekeeper_requests (requested_by, approved_by, channel, invite_id); request / approve (Q12) / respond / cancel; get_timekeeper_candidates; new _timekeeper_busy; timekeeper-mode branches of join_match_as_timekeeper and remove_match_timekeeper."),
@@ -1030,10 +1029,10 @@ def b00():
           ("Q11", "Phase 2 invite side effects?", "Create the friendship; do not count against the challenge invite cap."),
           ("Q12", "Should the other athlete approve a picked timekeeper (collusion)?", "Yes: one tap (TK-P25 to TK-P27, picker waits with TK-P28) inside the same 10 minutes, before the request is sent; also for replacements and code joins; admin signals."),
           ("Q13", "Arena copy says a timekeeper is needed even if the other athlete's app is too old to support it; keep the copy?", "Yes: nothing breaks, the match falls back to the two-athlete flow."),
-          ("Q14", "Missing timekeeper footage (D12): the upload never arrives or fails?", "Result and rating stand; the match is flagged for admin review (signal only) at the 24 h settle window; one push nudge 2 h after the end.")]
+          ("Q14", "Missing timekeeper footage (D12): the upload never arrives or fails?", "DECIDED (owner 2026-10-15): the timekeeper's video is required; if it is missing, the result and rating stand and the match is flagged for admin review (signal only) at the 24 h settle window; one push nudge 2 h after the end.")]
     openq = "".join(f'<div style="display: flex; flex-direction: row; gap: 12px; padding: 7px 0; border-top: 1px solid {HLF}">'
-                    f'<div style="width: 36px; flex-shrink: 0">{mono(k, 11, NEG if k in ("Q3b", "Q3c", "Q12", "Q13", "Q14") else INK, 700, 0.56, False)}</div>'
-                    f'<div style="flex: 1; min-width: 0">{body(qq, 12, INK)}</div><div style="width: 330px; flex-shrink: 0">{body("Recommended: " + a, 12, INK2)}</div></div>' for k, qq, a in qs)
+                    f'<div style="width: 36px; flex-shrink: 0">{mono(k, 11, NEG if k in ("Q3b", "Q3c", "Q12", "Q13") else INK, 700, 0.56, False)}</div>'
+                    f'<div style="flex: 1; min-width: 0">{body(qq, 12, INK)}</div><div style="width: 330px; flex-shrink: 0">{body(a if a.startswith("DECIDED") else "Recommended: " + a, 12, INK2)}</div></div>' for k, qq, a in qs)
     gonogo = (bullets([
         "1 · Every rules row enforced server side and covered by pgTAP; the full jr_be suite green with 061, 108, 111 unchanged.",
         "2 · Flag-OFF regression: the match-loop two-device scenario passes unchanged with all timekeeper code merged.",

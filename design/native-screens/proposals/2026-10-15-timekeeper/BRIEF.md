@@ -20,7 +20,7 @@ either an OWNER DECISION (binding) or RECON (verified against code on 2026-10-15
 | D9 | If the timekeeper is not there yet, or drops out, the match WAITS. After a 10-minute wait it is CANCELLED. |
 | D10 | Alpha in 2 days (2026-10-17). Timekeeper mode should be ON for the alpha only if the team is certain of it; otherwise it ships dark and the alpha runs flag OFF. Nothing in this work may block anyone with the flag OFF. |
 | D11 | If changes to the NON-timekeeper (flag OFF) flow are recommended (for example merging weight and ready), the proposal may show them, clearly marked as optional and separate from timekeeper mode. |
-| D12 | (2026-10-15) The timekeeper is REQUIRED to record the match on video; it is not optional like the athletes. Athletes stay optional (D8 unchanged). |
+| D12 | (2026-10-15) The timekeeper is REQUIRED to record the match on video; it is not optional like the athletes. Athletes stay optional (D8 unchanged). When the flag is on the timekeeper video is required; missing footage flags admin review and the result and rating stand (Q14, owner 2026-10-15). |
 
 Coordinator assumption pending owner confirmation (mark as such on the page): a timekeeper "doesn't look right" on an athlete's weight blocks start until that athlete re-weighs and the timekeeper confirms again, same as today's athlete flag.
 
