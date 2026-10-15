@@ -172,3 +172,72 @@ describe("SecureStoreAdapter (chunked)", () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
   });
 });
+
+describe("SecureStoreAdapter undecryptable values (jits-mafl.1)", () => {
+  // On Android a value whose Keystore key is gone (restored from a backup,
+  // reinstall) makes getItemAsync throw. The adapter must read as signed out
+  // and drop the dead entry, never reject and wedge the auth gate.
+  const getMock = SecureStore.getItemAsync as jest.Mock;
+  const deleteMock = SecureStore.deleteItemAsync as jest.Mock;
+  const DECRYPT = new Error("Could not decrypt the value");
+
+  function failReadsOf(keys: string[]) {
+    const real = getMock.getMockImplementation()!;
+    getMock.mockImplementation(async (k: string) => {
+      if (keys.includes(k)) throw DECRYPT;
+      return real(k);
+    });
+  }
+  afterEach(() => {
+    getMock.mockImplementation(async (key: string) =>
+      Object.prototype.hasOwnProperty.call(mockStore, key) ? mockStore[key] : null,
+    );
+    deleteMock.mockImplementation(async (key: string) => {
+      delete mockStore[key];
+    });
+  });
+
+  it("a chunk that will not decrypt: null, and every chunk, the meta and the legacy key are deleted", async () => {
+    await SecureStoreAdapter.setItem(KEY, "e".repeat(7000));
+    mockStore[KEY] = "legacy";
+    failReadsOf([`${KEY}.1`]);
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(mockStore).toEqual({});
+  });
+
+  it("an unreadable meta key: null, and a bounded sweep clears the chunks", async () => {
+    await SecureStoreAdapter.setItem(KEY, "f".repeat(5000));
+    failReadsOf([`${KEY}.meta`]);
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(mockStore).toEqual({});
+  });
+
+  it("an unreadable legacy single key: null and deleted", async () => {
+    mockStore[KEY] = "legacy";
+    failReadsOf([KEY]);
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(mockStore).toEqual({});
+  });
+
+  it("a failing delete during cleanup still resolves null and deletes the rest", async () => {
+    await SecureStoreAdapter.setItem(KEY, "g".repeat(5000));
+    failReadsOf([`${KEY}.0`]);
+    deleteMock.mockImplementation(async (k: string) => {
+      if (k === `${KEY}.1`) throw new Error("delete failed");
+      delete mockStore[k];
+    });
+    await expect(SecureStoreAdapter.getItem(KEY)).resolves.toBeNull();
+    expect(Object.keys(mockStore)).toEqual([`${KEY}.1`]);
+  });
+
+  it("removeItem never throws on an unreadable meta or a failed delete", async () => {
+    await SecureStoreAdapter.setItem(KEY, "h".repeat(5000));
+    failReadsOf([`${KEY}.meta`]);
+    deleteMock.mockImplementation(async (k: string) => {
+      if (k === `${KEY}.0`) throw new Error("delete failed");
+      delete mockStore[k];
+    });
+    await expect(SecureStoreAdapter.removeItem(KEY)).resolves.toBeUndefined();
+    expect(Object.keys(mockStore)).toEqual([`${KEY}.0`]);
+  });
+});

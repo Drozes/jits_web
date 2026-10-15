@@ -71,32 +71,73 @@ const splitIntoChunks = (value: string): string[] => {
   return chunks.length > 0 ? chunks : [""];
 };
 
+/**
+ * Chunk keys swept when the chunk count is unknown (its meta key could not
+ * be read). A session is a few KB, a handful of chunks; deleting a key that
+ * does not exist is a no-op.
+ */
+const PURGE_FALLBACK_CHUNKS = 16;
+
+/** Deletes one key; a failed delete never throws (best effort). */
+async function deleteQuietly(key: string): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch {
+    // Best effort: leave it; the next write overwrites it anyway.
+  }
+}
+
+/**
+ * Deletes every key a value may occupy: its chunks (`count` of them, or a
+ * bounded sweep when unknown), the meta key and the legacy single key. Never
+ * throws, and one failed delete does not stop the others.
+ */
+async function purge(key: string, count: number | null): Promise<void> {
+  const n = count !== null && Number.isFinite(count) && count >= 0 ? count : PURGE_FALLBACK_CHUNKS;
+  for (let i = 0; i < n; i += 1) await deleteQuietly(chunkKey(key, i));
+  await deleteQuietly(metaKey(key));
+  // Also clear any legacy single-key value so sign-out leaves no orphans.
+  await deleteQuietly(key);
+}
+
 export const SecureStoreAdapter = {
   async getItem(key: string): Promise<string | null> {
     if (isWeb) {
       return typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
     }
 
-    const countRaw = await SecureStore.getItemAsync(metaKey(key));
-    if (countRaw === null) {
-      // No chunk metadata: either nothing stored, or a legacy single-key value
-      // written before chunking existed. Return the legacy value so existing
-      // signed-in users keep their session (it gets re-chunked on next set).
-      return SecureStore.getItemAsync(key);
-    }
+    let knownCount: number | null = null;
+    try {
+      const countRaw = await SecureStore.getItemAsync(metaKey(key));
+      if (countRaw === null) {
+        // No chunk metadata: either nothing stored, or a legacy single-key value
+        // written before chunking existed. Return the legacy value so existing
+        // signed-in users keep their session (it gets re-chunked on next set).
+        return await SecureStore.getItemAsync(key);
+      }
 
-    const count = Number.parseInt(countRaw, 10);
-    if (!Number.isFinite(count) || count <= 0) return null;
+      const count = Number.parseInt(countRaw, 10);
+      if (!Number.isFinite(count) || count <= 0) return null;
+      knownCount = count;
 
-    const parts: string[] = [];
-    for (let i = 0; i < count; i += 1) {
-      const part = await SecureStore.getItemAsync(chunkKey(key, i));
-      // A missing chunk means the stored value is corrupt/incomplete; treat the
-      // whole entry as absent rather than returning a partial session.
-      if (part === null) return null;
-      parts.push(part);
+      const parts: string[] = [];
+      for (let i = 0; i < count; i += 1) {
+        const part = await SecureStore.getItemAsync(chunkKey(key, i));
+        // A missing chunk means the stored value is corrupt/incomplete; treat the
+        // whole entry as absent rather than returning a partial session.
+        if (part === null) return null;
+        parts.push(part);
+      }
+      return parts.join("");
+    } catch {
+      // The native read threw: on Android this is a value that cannot be
+      // decrypted any more (its Keystore key is gone, e.g. prefs restored
+      // from a backup onto a new device or after a reinstall; jits-mafl.1).
+      // It will never decrypt, so drop it and read as signed out instead of
+      // wedging the auth gate on a rejected promise.
+      await purge(key, knownCount);
+      return null;
     }
-    return parts.join("");
   },
 
   async setItem(key: string, value: string): Promise<void> {
@@ -137,13 +178,13 @@ export const SecureStoreAdapter = {
       return;
     }
 
-    const countRaw = await SecureStore.getItemAsync(metaKey(key));
-    const count = countRaw !== null ? Number.parseInt(countRaw, 10) : 0;
-    for (let i = 0; i < count; i += 1) {
-      await SecureStore.deleteItemAsync(chunkKey(key, i));
+    let count: number | null = null;
+    try {
+      const countRaw = await SecureStore.getItemAsync(metaKey(key));
+      count = countRaw !== null ? Number.parseInt(countRaw, 10) : 0;
+    } catch {
+      // Unreadable meta (see getItem): fall back to the bounded sweep.
     }
-    await SecureStore.deleteItemAsync(metaKey(key));
-    // Also clear any legacy single-key value so sign-out leaves no orphans.
-    await SecureStore.deleteItemAsync(key);
+    await purge(key, count);
   },
 };
