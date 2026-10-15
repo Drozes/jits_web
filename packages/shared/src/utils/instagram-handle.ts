@@ -35,3 +35,13 @@ export function isValidInstagramInput(raw: string | null | undefined): boolean {
 export function formatInstagramHandle(handle: string | null | undefined): string {
   return handle ? `@${handle}` : "";
 }
+
+/**
+ * Public profile URL for a stored handle ("marcus" ->
+ * "https://www.instagram.com/marcus/"); null for null or blank. On iOS the
+ * universal link opens the Instagram app when it is installed.
+ */
+export function instagramProfileUrl(handle: string | null | undefined): string | null {
+  const h = handle?.trim();
+  return h ? `https://www.instagram.com/${encodeURIComponent(h)}/` : null;
+}

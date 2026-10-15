@@ -91,9 +91,9 @@ async function signAll(keys: (string | null)[], now = Date.now()): Promise<Map<s
   return new Map(unique.map((k) => [k, posters.get(k)?.url ?? null]));
 }
 
-function toItems(raw: MyHighlightItem[], urls: Map<string, string | null>, viewerId: string | null): ReelItem[] {
+function toItems(raw: MyHighlightItem[], urls: Map<string, string | null>): ReelItem[] {
   return raw.map((item) => {
-    const reel = ownReelItem(item, item.posterPath ? (urls.get(item.posterPath) ?? null) : null, viewerId);
+    const reel = ownReelItem(item, item.posterPath ? (urls.get(item.posterPath) ?? null) : null);
     return locallySeen.has(seenKey(item.highlightId, item.version)) ? { ...reel, unseen: false } : reel;
   });
 }
@@ -126,7 +126,7 @@ export async function fetchReelPage(
   if (!res.ok) return null;
   if (!res.data.clipsEnabled) return { items: [], cursor: null };
   const urls = await signAll(res.data.items.map((i) => i.posterPath));
-  return { items: toItems(res.data.items, urls, viewerId), cursor: nextReelCursor(res.data, limit) };
+  return { items: toItems(res.data.items, urls), cursor: nextReelCursor(res.data, limit) };
 }
 
 export interface UseReelLaneOptions {
@@ -273,7 +273,7 @@ export function useReelLane(
         if (id !== seq.current) return;
         const prev = stateRef.current;
         const firstCursor = nextReelCursor(page, REEL_LANE_PAGE_SIZE);
-        const merged = mergeFirstPage(prev.items, toItems(page.items, urls, athleteId), firstCursor !== null);
+        const merged = mergeFirstPage(prev.items, toItems(page.items, urls), firstCursor !== null);
         commit({
           items: reuseReels(prev.items, merged.items),
           inFlight: toBuilding(page.inFlight, urls, receivedAt),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatInstagramHandle,
+  instagramProfileUrl,
   isValidInstagramHandle,
   isValidInstagramInput,
   normalizeInstagramHandle,
@@ -58,5 +59,18 @@ describe("formatInstagramHandle", () => {
   it("prefixes @ and renders null as empty", () => {
     expect(formatInstagramHandle("marcus")).toBe("@marcus");
     expect(formatInstagramHandle(null)).toBe("");
+  });
+});
+
+describe("instagramProfileUrl", () => {
+  it("builds the public profile URL for a stored handle", () => {
+    expect(instagramProfileUrl("marcus.reyes")).toBe("https://www.instagram.com/marcus.reyes/");
+  });
+
+  it("returns null for null, undefined and blank", () => {
+    expect(instagramProfileUrl(null)).toBeNull();
+    expect(instagramProfileUrl(undefined)).toBeNull();
+    expect(instagramProfileUrl("")).toBeNull();
+    expect(instagramProfileUrl("   ")).toBeNull();
   });
 });

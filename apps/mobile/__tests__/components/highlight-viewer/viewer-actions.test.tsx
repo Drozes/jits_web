@@ -1,14 +1,13 @@
 /**
- * The right rail and the bottom meta's secondary action under the ownership
- * rule (spec 8.6, owner decision 2026-10-06): a reel that is not yours never
- * offers Share to Instagram, Share reel, Save to Photos or Improve this reel;
- * Open match only for a participant, else View profile (C-V5).
+ * The right rail under the ownership rule (spec 8.6, owner decision
+ * 2026-10-06): a reel that is not yours never offers Share to Instagram, Share
+ * reel, Save to Photos or Improve this reel. The bottom meta (owner decision
+ * 2026-10-14): no Open match / View profile, only the subject's tappable
+ * `@handle` when set.
  */
 import * as React from "react";
 import { fireEvent, render } from "@testing-library/react-native";
 
-const mockPush = jest.fn();
-jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock("lucide-react-native", () => {
   const RN = require("react-native");
   const R = require("react");
@@ -80,7 +79,7 @@ describe("rail ownership (spec 8.6)", () => {
   });
 
   it.each([
-    ["friend", reel(2, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9" })],
+    ["friend", reel(2, { isOwn: false, source: "friend" })],
     ["own-source but isOwn false", reel(3, { isOwn: false })],
   ])("not yours (%s): no rail at all, whatever the share flags say", (_name, item) => {
     expect(canManageReel(item)).toBe(false);
@@ -94,7 +93,7 @@ describe("rail ownership (spec 8.6)", () => {
   });
 });
 
-describe("secondary action (spec 8.6)", () => {
+describe("bottom meta: Instagram handle (owner decision 2026-10-14)", () => {
   const detail = {
     highlightId: "h1",
     matchVideoId: "v1",
@@ -105,28 +104,63 @@ describe("secondary action (spec 8.6)", () => {
     caption: { athleteName: "A", opponentName: "Bea", matchType: "ranked", outcome: "win", eloAfter: 1, eloDelta: 1, technique: null, playedAt: "2026-10-04T15:00:00Z" },
   } as never;
   const progress = { phase: "ready", renderTotal: 1, playback: { durationS: 28, version: 1 } } as never;
+  let openURL: jest.SpyInstance;
 
-  beforeEach(() => mockPush.mockClear());
-
-  it("a participant gets Open match to match detail", () => {
-    const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, reel(1, { isOwn: false, viewerIsParticipant: true }))} />);
-    fireEvent.press(utils.getByText("Open match"));
-    expect(mockPush).toHaveBeenCalledWith("/(app)/match-detail/m1");
-    expect(utils.queryByText("View profile")).toBeNull();
+  beforeEach(() => {
+    const { Linking } = require("react-native");
+    openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(undefined);
   });
+  afterEach(() => openURL.mockRestore());
 
-  it("anyone else gets View profile (C-V5) to the subject's profile, with no title line", () => {
-    const item = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
-    const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, item)} />);
-    expect(utils.queryByTestId("viewer-title")).toBeNull();
-    fireEvent.press(utils.getByText("View profile"));
-    expect(mockPush).toHaveBeenCalledWith("/(app)/athlete/ath-9");
+  function expectNoSecondaryAction(utils: ReturnType<typeof render>) {
     expect(utils.queryByText("Open match")).toBeNull();
-  });
+    expect(utils.queryByText("View profile")).toBeNull();
+    expect(utils.queryByTestId("viewer-open-match")).toBeNull();
+    expect(utils.queryByTestId("viewer-view-profile")).toBeNull();
+  }
 
-  it("own reel: no title line, just the mono date + duration line", () => {
-    const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, reel(1))} />);
+  it("own reel with a handle: @handle under the date line, a link that opens the Instagram profile", () => {
+    const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, reel(1), "marcus.reyes")} />);
     expect(utils.queryByTestId("viewer-title")).toBeNull();
     expect(utils.getByTestId("viewer-meta")).toHaveTextContent("OCT 04 · 0:28");
+    const link = utils.getByTestId("viewer-instagram-handle");
+    expect(link).toHaveTextContent("@marcus.reyes");
+    expect(link.props.accessibilityRole).toBe("link");
+    expect(link.props.accessibilityLabel).toBe("Instagram, @marcus.reyes");
+    expect(link.props.accessibilityHint).toBe("Opens Instagram");
+    fireEvent.press(link);
+    expect(openURL).toHaveBeenCalledWith("https://www.instagram.com/marcus.reyes/");
+    expectNoSecondaryAction(utils);
+  });
+
+  it("the single-reel viewer (no lane item) shows the viewer's handle too", () => {
+    const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, null, "bea")} />);
+    expect(utils.getByTestId("viewer-instagram-handle")).toHaveTextContent("@bea");
+  });
+
+  it.each([null, undefined, "", "   "])("no handle (%p): no line, and no Open match / View profile", (handle) => {
+    const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, reel(1), handle)} />);
+    expect(utils.queryByTestId("viewer-instagram-handle")).toBeNull();
+    expect(utils.queryByText(/@/)).toBeNull();
+    expectNoSecondaryAction(utils);
+  });
+
+  it("a failed open is swallowed", async () => {
+    openURL.mockRejectedValueOnce(new Error("no handler"));
+    const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, reel(1), "marcus")} />);
+    expect(() => fireEvent.press(utils.getByTestId("viewer-instagram-handle"))).not.toThrow();
+    await Promise.resolve();
+    expect(openURL).toHaveBeenCalledTimes(1);
+  });
+
+  it("a reel that is not yours shows its subject's handle, never the viewer's", () => {
+    const other = reel(1, { isOwn: false, source: "friend", subjectInstagramHandle: "cruiz" });
+    const utils = render(<ViewerMeta progress={progress} meta={pageMeta(detail, other, "me.handle")} />);
+    expect(utils.getByTestId("viewer-instagram-handle")).toHaveTextContent("@cruiz");
+    expect(utils.queryByText("@me.handle")).toBeNull();
+    expectNoSecondaryAction(utils);
+    utils.unmount();
+    const unknown = render(<ViewerMeta progress={progress} meta={pageMeta(detail, reel(2, { isOwn: false, source: "friend" }), "me.handle")} />);
+    expect(unknown.queryByTestId("viewer-instagram-handle")).toBeNull();
   });
 });

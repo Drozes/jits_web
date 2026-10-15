@@ -1,5 +1,5 @@
-/** The full-screen page's bottom meta (spec 8.2, 8.6). */
-import { metaFromDetail, pageMeta, reelDuration, reelMetaLine, secondaryHref } from "@/lib/highlight/reel-meta";
+/** The full-screen page's bottom meta (spec 8.2; owner decision 2026-10-14: the @handle replaced Open match / View profile). */
+import { pageMeta, reelDuration, reelMetaLine } from "@/lib/highlight/reel-meta";
 import { reel } from "../../support/reel-fixtures";
 
 const detail = {
@@ -21,33 +21,26 @@ describe("reel meta", () => {
     expect(reelMetaLine(null, 28)).toBe("0:28");
   });
 
-  it("single-reel: own reel, no title, Open match to match detail", () => {
-    const m = metaFromDetail(detail);
-    expect(m).toMatchObject({ secondary: "open_match", matchId: "m1" });
+  it("single-reel (no lane item): the viewer's own handle and the match date, no title, no secondary action", () => {
+    const m = pageMeta(detail, null, "ana.bjj");
+    expect(m).toEqual({ dateIso: "2026-10-04T15:00:00Z", instagramHandle: "ana.bjj" });
     expect(m).not.toHaveProperty("title");
-    expect(secondaryHref(m)).toBe("/(app)/match-detail/m1");
+    expect(m).not.toHaveProperty("secondary");
   });
 
-  it("pager, own item: Open match, no title", () => {
-    const m = pageMeta(detail, reel(1));
-    expect(m).toMatchObject({ secondary: "open_match" });
-    expect(m).not.toHaveProperty("title");
+  it("pager, own item: the viewer's handle, as stored", () => {
+    expect(pageMeta(detail, reel(1), "Ana.Bjj").instagramHandle).toBe("Ana.Bjj");
+    expect(pageMeta(detail, reel(1, { subjectInstagramHandle: "ignored" }), "ana").instagramHandle).toBe("ana");
   });
 
-  it("not yours and not a participant: View profile (C-V5), no title", () => {
-    const item = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
-    const m = pageMeta(detail, item);
-    expect(m).toMatchObject({ secondary: "view_profile" });
-    expect(m).not.toHaveProperty("title");
-    expect(secondaryHref(m)).toBe("/(app)/athlete/ath-9");
+  it.each([null, undefined, "", "  "])("no handle (%p) reads as null", (handle) => {
+    expect(pageMeta(detail, reel(1), handle).instagramHandle).toBeNull();
+    expect(pageMeta(detail, null, handle).instagramHandle).toBeNull();
   });
 
-  it("not yours but a participant: Open match", () => {
-    const m = pageMeta(detail, reel(1, { isOwn: false, viewerIsParticipant: true }));
-    expect(secondaryHref(m)).toBe("/(app)/match-detail/m1");
-  });
-
-  it("no subject and not a participant: no secondary action", () => {
-    expect(secondaryHref(pageMeta(detail, reel(1, { isOwn: false, viewerIsParticipant: false, subjectAthleteId: null })))).toBeNull();
+  it("not yours: the item's subject handle, never the viewer's", () => {
+    const item = reel(1, { isOwn: false, source: "friend", opponentName: "C. Ruiz", subjectInstagramHandle: "cruiz" });
+    expect(pageMeta(detail, item, "ana").instagramHandle).toBe("cruiz");
+    expect(pageMeta(detail, reel(2, { isOwn: false, source: "friend" }), "ana").instagramHandle).toBeNull();
   });
 });
