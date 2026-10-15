@@ -176,7 +176,7 @@ Items the maintainer must complete before submitting to either store. Order matc
 - [ ] Host AASA file at `https://elorated.com/.well-known/apple-app-site-association` (required for `applinks:elorated.com` Universal Links)
 - [ ] Host `assetlinks.json` at `https://elorated.com/.well-known/assetlinks.json` (required for Android App Links `autoVerify`)
 - [ ] Replace `PLACEHOLDER_SHA256_FINGERPRINT` in `apps/web/public/.well-known/assetlinks.json` with the upload key and Play App Signing key SHA-256 fingerprints (owner; App Links for `/c/` and `/athlete` do not verify until then)
-- [ ] Create the Firebase project for `com.elorated.mobile` and add its `google-services.json` as the EAS file env var `GOOGLE_SERVICES_JSON` (`eas env:create --type file`); a production Android build without it fails on purpose (no push otherwise)
+- [ ] Create the Firebase project for `com.elorated.mobile` and add its `google-services.json` as the EAS file env var `GOOGLE_SERVICES_JSON` (`eas env:create --type file`); a production Android build without it fails on purpose (no push otherwise). Never commit the file: `apps/mobile/google-services.json` is gitignored and only serves local builds
 - [ ] Set `EXPO_PUBLIC_SENTRY_DSN` in EAS secrets (`eas secret:create --scope project --name EXPO_PUBLIC_SENTRY_DSN --value <DSN>`)
 - [ ] Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in EAS secrets
 - [ ] Host `PRIVACY_POLICY.md` content at a public URL and update both store listings with the link

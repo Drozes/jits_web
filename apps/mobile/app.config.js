@@ -67,7 +67,8 @@ function readUpdateNotice() {
 // and Android gets no push. Resolution order:
 //   1. env GOOGLE_SERVICES_JSON: an EAS "file" environment variable, which EAS
 //      materialises on the builder and exposes as the file's path;
-//   2. ./google-services.json next to this file (local builds), when present;
+//   2. ./google-services.json next to this file, when present: local builds
+//      only. It is gitignored, so EAS never uploads it; EAS builds must use 1;
 //   3. none: the key is omitted (local `expo config`, iOS builds and exports
 //      need no file), with a warning on a non-production Android EAS build.
 // A production Android EAS build with neither throws: that binary would ship
@@ -83,7 +84,8 @@ function resolveGoogleServicesFile() {
   if (platform === "android" && process.env.EAS_BUILD_PROFILE === "production") {
     throw new Error(
       "[app.config] Android production build without google-services.json: set the EAS file " +
-        "env var GOOGLE_SERVICES_JSON (eas env:create --type file) or add apps/mobile/google-services.json. " +
+        "env var GOOGLE_SERVICES_JSON (eas env:create --type file); the local apps/mobile/google-services.json " +
+        "is gitignored and never reaches EAS. " +
         "Without it the binary has no push.",
     );
   }
