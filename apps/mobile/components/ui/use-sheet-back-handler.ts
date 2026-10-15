@@ -17,16 +17,45 @@ export interface SheetBackHandlerOptions {
    * `ref.current?.dismiss()`, or the sheet's own cancel path) and returns
    * true when it STARTED a close. After a true, further presses while the
    * sheet animates out are consumed and ignored, so gorhom is never
-   * dismissed twice; after a false, the next press calls it again.
+   * dismissed twice; after a false, the next press calls it again. It may be
+   * called again for the same opening when that close did not take (see
+   * `onChange`), so it must not clear its own "presented" guard: clear that
+   * in the sheet's `onChange(-1)` / `onDismiss` instead.
    */
   onBack: () => boolean;
 }
+
+export interface SheetBackHandle {
+  /**
+   * Call from the sheet's `onChange` with every index. An open index (>= 0)
+   * after a back started a close means gorhom dropped that dismiss (a back
+   * during the present animation, jits-mafl.2.1): the close is issued again
+   * now that the sheet has settled open, so the back still ends closed.
+   */
+  onChange: (index: number) => void;
+}
+
+/**
+ * Backstop for a close that never reports back (no `onChange`, no
+ * `onDismiss`): after this long the next press calls `onBack` again instead
+ * of being swallowed forever. Longer than the ~300 ms present / dismiss
+ * animation, so a normal close never reaches it.
+ */
+export const SHEET_BACK_CLOSE_WATCHDOG_MS = 800;
 
 /**
  * Android hardware back for a gorhom `BottomSheetModal` (jits-mafl.2 M7).
  * gorhom does not listen to the back button, so without this it passes
  * through the sheet and pops the screen behind it. While `open`, the back
  * closes the sheet and returns true; while closed nothing is registered.
+ *
+ * A back during the present animation (jits-mafl.2.1): gorhom 5 can drop that
+ * `dismiss()` (the sheet is not measured yet, so `forceClose` is a no-op) and
+ * settle open, or close without ever firing `onChange(-1)` (its index never
+ * reached 0, so only `onDismiss` fires). So the owner must (1) pass every
+ * `onChange` index to the returned `onChange`, which re-issues a dropped
+ * close, and (2) treat `onDismiss` as closed, exactly like `onChange(-1)`.
+ * The watchdog above is the backstop: the "closing" latch never outlives it.
  *
  * The CLAUDE.md sheet rule still applies: `onBack` may only `dismiss()` a sheet
  * this component presented and that has not closed itself (see
@@ -41,20 +70,54 @@ export interface SheetBackHandlerOptions {
  *
  * BackHandler does nothing on iOS, so this is safe to call on every platform.
  */
-export function useSheetBackHandler({ open, busy = false, onBack }: SheetBackHandlerOptions): void {
+export function useSheetBackHandler({ open, busy = false, onBack }: SheetBackHandlerOptions): SheetBackHandle {
   const onBackRef = React.useRef(onBack);
   onBackRef.current = onBack;
   const busyRef = React.useRef(busy);
   busyRef.current = busy;
+  const openRef = React.useRef(open);
+  openRef.current = open;
+  const closingRef = React.useRef(false);
+  const watchdogRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const settle = React.useCallback(() => {
+    closingRef.current = false;
+    if (watchdogRef.current !== null) clearTimeout(watchdogRef.current);
+    watchdogRef.current = null;
+  }, []);
+
+  const startClose = React.useCallback(() => {
+    if (!onBackRef.current()) return;
+    closingRef.current = true;
+    if (watchdogRef.current !== null) clearTimeout(watchdogRef.current);
+    watchdogRef.current = setTimeout(() => {
+      watchdogRef.current = null;
+      closingRef.current = false;
+    }, SHEET_BACK_CLOSE_WATCHDOG_MS);
+  }, []);
 
   React.useEffect(() => {
+    settle();
     if (!open) return;
-    let closing = false;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (closing || busyRef.current) return true;
-      if (onBackRef.current()) closing = true;
+      if (!closingRef.current && !busyRef.current) startClose();
       return true;
     });
-    return () => sub.remove();
-  }, [open]);
+    return () => {
+      sub.remove();
+      settle();
+    };
+  }, [open, settle, startClose]);
+
+  const onChange = React.useCallback(
+    (index: number) => {
+      if (index < 0 || !closingRef.current) return;
+      // The back's close did not take: the sheet settled open. Close it now.
+      settle();
+      if (openRef.current && !busyRef.current) startClose();
+    },
+    [settle, startClose],
+  );
+
+  return React.useMemo(() => ({ onChange }), [onChange]);
 }

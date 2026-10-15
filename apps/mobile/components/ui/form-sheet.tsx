@@ -36,17 +36,8 @@ export function FormSheet({ open, busy, onClosed, children }: FormSheetProps) {
     } else if (presentedRef.current) ref.current?.dismiss();
   }, [open]);
 
-  const handleChange = React.useCallback(
-    (index: number) => {
-      if (index !== -1 || !presentedRef.current) return;
-      presentedRef.current = false;
-      onClosed();
-    },
-    [onClosed],
-  );
-
   // Android back: closes like a swipe; while busy it is swallowed, like the swipe (jits-mafl.2 M7).
-  useSheetBackHandler({
+  const back = useSheetBackHandler({
     open,
     busy,
     onBack: () => {
@@ -55,6 +46,21 @@ export function FormSheet({ open, busy, onClosed, children }: FormSheetProps) {
       return true;
     },
   });
+
+  // Closed: onChange(-1), or only onDismiss for a close during the present
+  // animation (jits-mafl.2.1). Whichever comes first reports it, once.
+  const handleClosed = React.useCallback(() => {
+    if (!presentedRef.current) return;
+    presentedRef.current = false;
+    onClosed();
+  }, [onClosed]);
+  const handleChange = React.useCallback(
+    (index: number) => {
+      back.onChange(index);
+      if (index === -1) handleClosed();
+    },
+    [back, handleClosed],
+  );
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => (
@@ -71,6 +77,7 @@ export function FormSheet({ open, busy, onClosed, children }: FormSheetProps) {
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
       onChange={handleChange}
+      onDismiss={handleClosed}
       accessible={false} // else the whole sheet is one "Bottom Sheet" leaf to VoiceOver
       backdropComponent={renderBackdrop}
       {...chrome}

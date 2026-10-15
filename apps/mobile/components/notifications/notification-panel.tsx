@@ -62,26 +62,30 @@ export function NotificationPanel({
     wasOpen.current = open;
   }, [open]);
 
-  // Android back closes the panel, once (jits-mafl.2 M7); `open` turning
-  // false after the close must not dismiss again.
-  useSheetBackHandler({
+  // Android back closes the panel (jits-mafl.2 M7). It leaves `wasOpen` set:
+  // a close dropped mid-present is re-issued (jits-mafl.2.1), and the close
+  // itself clears it below, so `open` turning false never dismisses again.
+  const back = useSheetBackHandler({
     open,
     onBack: () => {
       if (!wasOpen.current) return false;
-      wasOpen.current = false;
       ref.current?.dismiss();
       return true;
     },
   });
 
+  // Closed: onChange(-1), or only onDismiss for a close during the present
+  // animation (jits-mafl.2.1), which never reaches onChange(-1).
+  const handleClosed = React.useCallback(() => {
+    wasOpen.current = false; // the sheet closed itself; don't dismiss again
+    onOpenChange(false);
+  }, [onOpenChange]);
   const handleSheetChange = React.useCallback(
     (idx: number) => {
-      if (idx === -1) {
-        wasOpen.current = false; // the sheet closed itself; don't dismiss again
-        onOpenChange(false);
-      }
+      back.onChange(idx);
+      if (idx === -1) handleClosed();
     },
-    [onOpenChange],
+    [back, handleClosed],
   );
 
   const groups = React.useMemo(() => {
@@ -116,6 +120,7 @@ export function NotificationPanel({
       enableDynamicSizing={false}
       enablePanDownToClose
       onChange={handleSheetChange}
+      onDismiss={handleClosed}
       backdropComponent={renderBackdrop}
       {...chrome}
     >

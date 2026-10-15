@@ -91,25 +91,31 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
     wasOpen.current = open;
   }, [open]);
 
-  const onChange = React.useCallback(
-    (index: number) => {
-      if (index !== -1) return;
-      wasOpen.current = false;
-      onClosed();
-    },
-    [onClosed],
-  );
-
-  // Android back closes the sheet, once (jits-mafl.2 M7), like openStats.
-  useSheetBackHandler({
+  // Android back closes the sheet (jits-mafl.2 M7). It leaves `wasOpen` set:
+  // a close dropped mid-present is re-issued (jits-mafl.2.1), and the close
+  // itself clears it below, so `open` turning false never dismisses again.
+  const back = useSheetBackHandler({
     open,
     onBack: () => {
       if (!wasOpen.current) return false;
-      wasOpen.current = false;
       ref.current?.dismiss();
       return true;
     },
   });
+
+  // Closed: onChange(-1), or only onDismiss for a close during the present
+  // animation (jits-mafl.2.1), which never reaches onChange(-1).
+  const handleClosed = React.useCallback(() => {
+    wasOpen.current = false;
+    onClosed();
+  }, [onClosed]);
+  const onChange = React.useCallback(
+    (index: number) => {
+      back.onChange(index);
+      if (index === -1) handleClosed();
+    },
+    [back, handleClosed],
+  );
 
   const openStats = () => {
     // One dismiss only: the push blurs the tab and the parent sets open to
@@ -129,6 +135,7 @@ export function YourNumbersSheet({ athlete, open, onClosed }: YourNumbersSheetPr
       topInset={insets.top}
       enablePanDownToClose
       onChange={onChange}
+      onDismiss={handleClosed}
       accessible={false}
       backdropComponent={renderBackdrop}
       {...chrome}

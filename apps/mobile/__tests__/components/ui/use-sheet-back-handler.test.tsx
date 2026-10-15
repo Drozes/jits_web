@@ -7,7 +7,11 @@
  *    away when the sheet closes or unmounts;
  *  - `Sheet` / `SheetContent` and `FormSheet` close on back, and only a
  *    sheet they presented;
- *  - guard: every `BottomSheetModal` in app/ and components/ uses the hook.
+ *  - guard: every `BottomSheetModal` in app/ and components/ uses the hook;
+ *  - jits-mafl.2.1: a back during the present animation never leaves the back
+ *    swallowed for good: a dismiss gorhom dropped is re-issued once the sheet
+ *    settles open (`onChange` >= 0), a close reported only by `onDismiss`
+ *    counts as closed, and a watchdog clears the latch as a backstop.
  *
  * Source: apps/mobile/components/ui/use-sheet-back-handler.ts, sheet.tsx,
  * form-sheet.tsx
@@ -22,17 +26,24 @@ const mockPresent = jest.fn();
 const mockDismiss = jest.fn();
 let mockOnChange: ((i: number) => void) | null = null;
 let mockOnAnimate: ((from: number, to: number) => void) | null = null;
+let mockOnDismiss: (() => void) | null = null;
 jest.mock("@gorhom/bottom-sheet", () => {
   const R = require("react");
   const RN = require("react-native");
   const BottomSheetModal = R.forwardRef(
     (
-      props: { children?: React.ReactNode; onChange?: (i: number) => void; onAnimate?: (f: number, t: number) => void },
+      props: {
+        children?: React.ReactNode;
+        onChange?: (i: number) => void;
+        onAnimate?: (f: number, t: number) => void;
+        onDismiss?: () => void;
+      },
       ref: unknown,
     ) => {
       R.useImperativeHandle(ref, () => ({ present: mockPresent, dismiss: mockDismiss }));
       mockOnChange = props.onChange ?? null;
       mockOnAnimate = props.onAnimate ?? null;
+      mockOnDismiss = props.onDismiss ?? null;
       return R.createElement(RN.View, { testID: "gorhom-sheet" }, props.children);
     },
   );
@@ -43,7 +54,7 @@ jest.mock("@/lib/theme/use-sheet-scheme-scope", () => ({
   useSheetSchemeScope: () => (children: React.ReactNode) => children,
 }));
 
-import { useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
+import { SHEET_BACK_CLOSE_WATCHDOG_MS, useSheetBackHandler } from "@/components/ui/use-sheet-back-handler";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { FormSheet } from "@/components/ui/form-sheet";
 
@@ -54,6 +65,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockOnChange = null;
   mockOnAnimate = null;
+  mockOnDismiss = null;
   listeners = [];
   jest.spyOn(BackHandler, "addEventListener").mockImplementation(((_e: string, fn: BackListener) => {
     listeners.push(fn);
@@ -66,6 +78,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   jest.restoreAllMocks();
 });
 
@@ -135,6 +148,51 @@ describe("useSheetBackHandler", () => {
     expect(listeners).toHaveLength(0);
   });
 
+  it("jits-mafl.2.1: a close gorhom dropped is re-issued once the sheet settles open", () => {
+    const onBack = jest.fn(() => true);
+    const { result } = renderHook(() => useSheetBackHandler({ open: true, onBack }));
+    // Back during the present animation: the dismiss is dropped, the sheet settles open.
+    expect(pressBack()).toBe(true);
+    expect(onBack).toHaveBeenCalledTimes(1);
+    act(() => result.current.onChange(0));
+    expect(onBack).toHaveBeenCalledTimes(2);
+    // That retry is now the close in flight: further presses are consumed, no third dismiss.
+    expect(pressBack()).toBe(true);
+    expect(onBack).toHaveBeenCalledTimes(2);
+  });
+
+  it("onChange re-issues nothing without a back-started close, on a close (-1), when busy or closed", () => {
+    const onBack = jest.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ open, busy }: { open: boolean; busy: boolean }) => useSheetBackHandler({ open, busy, onBack }),
+      { initialProps: { open: true, busy: false } },
+    );
+    act(() => result.current.onChange(0)); // a normal opening
+    expect(onBack).not.toHaveBeenCalled();
+    pressBack();
+    act(() => result.current.onChange(-1)); // the close took
+    expect(onBack).toHaveBeenCalledTimes(1);
+    rerender({ open: true, busy: true });
+    act(() => result.current.onChange(0));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    rerender({ open: false, busy: false });
+    act(() => result.current.onChange(0));
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("jits-mafl.2.1 backstop: with no report at all, the latch clears after the watchdog", () => {
+    jest.useFakeTimers();
+    const onBack = jest.fn(() => true);
+    renderHook(() => useSheetBackHandler({ open: true, onBack }));
+    pressBack();
+    act(() => jest.advanceTimersByTime(SHEET_BACK_CLOSE_WATCHDOG_MS - 1));
+    pressBack();
+    expect(onBack).toHaveBeenCalledTimes(1);
+    act(() => jest.advanceTimersByTime(1));
+    expect(pressBack()).toBe(true);
+    expect(onBack).toHaveBeenCalledTimes(2);
+  });
+
   it("stacked sheets: the one opened last closes first", () => {
     const lower = jest.fn(() => true);
     const upper = jest.fn(() => true);
@@ -181,6 +239,38 @@ describe("Sheet / SheetContent", () => {
     expect(mockDismiss).toHaveBeenCalledTimes(1);
     // The close animation (toward -1) does not reopen it; onChange(-1) clears it.
     act(() => mockOnAnimate?.(0, -1));
+    act(() => mockOnChange?.(-1));
+    expect(pressBack()).toBe(false);
+  });
+
+  it("jits-mafl.2.1: a back mid-present whose close reports only onDismiss frees the back, and the next opening closes on back", () => {
+    const screen = render(<Harness />);
+    fireEvent.press(screen.getByText("Open"));
+    act(() => mockOnAnimate?.(-1, 0));
+    expect(pressBack()).toBe(true);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    // gorhom closed mid-present: its index never reached 0, so no onChange(-1).
+    act(() => mockOnDismiss?.());
+    expect(pressBack()).toBe(false);
+    // Reopen and let it settle: the back closes it again.
+    fireEvent.press(screen.getByText("Open"));
+    act(() => mockOnAnimate?.(-1, 0));
+    act(() => mockOnChange?.(0));
+    expect(pressBack()).toBe(true);
+    expect(mockDismiss).toHaveBeenCalledTimes(2);
+  });
+
+  it("jits-mafl.2.1: a back mid-present whose dismiss gorhom dropped still ends closed", () => {
+    const screen = render(<Harness />);
+    fireEvent.press(screen.getByText("Open"));
+    act(() => mockOnAnimate?.(-1, 0));
+    pressBack();
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    // The sheet settled open anyway: the dismiss is issued again, once.
+    act(() => mockOnChange?.(0));
+    expect(mockDismiss).toHaveBeenCalledTimes(2);
+    expect(pressBack()).toBe(true);
+    expect(mockDismiss).toHaveBeenCalledTimes(2);
     act(() => mockOnChange?.(-1));
     expect(pressBack()).toBe(false);
   });
@@ -240,6 +330,23 @@ describe("FormSheet", () => {
   it("closed: back passes through", () => {
     mount({ open: false, busy: false });
     expect(pressBack()).toBe(false);
+  });
+
+  it("jits-mafl.2.1: a close reported only by onDismiss reports onClosed once", () => {
+    const { onClosed } = mount({ open: true, busy: false });
+    pressBack();
+    act(() => mockOnDismiss?.());
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    act(() => mockOnChange?.(-1));
+    act(() => mockOnDismiss?.());
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it("jits-mafl.2.1: a dismiss dropped mid-present is re-issued when the sheet settles open", () => {
+    mount({ open: true, busy: false });
+    pressBack();
+    act(() => mockOnChange?.(0));
+    expect(mockDismiss).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -67,22 +67,20 @@ function DriftPromptModal({ blocked, onClosed }: { blocked: boolean; onClosed: (
     }
   }, [show, hasPrompt, onClosed]);
 
-  const onChange = React.useCallback(
-    (index: number) => {
-      if (index !== -1) return;
-      if (presentedRef.current) {
-        presentedRef.current = false;
-        // Swiped down or the backdrop: closed without a choice.
-        void answerDriftPrompt("dismiss");
-      }
-      onClosed();
-    },
-    [onClosed],
-  );
+  // Closed: onChange(-1), or only onDismiss for a close during the present
+  // animation (jits-mafl.2.1); a second report is a no-op.
+  const handleClosed = React.useCallback(() => {
+    if (presentedRef.current) {
+      presentedRef.current = false;
+      // Swiped down or the backdrop: closed without a choice.
+      void answerDriftPrompt("dismiss");
+    }
+    onClosed();
+  }, [onClosed]);
 
   // Android back = the swipe down: closed without a choice, the athlete stays
-  // live on the old tag (onChange answers "dismiss"); swallowed while busy (jits-mafl.2 M7).
-  useSheetBackHandler({
+  // live on the old tag (handleClosed answers "dismiss"); swallowed while busy (jits-mafl.2 M7).
+  const back = useSheetBackHandler({
     open: show,
     busy,
     onBack: () => {
@@ -91,6 +89,13 @@ function DriftPromptModal({ blocked, onClosed }: { blocked: boolean; onClosed: (
       return true;
     },
   });
+  const onChange = React.useCallback(
+    (index: number) => {
+      back.onChange(index);
+      if (index === -1) handleClosed();
+    },
+    [back, handleClosed],
+  );
 
   const renderBackdrop = React.useCallback(
     (props: BottomSheetBackdropProps) => <SheetBackdrop {...props} pressBehavior={busy ? "none" : "close"} />,
@@ -103,6 +108,7 @@ function DriftPromptModal({ blocked, onClosed }: { blocked: boolean; onClosed: (
       enableDynamicSizing
       enablePanDownToClose={!busy}
       onChange={onChange}
+      onDismiss={handleClosed}
       accessible={false}
       backdropComponent={renderBackdrop}
       {...chrome}
