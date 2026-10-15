@@ -804,6 +804,28 @@ describe("isAthleteGoLiveFlip (Arena tab blade clash, Adding Flare)", () => {
     for (const l of listeners) l("background");
     expect(isAthleteGoLiveFlip()).toBe(false);
   });
+
+  it("keeps a settled go-live through an Android permission dialog's 'background' (jits-3dc2)", async () => {
+    const { trackPermissionRequest } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    registerArenaController(controller());
+    await act(async () => {
+      await liveSwitch.goLive();
+    });
+    const { AppState } = require("react-native");
+    const listeners = ((AppState.addEventListener as jest.Mock).mock?.calls ?? [])
+      .filter((c: unknown[]) => c[0] === "change")
+      .map((c: unknown[]) => c[1] as (s: string) => void);
+    let answer!: () => void;
+    const request = trackPermissionRequest(() => new Promise<void>((r) => (answer = r)));
+    for (const l of listeners) l("background");
+    expect(isAthleteGoLiveFlip()).toBe(true);
+    answer();
+    await request;
+    for (const l of listeners) l("background");
+    expect(isAthleteGoLiveFlip()).toBe(false);
+  });
 });
 
 describe("round 4 (R1): sign-out always writes false", () => {

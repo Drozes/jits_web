@@ -28,6 +28,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import { useSyncExternalStore } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "../supabase/client";
+import { permissionRequestInFlight } from "@/lib/permissions/permission-request";
 
 interface AppOnlinePayload {
   athlete_id: string;
@@ -267,7 +268,9 @@ export function useOnlinePresence(
         // moments the app is still open. Untracking there spent presence calls
         // against the 5 per 30s channel limit (jits-fa9x) and blinked the
         // green dot for everyone watching. The lobby draws the same line
-        // (`lib/arena/use-arena-live.ts`).
+        // (`lib/arena/use-arena-live.ts`). An Android system permission
+        // dialog reports "background" too and is not leaving (jits-3dc2).
+        if (permissionRequestInFlight()) return;
         void untrack();
       }
     };

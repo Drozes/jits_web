@@ -179,6 +179,38 @@ describe("the hook: active only with every condition", () => {
   });
 });
 
+describe("background (jits-3dc2)", () => {
+  it("a real background drops the prompt; an Android permission dialog's 'background' keeps it", async () => {
+    const { trackPermissionRequest } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    let handler: ((s: string) => void) | null = null;
+    const spy = jest.spyOn(AppState, "addEventListener").mockImplementation(((_t: string, fn: (s: string) => void) => {
+      handler = fn;
+      return { remove: jest.fn() };
+    }) as never);
+    mockDriftFlag = true;
+    seedTag();
+    renderHook(() => useLiveDriftCheck({ athleteId: ME, isLive: true, inMatch: false, locationRequired: true }));
+    const prompt = renderHook(() => useDriftPrompt());
+    await act(async () => {
+      await runDriftCheck(ME);
+    });
+    expect(prompt.result.current).not.toBeNull();
+    let answer!: () => void;
+    const request = trackPermissionRequest(() => new Promise<void>((r) => (answer = r)));
+    act(() => handler?.("background"));
+    expect(prompt.result.current).not.toBeNull();
+    answer();
+    await act(async () => {
+      await request;
+    });
+    act(() => handler?.("background"));
+    expect(prompt.result.current).toBeNull();
+    spy.mockRestore();
+  });
+});
+
 describe("one check", () => {
   it("drifted at 501 m net of accuracy: prompts and logs drift_check / drifted with the reading", async () => {
     seedTag();

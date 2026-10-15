@@ -190,6 +190,38 @@ describe("useOnlinePresence", () => {
     unmount();
   });
 
+  it("stays tracked through an Android permission dialog's 'background' (jits-3dc2)", async () => {
+    const { trackPermissionRequest } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    const { unmount } = mount();
+    await settle();
+    const channel = mockChannels[0];
+    await subscribed(channel);
+    expect(channel.track).toHaveBeenCalledTimes(1);
+
+    let answer!: () => void;
+    let request!: Promise<void>;
+    await act(async () => {
+      request = trackPermissionRequest(() => new Promise<void>((r) => (answer = r)));
+      appStateHandler?.("background");
+    });
+    expect(channel.untrack).not.toHaveBeenCalled();
+    await act(async () => {
+      answer();
+      await request;
+      appStateHandler?.("active");
+    });
+    expect(channel.untrack).not.toHaveBeenCalled();
+
+    // A real background afterwards still untracks.
+    await act(async () => {
+      appStateHandler?.("background");
+    });
+    expect(channel.untrack).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
   it("rebuilds a server-closed channel and tracks on the new one", async () => {
     jest.useFakeTimers();
     const warn = jest.spyOn(console, "warn").mockImplementation(() => {});

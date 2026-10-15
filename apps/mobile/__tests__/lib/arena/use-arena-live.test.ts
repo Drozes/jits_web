@@ -409,6 +409,46 @@ describe("going offline", () => {
     expect(result.current.isLive).toBe(true);
   });
 
+  it("an Android permission dialog's 'background' keeps a live athlete live (jits-3dc2)", async () => {
+    const { trackPermissionRequest } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    const { result } = mount();
+    await act(async () => {
+      await result.current.toggle();
+    });
+    mockToggleMatchPreferences.mockClear();
+    mockLeaveLobby.mockClear();
+    mockJoinLobby.mockClear();
+    const dialog = deferred<void>();
+    let request!: Promise<void>;
+    await act(async () => {
+      request = trackPermissionRequest(() => dialog.promise);
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(mockLeaveLobby).not.toHaveBeenCalled();
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    expect(result.current.isLive).toBe(true);
+    await act(async () => {
+      dialog.resolve();
+      await request;
+      appStateHandler?.("active");
+      await flush();
+    });
+    // Nothing was taken down, so nothing is put back.
+    expect(mockToggleMatchPreferences).not.toHaveBeenCalled();
+    expect(mockJoinLobby).not.toHaveBeenCalled();
+    expect(result.current.isLive).toBe(true);
+    // A real background afterwards still goes offline.
+    await act(async () => {
+      appStateHandler?.("background");
+      await flush();
+    });
+    expect(mockLeaveLobby).toHaveBeenCalled();
+    expect(lastFlagWrite()).toEqual({ lookingForCasual: false, lookingForRanked: false });
+  });
+
   it("does not write anything on background when not live", async () => {
     mount();
 

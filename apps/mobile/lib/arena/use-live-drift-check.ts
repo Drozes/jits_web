@@ -30,6 +30,7 @@ import { reportGoLivePresence } from "@jits/shared/api/location";
 import type { LocationReading } from "@jits/shared/api/invites";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "@/lib/invites/location";
+import { permissionRequestInFlight } from "@/lib/permissions/permission-request";
 import { peekDeviceTag, recordAcceptedReading } from "@/lib/location/device-location-store";
 import { notePresenceAnswer } from "@/lib/location/presence-capability";
 import { isInArenaMatch } from "./arena-store";
@@ -171,7 +172,8 @@ export function useLiveDriftCheck({ athleteId, isLive, inMatch, locationRequired
         });
     }, DRIFT_INTERVAL_MS);
     const sub = AppState.addEventListener("change", (next) => {
-      if (next === "background") dropDriftPrompt();
+      // An Android permission dialog's "background" is not leaving (jits-3dc2).
+      if (next === "background" && !permissionRequestInFlight()) dropDriftPrompt();
     });
     return () => {
       clearInterval(t);

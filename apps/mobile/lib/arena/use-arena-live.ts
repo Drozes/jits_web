@@ -46,6 +46,7 @@ import { supabase } from "../supabase/client";
 import { joinLobby, leaveLobby } from "./use-lobby-presence";
 import type { LiveSwitchDirection } from "./arena-store";
 import { GO_OFFLINE_FAILED_MESSAGE } from "./constants";
+import { permissionRequestInFlight } from "@/lib/permissions/permission-request";
 import {
   abandonTappedGoLive,
   areLiveWritesBlocked,
@@ -1039,6 +1040,10 @@ export function useArenaLive({
       // alert and a half-swiped app switcher, none of which mean the athlete
       // left.
       if (next === "background") {
+        // An Android system permission dialog (location, camera, microphone)
+        // pauses the activity and reports "background": the athlete is still
+        // here, so treat it like iOS "inactive" and keep them live (jits-3dc2).
+        if (permissionRequestInFlight()) return;
         // A restore still running (a silent fix) has not set the intent yet:
         // the background must not lose it (B2).
         // A tapped go-live that has not landed is cancelled by the

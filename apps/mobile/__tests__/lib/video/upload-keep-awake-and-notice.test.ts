@@ -133,6 +133,25 @@ describe("backgrounding notice", () => {
     expect(mockDismiss).toHaveBeenCalledWith("notice-1");
   });
 
+  it("posts nothing for an Android permission dialog's 'background' (jits-3dc2)", async () => {
+    const { trackPermissionRequest } = jest.requireActual(
+      "@/lib/permissions/permission-request",
+    ) as typeof import("@/lib/permissions/permission-request");
+    bindUploadBackgroundNotice();
+    mockActivity.active = true;
+    let answer!: () => void;
+    const request = trackPermissionRequest(() => new Promise<void>((r) => (answer = r)));
+    appStateHandler?.("background");
+    await flush();
+    expect(mockSchedule).not.toHaveBeenCalled();
+    answer();
+    await request;
+    appStateHandler?.("active");
+    appStateHandler?.("background");
+    await flush();
+    expect(mockSchedule).toHaveBeenCalledTimes(1);
+  });
+
   it("posts nothing when the app backgrounds with no upload running", async () => {
     bindUploadBackgroundNotice();
     appStateHandler?.("background");

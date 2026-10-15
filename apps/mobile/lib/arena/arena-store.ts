@@ -23,6 +23,7 @@ import { useSyncExternalStore } from "react";
 import { AppState } from "react-native";
 import { isUuid } from "@jits/shared/utils";
 import { LIVE_SWITCH_COOLDOWN_MS } from "./constants";
+import { permissionRequestInFlight } from "@/lib/permissions/permission-request";
 import type {
   IncomingChallenge,
   OutgoingChallenge,
@@ -741,7 +742,8 @@ function clearAthleteGoLive(): void {
 
 try {
   AppState.addEventListener?.("change", (next) => {
-    if (next === "background") clearAthleteGoLive();
+    // An Android permission dialog's "background" is not leaving (jits-3dc2).
+    if (next === "background" && !permissionRequestInFlight()) clearAthleteGoLive();
   });
 } catch {
   // No AppState (some test environments): nothing to clear on.
