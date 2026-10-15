@@ -2,6 +2,7 @@ import * as React from "react";
 import { FlatList, Modal, Pressable, Text, TextInput, View } from "react-native";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { useWindowInsets } from "@/lib/layout/window-insets";
+import { useAndroidKeyboardHeight } from "@/lib/layout/android-keyboard-height";
 import { X } from "lucide-react-native";
 import { cn } from "@/lib/cn";
 import { useThemedTokens } from "@/lib/theme/use-theme";
@@ -103,6 +104,7 @@ export function SearchSelect({
   const animationType = useModalAnimation("slide");
   const insets = useWindowInsets();
   const [open, setOpen] = React.useState(false);
+  const keyboardHeight = useAndroidKeyboardHeight(open);
   const [query, setQuery] = React.useState("");
 
   const trimmed = query.trim();
@@ -271,7 +273,7 @@ export function SearchSelect({
 
           <FlatList
               style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 + keyboardHeight }}
               data={rows}
               keyExtractor={(r) => `${r.kind}:${r.value}`}
               keyboardShouldPersistTaps="always"
@@ -279,6 +281,7 @@ export function SearchSelect({
               // Input is pinned at the top, but the results list runs to the
               // bottom; track the keyboard so the lowest matches stay reachable
               // (iOS-only, no-op elsewhere) since there is no KeyboardAvoidingView.
+              // Android pads by the keyboard height instead (jits-mafl.2 M9).
               automaticallyAdjustKeyboardInsets
               ListEmptyComponent={
                 <View>
