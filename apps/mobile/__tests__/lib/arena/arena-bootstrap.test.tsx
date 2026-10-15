@@ -300,20 +300,33 @@ describe("ArenaBootstrap", () => {
       ),
       ranges: null,
     });
+    const plateFor = (snapshot: Parameters<typeof __setLatestNearbyForTests>[0], viewer: string | null, id: string) => {
+      __setLatestNearbyForTests(snapshot, viewer);
+      // A fresh challenge each time: the plate is decided on a challenge's first show.
+      mockIncoming = { ...RIVAL, challengeId: id };
+      const r = render(<ArenaBootstrap />);
+      const shown = r.queryByTestId("challenge-prompt-different-mat") !== null;
+      r.unmount();
+      return shown;
+    };
+    expect(plateFor(view([], [["a-9", 3000]]), "me-1", "ch-a")).toBe(true);
+    // On my mat, someone else close, a fallback read, no read: no plate.
+    expect(plateFor(view(["a-9"], []), "me-1", "ch-b")).toBe(false);
+    expect(plateFor(view([], [["a-1", 1000]]), "me-1", "ch-c")).toBe(false);
+    expect(plateFor({ mode: "fallback" }, "me-1", "ch-d")).toBe(false);
+    expect(plateFor(null, null, "ch-e")).toBe(false);
+    // A read made for another athlete on this device never shows (review: account switch).
+    expect(plateFor(view([], [["a-9", 3000]]), "someone-else", "ch-f")).toBe(false);
+
     mockIncoming = RIVAL;
-    __setLatestNearbyForTests(view([], [["a-9", 3000]]));
+    __setLatestNearbyForTests(view([], [["a-9", 3000]]), "me-1");
     const r = render(<ArenaBootstrap />);
-    expect(r.getByTestId("challenge-prompt-different-mat")).toBeTruthy();
     expect(
       r.getByText("Rival shows up < 3 km from you. Indoor GPS can be off by a lot, so check you're at the same gym before you roll."),
     ).toBeTruthy();
-    // On my mat, someone else close, or a fallback read: no plate.
-    act(() => __setLatestNearbyForTests(view(["a-9"], [])));
-    expect(r.queryByTestId("challenge-prompt-different-mat")).toBeNull();
-    act(() => __setLatestNearbyForTests(view([], [["a-1", 1000]])));
-    expect(r.queryByTestId("challenge-prompt-different-mat")).toBeNull();
-    act(() => __setLatestNearbyForTests({ mode: "fallback" }));
-    expect(r.queryByTestId("challenge-prompt-different-mat")).toBeNull();
+    // A nearby read landing while the prompt is up never moves the buttons.
+    act(() => __setLatestNearbyForTests(view(["a-9"], []), "me-1"));
+    expect(r.getByTestId("challenge-prompt-different-mat")).toBeTruthy();
     act(() => __setLatestNearbyForTests(null));
   });
 

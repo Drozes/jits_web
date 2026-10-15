@@ -238,7 +238,13 @@ export default function ArenaScreen() {
   // usable location, On the mat is only the athletes on my mat, and the live
   // ones within the close radius are "Online & close". Otherwise today's list.
   const lobbyKey = React.useMemo(() => [...lobbyIds].sort().join(","), [lobbyIds]);
-  const nearbyView = useArenaNearby({ focused: isFocused, isLive, locationRequired, lobbyKey });
+  const nearbyView = useArenaNearby({
+    focused: isFocused,
+    isLive,
+    locationRequired,
+    lobbyKey,
+    athleteId: selfId,
+  });
   const nearby = React.useMemo(
     () => partitionNearby(lobbyRows, nearbyView, friendIds),
     [lobbyRows, nearbyView, friendIds],

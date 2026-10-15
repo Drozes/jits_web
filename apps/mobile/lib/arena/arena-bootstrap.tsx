@@ -366,7 +366,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   // The challenger is in my own Online & close list (jr_be spec 023 8.4):
   // the prompt says "Maybe a different mat". Memoized on the band so the
   // prompt's frozen copy only changes when the band does.
-  const incomingClose = useNearbyCloseRow(incoming?.challengerId ?? null);
+  const incomingClose = useNearbyCloseRow(incoming?.challengerId ?? null, athlete.id);
   const incomingCloseMaxM = incomingClose?.bandMaxM ?? null;
   const incomingCloseBand = React.useMemo(
     () =>

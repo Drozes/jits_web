@@ -35,9 +35,10 @@ import {
   useNearbyCloseRow,
   type UseArenaNearbyInput,
 } from "@/lib/arena/use-arena-nearby";
+import { __getLatestNearbyForTests, publishLatestNearby, resetLatestNearby } from "@/lib/arena/nearby-snapshot";
 
 const OK_READING = { status: "ok", reading: { lat: 43.6, lng: -79.4, accuracyM: 12 } };
-const CLOSE_ROW = { athleteId: "a-2", band: "under_1km", bandMaxM: 1000, canChallenge: false };
+const CLOSE_ROW = { athleteId: "a-2", band: "under_1km" as const, bandMaxM: 1000, canChallenge: false };
 const NEARBY = {
   ok: true,
   data: { mode: "nearby", onTheMat: ["a-1"], close: [CLOSE_ROW], ranges: null },
@@ -59,7 +60,13 @@ async function advance(ms: number) {
   await flush();
 }
 
-const BASE: UseArenaNearbyInput = { focused: true, isLive: false, locationRequired: true, lobbyKey: "a-1,a-2" };
+const BASE: UseArenaNearbyInput = {
+  focused: true,
+  isLive: false,
+  locationRequired: true,
+  lobbyKey: "a-1,a-2",
+  athleteId: "me",
+};
 function mount(over: Partial<UseArenaNearbyInput> = {}) {
   return renderHook((p: UseArenaNearbyInput) => useArenaNearby(p), { initialProps: { ...BASE, ...over } });
 }
@@ -285,9 +292,9 @@ describe("useArenaNearby: the server's mode is the flag (M1 kill switch)", () =>
 });
 
 describe("useNearbyCloseRow: the app-wide latest close list (jr_be spec 023 8.4)", () => {
-  function mountBoth(id: string) {
+  function mountBoth(id: string, viewer: string | null = "me") {
     return renderHook(
-      (p: UseArenaNearbyInput) => ({ view: useArenaNearby(p), row: useNearbyCloseRow(id) }),
+      (p: UseArenaNearbyInput) => ({ view: useArenaNearby(p), row: useNearbyCloseRow(id, viewer) }),
       { initialProps: BASE },
     );
   }
@@ -309,7 +316,7 @@ describe("useNearbyCloseRow: the app-wide latest close list (jr_be spec 023 8.4)
   });
 
   it("is null after a fallback read and before any read", async () => {
-    const reader = renderHook(() => useNearbyCloseRow("a-2"));
+    const reader = renderHook(() => useNearbyCloseRow("a-2", "me"));
     expect(reader.result.current).toBeNull();
     mockNearby.mockResolvedValue({ ok: true, data: { mode: "flag_off", onTheMat: [], close: [], ranges: null } });
     const { result } = mountBoth("a-2");
@@ -326,5 +333,72 @@ describe("useNearbyCloseRow: the app-wide latest close list (jr_be spec 023 8.4)
     await advance(NEARBY_SNAPSHOT_MAX_AGE_MS + 1);
     rerender({ ...BASE, focused: false, lobbyKey: "x" });
     expect(result.current.row).toBeNull();
+  });
+});
+
+describe("the nearby snapshot belongs to the athlete it was read for (review: account switch)", () => {
+  it("a read for athlete A never answers for athlete B", async () => {
+    const a = renderHook((p: UseArenaNearbyInput) => useArenaNearby(p), { initialProps: { ...BASE, athleteId: "athlete-a" } });
+    await flush();
+    const asA = renderHook(() => useNearbyCloseRow("a-2", "athlete-a"));
+    const asB = renderHook(() => useNearbyCloseRow("a-2", "athlete-b"));
+    const nobody = renderHook(() => useNearbyCloseRow("a-2", null));
+    expect(asA.result.current).toEqual(CLOSE_ROW);
+    expect(asB.result.current).toBeNull();
+    expect(nobody.result.current).toBeNull();
+    a.unmount();
+  });
+
+  it("a read started for A that lands after B signs in stays A's", async () => {
+    let resolve: (v: unknown) => void = () => {};
+    mockNearby.mockReturnValue(new Promise((r) => (resolve = r)));
+    const hook = renderHook((p: UseArenaNearbyInput) => useArenaNearby(p), {
+      initialProps: { ...BASE, isLive: true, athleteId: "athlete-a" },
+    });
+    await flush();
+    hook.rerender({ ...BASE, isLive: true, athleteId: "athlete-b" });
+    await act(async () => {
+      resolve(NEARBY);
+    });
+    await flush();
+    expect(__getLatestNearbyForTests()?.athleteId).toBe("athlete-a");
+    expect(renderHook(() => useNearbyCloseRow("a-2", "athlete-b")).result.current).toBeNull();
+  });
+
+  it("resetLatestNearby (sign-out) forgets the read", async () => {
+    const { result } = renderHook(
+      (p: UseArenaNearbyInput) => ({ view: useArenaNearby(p), row: useNearbyCloseRow("a-2", "me") }),
+      { initialProps: BASE },
+    );
+    await flush();
+    expect(result.current.row).toEqual(CLOSE_ROW);
+    act(() => resetLatestNearby());
+    expect(result.current.row).toBeNull();
+    expect(__getLatestNearbyForTests()).toBeNull();
+  });
+
+  it("an unchanged read only refreshes its time and notifies nobody", () => {
+    const view = { mode: "nearby" as const, onTheMat: new Set(["a-1"]), close: new Map([["a-2", CLOSE_ROW]]), ranges: null };
+    publishLatestNearby(view, "me", 1000);
+    const first = __getLatestNearbyForTests();
+    let renders = 0;
+    renderHook(() => {
+      renders += 1;
+      return useNearbyCloseRow("a-2", "me");
+    });
+    const before = renders;
+    act(() =>
+      publishLatestNearby(
+        { mode: "nearby", onTheMat: new Set(["a-1"]), close: new Map([["a-2", { ...CLOSE_ROW }]]), ranges: null },
+        "me",
+        5000,
+      ),
+    );
+    expect(renders).toBe(before);
+    expect(__getLatestNearbyForTests()).toBe(first);
+    expect(__getLatestNearbyForTests()?.at).toBe(5000);
+    // A changed read does notify.
+    act(() => publishLatestNearby({ mode: "fallback" }, "me", 6000));
+    expect(renders).toBeGreaterThan(before);
   });
 });

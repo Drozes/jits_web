@@ -6,7 +6,9 @@ Status: build-ready, owner-approved scope (2026-10-15). Author: PM agent, 2026-1
 
 Summary: "On the mat" widens to about 600 m (base 500 m plus a GPS allowance capped at 100 m) for both the Arena display and the proximity gate; "Online & Close" becomes 3 km in two bands (`under_1km`, `under_3km`); close rows become challengeable when the server says so (`can_challenge`); a gentle, non-blocking info box appears on both sides of a challenge that involves someone in Online & Close; and every range is admin-tunable on the server without a migration or an app release.
 
-Release order: this client OTA ships FIRST (it is inert against today's server), then the jr_be migration is applied to prod by hand, then `/canvas-sync` redraws boards 57, 13, 14 and 15. See jr_be spec section 11.
+Release order: this client OTA ships FIRST, then the jr_be migration is applied to prod by hand, then `/canvas-sync` redraws boards 57, 13, 14 and 15. See jr_be spec section 11.
+
+Behaviour against today's server (before the jr_be migration): band labels (`< 500 m`, `< 1 km`, `< 2 km`), their order, the Online & close header radius (`< 2 km`) and ROLL gating (no ROLL on close rows, since today's server sends no `can_challenge`) are unchanged. It is not fully inert, though: for today's close rows (within 2 km), the header chip can read `LIVE · N NEARBY` and the control bar `N NEARBY` when nobody else is on the mat, and the incoming prompt can show the "Maybe a different mat" plate when the challenger is in the viewer's close list. Both follow the owner's intent (GPS often puts athletes on one mat in that list) and last only until the backend is applied.
 
 ## Client acceptance criteria (copied from jr_be spec section 10)
 

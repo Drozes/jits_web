@@ -24,9 +24,8 @@ import * as Location from "expo-location";
 import {
   getArenaNearby,
   reportBrowsePresence,
-  type ArenaCloseRow,
-  type ArenaRanges,
 } from "@jits/shared/api/location";
+import { publishLatestNearby, resetLatestNearby, type ArenaNearbyView } from "./nearby-snapshot";
 import { supabase } from "@/lib/supabase/client";
 import { readLocationOnce } from "@/lib/invites/location";
 import { getDeviceLocationOwner, recordAcceptedReading } from "@/lib/location/device-location-store";
@@ -39,85 +38,17 @@ export const ARENA_NEARBY_DEBOUNCE_MS = 1_500;
 /** The server's browse rate limit (one per 30 s per athlete). */
 export const BROWSE_MIN_INTERVAL_MS = 30_000;
 
-export type ArenaNearbyView =
-  | {
-      mode: "nearby";
-      onTheMat: ReadonlySet<string>;
-      /** Close rows by athlete id (band, its meters, `can_challenge`). */
-      close: ReadonlyMap<string, ArenaCloseRow>;
-      /** The server's configured ranges (jr_be spec 023), null before 023. */
-      ranges: ArenaRanges | null;
-    }
-  | { mode: "fallback" };
+export type { ArenaNearbyView } from "./nearby-snapshot";
+export {
+  NEARBY_SNAPSHOT_MAX_AGE_MS,
+  closeRowIn,
+  resetLatestNearby,
+  useNearbyCloseRow,
+  __setLatestNearbyForTests,
+  type NearbySnapshot,
+} from "./nearby-snapshot";
 
 export const NEARBY_FALLBACK: ArenaNearbyView = { mode: "fallback" };
-
-// ---------------------------------------------------------------------------
-// The latest nearby view, app-wide (jr_be spec 023 section 8.4): the incoming
-// challenge prompt is mounted outside the Arena screen and reads it to tell
-// whether a challenger is in the viewer's own Online & close list. Kept in
-// memory only, never persisted.
-// ---------------------------------------------------------------------------
-
-/**
- * How old the last read may be before nothing is concluded from it. The
- * Arena re-reads every 60 s while focused; away from it the list goes stale,
- * and an old list must not label a challenger who has since moved.
- */
-export const NEARBY_SNAPSHOT_MAX_AGE_MS = 5 * 60_000;
-
-export interface NearbySnapshot {
-  view: ArenaNearbyView;
-  /** `Date.now()` when the view was read. */
-  at: number;
-}
-
-let latestNearby: NearbySnapshot | null = null;
-const latestListeners = new Set<() => void>();
-
-function publishLatestNearby(view: ArenaNearbyView): void {
-  latestNearby = { view, at: Date.now() };
-  for (const l of latestListeners) l();
-}
-
-function subscribeLatestNearby(cb: () => void): () => void {
-  latestListeners.add(cb);
-  return () => {
-    latestListeners.delete(cb);
-  };
-}
-
-function getLatestNearby(): NearbySnapshot | null {
-  return latestNearby;
-}
-
-/** The athlete's close row in a snapshot, or null (not close, fallback, or stale). */
-export function closeRowIn(
-  snapshot: NearbySnapshot | null,
-  athleteId: string | null | undefined,
-  now: number = Date.now(),
-): ArenaCloseRow | null {
-  if (!snapshot || !athleteId || snapshot.view.mode !== "nearby") return null;
-  if (now - snapshot.at > NEARBY_SNAPSHOT_MAX_AGE_MS) return null;
-  if (snapshot.view.onTheMat.has(athleteId)) return null;
-  return snapshot.view.close.get(athleteId) ?? null;
-}
-
-/**
- * The athlete's row in the viewer's latest Online & close list, or null when
- * they are not in it (on the mat, not listed, a fallback mode, or a read
- * older than `NEARBY_SNAPSHOT_MAX_AGE_MS`).
- */
-export function useNearbyCloseRow(athleteId: string | null | undefined): ArenaCloseRow | null {
-  const snapshot = useSyncExternalStore(subscribeLatestNearby, getLatestNearby, getLatestNearby);
-  return closeRowIn(snapshot, athleteId);
-}
-
-/** Tests only: seed the app-wide snapshot. */
-export function __setLatestNearbyForTests(view: ArenaNearbyView | null, at: number = Date.now()): void {
-  latestNearby = view ? { view, at } : null;
-  for (const l of latestListeners) l();
-}
 
 // Module scope, so a remount (tab switch) does not trip the server's limit.
 let lastBrowseAt = 0;
@@ -125,8 +56,7 @@ let lastBrowseAt = 0;
 /** Tests only. */
 export function __resetArenaNearbyForTests(): void {
   lastBrowseAt = 0;
-  latestNearby = null;
-  for (const l of latestListeners) l();
+  resetLatestNearby();
   closeExpanded = false;
   for (const l of expandListeners) l();
 }
@@ -164,12 +94,20 @@ export interface UseArenaNearbyInput {
   locationRequired: boolean;
   /** Changes whenever the lobby set changes (a stable key, not the Set). */
   lobbyKey: string;
+  /** The signed-in athlete: the app-wide snapshot is tagged with it. */
+  athleteId: string | null;
 }
 
-export function useArenaNearby({ focused, isLive, locationRequired, lobbyKey }: UseArenaNearbyInput): ArenaNearbyView {
+export function useArenaNearby({
+  focused,
+  isLive,
+  locationRequired,
+  lobbyKey,
+  athleteId,
+}: UseArenaNearbyInput): ArenaNearbyView {
   const [view, setView] = React.useState<ArenaNearbyView>(NEARBY_FALLBACK);
-  const inputRef = React.useRef({ focused, isLive, locationRequired });
-  inputRef.current = { focused, isLive, locationRequired };
+  const inputRef = React.useRef({ focused, isLive, locationRequired, athleteId });
+  inputRef.current = { focused, isLive, locationRequired, athleteId };
   const mounted = React.useRef(true);
   const inflight = React.useRef(false);
   const again = React.useRef(false);
@@ -182,7 +120,9 @@ export function useArenaNearby({ focused, isLive, locationRequired, lobbyKey }: 
     }
     inflight.current = true;
     try {
-      const { isLive: live, locationRequired: flagOn } = inputRef.current;
+      // The read is for the athlete signed in when it starts: if another
+      // signs in meanwhile, the snapshot stays tagged with the first.
+      const { isLive: live, locationRequired: flagOn, athleteId: readFor } = inputRef.current;
       // A live viewer already has a fresh go_live reading (60 s refresh).
       if (flagOn && !live) await reportBrowseReading();
       const res = await getArenaNearby(supabase);
@@ -199,11 +139,11 @@ export function useArenaNearby({ focused, isLive, locationRequired, lobbyKey }: 
           ranges: res.data.ranges,
         };
         setView(next);
-        publishLatestNearby(next);
+        publishLatestNearby(next, readFor);
       } else {
         if (!res.ok) console.warn("[arena] get_arena_nearby failed:", res.error.hint, res.error.message);
         setView(NEARBY_FALLBACK);
-        publishLatestNearby(NEARBY_FALLBACK);
+        publishLatestNearby(NEARBY_FALLBACK, readFor);
       }
     } finally {
       inflight.current = false;

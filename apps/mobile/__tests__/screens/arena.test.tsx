@@ -2110,6 +2110,7 @@ describe("Arena nearby: On the mat by proximity and Online & close (016 addendum
       isLive: true,
       locationRequired: true,
       lobbyKey: "a-1,a-2,a-3,a-4,a-5",
+      athleteId: "me-1",
     });
   });
 

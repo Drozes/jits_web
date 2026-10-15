@@ -82,6 +82,11 @@ import { InfoPlate } from "@/components/arena/arena-plates";
  * fixed-height buttons. Every label is also one line.
  */
 const MAX_FONT_SCALE = 1.3;
+/** The prompt's vertical rhythm, and the tighter one with the different-mat plate. */
+const PROMPT_GAP = 28;
+const PROMPT_GAP_WITH_PLATE = 20;
+/** The different-mat body's visible lines; VoiceOver reads all of it. */
+const DIFFERENT_MAT_BODY_LINES = 3;
 
 /** The card's share of the window height: 633 of 844 on the board. */
 export const PROMPT_HEIGHT_RATIO = 0.75;
@@ -275,6 +280,15 @@ export function ChallengePromptSheet({
   // read while there is no challenge.
   const [lastShown, setLastShown] = React.useState<Shown | null>(null);
   const viewerElo = viewer?.elo ?? null;
+  // The different-mat plate is decided once per challenge, on its first
+  // show (jr_be spec 023 8.4): a nearby read landing while the prompt is up
+  // must not add or remove it and shift Accept / Decline under a thumb. A
+  // new challenge id takes the band anew; Later and reopen keep it.
+  const frozenBand = React.useRef<{ id: string; band: { label: string; spoken: string } | null } | null>(null);
+  if (challenge && frozenBand.current?.id !== challenge.challengeId) {
+    frozenBand.current = { id: challenge.challengeId, band: closeBand };
+  }
+  const shownBand = challenge ? (frozenBand.current?.band ?? null) : null;
   React.useEffect(() => {
     if (!challenge) return;
     setLastShown((prev) =>
@@ -283,13 +297,13 @@ export function ChallengePromptSheet({
       prev.stakes === stakes &&
       prev.moreCount === moreCount &&
       prev.viewerElo === viewerElo &&
-      prev.closeBand === closeBand
+      prev.closeBand === shownBand
         ? prev
-        : { challenge, stakes, moreCount, viewerElo, closeBand },
+        : { challenge, stakes, moreCount, viewerElo, closeBand: shownBand },
     );
-  }, [challenge, stakes, moreCount, viewerElo, closeBand]);
+  }, [challenge, stakes, moreCount, viewerElo, shownBand]);
   const shown: Shown | null = challenge
-    ? { challenge, stakes, moreCount, viewerElo, closeBand }
+    ? { challenge, stakes, moreCount, viewerElo, closeBand: shownBand }
     : lastShown;
 
   const visible = challenge !== null;
@@ -462,7 +476,9 @@ export function ChallengePromptSheet({
             >
               <View
                 testID="challenge-prompt"
-                style={{ gap: 28 }}
+                // Tighter with the different-mat plate, so Accept stays in
+                // view on a small phone at a large text size.
+                style={{ gap: shown.closeBand ? PROMPT_GAP_WITH_PLATE : PROMPT_GAP }}
                 // The prompt demands an answer: keep VoiceOver focus inside
                 // it rather than wandering to the screen behind the modal.
                 accessibilityViewIsModal
@@ -851,6 +867,7 @@ function DifferentMatPlate({ name, band }: { name: string; band: { label: string
       body={`${name} shows up ${band.label} from you. ${tail}`}
       accessibilityLabel={`Maybe a different mat. ${name} shows up ${band.spoken} from you. ${tail}`}
       maxFontSizeMultiplier={MAX_FONT_SCALE}
+      bodyNumberOfLines={DIFFERENT_MAT_BODY_LINES}
     />
   );
 }

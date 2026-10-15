@@ -143,12 +143,15 @@ export function InfoPlate({
   accessibilityLabel,
   testID,
   maxFontSizeMultiplier,
+  bodyNumberOfLines,
 }: {
   title: string;
   body: string;
   accessibilityLabel: string;
   testID?: string;
   maxFontSizeMultiplier?: number;
+  /** Caps the drawn body (ellipsis); the accessibility label keeps the full text. */
+  bodyNumberOfLines?: number;
 }) {
   return (
     <Plate
@@ -164,7 +167,11 @@ export function InfoPlate({
       >
         {title}
       </Text>
-      <Text maxFontSizeMultiplier={maxFontSizeMultiplier} className="mt-1 font-body text-body text-ink-2">
+      <Text
+        numberOfLines={bodyNumberOfLines}
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
+        className="mt-1 font-body text-body text-ink-2"
+      >
         {body}
       </Text>
     </Plate>
