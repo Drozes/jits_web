@@ -57,7 +57,7 @@ import {
   trackRunStart,
   trackUploaded,
 } from "./upload-telemetry";
-import { hasAiConsent } from "@/lib/moderation/ai-consent";
+import { aiConsentGivenAtMs, hasAiConsentFor } from "@/lib/moderation/ai-consent";
 
 /**
  * The single retry / resume authority for match-video uploads.
@@ -1391,6 +1391,33 @@ function surfaceFailedJob(job: PendingUploadJob): void {
   });
 }
 
+/** A job of mine waiting on AI processing consent: paused, Try again offered. */
+function surfaceConsentWait(job: PendingUploadJob): void {
+  const existing = getMatchUpload(job.matchId);
+  if (existing?.status === "error" && existing.errorClass === "needs_consent") return;
+  setMatchUpload(job.matchId, {
+    status: "error",
+    error: describeUploadFailure("needs_consent").message,
+    errorClass: "needs_consent",
+    storagePath: job.storagePath,
+    truncation: job.truncation,
+    bytesTotal: job.fileSizeBytes,
+    progress: job.phase === "row" ? 1 : ratio(job.bytesUploaded, job.fileSizeBytes),
+    videoId: null,
+  });
+}
+
+/**
+ * The retention window, counted from the later of the job's creation and
+ * the athlete's consent: a clip that waited for consent gets its full week
+ * from the moment the athlete allowed it.
+ */
+function isExpiredSinceConsent(job: PendingUploadJob, athleteId: string | null): boolean {
+  const consentAt = aiConsentGivenAtMs(athleteId);
+  const from = consentAt != null && consentAt > job.createdAt ? consentAt : job.createdAt;
+  return isJobExpired({ ...job, createdAt: from });
+}
+
 /**
  * Expire a job past the retention window. Claimed synchronously (see
  * `abandonClaims`). Another athlete's job is only cleaned up LOCALLY: its
@@ -1421,7 +1448,14 @@ function sweepJob(job: PendingUploadJob): Promise<void> | null {
   // it there would pull the file out from under a live upload.
   if (runners.has(job.matchId)) return null;
   const mine = owner != null && job.uploaderAthleteId === owner;
-  if (isJobExpired(job)) return expireJob(job, mine);
+  // No AI processing consent (5.1.2(i), jits-rog5.11): my clip is surfaced
+  // as paused so every Try again control shows (and asks for consent), but
+  // never launched, and never expired while it waits.
+  if (mine && !hasAiConsentFor(owner)) {
+    surfaceConsentWait(job);
+    return null;
+  }
+  if (mine ? isExpiredSinceConsent(job, owner) : isJobExpired(job)) return expireJob(job, mine);
   // Another athlete's job never runs under this session (jits-n2im.6). It
   // stays on disk and resumes when that athlete signs back in.
   if (!mine) return null;
@@ -1447,6 +1481,8 @@ function sweepJob(job: PendingUploadJob): Promise<void> | null {
 /** Resume one persisted job if it is still owed and runnable. */
 async function resumeOne(matchId: string): Promise<void> {
   if (!owner || runners.has(matchId)) return;
+  // A retry timer or a mid-session withdrawal never resumes without consent
+  // (sweepJob below surfaces it as waiting instead).
   const job = await loadUploadJob(matchId);
   if (!job) {
     clearRetryTimer(matchId);
@@ -1563,10 +1599,6 @@ export function startMatchVideoUpload(params: StartUploadParams): Promise<Upload
 export async function resumeMatchVideoUploads(): Promise<void> {
   ensureUploadListeners();
   if (!owner) return;
-  // No AI processing consent (5.1.2(i), jits-rog5.11): a clip queued before
-  // the consent prompt existed stays parked on disk, untouched, until the
-  // athlete allows (the bootstrap resumes on consent, Try again asks).
-  if (!hasAiConsent()) return;
   void retryPendingAbandons();
   const jobs = await loadUploadJobs();
   for (const job of jobs) {
@@ -1588,7 +1620,7 @@ export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "oth
 export async function retryMatchVideoUpload(matchId: string): Promise<RetryResult> {
   if (runners.has(matchId)) return "running";
   if (!owner) return "signed_out";
-  if (!hasAiConsent()) return "needs_consent";
+  if (!hasAiConsentFor(owner)) return "needs_consent";
   const job = await loadUploadJob(matchId);
   if (!job) return "no_job";
   if (job.uploaderAthleteId !== owner) return "other_athlete";

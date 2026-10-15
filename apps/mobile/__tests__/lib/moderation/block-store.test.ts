@@ -20,6 +20,7 @@ jest.mock("@jits/shared/api/moderation", () => ({
 }));
 
 import {
+  BLOCKS_SETTLE_TIMEOUT_MS,
   __resetBlocksForTests,
   blockAndRefresh,
   isBlocked,
@@ -28,7 +29,7 @@ import {
   useBlockState,
   withoutBlocked,
 } from "@/lib/moderation/block-store";
-import { renderHook } from "@testing-library/react-native";
+import { act, renderHook } from "@testing-library/react-native";
 
 const ROW = { athlete_id: "b-1", display_name: "Blocked One", blocked_at: "2026-10-14T10:00:00Z" };
 
@@ -73,6 +74,23 @@ describe("loadBlocks", () => {
     mockApi.getMyBlockedAthletes.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "" } });
     await expect(loadBlocks("me")).resolves.toBe(false);
     expect(isBlocked("them-2")).toBe(true);
+  });
+
+  it("a stalled first read settles after 10 s, so a waiting profile never hangs", async () => {
+    jest.useFakeTimers();
+    try {
+      mockApi.getMyBlockIds.mockReturnValue(new Promise(() => undefined));
+      void loadBlocks("me");
+      const { result } = renderHook(() => useBlockState());
+      expect(result.current.settled).toBe(false);
+      act(() => {
+        jest.advanceTimersByTime(BLOCKS_SETTLE_TIMEOUT_MS);
+      });
+      expect(result.current.settled).toBe(true);
+      expect(result.current.loaded).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("signing out (null) clears everything and reads nothing", async () => {

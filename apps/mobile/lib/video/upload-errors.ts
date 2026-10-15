@@ -56,6 +56,8 @@ export type UploadErrorClass =
   | "file_missing"
   /** Bytes are in the bucket, the match_videos write keeps failing. */
   | "save_failed"
+  /** No AI processing consent yet (jits-rog5.11): parked until the athlete allows. */
+  | "needs_consent"
   | "unknown";
 
 export type UploadDisposition = "paused" | "failed";
@@ -139,6 +141,11 @@ const COPY: Record<UploadErrorClass, Omit<UploadFailureCopy, "klass">> = {
     disposition: "paused",
     terminal: false,
     message: "Trying again shortly.",
+  },
+  needs_consent: {
+    disposition: "paused",
+    terminal: false,
+    message: "Allow AI processing to upload this clip. Tap Try again.",
   },
 };
 

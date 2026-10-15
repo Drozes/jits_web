@@ -41,6 +41,9 @@ export interface BlockState {
 
 const EMPTY: BlockState = { athleteId: null, loaded: false, settled: false, ids: new Set(), mine: new Set(), blockedList: [] };
 
+/** How long a profile waits for the first block read before showing anyway. */
+export const BLOCKS_SETTLE_TIMEOUT_MS = 10_000;
+
 let state: BlockState = EMPTY;
 /** Bumped on every athlete change, so a read for the previous athlete never lands. */
 let generation = 0;
@@ -68,7 +71,15 @@ export async function loadBlocks(athleteId: string | null): Promise<boolean> {
   }
   if (!athleteId) return false;
   const gen = generation;
+  // A stalled first read settles as failed after BLOCKS_SETTLE_TIMEOUT_MS, so
+  // a profile waiting on it never hangs; the read itself still lands later.
+  const settleTimer = state.settled
+    ? null
+    : setTimeout(() => {
+        if (gen === generation && !state.settled) set({ ...state, settled: true });
+      }, BLOCKS_SETTLE_TIMEOUT_MS);
   const [ids, mine] = await Promise.all([getMyBlockIds(moderationClient()), getMyBlockedAthletes(moderationClient())]);
+  if (settleTimer) clearTimeout(settleTimer);
   if (gen !== generation) return false;
   if (!ids.ok && !mine.ok) {
     if (!state.settled) set({ ...state, settled: true });

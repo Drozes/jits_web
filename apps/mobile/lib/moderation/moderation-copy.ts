@@ -81,7 +81,7 @@ export function moderationErrorCopy(hint: string | null | undefined, fallback: s
 export const AI_CONSENT_COPY = {
   title: "Before you film",
   body:
-    "Your match video, with your display name, rating and weight division, is sent to Google Gemini to find key moments and cut your highlights. Stills from the video may be sent to OpenAI (or Gemini) to make your avatar. Video and results are stored on our servers.",
+    "Your match video, with your display name, rating and weight division, is sent to Google Gemini to find key moments and cut your highlights. Stills from the video may be sent to OpenAI to make your avatar (or the video to Google Gemini if OpenAI is unavailable). Video and results are stored on our servers.",
   privacyLink: "Read the Privacy Policy",
   allow: "Allow and film",
   uploadTitle: "Before you upload",

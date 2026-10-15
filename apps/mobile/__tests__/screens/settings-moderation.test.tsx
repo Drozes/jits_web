@@ -130,7 +130,7 @@ describe("AI processing", () => {
     const s = render(<AiProcessingScreen />);
     expect(s.getByTestId("ai-consent-status").props.children).toBe("Not given");
     expect(s.getByText(/sent to Google Gemini to find key moments/)).toBeTruthy();
-    expect(s.getByText(/may be sent to OpenAI \(or Gemini\) to make your avatar/)).toBeTruthy();
+    expect(s.getByText(/may be sent to OpenAI to make your avatar \(or the video to Google Gemini if OpenAI is unavailable\)/)).toBeTruthy();
     expect(s.getByTestId("link-/legal/privacy?section=4")).toBeTruthy();
   });
 

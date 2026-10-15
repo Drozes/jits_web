@@ -131,6 +131,22 @@ export function hasAiConsent(): boolean {
   return state.consentAt !== null;
 }
 
+/**
+ * Consent of this athlete in particular (the upload manager passes its job
+ * owner), so an account switch can never upload one athlete's clip under
+ * another's consent.
+ */
+export function hasAiConsentFor(athleteId: string | null | undefined): boolean {
+  return !!athleteId && state.athleteId === athleteId && state.consentAt !== null;
+}
+
+/** When this athlete's current consent was given (ms), or null. */
+export function aiConsentGivenAtMs(athleteId: string | null | undefined): number | null {
+  if (!hasAiConsentFor(athleteId) || !state.consentAt) return null;
+  const t = Date.parse(state.consentAt);
+  return Number.isNaN(t) ? null : t;
+}
+
 export function useAiConsent(): AiConsentState {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
 }
