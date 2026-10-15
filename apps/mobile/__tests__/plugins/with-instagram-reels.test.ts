@@ -113,8 +113,8 @@ describe("Android <queries>", () => {
   });
 
   it("adds to an existing block instead of replacing it", () => {
-    // `expo-file-system`, `expo-sharing` and `expo-image-picker` each merge
-    // a `<queries>` block in. Replacing the array would silently drop the
+    // `expo-file-system` and `expo-sharing` each merge a `<queries>` block
+    // in. Replacing the array would silently drop the
     // intent queries those libraries depend on.
     const m = manifest([{ package: [{ $: { "android:name": "com.other.app" } }] }]);
     addInstagramPackageQuery(m);

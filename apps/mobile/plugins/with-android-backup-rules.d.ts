@@ -15,5 +15,7 @@ export declare const DATA_EXTRACTION_RULES: string;
 export declare const FULL_BACKUP_CONTENT: string;
 /** The excluded directory, kept in step with `RETAINED_DIR_NAME`. */
 export declare const DIRECTORY: string;
+/** expo-secure-store's SharedPreferences file, excluded from every backup. */
+export declare const SECURE_STORE_PREFS: string;
 /** The manifest half, as a pure function, so it can be asserted directly. */
 export declare function setBackupAttributes<T>(androidManifest: T): T;

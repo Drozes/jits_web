@@ -36,7 +36,9 @@ The final `appID` value should look like: `A1B2C3D4E5.com.elorated.mobile`
 
 ### Android SHA256 Fingerprint
 
-The `assetlinks.json` file contains `PLACEHOLDER_SHA256_FINGERPRINT`. Replace it with your app's signing certificate fingerprint.
+The `assetlinks.json` file contains `PLACEHOLDER_SHA256_FINGERPRINT`. Replace it with your app's signing certificate fingerprint. This is an **owner action**: the placeholder stays in the repo until the owner supplies the fingerprints. With Play App Signing, list both the upload key and the Play App Signing key fingerprints (an internal-testing install is signed by Play's key).
+
+The app's Android intent filter (`apps/mobile/app.json`, `android.intentFilters`, `autoVerify: true`) claims `https://elorated.com` paths with the prefixes `/c/` (invite links) and `/athlete` (profiles). `/session` is no longer claimed (jits-d3hb). Until verification passes, Android opens these links in the browser and only the `elorated://` scheme opens the app.
 
 **From a local keystore:**
 

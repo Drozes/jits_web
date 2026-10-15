@@ -50,6 +50,15 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -58,12 +67,12 @@
             {
               "scheme": "https",
               "host": "elorated.com",
-              "pathPrefix": "/athlete"
+              "pathPrefix": "/c/"
             },
             {
               "scheme": "https",
               "host": "elorated.com",
-              "pathPrefix": "/session"
+              "pathPrefix": "/athlete"
             }
           ],
           "category": [
@@ -103,18 +112,11 @@
       [
         "expo-secure-store",
         {
-          "faceIDPermission": false
+          "faceIDPermission": false,
+          "configureAndroidBackup": false
         }
       ],
       "expo-apple-authentication",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "ELO RATED uses your photo library to save your match highlights.",
-          "cameraPermission": "ELO RATED uses your camera to record your matches.",
-          "microphonePermission": "ELO RATED uses your microphone so your match recordings include audio."
-        }
-      ],
       [
         "expo-location",
         {
@@ -128,7 +130,8 @@
       [
         "expo-notifications",
         {
-          "color": "#ef4444",
+          "icon": "./assets/notification-icon.png",
+          "color": "#E63946",
           "defaultChannel": "default"
         }
       ],
@@ -151,7 +154,8 @@
         "expo-media-library",
         {
           "photosPermission": "ELO RATED uses your photo library to save your match highlights.",
-          "savePhotosPermission": "ELO RATED saves your match highlights to your photo library."
+          "savePhotosPermission": "ELO RATED saves your match highlights to your photo library.",
+          "granularPermissions": []
         }
       ],
       [
