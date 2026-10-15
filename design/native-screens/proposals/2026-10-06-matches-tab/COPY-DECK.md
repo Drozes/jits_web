@@ -111,10 +111,12 @@ Round 2: full-screen pages (spec 8). The shipped header title `Your highlight` i
 | shipped | Rail a11y labels | `Share to Instagram` (or `Share reel`), `Save to Photos`, `Improve this reel` |
 | spec 8.2 | Bottom meta, own reel | `vs {opp}`; `{shortDate} · {m:ss}` (e.g. `OCT 04 · 0:28`); link `Open match` |
 | spec 8.6 | Bottom meta, not your reel (future) | `{athlete short name}` plus source tag (`FRIEND`, `NEARBY`, `ELO RATED`); `SEP 30 · 0:31` |
-| C-V5 | Link, not your reel and not your match | `View profile` |
+| C-V5 | Link, not your reel and not your match | `View profile` (removed 2026-10-14, see the note below the table) |
 | C-V1 | Swipe hint, once per install, only when the carousel has 2+ pages | `Swipe up for the next one` |
 | C-V2 | Swipe past the last reel of a fully loaded list, 2 s | `You're all caught up` |
 | a11y | Video surface | `Your highlight vs {opp}, {s} seconds, playing. Tap to pause` |
+
+**Note (2026-10-14 owner decision):** the full-screen reel viewer no longer shows Open match or View profile (C-V5); both were removed (jits-uq3j, jits_web PR #94, OTA `9836f765`). In their place, under the mono date and duration line, the viewer shows the reel subject's Instagram handle as a small tappable `@handle` that opens `https://www.instagram.com/<handle>/`, and nothing when the subject has no handle. The handle comes from `instagram_handle`, now part of `ATHLETE_GUARD_SELECT`, and the URL from the shared `instagramProfileUrl`. `viewerIsParticipant` and `subjectAthleteId` were removed from `ReelItem`; `ReelItem` gained an optional `subjectInstagramHandle` for future non-own sources. The rows above is kept as the historical record.
 
 ## Profile (board 09)
 
