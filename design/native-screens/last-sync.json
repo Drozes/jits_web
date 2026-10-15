@@ -1,7 +1,7 @@
 {
   "canvas": "https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D",
-  "commit": "56c0ef2c98baa6cdc141ff5493b7ae70120fbb70",
-  "synced_at": "2026-10-14T10:23:33-04:00",
-  "version": "1791987806-f3f5",
-  "note": "OTA 88d790c9 \"Highlight viewer drops the title\" (spec 020 D): redrew 34-Highlight-Viewer and 35-Highlight-Share (viewer title removed). 32-Match-Detail skipped: only highlight-copy.ts gained reelPlayerLabel; playerLabel output unchanged, nothing visible."
+  "commit": "8dc39ed81687104757d12a7588b7226a0a26af06",
+  "synced_at": "2026-10-14T21:30:00-04:00",
+  "version": "1792027277-7701",
+  "note": "OTA 9836f765 \"Reel viewer Instagram handle\" (jits-uq3j, release/0.5.x 8dc39ed8): redrew 34-Highlight-Viewer and 35-Highlight-Share (Open match replaced by the tappable @handle under the date line; sample @marcusreyes). Reel frames on these boards are placeholders, so spec 022 (submission name, @elorated) needs no board change."
 }
