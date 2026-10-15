@@ -70,6 +70,8 @@ I = {
     "copy": '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>',
     "msg": '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>',
     "mail": '<rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>',
+    "video": '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect>',
+    "upload": '<path d="M12 3v12"></path><path d="m17 8-5-5-5 5"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>',
     "x": '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
 }
 
@@ -215,6 +217,19 @@ def record_panel(sub=None, on=True):
             f'background: {INK if on else BRIGHT}; display: flex; align-items: center; justify-content: {"flex-end" if on else "flex-start"}; cursor: pointer"><span style="width: 27px; height: 27px; border-radius: 14px; background: {VOID if on else INK3}"></span></button>')
     return (f'<div style="min-height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 0 14px; display: flex; flex-direction: row; align-items: center; gap: 12px; background: {PLATE}; border: 1px solid {HL}; border-radius: 3px">'
             f'<div style="flex: 1; display: flex; flex-direction: column; gap: 4px">{heading("Record from my phone", 13, INK, True, 1.12)}{s}</div>{knob}</div>')
+
+
+def record_locked():
+    """D12: the timekeeper's record row, locked on (TK-K9): shipped label, lock glyph, no switch."""
+    return (f'<div aria-label="Record from my phone, always on" style="min-height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 10px 14px; display: flex; flex-direction: row; align-items: center; gap: 12px; background: {PLATE}; border: 1px solid {HL}; border-radius: 3px">'
+            f'<div style="flex: 1; display: flex; flex-direction: column; gap: 4px">{heading("Record from my phone", 13, INK, True, 1.12)}{body("Timekeepers always record this match.", 12, INK2)}</div>'
+            f'{ic("lock", 18, INK2)}</div>')
+
+
+def upload_line(pct=64):
+    return (f'<div role="progressbar" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 0; flex-shrink: 0">'
+            f'{row(ic("upload", 12, INK2) + mono("YOUR ANGLE: UPLOADING", 10, INK2, 500, 1.68, True, "flex: 1") + mono(f"{pct}%", 10, INK2, 700, 0), 7)}'
+            f'<div style="height: 2px; background: {HLS}"><div style="height: 2px; width: {pct}%; background: {INK2}"></div></div></div>')
 
 
 def camera_card():
@@ -519,12 +534,12 @@ def tk_athlete(p, weighed, ready, verdict=None):
             f'{top}{sep}{act}</div>')
 
 
-def tk_faceoff(rows, start_enabled=False, reason=None, starting=False, extra=""):
+def tk_faceoff(rows, start_enabled=False, reason=None, starting=False, extra="", rec=None):
     if starting:
         foot = btn("Start match", "primary", 72, disabled=True) + hold_line("STARTING MATCH...", INK)
     else:
         foot = btn("Start match", "primary", 72, disabled=not start_enabled) + (hold_line(reason) if reason else "")
-    return screen(topbar("FACE-OFF · TIMEKEEPER") + fight_chip(you=False) + rows + extra + record_panel() + spacer()
+    return screen(topbar("FACE-OFF · TIMEKEEPER") + fight_chip(you=False) + rows + extra + (rec if rec is not None else record_locked()) + spacer()
                   + f'<div style="display: flex; flex-direction: column; gap: 10px; flex-shrink: 0">{foot}</div>', 14)
 
 
@@ -640,12 +655,13 @@ def b6():
         dict(step="B6 · 1", who=TKW, title="Both athletes weighing in; Start disabled",
              inner=tk_faceoff(r_wait, reason="WAITING FOR BOTH ATHLETES"),
              notes=["New screen (FE-5, faceoff/faceoff-timekeeper.tsx). Same frame, top bar and fight chip as the athletes' ready step, without the red you-dot: the timekeeper is not competing.",
+                    "D12: the record row is locked on in every frame (shipped label, lock glyph, TK-K9, no switch). Athletes keep their optional switch.",
                     "One row per athlete: name, rating, the challenge weight, and two status tags (weigh-in, ready). Confirm and Doesn't look right appear once that athlete has weighed in."],
-             copy="TK-K0 FACE-OFF · TIMEKEEPER; TK-K1 WEIGHING IN; TK-K3 NOT READY; TK-K6 Start match; TK-K7 WAITING FOR BOTH ATHLETES; shipped Leave, Record from my phone"),
+             copy="TK-K0 FACE-OFF · TIMEKEEPER; TK-K1 WEIGHING IN; TK-K3 NOT READY; TK-K6 Start match; TK-K7 WAITING FOR BOTH ATHLETES; TK-K9 Timekeepers always record this match.; shipped Leave, Record from my phone"),
         dict(step="B6 · 2", who=TKW, title="Confirming weights",
              inner=tk_faceoff(r_conf, reason="CONFIRM BOTH WEIGHTS"),
              notes=["M. Reyes is confirmed and ready; D. Okafor has weighed in and waits for the timekeeper's check, and has not tapped ready yet.",
-                    "Reason priority under Start (resolved here): MATCH ON HOLD · WEIGHT CHECK first, then CONFIRM BOTH WEIGHTS whenever a weigh-in is waiting on the timekeeper (their own next action), else WAITING FOR BOTH ATHLETES."],
+                    "Reason priority under Start (resolved here): MATCH ON HOLD · WEIGHT CHECK first, then WAITING FOR YOUR CAMERA (D12), then CONFIRM BOTH WEIGHTS whenever a weigh-in is waiting on the timekeeper (their own next action), else WAITING FOR BOTH ATHLETES."],
              copy="TK-K2 WEIGHED IN; TK-K4 READY; TK-K5 CONFIRMED; TK-K8 CONFIRM BOTH WEIGHTS; shipped Confirm, Doesn't look right"),
         dict(step="B6 · 3", who=TKW, chips=[ASSUMPTION], title="Timekeeper flagged D. Okafor: match on hold",
              inner=tk_faceoff(r_flag, reason="MATCH ON HOLD · WEIGHT CHECK"),
@@ -659,7 +675,15 @@ def b6():
         dict(step="B6 · 4", who=TKW, title="All set: Start match enabled",
              inner=tk_faceoff(r_ok, start_enabled=True),
              notes=["Both athletes ready server side (mark_match_ready), both timekeeper confirmations present, no open flag: start_match accepts only the timekeeper (BE-4). The athletes' phones never auto-start in timekeeper mode."],
-             copy="TK-K2, TK-K4, TK-K5, TK-K6 Start match"),
+             copy="TK-K2, TK-K4, TK-K5, TK-K6 Start match; TK-K9 Timekeepers always record this match."),
+        dict(step="B6 · 4b", who=TKW, chips=[chip("D12", AMBER, AMBER_RULE)], title="Camera permission denied: Start waits",
+             inner=tk_faceoff(r_ok, reason="WAITING FOR YOUR CAMERA",
+                              rec=(f'<div role="alert" style="flex-shrink: 0; box-sizing: border-box; padding: 12px; display: flex; flex-direction: column; gap: 10px; border: 1px dashed {AMBER}; border-radius: 3px">'
+                                   f'{row(ic("video", 18, AMBER) + body("Allow camera access to timekeep. Your camera records the match.", 13, AMBER, extra="flex: 1"), 10, "flex-start")}'
+                                   f'{btn("Open Settings", "secondary", 44)}</div>')),
+             notes=["D12: the timekeeper must record. Without camera access (or without the timekeeper recording intent) Start stays disabled: start_match refuses with timekeeper_not_recording, and set_match_recording_intent refuses to turn the timekeeper's intent off (timekeeper_must_record). Both athletes are ready and confirmed here; only the camera blocks.",
+                    "The server can verify the intent, not that the camera is actually rolling (spec B.9)."],
+             copy="TK-K10 WAITING FOR YOUR CAMERA; TK-K11 Allow camera access to timekeep. Your camera records the match.; TK-K12 Open Settings"),
         dict(step="B6 · 5", who=TKW, title="Starting the match",
              inner=tk_faceoff(r_ok, starting=True),
              notes=["Tap: one start_match call from this phone only; the button holds the shipped STARTING MATCH... line until the DB moves to in_progress, then all three phones run the shared countdown."],
@@ -681,12 +705,19 @@ def b7():
     frames = [
         dict(step="B7 · 1", who=TKW, title="Timekeeper, running",
              inner=live(hud_right=tk_kicker, you=False, bottom=live_controls(False)),
-             notes=["The shipped live screen. The athlete bar shows both athletes with no you-dot. PAUSE / RESUME and HOLD TO END are the timekeeper's only (can_control_match, BE-5); HOLD TO END calls the new end_match_clock. The REC tally shows because the timekeeper is recording (D8); without it the tally slot is empty."],
+             notes=["The shipped live screen. The athlete bar shows both athletes with no you-dot. PAUSE / RESUME and HOLD TO END are the timekeeper's only (can_control_match, BE-5); HOLD TO END calls the new end_match_clock. D12: the timekeeper always records, so the REC tally is always on and there is no stop-recording control (the shipped flow has none for anyone)."],
              copy="TK-L1 YOU RUN THE CLOCK; shipped LIVE, PAUSE, HOLD TO END, REC {mm:ss}"),
         dict(step="B7 · 2", who=TKW, title="Timekeeper, paused",
              inner=live(hud_right=tk_kicker, strip=("PAUSED", "CAMERA STILL RECORDING"), you=False, slab=("PAUSED", "02:46"), bottom=live_controls(True)),
              notes=["pause_match from the timekeeper; every phone reads the pause from the DB, as today."],
              copy="TK-L1; shipped PAUSED · CAMERA STILL RECORDING, PAUSED, RESUME"),
+        dict(step="B7 · 2b", who=TKW, chips=[chip("D12", AMBER, AMBER_RULE)], title="Timekeeper camera failed, clock keeps running",
+             inner=live(hud_right=tk_kicker, you=False, tally="NO VIDEO", bottom=live_controls(False),
+                        above=(f'<div role="alert" style="background: {OM_SLAB}; border: 1px dashed {AMBER}; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">'
+                               f'{row(ic("video", 16, AMBER) + mono("CAMERA STOPPED · KEEP RUNNING THE CLOCK", 10, AMBER, 700, 1.4, True, "white-space: normal"), 8)}'
+                               f'<button type="button" style="margin: 0; height: 44px; border-radius: 3px; border: 1px solid {OM_STRONG}; background: {OM_GLASS}; cursor: pointer; font-family: {DM}; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: #FFFFFF">Restart camera</button></div>')),
+             notes=["The match continues: the clock and the controls stay. A restarted recording becomes a second clip, the gap is noted on the match (timekeeper_recording_gaps, from the client report), and the athletes' optional angles still count. A camera that never restarts does not stop the match."],
+             copy="TK-L3 CAMERA STOPPED · KEEP RUNNING THE CLOCK; TK-L4 Restart camera; shipped NO VIDEO, LIVE, PAUSE, HOLD TO END"),
         dict(step="B7 · 3", who=ATH, title="Athlete, read-only",
              inner=live(you=True, bottom=runs_clock(TK.upper())),
              notes=["Same screen with the clock, REC tally and athlete bar, but no pause and no end. The strip sits where the controls were, so the clock does not move between modes. The athlete's camera records exactly as today (D8)."],
@@ -725,7 +756,13 @@ def b8():
                   f'{body(A["short"] + " and " + B["short"] + " confirm it next. Your rating isn&#39;t affected.".replace("&#39;", chr(39)), 14, INK2)}</div>'
                   + verdict_plate(rating=False)
                   + status_rows([(A["short"], "WAITING", AMBER), (B["short"], "D. OKAFOR CONFIRMED ✓", INK)])
-                  + spacer() + btn("Done", "secondary", 56), 20)
+                  + spacer() + upload_line(64) + body("Keep ELO RATED open until your film uploads.", 13, INK2) + btn("Done", "secondary", 56), 16)
+    tk_page = screen(f'<div style="height: 44px; display: flex; align-items: center; gap: 6px">{ic("chev_l", 18, INK)}{mono("MATCH", 10, INK3, 700, 2.52)}</div>'
+                     + annot("Match detail chrome as Current app 32; only the film block is new")
+                     + fight_chip(you=False, sub="elo")
+                     + verdict_plate(rating=False)
+                     + (f'<div role="alert" style="flex-shrink: 0; box-sizing: border-box; padding: 14px; display: flex; flex-direction: column; gap: 12px; background: {PLATE}; border: 1px dashed {AMBER}; border-radius: 3px">'
+                        f'{row(ic("upload", 18, AMBER) + body("Your film hasn" + chr(39) + "t uploaded yet.", 14, AMBER, 500), 10)}{btn("Upload now", "primary", 48)}</div>'), 16)
     confirm = screen(f'<div style="display: flex; flex-direction: column; gap: 10px">{mono("RESULT RECORDED BY " + TK.upper(), 10, INK2, 500, 2.52)}'
                      f'{heading("Confirm result", 30, INK, True, 0.56, tag="h1")}</div>'
                      + verdict_plate(True)
@@ -747,12 +784,17 @@ def b8():
         dict(step="B8 · 3", who=TKW, title="Timekeeper done, confirm progress",
              inner=done,
              notes=["record_match_result in timekeeper mode writes no confirmation row for anyone. The rows follow the athletes' confirmations live; Done exits to the Arena (the timekeeper can never confirm or dispute).",
-                    "Shown mid-way: D. Okafor has confirmed, M. Reyes has not."],
-             copy="TK-R2 Result recorded; TK-R3 {A} and {B} confirm it next. Your rating isn't affected.; TK-R4 Done; shipped WAITING, {OPP} CONFIRMED ✓, WINNER, {name} won"),
+                    "Shown mid-way: D. Okafor has confirmed, M. Reyes has not.", "D12: the timekeeper's upload is required, so the done screen carries the shipped upload line and the shipped keep-open line."],
+             copy="TK-R2 Result recorded; TK-R3 {A} and {B} confirm it next. Your rating isn't affected.; TK-R4 Done; shipped WAITING, {OPP} CONFIRMED ✓, WINNER, {name} won, YOUR ANGLE: UPLOADING, Keep ELO RATED open until your film uploads. (M-UPLOAD)"),
         dict(step="B8 · 4", who=ATH, title="Athlete confirms",
              inner=confirm,
              notes=["The shipped confirm step with the timekeeper's name. Code change (FE-7): the header reads the recorder's name from the timekeeper, not the opponent, and is not gated on anyone having confirmed. Both athletes start at WAITING ON YOU / WAITING because nobody is auto-confirmed. Confirm, dispute, the 24 h lock and the leave line are unchanged (D7). Rating is applied at record time, as today."],
              copy="TK-R5 RESULT RECORDED BY {NAME}; shipped Confirm result, YOUR RATING, WAITING, WAITING ON YOU, Dispute result, If you leave without disputing, it counts as confirming., Locks automatically in {n} h."),
+        dict(step="B8 · 5", who=TKW, chips=[chip("D12", AMBER, AMBER_RULE)], title="Timekeeper's match page: film not uploaded",
+             inner=tk_page,
+             notes=["Shown while the timekeeper's angle has not landed. Upload now resumes the upload. Push TK-N8 nudges once, 2 h after the end (board B10).",
+                    "If no usable timekeeper angle lands by the 24 h footage settle window, or the upload fails terminally, the match is flagged for admin review (match_timekeeper_footage_flags). Signal only: result, rating and dispute window stand, and athletes see nothing."],
+             copy="TK-U1 Your film hasn't uploaded yet.; TK-U2 Upload now; shipped WINNER, {name} won"),
     ]
     return row_board(on_tag(), "Spec B.5 · FE-7 · BE-6", "Result, three roles",
                      "The timekeeper is the only one who records the result (D4). Both athletes then confirm or dispute exactly as today (D7); the recorder is no longer auto-confirmed.",
@@ -847,6 +889,7 @@ def b10():
         ("TK-N6 · cancelled after a drop-out", "Match cancelled", "No timekeeper took over in time. The match won't count.", "2m ago"),
         ("TK-N7 · result recorded · background only", "Confirm your result", f"{TK} recorded {A['short']} vs {B['short']}. Confirm or dispute it.", "6m ago"),
     ])
+    p_n8 = stack([("TK-N8 · to the timekeeper · 2 h after the end, once (D12)", "Upload your match film", f"{A['short']} vs {B['short']} needs your film. Open ELO RATED to finish the upload.", "now")])
     r_ok = tk_athlete(A, True, True, "confirmed") + tk_athlete(B, True, False, "ask")
     leave = under(tk_faceoff(r_ok, reason="CONFIRM BOTH WEIGHTS"), 0.4) + alert("Stop timekeeping?", "The match waits up to 10 minutes for a new timekeeper.", "Keep timekeeping", "Leave")
     approve = screen(picker_head("8:05", me="B") + approval_card()
@@ -859,6 +902,11 @@ def b10():
              inner=p_tk,
              notes=["TK-N1 is a social_notifications kind in category matches (not friends, which a user may mute). Pushes have no action buttons: a tap opens the in-app Timekeep this match? sheet on the non-tab-root route /match/[matchId]/timekeep (board B4)."],
              copy="TK-N1, TK-N6"),
+        dict(step="B10 · 1b", who="TIMEKEEPER", chips=[chip("D12", AMBER, AMBER_RULE)], title="Upload nudge to the timekeeper",
+             inner=p_n8,
+             notes=["Sent once, only if the timekeeper's upload has not landed 2 h after the end. A tap opens their match page with TK-U1 and Upload now (board B8, frame 5).",
+                    "The missing-footage flag (match_timekeeper_footage_flags) is admin only: no athlete UI, no effect on the result, rating or disputes."],
+             copy="TK-N8 Upload your match film / {A} vs {B} needs your film. Open ELO RATED to finish the upload."),
         dict(step="B10 · 2", who="BOTH ATHLETES", title="Pushes to the athletes, before and at the start",
              inner=p_pre,
              notes=["TK-N2 and TK-N3 fire only when the app is in the background; in the app the picker already shows the change (board B3). TK-N3 also covers a request that lapsed after 2 minutes."],
@@ -886,10 +934,10 @@ def b10():
         "Athlete app killed mid-match: unchanged; the timekeeper runs the match and records the result; the athlete confirms later or the 24 h cron confirms.",
         "Flag flipped mid-match: no effect; the match keeps its requires_timekeeper snapshot. The wizard routes on requires_timekeeper from get_match_details, never on the live flag.",
         "Invite bookings (_start_invite_booking) snapshot the same way; the picker appears after the booking starts, as after an Arena accept. Practice matches are client-only and never timekeeper mode.",
-        "Timekeeper records video: allowed (D8) through the existing record-only media rights.",
+        "Timekeeper records video: required (D12), through the existing record-only media rights; athletes stay optional (D8). A missing timekeeper angle is an admin-only flag (match_timekeeper_footage_flags): athletes see nothing.",
     ]
     return row_board(on_tag(), "Spec B.7, B.8 · BE-9", "Pushes and edge cases",
-                     "Every push per role (TK-N1 to TK-N7 plus the shipped Match Started), the timekeeper's Leave alert (before the end only), the exit when an athlete leaves, and the opponent-approval variant pending the owner (Q12).",
+                     "Every push per role (TK-N1 to TK-N8 plus the shipped Match Started), the timekeeper's Leave alert (before the end only), the exit when an athlete leaves, and the opponent-approval variant pending the owner (Q12).",
                      frames, "Edge cases (spec B.8)", edges)
 
 
@@ -938,6 +986,7 @@ def b11():
                  f'{row(heading("Timekeep this match?", 20, INK, False, 0, tag="h1") + mono("ANSWER IN 1:42", 13, INK, 700, 0.5, False), 10, "center", "space-between")}'
                  f'{fight_chip(you=False, sub="elo")}'
                  f'<p style="margin: 0">{body("You start the match, run the clock and record the result. Your rating isn" + chr(39) + "t affected.", 14, INK2)}</p>'
+                 f'{row(ic("video", 16, INK2, style="margin-top: 2px") + body("Timekeepers record the match on video. ELO RATED analyses the film with AI.", 13, INK2), 8, "flex-start")}'
                  f'<div style="display: flex; gap: 12px"><a href="#" style="flex: 1 1 0; height: 56px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 3px; border: 1px solid {HLS}; color: {INK}; {bst}">Decline</a>'
                  f'<a href="#" style="flex: 2 1 0; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 3px; background: {RED}; color: {VOID}; {bst}">Accept</a></div></div></div>')
     frames = [
@@ -964,7 +1013,7 @@ def b11():
         dict(step="B11 · 6", who="INVITEE (APP, AFTER CLAIM)", chips=[P2], title="Claimed: the same accept sheet",
              inner=ask_sheet,
              notes=["A copy of board B4, frame 2 (Decline left, Accept right, ELO only, no weights). After the claim the new user gets the same sheet as an in-app pick; Accept ends in the shared _set_match_timekeeper core. Owner to decide whether the claim creates a friendship and whether invite caps apply (Q11)."],
-             copy="TK-T1 Timekeep this match?; TK-T2; TK-T3 Accept; TK-T4 Decline; TK-T5 ANSWER IN {m:ss}"),
+             copy="TK-T1 Timekeep this match?; TK-T2; TK-T7 Timekeepers record the match on video. ELO RATED analyses the film with AI.; TK-T3 Accept; TK-T4 Decline; TK-T5 ANSWER IN {m:ss}"),
     ]
     return row_board(p2 + on_tag(), "Spec P · BE-P2 · FE-P2", "PHASE 2: off-platform timekeeper",
                      "Not in the first build. How an athlete would invite someone who is not on ELO RATED to timekeep, reusing the 016 invites system so phase 1 is not painted into a corner (D3, owner update 2026-10-15).",

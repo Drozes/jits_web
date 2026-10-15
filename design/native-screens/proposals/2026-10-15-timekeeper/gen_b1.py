@@ -76,6 +76,7 @@ I = {
     "lock": '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>',
     "timer": '<line x1="10" x2="14" y1="2" y2="2"></line><line x1="12" x2="15" y1="14" y2="11"></line><circle cx="12" cy="14" r="8"></circle>',
     "x": '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
+    "video": '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"></path><rect x="2" y="6" width="14" height="12" rx="2"></rect>',
     "wifioff": '<path d="M12 20h.01"></path><path d="M8.5 16.429a5 5 0 0 1 7 0"></path><path d="M5 12.859a10 10 0 0 1 5.17-2.69"></path><path d="M19 12.859a10 10 0 0 0-2.007-1.523"></path><path d="M2 8.82a15 15 0 0 1 4.177-2.643"></path><path d="M22 8.82a15 15 0 0 0-11.288-3.764"></path><path d="m2 2 20 20"></path>',
 }
 
@@ -603,7 +604,7 @@ def push_card(title, text):
             f'{heading(title, 14, INK)}{body(text, 13, INK)}</div></div>')
 
 
-def ask_sheet(countdown="1:42"):
+def ask_sheet(countdown="1:42", refused_consent=False):
     btn = f"font-family: {DM}; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1.12px"
     btns = (f'<div style="display: flex; gap: 12px"><a href="#" aria-label="Decline timekeeping" style="flex: 1 1 0; height: 56px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 3px; border: 1px solid {HLS}; color: {INK}; {btn}">Decline</a>'
             f'<a href="{href("P-TK-B6-Timekeeper-Faceoff")}" aria-label="Accept timekeeping" style="flex: 2 1 0; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 3px; background: {RED}; color: {VOID}; {btn}">Accept</a></div>')
@@ -611,7 +612,21 @@ def ask_sheet(countdown="1:42"):
     return (f'<div role="dialog" aria-modal="true" aria-label="Timekeep this match?" style="box-sizing: border-box; background: {PLATE}; border: 1px solid {HLS}; border-radius: 8px; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px">'
             f'{row(heading("Timekeep this match?", 20, INK, tag="h1") + timer, 10, "center", "space-between")}'
             f'{fight_chip(A, you_dot=False, elo_only=True)}'
-            f'<p style="margin: 0">{body("You start the match, run the clock and record the result. Your rating isn" + chr(39) + "t affected.", 14, INK2)}</p>{btns}</div>')
+            f'<p style="margin: 0">{body("You start the match, run the clock and record the result. Your rating isn" + chr(39) + "t affected.", 14, INK2)}</p>'
+            f'{row(ic("video", 16, INK2) + body("Timekeepers record the match on video. ELO RATED analyses the film with AI.", 13, INK2), 8, "flex-start")}'
+            f'{notice("You need to allow recording to timekeep.") if refused_consent else ""}{btns}</div>')
+
+
+def consent_sheet():
+    """Shipped AI consent sheet (components/moderation/ai-consent-sheet.tsx:40, 53, 54; AI_CONSENT_COPY in lib/moderation/moderation-copy.ts)."""
+    body_t = ("Your match video, with your display name, rating and weight division, is sent to Google Gemini to find key moments and cut your highlights. "
+              "Stills from the video may be sent to OpenAI to make your avatar (or the video to Google Gemini if OpenAI is unavailable). Video and results are stored on our servers.")
+    return (f'<div role="dialog" aria-modal="true" aria-label="Before you film" style="box-sizing: border-box; background: {PLATE}; border: 1px solid {HL}; border-radius: 8px; padding: 17.5px; display: flex; flex-direction: column; gap: 14px">'
+            f'{heading("Before you film", 18, INK, True, 1.12, tag="h2")}'
+            f'<p style="margin: 0">{body(body_t, 14, INK, extra="line-height: 21px")}</p>'
+            f'<a href="#" style="align-self: flex-start; color: {INK}">{body("Read the Privacy Policy", 13, INK, extra="text-decoration: underline")}</a>'
+            f'{btn_red("Allow and film", 56, href("P-TK-B6-Timekeeper-Faceoff"))}'
+            f'<a href="#" style="height: 44px; display: flex; align-items: center; justify-content: center; font-family: {DM}; font-weight: 700; font-size: 14px; letter-spacing: 1.12px; text-transform: uppercase; color: {INK2}">Not now</a></div>')
 
 
 @board("P-TK-B4-Timekeeper-Ask.dc.html", "Proposed: Timekeeper mode, the asked person (push, Timekeep this match?, closed, entering)", w=None)
@@ -625,15 +640,24 @@ def b4():
         fr("2 · ASKED PERSON", "Timekeep this match?",
            frame(f'<div style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.55); padding: 0 16px; display: flex; flex-direction: column; justify-content: center">{ask_sheet()}</div>'),
            ["Incoming challenge sheet look: PromptCountdown type for ANSWER IN (the 2-minute request), Decline outline (1 part), Accept red (2 parts). The fight chip shows both athletes with ELOs and no you-mark: the timekeeper is neither. In the app the same sheet opens from the realtime row.",
-            "Decline calls respond_timekeeper_request(false); the athletes see TK-P21."], "TK-T1 to TK-T5", [TAG_B]),
-        fr("3 · ASKED PERSON", "Request no longer open",
+            "Decline calls respond_timekeeper_request(false); the athletes see TK-P21."], "TK-T1 to TK-T5, TK-T7 (D12)", [TAG_B]),
+        fr("3 · ASKED PERSON", "Accept opens the shipped AI consent sheet",
+           frame(f'<div style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.55); padding: 0 21px; display: flex; flex-direction: column; justify-content: center">{consent_sheet()}</div>'),
+           ["D12: the timekeeper must record. If they have not yet allowed AI processing (the Before you film consent, jits-rog5.11), Accept opens the shipped consent sheet first, unchanged.",
+            "Allow and film continues the accept (frame 6). Not now returns to the request sheet (frame 4). Refusing consent means they cannot timekeep; Decline is always available."],
+           "shipped AI_CONSENT_COPY title, body, privacyLink, allow, notNow (ai-consent-sheet.tsx:40, 53, 54)", [TAG_B]),
+        fr("4 · ASKED PERSON", "After Not now: Accept still available",
+           frame(f'<div style="flex: 1; box-sizing: border-box; background: rgba(0,0,0,0.55); padding: 0 16px; display: flex; flex-direction: column; justify-content: center">{ask_sheet("1:18", refused_consent=True)}</div>'),
+           ["The request is still open and ANSWER IN keeps counting. Tapping Accept again reopens the consent sheet."],
+           "TK-T8", [TAG_B]),
+        fr("5 · ASKED PERSON", "Request no longer open",
            phone(toast("This request is no longer open.", tone=AMBER) + f'<div style="flex: 1; display: flex; align-items: center; justify-content: center; border: 1px dashed {HL}; border-radius: 3px">{mono("PREVIOUS SCREEN", 10, PH, 500, 2)}</div>', pad="60px 16px 34px"),
            ["Withdrawn, lapsed, another request accepted first, or they started their own match (request_closed, timekeeper_busy). The sheet closes and the toast says why; a lapsed push lands here too."], "TK-T6", [TAG_B]),
-        fr("4 · TIMEKEEPER", "Accepted: entering the match",
+        fr("6 · TIMEKEEPER", "Accepted: entering the match",
            phone(top_bar("FACE-OFF · TIMEKEEPER") + fight_chip(A, you_dot=False)
                  + f'<div style="flex: 1; padding: 28px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; border: 1px dashed {HL}; border-radius: 3px">'
                  f'{mono("TIMEKEEPER FACE-OFF", 10, INK3, 700, 2.52)}<a href="{href("P-TK-B6-Timekeeper-Faceoff")}" style="color: {NEG}">{mono("CONTINUES ON BOARD P-TK-B6", 10, NEG, 700, 1.68)}</a></div>'),
-           ["Accept runs _set_match_timekeeper (the same core as join_match_as_timekeeper) and clears the deadline. The in-person code/QR join follows the same rules (busy, deadline, Q12 approval), pushes both athletes and is refused once the match has started.",
+           ["Accept runs _set_match_timekeeper (the same core as join_match_as_timekeeper), writes the timekeeper's recording intent ON server side (locked on, D12) and clears the deadline. The in-person code/QR join follows the same rules (busy, deadline, Q12 approval), pushes both athletes and is refused once the match has started.",
             "The timekeeper is never a match_participants row."], "TK-K0", [TAG_B]),
     ]
     return row_board([TAG_B], KICK, f"The asked person ({TK}'s phone)",
@@ -721,9 +745,9 @@ RULES = [
     ("Ready", [yes("Broadcast only."), yes("Broadcast only."), na()], [yes("Server side."), yes("Server side."), no()],
      "mark_match_ready: refuses on a flag-OFF match; caller is a competitor; own weight in; own opponent check confirmed (mandatory in timekeeper mode regardless of opponent_weight_check_required, review m3); reset by any re-weigh or flag.",
      ["not_timekeeper_mode", "weight_check_pending"]),
-    ("Start", [yes("Both phones auto-call start_match."), yes("Auto, same race."), na()], [no("No auto-start."), no("No auto-start."), yes("Start button.")],
-     "start_match: caller is timekeeper_id; both athletes ready; both timekeeper confirmations, no open flag.",
-     ["not_timekeeper", "timekeeper_required", "athletes_not_ready", "WEIGHT_* (as today)"]),
+    ("Start", [yes("Both phones auto-call start_match."), yes("Auto, same race."), na()], [no("No auto-start."), no("No auto-start."), yes("Start button, once their camera is ready and recording intent is on (D12).")],
+     "start_match: caller is timekeeper_id; both athletes ready; both timekeeper confirmations, no open flag; the timekeeper's recording intent is on (D12; the camera-ready part is client-side only).",
+     ["not_timekeeper", "timekeeper_required", "athletes_not_ready", "WEIGHT_* (as today)", "timekeeper_not_recording"]),
     ("Pause / resume", [yes(), yes(), na()], [no("Read-only clock."), no("Read-only clock."), yes()],
      "can_control_match: timekeeper only.", ["not_timekeeper"]),
     ("End", [yes("Broadcast (legacy end_match RPC exists, unused)."), yes("Same."), na()], [no(), no(), yes("end_match_clock; the server auto-ends at full time.")],
@@ -747,8 +771,9 @@ RULES = [
      ["timekeeper_busy", "match_started"]),
     ("Leave after start", [no("Not offered."), no("Not offered."), na()], [no("Not offered."), no("Not offered."), yes("Until ended_at: drop-out rule. After ended_at: no Leave.")],
      "leave_match_as_timekeeper extended to in_progress without ended_at, timekeeper mode only.", ["result_owed"]),
-    ("Record video", [yes(), yes(), yes("Code-joined: record-only media rights.")], [yes(), yes(), yes("D8.")],
-     "Unchanged (can_upload_match_video, record-only media rights); a dropped timekeeper keeps read access to their own footage via match_timekeeper_history.", []),
+    ("Record video", [yes("Optional."), yes("Optional."), yes("Code-joined: record-only media rights, optional.")], [yes("Optional (D8)."), yes("Optional (D8)."), yes("REQUIRED (D12): intent locked on, no switch; upload required.")],
+     "set_match_recording_intent refuses turning the timekeeper's intent off. Missing timekeeper footage after the 24 h settle window flags the match for admin review (signal only). can_upload_match_video and record-only media rights unchanged; a dropped timekeeper keeps read access to their own footage via match_timekeeper_history.",
+     ["timekeeper_must_record"]),
 ]
 
 
@@ -854,16 +879,24 @@ def b_rules():
         "remove_match_timekeeper in timekeeper mode: one athlete alone is refused (requires_both_athletes) once the timekeeper has given any weight verdict; before that it is allowed and pushes the other athlete.",
         "get_match_timekeeper_code unchanged. Flag-OFF branches unchanged (pgTAP 108).",
     ])
+    rec = bullets([
+        "Consent first: a timekeeper without AI processing consent cannot accept (the shipped Before you film sheet opens at Accept; TK-T7, TK-T8).",
+        "Before the start the server verifies ONLY the recording intent: written ON at accept, set_match_recording_intent refuses turning it off (timekeeper_must_record), start_match refuses without it (timekeeper_not_recording). Camera ready is checked on the phone only.",
+        "After the match the server verifies ONLY whether an upload arrived. It never knows that the camera was actually rolling.",
+        "Camera failure mid-match: the match continues (TK-L3, TK-L4); the client reports the gap (timekeeper_recording_gaps); athletes' optional angles still count.",
+        "No usable timekeeper angle when the 24 h footage settle window closes (from completed_at), or a terminal upload failure: the match is flagged for admin review in the server-only match_timekeeper_footage_flags. Signal only: result, rating and dispute window stand; athletes see nothing. One push nudge TK-N8 at 2 h (Q14).",
+    ])
     pend = bullets([
         "Q1: a timekeeper Doesn't look right blocks the start until that athlete re-weighs and the timekeeper confirms again, as today's athlete flag (recommended yes). Drawn on P-TK-B5 frame 5 and P-TK-B6.",
         "Q12: the other athlete approves the pick with one tap (TK-P25 to TK-P27; the picker waits with TK-P28) inside the same 10 minutes, before the request is sent; also for mid-match replacements and code joins (recommended yes; requested_by and approved_by recorded). Drawn on P-TK-B2 frames 5 and 6.",
         "Q3b offline and Q3c stall rules (recommended yes).",
+        "Q14: missing timekeeper footage leaves the result and rating standing, with an admin flag (recommended yes).",
     ])
     grid = (f'<div style="padding: 24px 48px 48px; display: flex; flex-direction: column; gap: 20px">'
             f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{callout("The 10-minute rule (D9)", ten, AMBER)}{callout("The snapshot and client-capability rule (D1, review M1)", snap, INK, w=440)}</div>'
             f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{callout("The drop-out rule: explicit Leave (B.6)", drop, NEG)}{callout("The offline and stall rules (B.6, Q3b, Q3c)", offline, NEG)}</div>'
             f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{callout("Lock order (review m5)", lock, INK)}{callout("Code join and removal in timekeeper mode (review B2)", branches, INK)}{callout("The 2-minute request lapse", lapse, AMBER, w=380)}</div>'
-            f'{callout("Pending owner", pend, NEG, TAG_PENDING)}</div>')
+            f'<div style="display: flex; flex-direction: row; gap: 20px; align-items: stretch">{callout("Timekeeper recording is REQUIRED (D12): what the server can and cannot check", rec, AMBER)}{callout("Pending owner", pend, NEG, TAG_PENDING, w=640)}</div></div>')
     return top + table + grid
 
 
@@ -886,9 +919,9 @@ def flow():
     lanes = [
         ("Challenger", A, ["Sent; drops in on accept", "Picker (crew); can Ask", "Sees the pending card", "Own weight", "Checks opponent + ready, one tap", "Waits", "Clock read-only; records video", "Sees the timekeeper ended it", "Waits, no take-over", "Confirm or dispute"]),
         ("Opponent", B, ["Accepts (TK-AR1)", "Picker (crew); can Ask", "Approves the pick (Q12), then sees the pending card", "Own weight", "Checks opponent + ready, one tap", "Waits", "Clock read-only; records video", "Sees the timekeeper ended it", "Waits, no take-over", "Confirm or dispute"]),
-        ("Timekeeper", TK, ["", "", "Push, sheet: Accept", "Confirms EACH weight", "Watches ready", "Start match", "Pause, resume; may record", "end_match_clock, or server at duration", "Records result within 10 min", "Done (cannot confirm)"]),
+        ("Timekeeper", TK, ["", "", "Push, sheet: consent + Accept", "Confirms EACH weight", "Watches ready; camera on (locked)", "Start match (camera + intent ready)", "Pause, resume; RECORDING REQUIRED (D12)", "end_match_clock, or server at duration", "Records result within 10 min", "Done; upload REQUIRED (cannot confirm)"]),
     ]
-    hot = {"Start match", "Pause, resume; may record", "end_match_clock, or server at duration", "Records result within 10 min"}
+    hot = {"Start match (camera + intent ready)", "Pause, resume; RECORDING REQUIRED (D12)", "Done; upload REQUIRED (cannot confirm)", "end_match_clock, or server at duration", "Records result within 10 min"}
     g = (f'<div style="display: grid; grid-template-columns: 130px repeat(10, 1fr); gap: 6px"><div></div>'
          + "".join(f'<div style="padding: 4px 2px">{mono(f"{i + 1} · {s}", 10, INK, 700, 1.12, True, "white-space: normal")}</div>' for i, s in enumerate(stages)))
     for lane, who, cells in lanes:
@@ -927,6 +960,7 @@ def b00():
         "Athlete face-off: weigh-in unchanged; ready merges the opponent weight check (Weight looks right, I'm ready), stored server side.",
         "The timekeeper confirms each athlete's weight and alone can Start, pause, resume, end the clock (new end_match_clock; the server also ends it at match duration) and record the result.",
         "Athletes keep their camera, see a read-only clock, then confirm or dispute; the recorder is no longer auto-confirmed.",
+        "D12: the timekeeper MUST record the match (consent at Accept, record row locked on, Start waits for their camera, upload required; missing footage = admin flag, Q14). Athletes' recording stays optional.",
         "An explicit Leave pauses the clock; an OFFLINE timekeeper (60 s heartbeat gap) starts a 10-minute wait without pausing; cancel only if nobody takes over. After the clock ends there is no Leave; a result stall goes to admin review.",
         "Arena copy changes in two lines when the flag is known ON (TK-AR1, TK-AR2).",
     ], 13)
@@ -940,16 +974,17 @@ def b00():
            ("D8", "All athletes can still record video; the timekeeper can too."),
            ("D9", "Timekeeper missing or dropped out: the match waits; after 10 minutes it is cancelled."),
            ("D10", "Alpha 2026-10-17: ON only if certain, else ship dark with the alpha flag OFF; nothing may block flag OFF."),
-           ("D11", "Flag-OFF changes may be shown only as optional and separate (board P-TK-C1).")]
+           ("D11", "Flag-OFF changes may be shown only as optional and separate (board P-TK-C1)."),
+           ("D12", "The timekeeper is REQUIRED to record the match on video; athletes stay optional (D8 unchanged).")]
     decisions = kv([(mono(k, 11, INK, 700, 0.56, False), v) for k, v in dec], 44) + (
         f'<div style="margin-top: 6px; padding: 10px; border: 1px dashed {RED_RULE}; border-radius: 3px; display: flex; flex-direction: column; gap: 6px">{TAG_PENDING}'
         f'{body("Coordinator assumption: a timekeeper Doesn" + chr(39) + "t look right blocks the start until that athlete re-weighs and the timekeeper confirms again, as today" + chr(39) + "s athlete flag (Q1).", 12, INK2)}'
-        f'{body("Also owner-pending: Q3b (offline), Q3c (stalls), Q4 (code/QR link in the picker), Q6 (cancelled-match video), Q8 and Q11 (phase 2), Q12 (opponent approves the timekeeper), Q13 (Arena copy with an older app on the other side).", 12, INK2)}</div>')
+        f'{body("Also owner-pending: Q3b (offline), Q3c (stalls), Q4 (code/QR link in the picker), Q6 (cancelled-match video), Q8 and Q11 (phase 2), Q12 (opponent approves the timekeeper), Q13 (Arena copy with an older app on the other side), Q14 (missing timekeeper footage).", 12, INK2)}</div>')
     be = kv([(mono(k, 11, INK, 700, 0.56, False), v) for k, v in [
         ("BE-1", "requires_timekeeper, timekeeper_deadline_at, ended_at; snapshot with p_client_supports_timekeeper DEFAULT false and the both-clients rule; guard; timekeeper_busy at creation."),
         ("BE-2", "_set_match_timekeeper core; match_timekeeper_requests (requested_by, approved_by, channel, invite_id); request / approve (Q12) / respond / cancel; get_timekeeper_candidates; new _timekeeper_busy; timekeeper-mode branches of join_match_as_timekeeper and remove_match_timekeeper."),
         ("BE-3", "mark_match_ready (refuses not_timekeeper_mode on flag-OFF; opponent check mandatory); timekeeper-mode re-weigh voids every check on the caller and clears both readies."),
-        ("BE-4", "start_match timekeeper branch and HINTs."),
+        ("BE-4", "start_match timekeeper branch and HINTs, including timekeeper_not_recording (D12)."),
         ("BE-5", "can_control_match branch; new end_match_clock(p_match_id, p_final_elapsed_s); legacy end_match refuses timekeeper mode (use_end_match_clock)."),
         ("BE-6", "record_match_result timekeeper branch, no confirmation insert."),
         ("BE-7", "Sibling table match_timekeeper_weight_checks and check_athlete_weight_as_timekeeper; check_opponent_weight untouched."),
@@ -957,13 +992,14 @@ def b00():
         ("BE-9", "Pushes timekeeper_requested / accepted / declined / expired (category matches), TK-N5 to TK-N7; non-tab-root deep links."),
         ("BE-10", "get_match_details already admits the timekeeper: add requires_timekeeper, role, timekeeper name, presence and deadlines."),
         ("BE-11", "pgTAP per rules row; flag-OFF regression; legacy end_match refusal; stall; cancelled match leaves no rating rows; capability rule."),
+        ("BE-12", "D12: timekeeper recording intent written at accept and locked on (set_match_recording_intent, timekeeper_must_record); start_match timekeeper_not_recording; server-only match_timekeeper_footage_flags at the 24 h settle window (admin_list_missing_timekeeper_footage); timekeeper_recording_gaps; push TK-N8."),
         ("BE-P2", "PHASE 2 off-platform invite (later).")]], 50)
     fe = kv([(mono(k, 11, INK, 700, 0.56, False), v) for k, v in [
         ("FE-1", "use-timekeeper-enabled (fail-closed, known, refetch on foreground) for the Arena copy only."),
         ("FE-2", "Step crew and role routing (requires_timekeeper, missing = false); the wizard admits the timekeeper; pass p_client_supports_timekeeper on every challenge create, accept and start."),
         ("FE-3", "Picker, request card, asked-person sheet on /match/[id]/timekeep, push handler, deadline chip."),
         ("FE-4", "Athlete merged ready and timekeeper row; no auto-start."),
-        ("FE-5", "Timekeeper face-off with Start."),
+        ("FE-5", "Timekeeper face-off with Start; record row locked on (TK-K9); Start gated on camera and intent (TK-K10 to TK-K12); consent at Accept (TK-T7, TK-T8)."),
         ("FE-6", "Live: controls for the timekeeper only; athlete strip; end via end_match_clock."),
         ("FE-7", "Result: timekeeper form without claim; athletes wait; Done screen."),
         ("FE-8", "Drop-out plate, offline banner (TK-D7), admin-review state (TK-D8), re-pick sheet with approval (Q12), deadline chip, heartbeat."),
@@ -993,9 +1029,10 @@ def b00():
           ("Q10", "Alpha?", "Ship dark (go/no-go below)."),
           ("Q11", "Phase 2 invite side effects?", "Create the friendship; do not count against the challenge invite cap."),
           ("Q12", "Should the other athlete approve a picked timekeeper (collusion)?", "Yes: one tap (TK-P25 to TK-P27, picker waits with TK-P28) inside the same 10 minutes, before the request is sent; also for replacements and code joins; admin signals."),
-          ("Q13", "Arena copy says a timekeeper is needed even if the other athlete's app is too old to support it; keep the copy?", "Yes: nothing breaks, the match falls back to the two-athlete flow.")]
+          ("Q13", "Arena copy says a timekeeper is needed even if the other athlete's app is too old to support it; keep the copy?", "Yes: nothing breaks, the match falls back to the two-athlete flow."),
+          ("Q14", "Missing timekeeper footage (D12): the upload never arrives or fails?", "Result and rating stand; the match is flagged for admin review (signal only) at the 24 h settle window; one push nudge 2 h after the end.")]
     openq = "".join(f'<div style="display: flex; flex-direction: row; gap: 12px; padding: 7px 0; border-top: 1px solid {HLF}">'
-                    f'<div style="width: 36px; flex-shrink: 0">{mono(k, 11, NEG if k in ("Q3b", "Q3c", "Q12", "Q13") else INK, 700, 0.56, False)}</div>'
+                    f'<div style="width: 36px; flex-shrink: 0">{mono(k, 11, NEG if k in ("Q3b", "Q3c", "Q12", "Q13", "Q14") else INK, 700, 0.56, False)}</div>'
                     f'<div style="flex: 1; min-width: 0">{body(qq, 12, INK)}</div><div style="width: 330px; flex-shrink: 0">{body("Recommended: " + a, 12, INK2)}</div></div>' for k, qq, a in qs)
     gonogo = (bullets([
         "1 · Every rules row enforced server side and covered by pgTAP; the full jr_be suite green with 061, 108, 111 unchanged.",
@@ -1005,10 +1042,10 @@ def b00():
         "5 · Independent review of backend and mobile diffs closed with no open findings.",
         "6 · Client capability gate in: an older build never receives a timekeeper-mode match.",
         "7 · pgTAP proves the legacy end_match refuses timekeeper-mode matches and covers a stalling timekeeper.",
-    ]) + kv([(mono("Backend", 11, INK, 700, 0.56, False), "BE-1 to BE-11: about 5 to 7 engineer days with pgTAP."),
-             (mono("Mobile", 11, INK, 700, 0.56, False), "FE-1 to FE-10: about 4 to 5 days."),
+    ]) + kv([(mono("Backend", 11, INK, 700, 0.56, False), "BE-1 to BE-12: about 6 to 8 engineer days with pgTAP (D12 adds about 1)."),
+             (mono("Mobile", 11, INK, 700, 0.56, False), "FE-1 to FE-10: about 4.5 to 5.5 days (D12 adds about half a day)."),
              (mono("Review + test", 11, INK, 700, 0.56, False), "1 to 2 days."),
-             (mono("Total", 11, NEG, 700, 0.56, False), "Roughly 10 to 14 days against 2 before the alpha.")], 110)
+             (mono("Total", 11, NEG, 700, 0.56, False), "Roughly 11 to 15 days against 2 before the alpha.")], 110)
         + f'<div style="margin-top: 6px; padding: 14px; border: 1px solid {RED}; border-radius: 3px; display: flex; flex-direction: column; gap: 6px">'
           f'{mono("RECOMMENDATION: SHIP DARK", 13, NEG, 700, 1.68)}{body("The alpha (2026-10-17) runs with timekeeper_role OFF, which this proposal guarantees is untouched. Build timekeeper mode behind the flag after owner approval, enable it for an internal three-person test, then for alpha users.", 13, INK)}</div>')
     phase2 = (f'<div style="display: flex; flex-direction: column; gap: 8px">{row(TAG_P2 + mono("Not in the first build", 10, INK3, 700, 1.68), 8)}'

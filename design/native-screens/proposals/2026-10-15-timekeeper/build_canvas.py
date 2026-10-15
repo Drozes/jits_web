@@ -56,13 +56,21 @@ def resolve(prefix, boards):
 def main(src, out):
     canvas = json.loads(Path(src).read_text())
     boards = load_boards()
-    assert all(p["id"] != PAGE_ID for p in canvas["pages"]), "page already exists; update instead"
+    # Update mode: drop this page's own entries (only P-TK boards on this page
+    # and tk-row notes), then lay the page out again. Nothing else is touched.
     for k, v in canvas["boards"].items():
-        assert not k.startswith("P-TK-"), f"{k} already on canvas"
-    for k in canvas["notes"]:
-        assert not k.startswith("tk-row-"), f"{k} already on canvas"
-
-    canvas["pages"].append({"id": PAGE_ID, "name": PAGE_NAME})
+        if k.startswith("P-TK-"):
+            assert v.get("page") == PAGE_ID, f"{k} sits on another page"
+    for k, v in canvas["notes"].items():
+        if k.startswith("tk-row-"):
+            assert v.get("page") == PAGE_ID, f"{k} sits on another page"
+    mine = {k for k, v in canvas["boards"].items() if v.get("page") == PAGE_ID}
+    assert all(k.startswith("P-TK-") for k in mine), f"foreign boards on page: {mine}"
+    canvas["boards"] = {k: v for k, v in canvas["boards"].items() if k not in mine}
+    canvas["order"] = [k for k in canvas["order"] if k not in mine]
+    canvas["notes"] = {k: v for k, v in canvas["notes"].items() if not k.startswith("tk-row-")}
+    if not any(p["id"] == PAGE_ID for p in canvas["pages"]):
+        canvas["pages"].append({"id": PAGE_ID, "name": PAGE_NAME})
     y = 0
     used = set()
     for i, (title, prefixes) in enumerate(ROWS):

@@ -36,3 +36,17 @@ Designer A owns copy fidelity: every string literal from the file:line in SPEC s
 | `P-TK-C1-Merged-Ready-FlagOff` | OPTIONAL: merged ready for flag OFF | (1) weigh-in own weight only, (2) ready with opponent weight line and merged button, (3) waiting. Tag `OPTIONAL · NOT BEFORE ALPHA` | C | TK-F4 (reused) |
 
 Layout: the map at (0, 0), the rules board to its right; row A (A1 to A5) below, row B (B1 to B11) below that, C1 at the end of row B. Rows 343 px apart with a title note 280 px above each, as on the Oct 6 page.
+
+## Round 3: D12 board changes (timekeeper must record)
+
+| Board | Owner | Change |
+|---|---|---|
+| `P-TK-00-Map` | Designer B1 | Add D12 to the decisions list; add BE-12 and Q14; sizing 11 to 15 days; flow diagram notes the timekeeper's recording as required. |
+| `P-TK-B-Rules` | Designer B1 | Record video row: athletes optional, timekeeper REQUIRED (`timekeeper_must_record`); Start row adds `timekeeper_not_recording`; a note on the server's limits (intent and upload only); missing footage flags admin review. |
+| `P-TK-B4-Timekeeper-Ask` | Designer B1 | Sheet adds TK-T7; new frame: the shipped AI consent sheet opened by Accept; new frame: after `Not now`, TK-T8 with Accept still available. |
+| `P-TK-B6-Timekeeper-Faceoff` | Designer B2 | Record row locked on with lock glyph and TK-K9 (no switch) in every frame; new disabled reason TK-K10; new frame: camera permission denied (TK-K11, TK-K12). |
+| `P-TK-B7-Live` | Designer B2 | Timekeeper frames: REC tally always on, no stop control; new frame: TK-L3 banner with TK-L4, clock still running. |
+| `P-TK-B8-Result` | Designer B2 | Timekeeper done frame adds the shipped upload line and `Keep ELO RATED open until your film uploads.`; new frame: timekeeper match page with TK-U1, TK-U2. |
+| `P-TK-B10-Notifications-Edges` | Designer B2 | Add TK-N8 to the push list and a lock-screen frame for it; note the admin-only missing-footage flag (no athlete UI). |
+| `P-TK-B9-Dropout`, `P-TK-B11-Phase2-Invite`, `P-TK-C1-Merged-Ready-FlagOff`, B1 to B3, B5, A1 to A5 | n/a | No change (B11's accept sheet copies B4: add TK-T7 there too if it is redrawn). |
+

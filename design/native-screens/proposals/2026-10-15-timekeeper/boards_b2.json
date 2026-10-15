@@ -3,22 +3,22 @@
     "id": "P-TK-B6-Timekeeper-Faceoff",
     "file": "P-TK-B6-Timekeeper-Faceoff.dc.html",
     "title": "Timekeeper face-off and Start",
-    "w": 3080,
-    "h": 1403
+    "w": 3512,
+    "h": 1441
   },
   {
     "id": "P-TK-B7-Live",
     "file": "P-TK-B7-Live.dc.html",
     "title": "Live, three roles",
-    "w": 2216,
+    "w": 2648,
     "h": 1473
   },
   {
     "id": "P-TK-B8-Result",
     "file": "P-TK-B8-Result.dc.html",
     "title": "Result, three roles",
-    "w": 1784,
-    "h": 1405
+    "w": 2216,
+    "h": 1421
   },
   {
     "id": "P-TK-B9-Dropout",
@@ -31,7 +31,7 @@
     "id": "P-TK-B10-Notifications-Edges",
     "file": "P-TK-B10-Notifications-Edges.dc.html",
     "title": "Pushes and edge cases",
-    "w": 2648,
+    "w": 3080,
     "h": 1601
   },
   {

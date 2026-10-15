@@ -102,6 +102,7 @@ The asked person's side:
 
 - Push `Timekeep {A} vs {B}?` / `{athlete} asked you to start the match, run the clock and record the result.` (TK-N1), sent as the `social_notifications` kind `timekeeper_requested` in category `matches` (not `friends`, which a user may mute). Pushes have no action buttons, so a tap opens an in-app sheet on a non-tab-root route (`/match/[matchId]/timekeep`; tab-root targets are dropped during a match). If they are in the app, the same sheet opens from a realtime row. It shows `Timekeep this match?` (TK-T1), the fight chip `{A} vs {B}` with ELOs, `You start the match, run the clock and record the result. Your rating isn't affected.` (TK-T2), `Accept` (TK-T3), `Decline` (TK-T4), and the request countdown `ANSWER IN {m:ss}` (TK-T5).
 - Accept refused (they started their own match, or another request was accepted first, or the request was withdrawn): `This request is no longer open.` (TK-T6).
+- Recording consent (D12): the sheet adds `Timekeepers record the match on video. ELO RATED analyses the film with AI.` (TK-T7). If the timekeeper has not yet allowed AI processing (the "Before you film" consent, jits-rog5.11), Accept opens the shipped consent sheet first; `Allow and film` (shipped label, `lib/moderation/moderation-copy.ts:86`) continues the accept, `Not now` returns to the request sheet with `You need to allow recording to timekeep.` (TK-T8) and Accept stays available. Refusing consent means they cannot timekeep; Decline is always available.
 - After Accept they enter the match wizard in the timekeeper role (B.3).
 
 ### B.3 Face-off in timekeeper mode
@@ -121,8 +122,8 @@ Why merge: in timekeeper mode, ready is no longer a trigger (nobody auto-starts)
 
 - The fight chip (both athletes, ELOs, weights).
 - One row per athlete: name, `{w} LBS`, status `WEIGHING IN` / `WEIGHED IN` (TK-K1, TK-K2), ready `NOT READY` / `READY` (TK-K3, TK-K4), and once weighed in the timekeeper's buttons `Confirm` and `Doesn't look right` (shipped labels). After a verdict the row shows `CONFIRMED` (TK-K5) or `YOU FLAGGED` (shipped) with `Withdraw flag` (shipped).
-- Recording: `Record from my phone` (shipped label; D8).
-- Start: `Start match` (TK-K6), disabled until both athletes are ready, both timekeeper weight confirmations exist and no flag is open. The disabled reason under it: `WAITING FOR BOTH ATHLETES` (TK-K7), `CONFIRM BOTH WEIGHTS` (TK-K8) or `MATCH ON HOLD · WEIGHT CHECK` (shipped). Tap: `STARTING MATCH...` (shipped) then the shared countdown on all three phones, with the caption `SYNCED TO SERVER CLOCK · ALL PHONES` (TK-L0) in timekeeper mode.
+- Recording (D12): the timekeeper's record row is LOCKED ON: the shipped label `Record from my phone` with no switch, a lock glyph and `Timekeepers always record this match.` (TK-K9). Their recording intent is written server side when they accept (`set_match_recording_intent`, role timekeeper, on). The camera preview shows the shipped `Preview only. Recording starts with the match.`
+- Start: `Start match` (TK-K6), disabled until both athletes are ready, both timekeeper weight confirmations exist, no flag is open, AND (D12) the timekeeper's camera is ready on this phone and their recording intent is on server side. The disabled reason under it: `WAITING FOR BOTH ATHLETES` (TK-K7), `CONFIRM BOTH WEIGHTS` (TK-K8), `MATCH ON HOLD · WEIGHT CHECK` (shipped), or `WAITING FOR YOUR CAMERA` (TK-K10). Camera permission denied: `Allow camera access to timekeep. Your camera records the match.` (TK-K11) with `Open Settings` (TK-K12); Start stays disabled. Tap: `STARTING MATCH...` (shipped) then the shared countdown on all three phones, with the caption `SYNCED TO SERVER CLOCK · ALL PHONES` (TK-L0) in timekeeper mode.
 - Coordinator assumption, pending owner confirmation (drawn and labelled as such): a timekeeper "Doesn't look right" on an athlete blocks the start until that athlete re-weighs and the timekeeper confirms again, the same as today's athlete flag.
 
 ### B.4 Live
@@ -154,6 +155,16 @@ What a drop-out does:
 - **Film access (review m7)**: a dropped timekeeper keeps read access to the footage they uploaded: `match_timekeeper_history (match_id, timekeeper_id, seated_at, left_at)` is honoured by the media RLS alongside `matches.timekeeper_id`.
 - Justification: only an explicit Leave is certain; gym Wi-Fi makes a 60 s gap common, so a gap only starts the D9 wait (review M6). The athletes are never handed the clock or the result in a timekeeper-mode match, because that would let a losing athlete force a drop-out to take control.
 
+### B.9 Timekeeper recording is required (D12)
+
+D12: the timekeeper must record the match on video. Athletes stay optional (D8 unchanged).
+
+- **Consent**: handled at Accept (B.2). A timekeeper without AI processing consent cannot accept.
+- **Face-off**: the record row is locked on (TK-K9); Start waits for the timekeeper's camera and recording intent (TK-K10; HINT `timekeeper_not_recording`).
+- **Server**: in timekeeper mode, `set_match_recording_intent` refuses to turn the timekeeper's intent off (`timekeeper_must_record`); `start_match` refuses without it (`timekeeper_not_recording`). Limits, stated plainly: the server can verify only the intent before the start and, later, whether an upload arrived. It cannot verify that the camera is actually rolling.
+- **Live**: the timekeeper has no stop-recording control (the shipped flow has none for anyone; the REC tally stays). If the camera fails mid-match, the timekeeper's phone shows the banner `CAMERA STOPPED · KEEP RUNNING THE CLOCK` (TK-L3) with `Restart camera` (TK-L4); the match continues, a restarted recording becomes a second clip, the gap is noted on the match (`timekeeper_recording_gaps`, server-side from the client report) and the athletes' optional angles still count. A camera that never restarts does not stop the match.
+- **After**: the timekeeper's upload is required. The timekeeper's done screen (TK-R3) adds the shipped upload line and `Keep ELO RATED open until your film uploads.` (shipped M-UPLOAD string, Oct 4 copy deck). If no usable timekeeper angle has landed when the existing 24 h footage settle window (`_match_footage_settle_window()`, measured from `completed_at`) closes, or the upload failed terminally, the match is flagged for admin review in a server-only `match_timekeeper_footage_flags` (same spirit as the admin-only no-jiu-jitsu flag): signal only; the result, rating and dispute window stand, and athletes see nothing. Nudges: a push to the timekeeper 2 h after the end if their upload has not landed, `Upload your match film` / `{A} vs {B} needs your film. Open ELO RATED to finish the upload.` (TK-N8), and the in-app line `Your film hasn't uploaded yet.` with `Upload now` (TK-U1, TK-U2) on their match page. At most one push. Owner question Q14.
+
 ### B.7 Notifications per role
 
 | Id | To | When | Title / body |
@@ -166,6 +177,7 @@ What a drop-out does:
 | TK-N5 | Both athletes | Timekeeper dropped out | `Your timekeeper left` / `Your match is paused. Pick a new timekeeper within 10 minutes.` |
 | TK-N6 | Both athletes and the dropped timekeeper | Cancelled after a drop-out | `Match cancelled` / `No timekeeper took over in time. The match won't count.` |
 | TK-N7 | Both athletes | Result recorded by the timekeeper (background only) | `Confirm your result` / `{name} recorded {A} vs {B}. Confirm or dispute it.` |
+| TK-N8 | Timekeeper | Upload not landed 2 h after the end (once, D12) | `Upload your match film` / `{A} vs {B} needs your film. Open ELO RATED to finish the upload.` |
 
 ### B.8 Edge cases
 
@@ -176,7 +188,7 @@ What a drop-out does:
 - **Flag flipped mid-match**: no effect; the match keeps its `requires_timekeeper`. Flag flipped while an athlete is on the challenge sheet: the server's snapshot wins, and the wizard routes on `requires_timekeeper` from `get_match_details`.
 - **Invite bookings** (`_start_invite_booking`): snapshot the same way; the picker appears after the start of the booking just as after an Arena accept.
 - **Practice match**: client-only, never timekeeper mode.
-- **Timekeeper also wants to record video**: allowed (D8), via the existing record-only media rights.
+- **Timekeeper video**: REQUIRED in timekeeper mode (D12, section B.9), via the existing record-only media rights.
 - **A timekeeper's queued result**: a timekeeper's own offline-queued result stays valid while they hold the seat (offline does not unseat them, B.6).
 - **Code join mid-match (review m8)**: the code closes when the match leaves `pending` (`close_match_timekeeper_code`), so the code/QR fallback only works before the start; mid-match replacements go through the picker.
 
@@ -198,7 +210,7 @@ Every refusal is a server rule; the client only mirrors it. Timekeeper-mode rule
 | Opponent weight check | Each athlete checks the other | Unchanged, merged into ready | `check_opponent_weight` unchanged |
 | Timekeeper weight check | n/a | Timekeeper checks each athlete | New `check_athlete_weight_as_timekeeper(p_match_id, p_subject_id, p_verdict, p_weight)` writing the sibling table `match_timekeeper_weight_checks` (PK `(match_id, subject_id)`); caller is `timekeeper_id` (`not_timekeeper`); subject is a competitor; status `pending`. `match_weight_checks` and `check_opponent_weight` are untouched (review M4) |
 | Ready | Both, broadcast only | Both, server side | `mark_match_ready`: refuses `not_timekeeper_mode` on a flag-OFF match; caller is a competitor; own weight in; own opponent check confirmed (`weight_check_pending`; in timekeeper mode the athlete opponent check is mandatory regardless of `opponent_weight_check_required`, review m3); reset by any re-weigh or flag |
-| Start | Both phones auto-call `start_match` | Timekeeper only, button | `start_match`: caller is `timekeeper_id` (`not_timekeeper`, `timekeeper_required` if none); both ready (`athletes_not_ready`); both timekeeper confirmations, no open flag (`WEIGHT_*` HINTs as today) |
+| Start | Both phones auto-call `start_match` | Timekeeper only, button | `start_match`: caller is `timekeeper_id` (`not_timekeeper`, `timekeeper_required` if none); both ready (`athletes_not_ready`); both timekeeper confirmations, no open flag (`WEIGHT_*` HINTs as today); the timekeeper's recording intent is on (`timekeeper_not_recording`, D12; the camera-ready part is client-side only) |
 | Pause / resume | Either athlete | Timekeeper only | `can_control_match`: timekeeper only (`not_timekeeper`) |
 | End | Either athlete, broadcast (legacy `end_match` RPC exists, unused) | Timekeeper only, `end_match_clock`; server auto-end at full time | `end_match_clock`: refuses `not_timekeeper_mode` on flag-OFF; caller is `timekeeper_id`; `in_progress` (`match_not_live`). Legacy `end_match` refuses timekeeper-mode matches (`use_end_match_clock`) |
 | Record result | Either athlete, claim-first; recorder auto-confirmed | Timekeeper only; nobody auto-confirmed | `record_match_result`: caller is `timekeeper_id` (`not_timekeeper`); `in_progress`; no confirmation row written |
@@ -208,7 +220,7 @@ Every refusal is a server rule; the client only mirrors it. Timekeeper-mode rule
 | Get a timekeeper code | Either athlete, pending | Either athlete, pending | `get_match_timekeeper_code` unchanged in behaviour; the code is the in-person fallback |
 | Join by code | Anyone not a competitor, pending | Same rules as an accepted request | `join_match_as_timekeeper` in timekeeper mode: runs through `_set_match_timekeeper` with `_timekeeper_busy` (`timekeeper_busy`), the deadline check, the opponent-approval rule (Q12) and a push to both athletes; refused `match_started` after `pending` (review B2, m8) |
 | Leave after start | Not offered | Athletes: not offered. Timekeeper: Leave until `ended_at` triggers the drop-out rule; no Leave after `ended_at` | `leave_match_as_timekeeper` extended to `in_progress` without `ended_at`, timekeeper mode only (`result_owed` after the end) |
-| Record video | Each athlete, and a code-joined record-only timekeeper (record-only media rights) | Each athlete and the timekeeper | Unchanged (`can_upload_match_video`, record-only media rights); a dropped timekeeper keeps read access to their own footage via `match_timekeeper_history` |
+| Record video | Each athlete, and a code-joined record-only timekeeper (record-only media rights), all optional | Athletes optional (D8); the timekeeper REQUIRED (D12) | `set_match_recording_intent` refuses turning the timekeeper's intent off (`timekeeper_must_record`); missing timekeeper footage after the 24 h settle window flags the match for admin review (signal only); `can_upload_match_video` unchanged; a dropped timekeeper keeps read access to their own footage via `match_timekeeper_history` |
 
 - **10-minute rule**: `timekeeper_deadline_at` is set when the match is created in timekeeper mode, and again at each drop-out. It is cleared when a timekeeper accepts. Every timekeeper RPC checks it lazily, but a lazy check never cancels then raises (the cancel would roll back): it returns `{ok:false, code:'match_cancelled'}` after committing, or leaves the cancel to the cron (review m4). A per-minute pg_cron sweep cancels any timekeeper-mode match past its deadline with no seated timekeeper (before the end), with TK-N4 or TK-N6; after `ended_at` it flags for admin review instead (B.6).
 - **Lock order (review m5)**: every new writer (the sweeps, `end_match_clock`, `mark_match_ready`, the request RPCs, the timekeeper weight check) locks `matches` FOR UPDATE first and the request or check row second, re-checks `status` and `requires_timekeeper` under the lock, and never takes the `rating_v9` advisory lock after a match row lock (`record_match_result` takes the rating lock first, then the match row). A cancel racing a record is then safe: whichever commits first wins.
@@ -225,7 +237,8 @@ Keyed on `requires_timekeeper`; with it false every function takes today's path 
 | BE-1 | `matches.requires_timekeeper` (default false), `timekeeper_deadline_at`, `ended_at`; snapshot in `start_match_from_challenge` and `_start_invite_booking` with `p_client_supports_timekeeper boolean DEFAULT false` and the both-clients rule (B.0); guard in `guard_match_columns`; `timekeeper_busy` refusal at creation when an athlete is a seated timekeeper-mode timekeeper | 0 |
 | BE-2 | Internal `_set_match_timekeeper` core factored out of `join_match_as_timekeeper`; `match_timekeeper_requests` (id, match_id, requested_by, approved_by, invitee_id, status pending/accepted/declined/expired/cancelled, expires_at, `channel` `in_app` now and `invite` in phase 2, nullable `invite_id`), one pending request per match, realtime scoped to the parties; RPCs `request_match_timekeeper`, `approve_timekeeper_request` (Q12), `respond_timekeeper_request(accept)`, `cancel_timekeeper_request`; `get_timekeeper_candidates(p_match_id)` (excludes invitees who declined this match); new `_timekeeper_busy` (timekeeper-mode matches only; `_athlete_busy` untouched); timekeeper-mode branches in `join_match_as_timekeeper` and `remove_match_timekeeper` (section R) | 1 |
 | BE-3 | Server-side ready: `mark_match_ready(match_id, p_confirm_opponent_weight)`, refusing `not_timekeeper_mode` on flag-OFF; athlete opponent check mandatory in timekeeper mode; ready reset on re-weigh and flag; timekeeper-mode `reweigh_for_match` voids every check whose subject is the caller, including the timekeeper's | 2 |
-| BE-4 | `start_match` timekeeper branch and HINTs | 3 |
+| BE-4 | `start_match` timekeeper branch and HINTs, including `timekeeper_not_recording` (D12) | 3 |
+| BE-12 | D12: timekeeper recording intent written at accept and locked on in timekeeper mode (`set_match_recording_intent`, `timekeeper_must_record`); `match_timekeeper_footage_flags` (server-only, admin read `admin_list_missing_timekeeper_footage`) set when no usable timekeeper angle exists at the 24 h settle window; `timekeeper_recording_gaps` from the client's camera-failure report; TK-N8 nudge 2 h after the end | 4, 5 |
 | BE-5 | `can_control_match` timekeeper branch; NEW `end_match_clock(p_match_id, p_final_elapsed_s)` (timekeeper mode only, stamps `ended_at`, leaves status); legacy `end_match` refuses timekeeper-mode matches (`use_end_match_clock`), flag-OFF untouched (061/066 unchanged) | 4 |
 | BE-6 | `record_match_result` timekeeper branch, no confirmation insert; `auto_finalize_match` unchanged (counts competitors) | 5 |
 | BE-7 | Timekeeper weight checks in the sibling table `match_timekeeper_weight_checks` (PK `(match_id, subject_id)`) written by `check_athlete_weight_as_timekeeper`; its own SELECT policy; read by the `start_match` timekeeper branch only. No change to `match_weight_checks` or `check_opponent_weight` | 6 |
@@ -241,8 +254,8 @@ Keyed on `requires_timekeeper`; with it false every function takes today's path 
 | FE-2 | Step `crew` and role routing in `step-router.ts` (only when `requires_timekeeper` is true; missing = false); the wizard's own refusal of non-participants is the only blocker for the timekeeper (`match-flow-wizard.tsx:107-110, 247-253`); pass `p_client_supports_timekeeper` on every challenge create, accept and start | `lib/match-flow/step-router.ts`, `components/match-flow/match-flow-wizard.tsx` |
 | FE-3 | Picker screen and request card, asked-person sheet on a non-tab-root route, push handler, deadline chip on `lib/arena/fresh-countdown.ts` | new `components/match-flow/crew/*`, new `app/(app)/match/[matchId]/timekeep.tsx`, `lib/notifications/handlers.ts` |
 | FE-4 | Athlete ready merge and timekeeper row; no auto-start in timekeeper mode | `faceoff/faceoff-body.tsx`, `lib/match-flow/use-faceoff.ts` |
-| FE-5 | Timekeeper face-off screen with the Start button | new `faceoff/faceoff-timekeeper.tsx` |
-| FE-6 | Live: controls only for the timekeeper; athletes read-only with the strip; end via server | `steps/live-step.tsx`, `lib/match-flow/use-live-controls.ts`, `live/state-strip.tsx` |
+| FE-5 | Timekeeper face-off screen with the Start button; record row locked on (TK-K9); Start gated on camera ready and intent (TK-K10 to TK-K12); consent at Accept (TK-T7, TK-T8) via the shipped AI consent sheet | new `faceoff/faceoff-timekeeper.tsx` |
+| FE-6 | Live: controls only for the timekeeper; athletes read-only with the strip; end via server; timekeeper camera-failure banner and restart (TK-L3, TK-L4), gap report; upload nudge line (TK-U1, TK-U2) | `steps/live-step.tsx`, `lib/match-flow/use-live-controls.ts`, `live/state-strip.tsx` |
 | FE-7 | Result: timekeeper form without claim; athletes waiting without take-over; timekeeper done screen; the confirm header `RESULT RECORDED BY {NAME}` (TK-R5) in timekeeper mode comes from the timekeeper's name and is NOT gated on `opponentConfirmed` (`confirm-step.tsx:174` code change) | `steps/result-step.tsx`, `steps/result-waiting.tsx`, `lib/match-flow/use-record-result.ts` |
 | FE-8 | Drop-out plate, offline banner (TK-D7), admin-review state (TK-D8), re-pick sheet with opponent approval (Q12), deadline chip, heartbeat | `steps/live-step.tsx`, new `crew/deadline-chip.tsx` |
 | FE-9 | Arena copy: TK-AR1 under the stakes strip and in place of the no-stakes fallback; TK-AR2 under the mat-board waiting strip | `components/arena/challenge-prompt-sheet.tsx` (:465-484), `components/arena/mat-board.tsx` (:382) |
@@ -271,7 +284,7 @@ Criteria to turn the flag ON for the alpha (all must hold):
 6. Client capability gate (review M1): the both-clients snapshot rule (B.0) is in, so an older build never receives a timekeeper-mode match.
 7. pgTAP proves the legacy `end_match` refuses timekeeper-mode matches (review B1) and covers a stalling timekeeper (review M2).
 
-Sizing (honest, revised after review m10): backend BE-1 to BE-11 is about 5 to 7 engineer days including pgTAP (five core RPCs branch, the legacy `end_match` guard, the code-join and remove branches, four new tables, sweeps for deadline, offline, auto-end and stalls, the capability snapshot, pushes). Mobile FE-1 to FE-10 is about 4 to 5 days. Review and three-device testing add 1 to 2 days. The total is roughly 10 to 14 days against 2.
+Sizing (honest, revised after review m10): backend BE-1 to BE-12 is about 6 to 8 engineer days (D12 adds about 1) including pgTAP (five core RPCs branch, the legacy `end_match` guard, the code-join and remove branches, four new tables, sweeps for deadline, offline, auto-end and stalls, the capability snapshot, pushes). Mobile FE-1 to FE-10 is about 4.5 to 5.5 days (D12 adds about half a day). Review and three-device testing add 1 to 2 days. The total is roughly 11 to 15 days against 2.
 
 Recommendation: **ship dark.** The alpha runs flag OFF, which this proposal guarantees is untouched. Build timekeeper mode behind the flag after owner approval, then enable it for an internal three-person test, then for alpha users.
 
@@ -292,6 +305,7 @@ Recommendation: **ship dark.** The alpha runs flag OFF, which this proposal guar
 12. **Q12, collusion and opponent approval (review M7).** Should the other athlete approve a picked timekeeper? Recommended: yes. The non-picking athlete approves with one tap (`{athlete} picked {name}. OK with you?`, TK-P25, `Approve` TK-P26 / `Not this one` TK-P27) inside the same 10-minute window, before the request is sent; the same applies to mid-match replacements and code joins. Record `requested_by` and `approved_by`. Add an admin signal for repeat athlete and timekeeper pairs, drop-outs after the end and disputed results per timekeeper.
 11. **Q11, phase 2 invite side effects.** Does claiming a timekeeper invite create a friendship, and do the weekly invite caps apply? (The public landing shows names and the deadline only, never weights.) Recommended: create the friendship (it makes the next pick a Friends row), and do not count timekeeper invites against the challenge invite cap.
 13. **Q13, Arena copy and older builds.** TK-AR1 and TK-AR2 can promise a timekeeper when the other athlete's build lacks support, and the match then runs the two-athlete flow. Acceptable? Recommended: keep the copy; it is a soft promise, the picker never appears and nothing breaks. Alternative: show TK-AR2 only once the challenge row records both sides' capability (possible on the challenger's strip after accept, not on the opponent's sheet before accept).
+14. **Q14, missing timekeeper footage (D12).** If the timekeeper's upload never arrives or fails, the result and rating stand and the match is flagged for admin review (signal only, like the no-jiu-jitsu flag), measured at the existing 24 h footage settle window, with one push nudge to the timekeeper 2 h after the end. Recommended: yes. Alternative rejected: holding the result until the film lands (a lost phone would block a real result).
 
 ## G. Acceptance criteria (testable)
 
@@ -305,6 +319,8 @@ Recommendation: **ship dark.** The alpha runs flag OFF, which this proposal guar
 8. A timekeeper whose heartbeat is older than 60 s is shown offline and keeps the seat and the clock; after 10 more minutes without a heartbeat they are dropped (clock paused then, never backdated). After `ended_at` no Leave is accepted, and a missing result after 10 minutes flags the match for admin review rather than cancelling it.
 13. A match snapshots `requires_timekeeper = true` only when the flag is on and both athletes' clients passed `p_client_supports_timekeeper = true`.
 14. The server auto-ends the clock at full time if the timekeeper has not.
+16. In timekeeper mode, the timekeeper cannot accept without AI processing consent, cannot turn their recording intent off, and `start_match` refuses with `timekeeper_not_recording` without it; the timekeeper sees no record switch.
+17. A timekeeper-mode match with no usable timekeeper angle at the 24 h settle window is flagged for admin review; the result, rating and athletes' view are unchanged.
 15. In timekeeper mode, one athlete alone cannot remove a timekeeper who has given a weight verdict, and the code join obeys the busy, deadline and approval rules; flag-OFF code join and removal are unchanged (pgTAP 108).
 9. `record_match_result` by the timekeeper writes no confirmation row; the match finalises only when both athletes confirm or the 24 h cron runs.
 10. The timekeeper can read `get_match_details` for their match and can never confirm or dispute.
@@ -353,4 +369,16 @@ Source: `REVIEW-SPEC.md` (2 BLOCKER, 9 MAJOR, 10 MINOR), with the coordinator's 
 | m10 | Shipped C1 strings added to the copy deck. |
 | m12 | BOARDS.md records Designer A's on-disk ids. |
 | M1 to M3, m1, m3 to m5, m11 | Board-only fixes for the designers (sample data, roster, styling, clocks, dates, stakes); no spec change. |
+
+## Round 3: D12 (timekeeper must record)
+
+| Item | What changed |
+|---|---|
+| Decision | D12 added to BRIEF.md: the timekeeper must record; athletes stay optional (D8). |
+| Consent | AI processing consent is taken at Accept (B.2, TK-T7, TK-T8); refusing it means they cannot timekeep. |
+| Face-off | Record row locked on (TK-K9); Start also gated on the timekeeper's camera ready and server-side intent (TK-K10; permission denied TK-K11, TK-K12). |
+| Server | `set_match_recording_intent` refuses turning the timekeeper's intent off (`timekeeper_must_record`); `start_match` refuses `timekeeper_not_recording`. The server verifies intent and uploads only, never that the camera rolls. Section R Start and Record video rows. BE-4, new BE-12. |
+| Live | No stop control; camera failure banner and restart (TK-L3, TK-L4), the match continues, the gap is noted, athletes' angles count (B.9). FE-6. |
+| After | Upload required; missing at the 24 h settle window flags admin review (signal only); one push nudge TK-N8 and in-app TK-U1, TK-U2. Q14. |
+| Criteria and sizing | G16, G17; sizing 11 to 15 days. |
 

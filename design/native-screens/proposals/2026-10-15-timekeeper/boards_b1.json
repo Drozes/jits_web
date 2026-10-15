@@ -24,7 +24,7 @@
     "id": "P-TK-B4-Timekeeper-Ask",
     "file": "P-TK-B4-Timekeeper-Ask.dc.html",
     "title": "Proposed: Timekeeper mode, the asked person (push, Timekeep this match?, closed, entering)",
-    "w": 1784,
+    "w": 2648,
     "h": 1352
   },
   {
@@ -39,13 +39,13 @@
     "file": "P-TK-B-Rules.dc.html",
     "title": "Proposed: Timekeeper mode rules (who can do what, flag OFF vs timekeeper mode, server rule and HINT)",
     "w": 1440,
-    "h": 3426
+    "h": 3642
   },
   {
     "id": "P-TK-00-Map",
     "file": "P-TK-00-Map.dc.html",
     "title": "Proposed: Timekeeper mode map (what changed, decisions, flow, asks, open questions, go/no-go)",
     "w": 1440,
-    "h": 4334
+    "h": 4649
   }
 ]

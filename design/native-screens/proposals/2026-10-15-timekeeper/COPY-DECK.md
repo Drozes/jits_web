@@ -107,6 +107,9 @@ Every string on the `P-TK-*` boards. Shipped strings cite `apps/mobile/` file:li
 | TK-T4 | Secondary | `Decline` |
 | TK-T5 | Countdown | `ANSWER IN {m:ss}` |
 | TK-T6 | Refused | `This request is no longer open.` |
+| TK-T7 | Sheet, recording line (D12) | `Timekeepers record the match on video. ELO RATED analyses the film with AI.` |
+| TK-T8 | After `Not now` on the consent sheet (D12) | `You need to allow recording to timekeep.` |
+| shipped | Consent sheet before the first recording | `AI_CONSENT_COPY` title, `allow`, `notNow` (`components/moderation/ai-consent-sheet.tsx:40, 53, 54`) |
 
 ### Athlete face-off (B5)
 
@@ -132,6 +135,10 @@ Every string on the `P-TK-*` boards. Shipped strings cite `apps/mobile/` file:li
 | TK-K6 | Start | `Start match` |
 | TK-K7 | Start disabled reason | `WAITING FOR BOTH ATHLETES` |
 | TK-K8 | Start disabled reason | `CONFIRM BOTH WEIGHTS` |
+| TK-K9 | Locked record row helper (D12) | `Timekeepers always record this match.` (label stays the shipped `Record from my phone`, no switch) |
+| TK-K10 | Start disabled reason (D12) | `WAITING FOR YOUR CAMERA` |
+| TK-K11 | Camera permission denied (D12) | `Allow camera access to timekeep. Your camera records the match.` |
+| TK-K12 | Action | `Open Settings` |
 | TK-K14 | Timekeeper Leave alert (before the end only; no Leave after the end) | `Stop timekeeping?` / `The match waits up to 10 minutes for a new timekeeper.` / `Keep timekeeping` / `Leave` |
 | TK-L0 | Countdown caption (timekeeper mode) | `SYNCED TO SERVER CLOCK · ALL PHONES` |
 | shipped | Verdict buttons, flag, record, starting | `Confirm`, `Doesn't look right`, `YOU FLAGGED`, `Withdraw flag`, `Record from my phone`, `MATCH ON HOLD · WEIGHT CHECK`, `STARTING MATCH...` |
@@ -142,6 +149,8 @@ Every string on the `P-TK-*` boards. Shipped strings cite `apps/mobile/` file:li
 |---|---|---|
 | TK-L1 | Timekeeper kicker | `YOU RUN THE CLOCK` |
 | TK-L2 | Athlete strip (replaces controls) | `{NAME} RUNS THE CLOCK` |
+| TK-L3 | Timekeeper banner, camera failed (D12) | `CAMERA STOPPED · KEEP RUNNING THE CLOCK` |
+| TK-L4 | Banner action | `Restart camera` |
 | shipped | End plate on athletes | `{NAME} ENDED THE MATCH`, `FINAL CLOCK {mm:ss} OF {mm:ss}` (name = timekeeper) |
 
 ### Result (B8)
@@ -154,6 +163,10 @@ Every string on the `P-TK-*` boards. Shipped strings cite `apps/mobile/` file:li
 | TK-R4 | Timekeeper done action | `Done` |
 | TK-R5 | Athlete confirm kicker | `RESULT RECORDED BY {NAME}` (shipped template with the timekeeper's name; needs a code change: `confirm-step.tsx:174` gates it on `opponentConfirmed`, FE-7) |
 | TK-N7 | Push | `Confirm your result` / `{name} recorded {A} vs {B}. Confirm or dispute it.` |
+| shipped | Timekeeper done screen upload line | `Keep ELO RATED open until your film uploads.` (M-UPLOAD, Oct 4 copy deck) |
+| TK-U1 | Timekeeper match page, upload not landed (D12) | `Your film hasn't uploaded yet.` |
+| TK-U2 | Action | `Upload now` |
+| TK-N8 | Push to the timekeeper, 2 h after the end, once (D12) | `Upload your match film` / `{A} vs {B} needs your film. Open ELO RATED to finish the upload.` |
 
 ### Drop-out and cancel (B9)
 
@@ -180,6 +193,7 @@ Every string on the `P-TK-*` boards. Shipped strings cite `apps/mobile/` file:li
 | TK-N5 | `Your timekeeper left` / `Your match is paused. Pick a new timekeeper within 10 minutes.` |
 | TK-N6 | `Match cancelled` / `No timekeeper took over in time. The match won't count.` |
 | TK-N7 | `Confirm your result` / `{name} recorded {A} vs {B}. Confirm or dispute it.` |
+| TK-N8 | `Upload your match film` / `{A} vs {B} needs your film. Open ELO RATED to finish the upload.` |
 
 ### Phase 2 (B11, tagged PHASE 2)
 

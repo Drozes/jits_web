@@ -170,3 +170,64 @@ B1 to B5 are now rows: B1 1784, B2 2648, B3 4376, B4 1784 and B5 2216 px wide, a
 
 - **m11 is not fixed.** On B9 frames 2, 3 and 6 the slab caption `OF 05:00` still touches the numerals. Before a later polish pass, compare the slab against live board 24.
 - **Two frames leave things out, but say so on the board.** B2 frames 3 to 6 cut the list at the fold. The B3 frames omit the fight chip.
+
+## Round 3 verification (D12, timekeeper must record), 2026-10-15
+
+**Verdict: PUBLISHABLE.** No blockers. Two MINOR documentation items and one owner/legal note follow; none of them blocks publishing.
+
+### Checks
+
+1. **Format: pass.** The checker was re-run over all 19 boards and every one passes:
+   - the `support.js` line is identical on every board;
+   - the DCLogic body is the reference body;
+   - root size equals the board's w/h in `boards_*.json` and its `$preview` (for example B4 2648x1352, B6 3512x1441, B7 2648x1473);
+   - markup is static;
+   - there are no em, en or horizontal-bar dashes.
+   The only exceptions are the two allowed ones: the shared `/_blob/` camera images on A2 and A3, and the shipped `Your match has begun!` on B10.
+
+2. **D12 copy: pass.** Each D12 string on the boards matches COPY-DECK exactly, under the right id:
+
+   | Id | String | Board |
+   |---|---|---|
+   | TK-T7 | `Timekeepers record the match on video. ELO RATED analyses the film with AI.` | B4 frames 2 and 4, B11 frame 6 |
+   | TK-T8 | `You need to allow recording to timekeep.` | B4 frame 4 |
+   | TK-K9 | `Timekeepers always record this match.` | every B6 face-off frame, B10 frame 4 |
+   | TK-K10 | `WAITING FOR YOUR CAMERA` | B6 |
+   | TK-K11 | `Allow camera access to timekeep. Your camera records the match.` | B6 |
+   | TK-K12 | `Open Settings` | B6 |
+   | TK-L3 | `CAMERA STOPPED · KEEP RUNNING THE CLOCK` | B7 frame 2b |
+   | TK-L4 | `Restart camera` | B7 frame 2b |
+   | TK-U1 | `Your film hasn't uploaded yet.` | B8 |
+   | TK-U2 | `Upload now` | B8 |
+   | TK-N8 | `Upload your match film` / `{A} vs {B} needs your film. Open ELO RATED to finish the upload.` | B10 |
+
+   B8 also uses the shipped keep-open line `Keep ELO RATED open until your film uploads.`, which matches `lib/video/upload-copy.ts:26` literally.
+
+3. **Cross-board consistency: pass.** SPEC R, the rules board, the map and B4, B6, B7, B8 and B10 agree on each point below.
+   - **Record row:** locked on in every timekeeper frame, with the shipped label, a lock glyph and no switch. The athletes keep their optional switch.
+   - **Start gate:** opens only when the camera is ready (checked on the phone) and the intent is on server side. `start_match` refuses with `timekeeper_not_recording`; `set_match_recording_intent` refuses to turn the intent off with `timekeeper_must_record`.
+   - **Consent:** taken at Accept, through the shipped AI consent sheet.
+   - **Camera failure:** the banner shows while the clock and controls stay, and the match is never stopped.
+   - **Upload:** required. Missing footage at the 24 h settle window (counted from `completed_at`) only flags the match for admin review; athletes see nothing.
+   - **Push:** one TK-N8 nudge, 2 h after the end.
+   - **Q14:** on the map in order, with the recommended answer.
+
+4. **B11 frame 6 vs B4 frame 2: pass.** B11 frame 6 matches B4 frame 2 string for string and in order:
+   - the title and `ANSWER IN 1:42`;
+   - the fight chip with ELO only and no weights;
+   - TK-T2, then TK-T7 directly below it;
+   - Decline on the left, Accept on the right.
+
+5. **Feasibility: pass.**
+   - **What the server checks:** SPEC B.9, the rules board and B6 frame 4b all say the server can verify only the recording intent before the start and only whether an upload arrived afterwards. None of them claims the server can tell the camera is rolling.
+   - **Intent write at accept:** the shipped `set_match_recording_intent` (`20261005100300`) accepts writes while the match is `pending` or `in_progress` and derives the timekeeper role. So writing the intent at accept also works for mid-match replacements.
+   - **D8:** nothing contradicts it. Athletes stay optional everywhere: B6 frame 1, B7 frame 2b ("the athletes' optional angles still count"), the B10 edge list and the rules board's Record video row.
+   - **Flag-OFF safety:** both RPC changes are stated as timekeeper-mode only (SPEC B.9 "in timekeeper mode", R and BE-12). The flag-OFF Record video column still reads "all optional", including the code-joined record-only timekeeper.
+
+6. **Renders: pass.** B4, B6 and B7 were rendered in headless Chrome. There is no clipping or overlap; the new consent frame, the camera-denied frame and the camera-failure banner all fit their 390 px frames.
+
+### Remaining items (none blocking)
+
+- **MINOR, SPEC fix needed.** SPEC B.2 (line 105) calls the consent button `Allow`. The shipped label is `Allow and film` (`AI_CONSENT_COPY.allow`, `lib/moderation/moderation-copy.ts:86`), and B4 frame 3 correctly draws `Allow and film`. Change SPEC B.2 to `Allow and film`, and add the shipped consent strings with their file:line to COPY-DECK under B4.
+- **MINOR, owner/legal note (no board change).** The shipped "Before you film" body is worded for an athlete filming themselves: "Your match video, with your display name, rating and weight division, is sent to Google Gemini…". A timekeeper films two other people, and their own name, rating and division are not what gets sent. Reusing the sheet unchanged is fine for the boards. Before build, the owner or legal should confirm that this consent is enough for a non-competing filmer, or add timekeeper-specific body copy.
+- **Carried over from round 2.** m11 is still open: the `OF 05:00` slab caption touches the numerals on B9, and now on B7 too. This is cosmetic; compare with live board 24.
