@@ -161,6 +161,7 @@ import {
 import { getMatchUpload, resetMatchUploadStore } from "@/lib/video/match-upload-store";
 import { describeUploadFailure } from "@/lib/video/upload-errors";
 import { __resetUploadTelemetry } from "@/lib/video/upload-telemetry";
+import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 
 const SIZE = 600_000_000;
 
@@ -206,6 +207,8 @@ let warnSpy: jest.SpyInstance;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Consented: resume and retry wait for AI processing consent (jits-rog5.11, own suite below).
+  __resetAiConsentForTests({ athleteId: "me", consentAt: "2026-10-14T12:00:00Z", known: true });
   mockStore.clear();
   mockNetListeners.length = 0;
   mockNetConnected.current = true;
@@ -544,6 +547,23 @@ describe("a failed match_videos write never destroys the uploaded bytes", () => 
 });
 
 describe("resuming persisted jobs", () => {
+  it("without AI processing consent a queued job stays parked on disk, and Try again asks for consent (jits-rog5.11)", async () => {
+    __resetAiConsentForTests({ athleteId: "me", consentAt: null, known: true });
+    seedJob({ uploadUrl: "https://up/abc", bytesUploaded: 300_000_000 });
+
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+    expect(await loadUploadJob("M1")).not.toBeNull();
+    expect(await retryMatchVideoUpload("M1")).toBe("needs_consent");
+    expect(mockUploadFileResumable).not.toHaveBeenCalled();
+
+    __resetAiConsentForTests({ athleteId: "me", consentAt: "2026-10-14T12:00:00Z", known: true });
+    await resumeMatchVideoUploads();
+    await flush();
+    expect(mockUploadFileResumable).toHaveBeenCalledTimes(1);
+  });
+
   it("resumes a phase 'bytes' job from its persisted upload URL", async () => {
     seedJob({ uploadUrl: "https://up/abc", bytesUploaded: 300_000_000 });
 

@@ -15,7 +15,11 @@
  */
 import { useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getAiProcessingConsent, recordAiProcessingConsent } from "@jits/shared/api/moderation";
+import {
+  AI_PROCESSING_CONSENT_VERSION,
+  getAiProcessingConsent,
+  recordAiProcessingConsent,
+} from "@jits/shared/api/moderation";
 import { moderationClient } from "@/lib/moderation/client";
 import { useRecordingOptIn } from "@/lib/match-flow/recording-optin";
 
@@ -33,6 +37,8 @@ export const aiConsentCacheKey = (athleteId: string) => `ai-consent.${athleteId}
 
 let state: AiConsentState = EMPTY;
 let generation = 0;
+/** Bumped by every consent recorded on this device: a read that started before it never undoes it. */
+let recordedSeq = 0;
 const listeners = new Set<() => void>();
 
 function set(next: AiConsentState) {
@@ -49,9 +55,32 @@ function subscribe(cb: () => void) {
 
 const snapshot = () => state;
 
+/**
+ * Only consent to the text this build shows counts: a consent to an older
+ * version (or none) asks again (`AI_PROCESSING_CONSENT_VERSION`).
+ */
+export function currentConsentAt(consentAt: string | null, version: string | null): string | null {
+  return consentAt && version === AI_PROCESSING_CONSENT_VERSION ? consentAt : null;
+}
+
+/** The cache holds `{ at, version }`; anything else (or another version) reads as none. */
+function parseCached(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { at?: unknown; version?: unknown };
+    return typeof v.at === "string" && typeof v.version === "string" ? currentConsentAt(v.at, v.version) : null;
+  } catch {
+    return null;
+  }
+}
+
 function cache(athleteId: string, consentAt: string | null) {
   const key = aiConsentCacheKey(athleteId);
-  void (consentAt ? AsyncStorage.setItem(key, consentAt) : AsyncStorage.removeItem(key)).catch(() => undefined);
+  void (
+    consentAt
+      ? AsyncStorage.setItem(key, JSON.stringify({ at: consentAt, version: AI_PROCESSING_CONSENT_VERSION }))
+      : AsyncStorage.removeItem(key)
+  ).catch(() => undefined);
 }
 
 /**
@@ -65,18 +94,22 @@ export async function loadAiConsent(athleteId: string | null): Promise<void> {
   }
   if (!athleteId) return;
   const gen = generation;
+  const seq = recordedSeq;
   try {
-    const cached = await AsyncStorage.getItem(aiConsentCacheKey(athleteId));
-    // A consent recorded meanwhile (or the server read) wins over the cache.
-    if (gen === generation && cached && !state.consentAt) set({ athleteId, consentAt: cached, known: true });
+    const cached = parseCached(await AsyncStorage.getItem(aiConsentCacheKey(athleteId)));
+    // A consent recorded meanwhile wins over the cache.
+    if (gen === generation && seq === recordedSeq && cached) set({ athleteId, consentAt: cached, known: true });
   } catch {
     // No cache: the server read decides.
   }
   const res = await getAiProcessingConsent(moderationClient(), athleteId);
   if (gen !== generation || !res.ok) return;
-  // A consent just recorded on this device is never undone by a read that
-  // started before it landed.
-  const consentAt = res.data.consentAt ?? state.consentAt;
+  // Consent recorded on this device while the read was in flight: the read
+  // predates it and must not undo it.
+  if (seq !== recordedSeq) return;
+  // Otherwise the server wins, including a NULL: consent withdrawn (cleared
+  // by the team on request) stops recording on this device too.
+  const consentAt = currentConsentAt(res.data.consentAt, res.data.version);
   set({ athleteId, consentAt, known: true });
   cache(athleteId, consentAt);
 }
@@ -88,6 +121,7 @@ export async function giveAiConsent(): Promise<boolean> {
   const res = await recordAiProcessingConsent(moderationClient());
   if (!res.ok) return false;
   if (state.athleteId !== athleteId) return false;
+  recordedSeq += 1;
   set({ athleteId, consentAt: res.data, known: true });
   cache(athleteId, res.data);
   return true;

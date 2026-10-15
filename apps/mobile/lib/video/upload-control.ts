@@ -12,7 +12,7 @@
  * the manager has never loaded.
  */
 /** Mirrors `RetryResult` in the manager (kept here so this file imports nothing). */
-export type RetryMatchUploadResult = "started" | "running" | "no_job" | "signed_out" | "other_athlete";
+export type RetryMatchUploadResult = "started" | "running" | "no_job" | "signed_out" | "other_athlete" | "needs_consent";
 
 export interface UploadControl {
   retry: (matchId: string) => Promise<RetryMatchUploadResult>;

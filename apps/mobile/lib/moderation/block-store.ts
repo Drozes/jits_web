@@ -31,13 +31,15 @@ export interface BlockState {
   athleteId: string | null;
   /** Both reads have landed at least once for this athlete. */
   loaded: boolean;
+  /** A read for this athlete has finished at least once, ok or not (a profile waits for it). */
+  settled: boolean;
   ids: ReadonlySet<string>;
   mine: ReadonlySet<string>;
   /** My blocks, most recent first (Settings, Blocked athletes). */
   blockedList: readonly BlockedAthlete[];
 }
 
-const EMPTY: BlockState = { athleteId: null, loaded: false, ids: new Set(), mine: new Set(), blockedList: [] };
+const EMPTY: BlockState = { athleteId: null, loaded: false, settled: false, ids: new Set(), mine: new Set(), blockedList: [] };
 
 let state: BlockState = EMPTY;
 /** Bumped on every athlete change, so a read for the previous athlete never lands. */
@@ -68,13 +70,16 @@ export async function loadBlocks(athleteId: string | null): Promise<boolean> {
   const gen = generation;
   const [ids, mine] = await Promise.all([getMyBlockIds(moderationClient()), getMyBlockedAthletes(moderationClient())]);
   if (gen !== generation) return false;
-  if (!ids.ok && !mine.ok) return false;
+  if (!ids.ok && !mine.ok) {
+    if (!state.settled) set({ ...state, settled: true });
+    return false;
+  }
   const blockedList = mine.ok ? mine.data : state.blockedList;
   const mineIds = new Set(blockedList.map((b) => b.athlete_id));
   // My own blocks are always in the either-direction set, even if that read failed.
   const all = new Set(ids.ok ? ids.data : state.ids);
   for (const id of mineIds) all.add(id);
-  set({ athleteId, loaded: state.loaded || (ids.ok && mine.ok), ids: all, mine: mineIds, blockedList });
+  set({ athleteId, loaded: state.loaded || (ids.ok && mine.ok), settled: true, ids: all, mine: mineIds, blockedList });
   return ids.ok && mine.ok;
 }
 

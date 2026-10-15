@@ -97,7 +97,10 @@ export default function AthleteProfileScreen() {
     };
   }, [athlete?.id, id]);
 
-  if (authLoading || isLoading) {
+  // Until the block sets are read once, a deep link to a blocked profile
+  // must not flash its stats (a failed read settles too, so this never sticks).
+  const blocksPending = !isSelf && !blocks.settled;
+  if (authLoading || isLoading || blocksPending) {
     return (
       <View className="flex-1 bg-surface">
         <AppHeader title="Athlete" back />
@@ -130,7 +133,7 @@ export default function AthleteProfileScreen() {
         back
         rightAction={
           <View className="flex-row items-center gap-2">
-            <ShareButton athleteId={data.competitor.id} displayName={data.competitor.display_name} />
+            {blocked ? null : <ShareButton athleteId={data.competitor.id} displayName={data.competitor.display_name} />}
             {isSelf ? null : <MoreActionsButton onPress={() => setSheetMode("menu")} />}
           </View>
         }

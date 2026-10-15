@@ -57,6 +57,7 @@ import {
   trackRunStart,
   trackUploaded,
 } from "./upload-telemetry";
+import { hasAiConsent } from "@/lib/moderation/ai-consent";
 
 /**
  * The single retry / resume authority for match-video uploads.
@@ -1562,6 +1563,10 @@ export function startMatchVideoUpload(params: StartUploadParams): Promise<Upload
 export async function resumeMatchVideoUploads(): Promise<void> {
   ensureUploadListeners();
   if (!owner) return;
+  // No AI processing consent (5.1.2(i), jits-rog5.11): a clip queued before
+  // the consent prompt existed stays parked on disk, untouched, until the
+  // athlete allows (the bootstrap resumes on consent, Try again asks).
+  if (!hasAiConsent()) return;
   void retryPendingAbandons();
   const jobs = await loadUploadJobs();
   for (const job of jobs) {
@@ -1571,7 +1576,7 @@ export async function resumeMatchVideoUploads(): Promise<void> {
 }
 
 /** Why a Try again did or did not start a run (each gets its own message, m8). */
-export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "other_athlete";
+export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "other_athlete" | "needs_consent";
 
 /**
  * The athlete's Try again (jits-n2im.3): run a parked or failed job NOW,
@@ -1583,6 +1588,7 @@ export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "oth
 export async function retryMatchVideoUpload(matchId: string): Promise<RetryResult> {
   if (runners.has(matchId)) return "running";
   if (!owner) return "signed_out";
+  if (!hasAiConsent()) return "needs_consent";
   const job = await loadUploadJob(matchId);
   if (!job) return "no_job";
   if (job.uploaderAthleteId !== owner) return "other_athlete";

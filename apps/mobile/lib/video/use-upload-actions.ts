@@ -1,7 +1,11 @@
 import * as React from "react";
 import { Alert } from "react-native";
 import { toast } from "@/components/ui/toast";
+import { router } from "expo-router";
 import { discardMatchUpload, retryMatchUpload, type RetryMatchUploadResult } from "./upload-control";
+import { giveAiConsent } from "@/lib/moderation/ai-consent";
+import { AI_CONSENT_COPY } from "@/lib/moderation/moderation-copy";
+import { legalHref } from "@/lib/legal/legal-copy";
 
 /** The deck's label for every retry control (convention 4). */
 export const TRY_AGAIN_LABEL = "Try again";
@@ -36,10 +40,16 @@ export function retryRefusedCopy(result: RetryMatchUploadResult): string | null 
  */
 export function useUploadActions(matchId: string): { retry: () => void; discard: () => void } {
   const retry = React.useCallback(() => {
-    void retryMatchUpload(matchId).then((result) => {
-      const refused = retryRefusedCopy(result);
-      if (refused) toast.error(refused);
-    });
+    const run = () =>
+      void retryMatchUpload(matchId).then((result) => {
+        if (result === "needs_consent") {
+          askConsentToUpload(run);
+          return;
+        }
+        const refused = retryRefusedCopy(result);
+        if (refused) toast.error(refused);
+      });
+    run();
   }, [matchId]);
 
   const discard = React.useCallback(() => {
@@ -50,4 +60,24 @@ export function useUploadActions(matchId: string): { retry: () => void; discard:
   }, [matchId]);
 
   return { retry, discard };
+}
+
+/**
+ * A clip recorded before the consent prompt existed (jits-rog5.11): Try
+ * again asks first. Allow records consent and uploads; Not now keeps the
+ * clip parked on this phone.
+ */
+export function askConsentToUpload(onAllowed: () => void): void {
+  Alert.alert(AI_CONSENT_COPY.uploadTitle, AI_CONSENT_COPY.body, [
+    { text: AI_CONSENT_COPY.notNow, style: "cancel", onPress: () => toast.info(AI_CONSENT_COPY.uploadParked) },
+    { text: AI_CONSENT_COPY.privacyLink, onPress: () => router.push(legalHref("privacy", undefined, "4")) },
+    {
+      text: AI_CONSENT_COPY.allowUpload,
+      onPress: () =>
+        void giveAiConsent().then((ok) => {
+          if (ok) onAllowed();
+          else toast.error(AI_CONSENT_COPY.failed);
+        }),
+    },
+  ]);
 }

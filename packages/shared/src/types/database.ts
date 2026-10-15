@@ -3972,6 +3972,7 @@ export type Database = {
         Returns: number
       }
       _inviter_card: { Args: { p_athlete: string }; Returns: Json }
+      _is_blocked_pair: { Args: { p_a: string; p_b: string }; Returns: boolean }
       _issue_timekeeper_code: {
         Args: { p_by: string; p_match_id: string }
         Returns: {
@@ -4247,6 +4248,26 @@ export type Database = {
           primary_gym_name: string
         }[]
       }
+      admin_list_content_reports: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: {
+          created_at: string
+          details: string
+          id: string
+          reason: string
+          reported_athlete_id: string
+          reported_display_name: string
+          reported_open_reports: number
+          reporter_display_name: string
+          reporter_id: string
+          resolution_note: string
+          reviewed_at: string
+          reviewed_by: string
+          status: string
+          target_id: string
+          target_type: string
+        }[]
+      }
       admin_list_invite_attributions: {
         Args: { p_limit?: number; p_since: string }
         Returns: Json
@@ -4303,6 +4324,10 @@ export type Database = {
       }
       admin_remove_gym_manager: {
         Args: { p_athlete_id: string; p_gym_id: string }
+        Returns: undefined
+      }
+      admin_resolve_content_report: {
+        Args: { p_note?: string; p_report_id: string; p_status: string }
         Returns: undefined
       }
       admin_search_athletes: {

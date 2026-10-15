@@ -10,6 +10,7 @@ const mockToastInfo = jest.fn();
 jest.mock("@/components/ui/toast", () => ({ toast: { info: (m: string) => mockToastInfo(m), success: jest.fn(), error: jest.fn() } }));
 const mockApi = { getAiProcessingConsent: jest.fn(), recordAiProcessingConsent: jest.fn() };
 jest.mock("@jits/shared/api/moderation", () => ({
+  AI_PROCESSING_CONSENT_VERSION: "2026-10-14",
   getAiProcessingConsent: (...a: unknown[]) => mockApi.getAiProcessingConsent(...a),
   recordAiProcessingConsent: (...a: unknown[]) => mockApi.recordAiProcessingConsent(...a),
 }));
@@ -26,6 +27,7 @@ import { useAiConsentGate } from "@/lib/moderation/use-ai-consent-gate";
 import { __resetRecordingOptInForTests, getRecordingOptIn } from "@/lib/match-flow/recording-optin";
 
 const AT = "2026-10-14T12:00:00.000Z";
+const CACHED = JSON.stringify({ at: AT, version: "2026-10-14" });
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -46,11 +48,11 @@ describe("loadAiConsent", () => {
     mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: "2026-10-14" } });
     await loadAiConsent("me");
     expect(hasAiConsent()).toBe(true);
-    expect(await AsyncStorage.getItem(aiConsentCacheKey("me"))).toBe(AT);
+    expect(await AsyncStorage.getItem(aiConsentCacheKey("me"))).toBe(CACHED);
   });
 
   it("the device cache answers first, so a consented athlete never sees the gate while the read runs", async () => {
-    await AsyncStorage.setItem(aiConsentCacheKey("me"), AT);
+    await AsyncStorage.setItem(aiConsentCacheKey("me"), CACHED);
     mockApi.getAiProcessingConsent.mockReturnValue(new Promise(() => undefined));
     void loadAiConsent("me");
     await act(async () => {});
@@ -58,14 +60,46 @@ describe("loadAiConsent", () => {
   });
 
   it("a failed server read keeps the cached answer", async () => {
-    await AsyncStorage.setItem(aiConsentCacheKey("me"), AT);
+    await AsyncStorage.setItem(aiConsentCacheKey("me"), CACHED);
     mockApi.getAiProcessingConsent.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "" } });
     await loadAiConsent("me");
     expect(hasAiConsent()).toBe(true);
   });
 
+  it("withdrawn on the server (NULL) beats a cached given, and clears the cache", async () => {
+    await AsyncStorage.setItem(aiConsentCacheKey("me"), CACHED);
+    await loadAiConsent("me");
+    expect(hasAiConsent()).toBe(false);
+    expect(await AsyncStorage.getItem(aiConsentCacheKey("me"))).toBeNull();
+  });
+
+  it("consent given while a read is in flight is not undone by that read", async () => {
+    let resolve: (v: unknown) => void = () => undefined;
+    mockApi.getAiProcessingConsent.mockReturnValueOnce(new Promise((r) => (resolve = r)));
+    const reading = loadAiConsent("me");
+    await act(async () => {});
+    await act(async () => {
+      await giveAiConsent();
+    });
+    resolve({ ok: true, data: { consentAt: null, version: null } });
+    await reading;
+    expect(hasAiConsent()).toBe(true);
+  });
+
+  it("consent to an older text version asks again (server and cache)", async () => {
+    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: "2025-01-01" } });
+    await loadAiConsent("me");
+    expect(hasAiConsent()).toBe(false);
+    __resetAiConsentForTests();
+    await AsyncStorage.setItem(aiConsentCacheKey("me"), JSON.stringify({ at: AT, version: "2025-01-01" }));
+    mockApi.getAiProcessingConsent.mockReturnValue(new Promise(() => undefined));
+    void loadAiConsent("me");
+    await act(async () => {});
+    expect(hasAiConsent()).toBe(false);
+  });
+
   it("signing out clears it", async () => {
-    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: null } });
+    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: "2026-10-14" } });
     await loadAiConsent("me");
     await loadAiConsent(null);
     expect(hasAiConsent()).toBe(false);
@@ -133,7 +167,7 @@ describe("useAiConsentGate (the face-off switch)", () => {
   });
 
   it("with consent already given, the switch passes straight through (no prompt)", async () => {
-    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: null } });
+    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: "2026-10-14" } });
     await loadAiConsent("me");
     const { result } = renderHook(() => useAiConsentGate());
     act(() => result.current.onRecordingChange(true));

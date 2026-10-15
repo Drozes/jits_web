@@ -10,6 +10,7 @@ import {
   setUploadOwner,
   stopMatchVideoUploadsForSignOut,
 } from "./video-upload-manager";
+import { useAiConsent } from "@/lib/moderation/ai-consent";
 
 /**
  * Picks up match-video uploads that an earlier app launch could not finish
@@ -31,6 +32,9 @@ import {
 export function VideoUploadBootstrap() {
   const { athlete } = useAuth();
   const athleteId = athlete?.id ?? null;
+  // Uploads wait for AI processing consent (jits-rog5.11); the moment it is
+  // known or given, the parked jobs resume.
+  const consented = useAiConsent().consentAt !== null;
 
   // Reported once per launch, and deliberately NOT gated on auth: it is a
   // fact about the binary, and an error raised before sign-in should carry
@@ -86,6 +90,10 @@ export function VideoUploadBootstrap() {
       void unbind;
     };
   }, [athleteId]);
+
+  React.useEffect(() => {
+    if (athleteId && consented) void resumeMatchVideoUploads();
+  }, [athleteId, consented]);
 
   return null;
 }

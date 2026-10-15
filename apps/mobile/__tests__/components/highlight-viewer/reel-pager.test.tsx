@@ -332,6 +332,17 @@ describe("ReelPager", () => {
     expect(pool()[0].playing).toBe(false);
   });
 
+  it("not yours: opening Report suspends paging and pauses, like the other sheets (jits-rog5.11)", async () => {
+    const other = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
+    const utils = await open(session([other, reel(2)], 0));
+    expect(list(utils).props.scrollEnabled).toBe(true);
+    await act(async () => fireEvent.press(utils.getByTestId("viewer-report")));
+    await flush();
+    expect(utils.getByTestId("report-form")).toBeTruthy();
+    expect(list(utils).props.scrollEnabled).toBe(false);
+    expect(pool()[0].playing).toBe(false);
+  });
+
   it("tap toggles pause and play on the visible reel", async () => {
     const utils = await open(session([reel(1), reel(2)], 0));
     fireEvent.press(utils.getByTestId("highlight-player-toggle"));

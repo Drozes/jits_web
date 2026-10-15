@@ -33,7 +33,7 @@ export function ViewerReady({ detail, source, binding }: { detail: HighlightDeta
   // lane item's `opponentName` carries its subject's name.
   const item = binding.item;
   const subject = React.useMemo(() => ({ isOwn: !item || item.isOwn, name: item?.opponentName ?? null }), [item]);
-  const { onReport, sheet: reportSheet } = useReelReport(subject.isOwn, detail.highlightId);
+  const { onReport, sheet: reportSheet } = useReelReport(subject.isOwn, detail.highlightId, binding);
 
   if (!progress || !playback) {
     return <ViewerNoPlayback progress={progress} error={my.progressError} onRetry={my.reload} binding={binding} />;

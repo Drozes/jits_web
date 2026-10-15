@@ -70,7 +70,7 @@ import { __resetBlocksForTests } from "@/lib/moderation/block-store";
 
 beforeEach(() => {
   mockId = "rival-1";
-  __resetBlocksForTests({ athleteId: "me-1", loaded: true });
+  __resetBlocksForTests({ athleteId: "me-1", loaded: true, settled: true });
 });
 
 describe("AthleteProfileScreen", () => {
@@ -96,7 +96,7 @@ describe("AthleteProfileScreen", () => {
   });
 
   it("someone I blocked (a deep link too): the blocked state with Unblock, no stats or compare", async () => {
-    __resetBlocksForTests({ athleteId: "me-1", loaded: true, ids: new Set(["rival-1"]), mine: new Set(["rival-1"]) });
+    __resetBlocksForTests({ athleteId: "me-1", loaded: true, settled: true, ids: new Set(["rival-1"]), mine: new Set(["rival-1"]) });
     const s = render(<AthleteProfileScreen />);
     await act(async () => {});
     expect(s.getByTestId("athlete-blocked-state")).toBeTruthy();
@@ -105,11 +105,27 @@ describe("AthleteProfileScreen", () => {
   });
 
   it("someone who blocked me: not available, no Unblock", async () => {
-    __resetBlocksForTests({ athleteId: "me-1", loaded: true, ids: new Set(["rival-1"]) });
+    __resetBlocksForTests({ athleteId: "me-1", loaded: true, settled: true, ids: new Set(["rival-1"]) });
     const s = render(<AthleteProfileScreen />);
     await act(async () => {});
     expect(s.getByText("You can't see this athlete's profile.")).toBeTruthy();
     expect(s.queryByTestId("athlete-unblock")).toBeNull();
     expect(s.queryByText("Compare Stats")).toBeNull();
+  });
+
+  it("holds the profile back until the block sets are read, so a blocked one never flashes", async () => {
+    __resetBlocksForTests({ athleteId: "me-1" });
+    const s = render(<AthleteProfileScreen />);
+    await act(async () => {});
+    expect(s.queryByText("Compare Stats")).toBeNull();
+    expect(s.queryByTestId("athlete-more")).toBeNull();
+  });
+
+  it("no Share on a blocked profile", async () => {
+    __resetBlocksForTests({ athleteId: "me-1", loaded: true, settled: true, ids: new Set(["rival-1"]), mine: new Set(["rival-1"]) });
+    const s = render(<AthleteProfileScreen />);
+    await act(async () => {});
+    expect(s.queryByLabelText("Share")).toBeNull();
+    expect(s.getByTestId("athlete-more")).toBeTruthy();
   });
 });
