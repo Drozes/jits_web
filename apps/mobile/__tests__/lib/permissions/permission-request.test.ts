@@ -52,6 +52,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  __resetPermissionRequestsForTests();
   jest.useRealTimers();
   setOS(ORIGINAL_OS as "ios" | "android");
 });

@@ -63,3 +63,10 @@ it("only go-live-location.ts passes upgrade to readLocationOnce", () => {
     .map((f) => path.relative(root, f).split(path.sep).join("/"));
   expect(passers).toEqual(["lib/arena/go-live-location.ts"]);
 });
+
+// Drop any permission request a test left pending, and its expiry timer.
+afterEach(() => {
+  (
+    jest.requireActual("@/lib/permissions/permission-request") as typeof import("@/lib/permissions/permission-request")
+  ).__resetPermissionRequestsForTests();
+});

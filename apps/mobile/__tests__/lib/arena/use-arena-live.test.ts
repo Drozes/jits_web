@@ -474,7 +474,7 @@ describe("going offline", () => {
       "@/lib/permissions/permission-request",
     ) as typeof import("@/lib/permissions/permission-request");
     Object.defineProperty(require("react-native").Platform, "OS", { value: "android", configurable: true });
-    const { result } = mount();
+    const { result, rerender } = mount();
     await act(async () => {
       await result.current.toggle();
     });
@@ -491,6 +491,8 @@ describe("going offline", () => {
         await flush();
       });
       expect(mockLeaveLobby).not.toHaveBeenCalled();
+      // A re-render while the replay is pending must not drop it (review N-b).
+      rerender({ ...ARGS, currentElo: 1300 });
       // The dialog answers; no further AppState event arrives (Home was pressed).
       await act(async () => {
         dialog.resolve();

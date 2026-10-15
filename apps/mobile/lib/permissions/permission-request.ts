@@ -14,7 +14,7 @@
  *  - `ignoreBackgroundForPermissionDialog()` is Android only. iOS reports a
  *    dialog as "inactive", so an iOS "background" with a prompt up is a real
  *    Home press and is never ignored.
- *  - A request older than `PERMISSION_REQUEST_MAX_AGE_MS` no longer counts, so
+ *  - A request older than `PERMISSION_REQUEST_MAX_AGE_MS` (30 s) no longer counts, so
  *    a native promise that never settles cannot hold the guard for the life of
  *    the process.
  *  - On Android, pressing Home while the dialog is up fires no further
@@ -35,13 +35,23 @@
  */
 import { AppState, Platform, type AppStateStatus } from "react-native";
 
-export const PERMISSION_REQUEST_MAX_AGE_MS = 60_000;
+/**
+ * 30 s, the location prompt's own timeout (`PERMISSION_REQUEST_TIMEOUT_MS`),
+ * so every prompt, camera and microphone included, holds the guard for at
+ * most about 31 s with the replay delay (review, jits-mafl.2).
+ */
+export const PERMISSION_REQUEST_MAX_AGE_MS = 30_000;
 export const SETTLE_REPLAY_DELAY_MS = 1_000;
 
 /** Request id -> start time (ms epoch). */
 const requests = new Map<number, number>();
 let nextId = 0;
 let expiryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Never keeps a Node (Jest) process alive; a no-op in React Native. */
+function unrefTimer(t: ReturnType<typeof setTimeout>): void {
+  (t as { unref?: () => void }).unref?.();
+}
 const settledListeners = new Set<() => void>();
 
 export function permissionRequestInFlight(now: number = Date.now()): boolean {
@@ -85,6 +95,7 @@ function scheduleExpiry(): void {
     if (requests.size === 0) notifySettled();
     else scheduleExpiry();
   }, wait);
+  unrefTimer(expiryTimer);
 }
 
 /**
@@ -144,6 +155,7 @@ export function permissionDialogBackgroundGuard(replay: () => void): PermissionD
       pending = false;
       replay();
     }, SETTLE_REPLAY_DELAY_MS);
+    unrefTimer(t);
     timers.add(t);
   });
   return {
@@ -164,7 +176,7 @@ export function permissionDialogBackgroundGuard(replay: () => void): PermissionD
   };
 }
 
-/** Tests only. */
+/** Tests only: call in afterEach. Drops every request and the expiry timer. */
 export function __resetPermissionRequestsForTests(): void {
   requests.clear();
   if (expiryTimer) clearTimeout(expiryTimer);

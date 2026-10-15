@@ -1292,3 +1292,10 @@ describe("camera and microphone prompts count as a permission request (jits-3dc2
     expect(permissionRequestInFlight()).toBe(false);
   });
 });
+
+// Drop any permission request a test left pending, and its expiry timer.
+afterEach(() => {
+  (
+    jest.requireActual("@/lib/permissions/permission-request") as typeof import("@/lib/permissions/permission-request")
+  ).__resetPermissionRequestsForTests();
+});
