@@ -1,11 +1,8 @@
 /**
- * One-screen setup for an invitee (jr_be spec 016, AC2.4 and AC2.5).
- *
- * Attribution is written first, at the first authenticated moment, so it
- * survives stalling here. Then one screen: waiver, first and last name
- * (prefilled from the account), gender, date of birth (16+), weight. Free
- * agent is set automatically and city is deferred. Saving activates the
- * profile and returns to `app/index.tsx`, which runs the claim.
+ * One-screen setup for an invitee (jr_be spec 016, AC2.4 and AC2.5). Attribution is written first, at the first
+ * authenticated moment, so it survives stalling here. Then one screen: waiver, first and last name (prefilled from
+ * the account), gender, date of birth (16+), weight. Free agent is set automatically and city is deferred. Saving
+ * activates the profile and returns to `app/index.tsx`, which runs the claim.
  */
 import * as React from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
