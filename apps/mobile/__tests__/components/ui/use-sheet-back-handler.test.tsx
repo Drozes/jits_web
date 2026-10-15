@@ -373,4 +373,24 @@ describe("guard: every gorhom sheet handles the Android back", () => {
   it("each file that renders a BottomSheet or BottomSheetModal calls useSheetBackHandler", () => {
     expect(files.filter((f) => !/useSheetBackHandler\(/.test(f.src)).map((f) => f.rel)).toEqual([]);
   });
+
+  // jits-mafl.2.1: without these a back during the present animation can
+  // leave the sheet open (a dropped dismiss is never re-issued) or the back
+  // swallowed for good (a close reported only by onDismiss is never seen).
+  const users = ["app", "components", "lib"]
+    .flatMap((d) => walk(path.join(ROOT, d)))
+    .map((full) => ({ rel: path.relative(ROOT, full).split(path.sep).join("/"), src: fs.readFileSync(full, "utf8") }))
+    .filter((f) => !f.rel.endsWith("use-sheet-back-handler.ts") && /useSheetBackHandler\(/.test(f.src));
+
+  it("finds the hook's users", () => {
+    expect(users.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("each user forwards the sheet's onChange to the hook's returned onChange", () => {
+    expect(users.filter((f) => !/\.onChange\(/.test(f.src)).map((f) => f.rel)).toEqual([]);
+  });
+
+  it("each user wires the sheet's onDismiss", () => {
+    expect(users.filter((f) => !/onDismiss=\{/.test(f.src)).map((f) => f.rel)).toEqual([]);
+  });
 });

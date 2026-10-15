@@ -181,6 +181,20 @@ describe("NotificationPanel Android back mid-present (jits-mafl.2.1)", () => {
     expect(mockDismiss).toHaveBeenCalledTimes(2);
   });
 
+  it("a normal close reported twice (onChange(-1), then onDismiss) closes once and never dismisses again", () => {
+    const onOpenChange = jest.fn();
+    const { rerender } = render(<Harness open onOpenChange={onOpenChange} />);
+    act(() => mockOnChange?.(0));
+    pressBack();
+    act(() => mockOnChange?.(-1));
+    act(() => onDismiss());
+    expect(onOpenChange.mock.calls.filter(([o]) => o === false).length).toBeGreaterThanOrEqual(1);
+    expect(onOpenChange).not.toHaveBeenCalledWith(true);
+    rerender(<Harness open={false} onOpenChange={onOpenChange} />);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    expect(pressBack()).toBe(false);
+  });
+
   it("a dismiss gorhom dropped is re-issued once the panel settles open", () => {
     const onOpenChange = jest.fn();
     render(<Harness open onOpenChange={onOpenChange} />);

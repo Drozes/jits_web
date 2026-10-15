@@ -55,7 +55,7 @@ jest.mock("@/lib/cache/use-cached-resource", () => ({
   useCachedResource: () => mockHistory,
 }));
 
-import { StyleSheet } from "react-native";
+import { BackHandler, StyleSheet } from "react-native";
 import { YourNumbersBody, YourNumbersSheet } from "@/components/layout/your-numbers-sheet";
 
 const ATHLETE = {
@@ -260,5 +260,49 @@ describe("YourNumbersSheet", () => {
     const utils = render(<YourNumbersSheet athlete={ATHLETE} open onClosed={jest.fn()} />);
     utils.rerender(<YourNumbersSheet athlete={ATHLETE} open={false} onClosed={jest.fn()} />);
     expect(mockDismiss).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("YourNumbersSheet close reports (jits-mafl.2.1)", () => {
+  type BackListener = () => boolean | null | undefined;
+  let listeners: BackListener[] = [];
+  beforeEach(() => {
+    listeners = [];
+    jest.spyOn(BackHandler, "addEventListener").mockImplementation(((_e: string, fn: BackListener) => {
+      listeners.push(fn);
+      return { remove: () => (listeners = listeners.filter((l) => l !== fn)) };
+    }) as never);
+  });
+  afterEach(() => jest.restoreAllMocks());
+  const pressBack = () => [...listeners].reverse().some((l) => l());
+  const change = (i: number) => (mockSheetProps.onChange as (i: number) => void)(i);
+  const dismissed = () => (mockSheetProps.onDismiss as () => void)();
+
+  it("back, then a close reported only by onDismiss: closed, and open=false after it never dismisses", () => {
+    const onClosed = jest.fn();
+    const utils = render(<YourNumbersSheet athlete={ATHLETE} open onClosed={onClosed} />);
+    expect(pressBack()).toBe(true);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+    act(() => dismissed());
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    utils.rerender(<YourNumbersSheet athlete={ATHLETE} open={false} onClosed={onClosed} />);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("back, then onChange(-1) and onDismiss: wasOpen is cleared, so open=false after it never dismisses", () => {
+    const onClosed = jest.fn();
+    const utils = render(<YourNumbersSheet athlete={ATHLETE} open onClosed={onClosed} />);
+    pressBack();
+    act(() => change(-1));
+    act(() => dismissed());
+    utils.rerender(<YourNumbersSheet athlete={ATHLETE} open={false} onClosed={onClosed} />);
+    expect(mockDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("a dismiss gorhom dropped mid-present is re-issued once the sheet settles open", () => {
+    render(<YourNumbersSheet athlete={ATHLETE} open onClosed={jest.fn()} />);
+    pressBack();
+    act(() => change(0));
+    expect(mockDismiss).toHaveBeenCalledTimes(2);
   });
 });

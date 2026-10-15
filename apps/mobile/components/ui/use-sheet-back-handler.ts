@@ -39,7 +39,11 @@ export interface SheetBackHandle {
  * Backstop for a close that never reports back (no `onChange`, no
  * `onDismiss`): after this long the next press calls `onBack` again instead
  * of being swallowed forever. Longer than the ~300 ms present / dismiss
- * animation, so a normal close never reaches it.
+ * animation, so a normal close never reaches it. It also covers a back in
+ * the first frame, before `present()`'s requestAnimationFrame mounts the
+ * sheet: gorhom then never renders it and reports nothing, so the sheet is
+ * recovered by the next back after the watchdog, whose dismiss unmounts it
+ * and fires `onDismiss`.
  */
 export const SHEET_BACK_CLOSE_WATCHDOG_MS = 800;
 
