@@ -254,24 +254,84 @@ export function reportBrowsePresence(supabase: Client, reading: LocationReading)
 }
 
 export type ArenaNearbyMode = "flag_off" | "no_location" | "nearby";
-export type ArenaDistanceBand = "on_the_mat" | "under_500m" | "under_1km" | "under_2km";
-export type ArenaCloseBand = Exclude<ArenaDistanceBand, "on_the_mat">;
+/**
+ * A close band id. The server derives ids from its configured edges (jr_be
+ * spec 023 section 5.2: `under_1km`, `under_3km`, `under_1500m`, ...), so the
+ * client accepts any `under_<N>m` / `under_<N>km` instead of an allowlist.
+ */
+export type ArenaCloseBand = `under_${string}`;
+export type ArenaDistanceBand = "on_the_mat" | ArenaCloseBand;
+
+/** One live athlete in Online & close. Never a distance, only the band. */
+export interface ArenaCloseRow {
+  athleteId: string;
+  band: ArenaCloseBand;
+  /** The band's upper edge in meters (`band_max_m`, else read from the id). */
+  bandMaxM: number;
+  /**
+   * The server lets the viewer challenge this athlete (jr_be spec 023
+   * `can_challenge`). True only when the server sent exactly `true`; a server
+   * from before 023 sends nothing, so close rows stay unchallengeable there.
+   */
+  canChallenge: boolean;
+}
+
+/** The configured ranges (jr_be spec 023 `ranges`), for copy only. */
+export interface ArenaRanges {
+  /** About how far "on the mat" reaches (base plus the GPS allowance cap). */
+  sameMatM: number;
+  /** The Online & close radius. */
+  closeRadiusM: number;
+  bandEdgesM: number[];
+}
 
 export interface ArenaNearby {
   mode: ArenaNearbyMode;
-  /** Athletes on the viewer's mat (the match-start proximity rule). */
+  /** Athletes on the viewer's mat (the match-start proximity rule); always challengeable. */
   onTheMat: string[];
-  /** Live athletes within 2 km who are not on the mat, banded, never a number. */
-  close: { athleteId: string; band: ArenaCloseBand }[];
+  /** Live athletes within the close radius who are not on the mat, banded, never a distance. */
+  close: ArenaCloseRow[];
+  /** Null when the server sent none (before spec 023) or sent a malformed one. */
+  ranges: ArenaRanges | null;
 }
 
 const NEARBY_MODES: ReadonlySet<string> = new Set(["flag_off", "no_location", "nearby"]);
-const CLOSE_BANDS: ReadonlySet<string> = new Set(["under_500m", "under_1km", "under_2km"]);
+const CLOSE_BAND_RE = /^under_(\d+)(m|km)$/;
+
+function positiveInt(v: unknown): number | null {
+  return typeof v === "number" && Number.isInteger(v) && v > 0 ? v : null;
+}
+
+/** The meters a band id stands for (`under_2km` is 2000), or null when malformed. */
+export function closeBandMeters(band: string): number | null {
+  const m = CLOSE_BAND_RE.exec(band);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isSafeInteger(n) || n <= 0) return null;
+  return m[2] === "km" ? n * 1000 : n;
+}
+
+function parseRanges(v: unknown): ArenaRanges | null {
+  const r = obj(v);
+  if (!r) return null;
+  const sameMatM = positiveInt(r.same_mat_m);
+  const closeRadiusM = positiveInt(r.close_radius_m);
+  const edges = Array.isArray(r.band_edges_m) ? r.band_edges_m.map(positiveInt) : null;
+  if (sameMatM === null || closeRadiusM === null || !edges || edges.length === 0) return null;
+  if (edges.some((e) => e === null)) return null;
+  return { sameMatM, closeRadiusM, bandEdgesM: edges as number[] };
+}
 
 /**
  * Parse `get_arena_nearby()`. A refusal (`{ ok:false, code:'not_active' }`)
- * or an unknown shape is null (the caller falls back to today's list). Rows
- * with an unknown band are dropped rather than guessed.
+ * or an unknown shape is null (the caller falls back to today's list).
+ *
+ * Tolerant of both server generations (jr_be spec 023 section 8.1): a close
+ * row is kept whenever its band reads `under_<N>m` or `under_<N>km` (a row
+ * with a malformed band, or no athlete id, is dropped rather than guessed);
+ * `band_max_m` is used when it is a positive integer, else the meters come
+ * from the id; `can_challenge` is true only when it is exactly `true`; and
+ * `ranges` is null unless every field is valid.
  */
 export function parseArenaNearby(data: unknown): ArenaNearby | null {
   const o = obj(data);
@@ -283,45 +343,50 @@ export function parseArenaNearby(data: unknown): ArenaNearby | null {
     const id = str(obj(row)?.athlete_id);
     if (id) onTheMat.push(id);
   }
-  const close: ArenaNearby["close"] = [];
+  const close: ArenaCloseRow[] = [];
   for (const row of Array.isArray(o.close) ? o.close : []) {
     const r = obj(row);
     const id = str(r?.athlete_id);
     const band = str(r?.distance_band);
-    if (id && band && CLOSE_BANDS.has(band)) close.push({ athleteId: id, band: band as ArenaCloseBand });
+    if (!id || !band) continue;
+    const fromId = closeBandMeters(band);
+    if (fromId === null) continue;
+    close.push({
+      athleteId: id,
+      band: band as ArenaCloseBand,
+      bandMaxM: positiveInt(r?.band_max_m) ?? fromId,
+      canChallenge: r?.can_challenge === true,
+    });
   }
-  return { mode: mode as ArenaNearbyMode, onTheMat, close };
+  return { mode: mode as ArenaNearbyMode, onTheMat, close, ranges: parseRanges(o.ranges) };
 }
 
 /**
- * Which live athletes are on the viewer's mat and which are within 2 km
- * (bands only). Mode `flag_off` / `no_location` carries empty lists; the
- * Arena then shows today's list. Never throws.
+ * Which live athletes are on the viewer's mat and which are close (bands
+ * only). Mode `flag_off` / `no_location` carries empty lists; the Arena then
+ * shows today's list. Never throws.
  */
 export function getArenaNearby(supabase: Client): Promise<InviteResult<ArenaNearby>> {
   return rpc(supabase, "get_arena_nearby", {}, parseArenaNearby);
 }
 
-/** What a close row shows for its band. */
-export const ARENA_BAND_LABEL: Record<ArenaCloseBand, string> = {
-  under_500m: "< 500 m",
-  under_1km: "< 1 km",
-  under_2km: "< 2 km",
-};
+/**
+ * What a band shows, from its meters: whole kilometers read `< N km`, else
+ * `< N m` (500 is `< 500 m`, 1000 `< 1 km`, 1500 `< 1500 m`, 3000 `< 3 km`).
+ * Reproduces the labels of the server before spec 023 exactly.
+ */
+export function formatBandLabel(meters: number): string {
+  return meters % 1000 === 0 ? `< ${meters / 1000} km` : `< ${meters} m`;
+}
 
-/** What VoiceOver reads for a band. */
-export const ARENA_BAND_SPOKEN: Record<ArenaCloseBand, string> = {
-  under_500m: "under 500 meters",
-  under_1km: "under 1 kilometer",
-  under_2km: "under 2 kilometers",
-};
-
-/** Band order for sorting (nearest first). */
-export const ARENA_BAND_ORDER: Record<ArenaCloseBand, number> = {
-  under_500m: 0,
-  under_1km: 1,
-  under_2km: 2,
-};
+/** What VoiceOver reads for a band: `under 1 kilometer`, `under 3 kilometers`, `under 500 meters`. */
+export function formatBandSpoken(meters: number): string {
+  if (meters % 1000 === 0) {
+    const km = meters / 1000;
+    return `under ${km} ${km === 1 ? "kilometer" : "kilometers"}`;
+  }
+  return `under ${meters} ${meters === 1 ? "meter" : "meters"}`;
+}
 
 // ---------------------------------------------------------------------------
 // Location event telemetry (016 addendum: live location fixes, section 3.2)

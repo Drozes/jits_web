@@ -20,6 +20,7 @@ import {
   useLiveSurface,
   useHasArenaController,
   useNeedsLocation,
+  useNearbyCloseCount,
   useIncomingReopenSurface,
   useLiveSwitchDirection,
   useLiveSwitchPhase,
@@ -128,6 +129,7 @@ export function HeaderStatusChip({ onArena = false, onSpareWidth }: HeaderStatus
   const direction = useLiveSwitchDirection();
   const selfId = useArenaSelfId();
   const onMat = useOnMatCount(selfId);
+  const nearbyClose = useNearbyCloseCount();
   const toConfirm = useMatchToConfirm(selfId);
   const controllerReady = useHasArenaController();
   // Live as drawn, the overlay and pending: ONE snapshot, shared with the
@@ -160,6 +162,7 @@ export function HeaderStatusChip({ onArena = false, onSpareWidth }: HeaderStatus
     reconnecting: arena.reconnecting,
     lastLiveWriteFailed: arena.lastLiveWriteFailed,
     onMat,
+    nearbyClose,
     outgoing: arena.outgoing,
     incoming: arena.incoming,
     incomingTucked: arena.incomingTucked,

@@ -369,22 +369,46 @@ export function WaitingStrip({
   active,
   onCancel,
   disabled,
+  closeBand = null,
 }: {
   name: string;
   source: CountdownSource | null;
   active: boolean;
   onCancel: () => void;
   disabled: boolean;
+  /**
+   * Sent to someone in Online & close (jr_be spec 023 section 8.4): a gentle
+   * second line, `Possibly on a different mat · < 3 km`. Never blocking.
+   */
+  closeBand?: { label: string; spoken: string } | null;
 }) {
+  const line = (
+    <StripLine
+      head={`Waiting · ${name}`}
+      headAccessibilityLabel={`Waiting for ${name}`}
+      source={source}
+      active={active}
+      countdownTestID="arena-strip-countdown"
+    />
+  );
   return (
     <StripShell rail="neutral" testID="arena-strip-waiting">
-      <StripLine
-        head={`Waiting · ${name}`}
-        headAccessibilityLabel={`Waiting for ${name}`}
-        source={source}
-        active={active}
-        countdownTestID="arena-strip-countdown"
-      />
+      {closeBand ? (
+        <View className="flex-1">
+          <View className="flex-row">{line}</View>
+          <Text
+            testID="arena-strip-waiting-close"
+            numberOfLines={2}
+            accessibilityLabel={`Possibly on a different mat, ${closeBand.spoken} away.`}
+            maxFontSizeMultiplier={MAX_SCALE}
+            className="mt-0.5 font-body text-small text-ink-2"
+          >
+            {`Possibly on a different mat · ${closeBand.label}`}
+          </Text>
+        </View>
+      ) : (
+        line
+      )}
       <OutlineAction
         label="Cancel"
         accessibilityLabel="Cancel challenge"
@@ -721,8 +745,9 @@ export type MatRowAction =
   /** I am at the server's 3 pending outgoing cap. */
   | { kind: "capped" }
   /**
-   * Online & close (within 2 km, not on my mat): no ROLL, a challenge would
-   * fail the proximity gate. A neutral hint instead, never red.
+   * Online & close, not on my mat, and the server does not allow a
+   * challenge (`can_challenge` false or absent): no ROLL. A neutral hint
+   * instead, never red.
    */
   | { kind: "not-on-mat" };
 

@@ -68,11 +68,30 @@ it("counts the Arena's nearby On the mat rows, not the whole lobby", () => {
   expect(chipText(getByTestId)).toBe("○GO LIVE · 2");
 });
 
-it("live with nobody on my mat reads JUST YOU, even with others live nearby", () => {
+it("live with nobody on my mat and nobody close reads JUST YOU", () => {
   act(() => publishArenaState({ ...IDLE_ARENA_STATE, isLive: true }));
   const { getByTestId } = render(<HeaderStatusChip />);
   act(() => publishNearbyOnMatCount({ count: 0 }));
   expect(chipText(getByTestId)).toBe("LIVE · JUST YOU");
+  act(() => publishNearbyOnMatCount({ count: 0, close: 0 }));
+  expect(chipText(getByTestId)).toBe("LIVE · JUST YOU");
+});
+
+it("live with nobody on my mat but some close reads LIVE · N NEARBY, never JUST YOU (jr_be spec 023)", () => {
+  act(() => publishArenaState({ ...IDLE_ARENA_STATE, isLive: true }));
+  const { getByTestId } = render(<HeaderStatusChip />);
+  act(() => publishNearbyOnMatCount({ count: 0, close: 3 }));
+  expect(chipText(getByTestId)).toBe("LIVE · 3 NEARBY");
+  const status = getByTestId("header-status-chip").findAll(
+    (n: { props: { accessibilityLabel?: unknown } }) =>
+      typeof n.props.accessibilityLabel === "string" && n.props.accessibilityLabel.startsWith("Live status:"),
+  )[0] as { props: { accessibilityLabel: string } };
+  expect(status.props.accessibilityLabel).toBe("Live status: Nobody else on your mat, 3 nearby. Open live menu");
+  act(() => publishNearbyOnMatCount({ count: 0, close: 1 }));
+  expect(chipText(getByTestId)).toBe("LIVE · 1 NEARBY");
+  // Someone on my mat: the mat count, as before.
+  act(() => publishNearbyOnMatCount({ count: 2, close: 4 }));
+  expect(chipText(getByTestId)).toBe("LIVE · 2");
 });
 
 it("nearby rows not known yet: no number, never a guess", () => {

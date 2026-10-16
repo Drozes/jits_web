@@ -242,6 +242,31 @@ describe("describeHeaderChip copy (spec 4.3)", () => {
     expect(chipCopy(describeHeaderChip(input({ isLive: true, onMat: 0 })))).toBe(
       "● LIVE · JUST YOU",
     );
+    // Nobody close either (or unknown): still JUST YOU (jr_be spec 023 C7).
+    expect(chipCopy(describeHeaderChip(input({ isLive: true, onMat: 0, nearbyClose: 0 })))).toBe(
+      "● LIVE · JUST YOU",
+    );
+    expect(chipCopy(describeHeaderChip(input({ isLive: true, onMat: 0, nearbyClose: null })))).toBe(
+      "● LIVE · JUST YOU",
+    );
+  });
+
+  it("live with nobody on my mat but some close reads LIVE · N NEARBY (jr_be spec 023 C7)", () => {
+    const m = describeHeaderChip(input({ isLive: true, onMat: 0, nearbyClose: 4 }));
+    expect(chipCopy(m)).toBe("● LIVE · 4 NEARBY");
+    expect(m.accessibilityLabel).toBe("Live status: Nobody else on your mat, 4 nearby. Open live menu");
+    expect(m.tone).toBe("live");
+    expect(chipCopy(describeHeaderChip(input({ isLive: true, onMat: 0, nearbyClose: 1 })))).toBe(
+      "● LIVE · 1 NEARBY",
+    );
+    expect(chipCopy(describeHeaderChip(input({ isLive: true, onMat: 0, nearbyClose: 120 })))).toBe(
+      "● LIVE · 99+ NEARBY",
+    );
+    // Someone on my mat, or the mat count unknown: never NEARBY.
+    expect(chipCopy(describeHeaderChip(input({ isLive: true, onMat: 3, nearbyClose: 4 })))).toBe("● LIVE · 3");
+    expect(chipCopy(describeHeaderChip(input({ isLive: true, onMat: null, nearbyClose: 4 })))).toBe("● LIVE");
+    // Offline is unchanged.
+    expect(chipCopy(describeHeaderChip(input({ isLive: false, onMat: 0, nearbyClose: 4 })))).toBe("○ GO LIVE · 0");
   });
 
   it("an offline choice is drawn at once, while the server still says live (review round 3)", () => {

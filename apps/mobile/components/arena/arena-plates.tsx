@@ -131,6 +131,53 @@ export function CapPlate({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
+/**
+ * A gentle notice: title and body on the neutral rail, no button, nothing to
+ * answer (jr_be spec 023 section 8.4, the incoming challenge's "Maybe a
+ * different mat"). Read by VoiceOver as one element (`accessibilityLabel`).
+ * Never Signal Red: it informs, it does not block.
+ */
+export function InfoPlate({
+  title,
+  body,
+  accessibilityLabel,
+  testID,
+  maxFontSizeMultiplier,
+  bodyNumberOfLines,
+}: {
+  title: string;
+  body: string;
+  accessibilityLabel: string;
+  testID?: string;
+  maxFontSizeMultiplier?: number;
+  /** Caps the drawn body (ellipsis); the accessibility label keeps the full text. */
+  bodyNumberOfLines?: number;
+}) {
+  return (
+    <Plate
+      testID={testID}
+      className={DEGRADED_RAIL}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Text
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
+        className="font-mono-bold tabular-nums text-micro text-ink-2 uppercase tracking-caps-xl"
+      >
+        {title}
+      </Text>
+      <Text
+        numberOfLines={bodyNumberOfLines}
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
+        className="mt-1 font-body text-body text-ink-2"
+      >
+        {body}
+      </Text>
+    </Plate>
+  );
+}
+
 /** The roster read failed. Distinct from an empty roster, on purpose. */
 export function RosterErrorPlate({ onRetry }: { onRetry: () => void }) {
   return (

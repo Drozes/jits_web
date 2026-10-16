@@ -1433,3 +1433,87 @@ describe("ChallengePromptSheet Adding Flare (jits-pddd.3): accept sweep, sheen, 
     expect(mockNotify).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("ChallengePromptSheet: Maybe a different mat (jr_be spec 023 8.4, C6)", () => {
+  const BAND = { label: "< 3 km", spoken: "under 3 kilometers" };
+  const BODY = "Rival shows up < 3 km away. GPS can be off indoors, so check you're at the same gym.";
+
+  function Sheet(props: {
+    closeBand?: { label: string; spoken: string } | null;
+    onAccept?: () => void;
+    onDecline?: () => void;
+    challenge?: IncomingChallenge | null;
+  }) {
+    return (
+      <ChallengePromptSheet
+        challenge={props.challenge === undefined ? RIVAL : props.challenge}
+        busy={false}
+        onAccept={props.onAccept ?? jest.fn()}
+        onDecline={props.onDecline ?? jest.fn()}
+        closeBand={props.closeBand}
+      />
+    );
+  }
+
+  it("shows the plate with the band when the challenger is in my close list", () => {
+    const screen = render(<Sheet closeBand={BAND} />);
+    const plate = screen.getByTestId("challenge-prompt-different-mat");
+    expect(within(plate).getByText("Maybe a different mat")).toBeTruthy();
+    expect(within(plate).getByText(BODY)).toBeTruthy();
+    expect(plate.props.accessibilityLabel).toBe(
+      "Maybe a different mat. Rival shows up under 3 kilometers away. GPS can be off indoors, so check you're at the same gym.",
+    );
+    // Neutral rail, never Signal Red, and nothing to press.
+    expect(plate.props.className).toMatch(/border-l-ink-3/);
+    expect(plate.props.className).not.toMatch(/cta|negative/);
+    expect(within(plate).queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("no plate without a band (on my mat, not listed, or no nearby reading)", () => {
+    const screen = render(<Sheet />);
+    expect(screen.queryByTestId("challenge-prompt-different-mat")).toBeNull();
+    screen.rerender(<Sheet closeBand={null} />);
+    expect(screen.queryByTestId("challenge-prompt-different-mat")).toBeNull();
+    expect(screen.queryByText("Maybe a different mat")).toBeNull();
+  });
+
+  it("decides the plate once per challenge: a read landing while it is up changes nothing", () => {
+    const screen = render(<Sheet closeBand={BAND} />);
+    expect(screen.getByTestId("challenge-prompt-different-mat")).toBeTruthy();
+    // The challenger shows up on my mat now: the plate stays (no layout shift).
+    screen.rerender(<Sheet closeBand={null} />);
+    expect(screen.getByTestId("challenge-prompt-different-mat")).toBeTruthy();
+    expect(screen.getByTestId("challenge-prompt").props.style).toEqual({ gap: 20 });
+    // Tucked with Later and reopened: still the same challenge, still the plate.
+    screen.rerender(<Sheet challenge={null} closeBand={null} />);
+    screen.rerender(<Sheet closeBand={null} />);
+    expect(screen.getByTestId("challenge-prompt-different-mat")).toBeTruthy();
+    // A new challenge takes its own band.
+    const next = { ...RIVAL, challengeId: "ch-2" };
+    screen.rerender(<Sheet challenge={next} closeBand={null} />);
+    expect(screen.queryByTestId("challenge-prompt-different-mat")).toBeNull();
+    expect(screen.getByTestId("challenge-prompt").props.style).toEqual({ gap: 28 });
+    // And no plate appears on it later either.
+    screen.rerender(<Sheet challenge={next} closeBand={BAND} />);
+    expect(screen.queryByTestId("challenge-prompt-different-mat")).toBeNull();
+  });
+
+  it("caps the drawn body at 3 lines and keeps the full text for VoiceOver", () => {
+    const screen = render(<Sheet closeBand={BAND} />);
+    const plate = screen.getByTestId("challenge-prompt-different-mat");
+    expect(within(plate).getByText(BODY).props.numberOfLines).toBe(3);
+    expect(plate.props.accessibilityLabel).toContain("check you're at the same gym.");
+  });
+
+  it("Accept and Decline are unchanged with the plate up", () => {
+    jest.useFakeTimers();
+    const onAccept = jest.fn();
+    const onDecline = jest.fn();
+    const screen = render(<Sheet closeBand={BAND} onAccept={onAccept} onDecline={onDecline} />);
+    act(() => jest.advanceTimersByTime(PROMPT_INPUT_GUARD_MS));
+    fireEvent.press(screen.getByRole("button", { name: "Decline challenge" }));
+    expect(onDecline).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByLabelText("Accept challenge"));
+    expect(onAccept).toHaveBeenCalledTimes(1);
+  });
+});
