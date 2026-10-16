@@ -322,7 +322,7 @@ describe("ArenaBootstrap", () => {
     __setLatestNearbyForTests(view([], [["a-9", 3000]]), "me-1");
     const r = render(<ArenaBootstrap />);
     expect(
-      r.getByText("Rival shows up < 3 km from you. Indoor GPS can be off by a lot, so check you're at the same gym before you roll."),
+      r.getByText("Rival shows up < 3 km away. GPS can be off indoors, so check you're at the same gym."),
     ).toBeTruthy();
     // A nearby read landing while the prompt is up never moves the buttons.
     act(() => __setLatestNearbyForTests(view(["a-9"], []), "me-1"));

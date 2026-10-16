@@ -1436,7 +1436,7 @@ describe("ChallengePromptSheet Adding Flare (jits-pddd.3): accept sweep, sheen, 
 
 describe("ChallengePromptSheet: Maybe a different mat (jr_be spec 023 8.4, C6)", () => {
   const BAND = { label: "< 3 km", spoken: "under 3 kilometers" };
-  const BODY = "Rival shows up < 3 km from you. Indoor GPS can be off by a lot, so check you're at the same gym before you roll.";
+  const BODY = "Rival shows up < 3 km away. GPS can be off indoors, so check you're at the same gym.";
 
   function Sheet(props: {
     closeBand?: { label: string; spoken: string } | null;
@@ -1461,7 +1461,7 @@ describe("ChallengePromptSheet: Maybe a different mat (jr_be spec 023 8.4, C6)",
     expect(within(plate).getByText("Maybe a different mat")).toBeTruthy();
     expect(within(plate).getByText(BODY)).toBeTruthy();
     expect(plate.props.accessibilityLabel).toBe(
-      "Maybe a different mat. Rival shows up under 3 kilometers from you. Indoor GPS can be off by a lot, so check you're at the same gym before you roll.",
+      "Maybe a different mat. Rival shows up under 3 kilometers away. GPS can be off indoors, so check you're at the same gym.",
     );
     // Neutral rail, never Signal Red, and nothing to press.
     expect(plate.props.className).toMatch(/border-l-ink-3/);
@@ -1502,7 +1502,7 @@ describe("ChallengePromptSheet: Maybe a different mat (jr_be spec 023 8.4, C6)",
     const screen = render(<Sheet closeBand={BAND} />);
     const plate = screen.getByTestId("challenge-prompt-different-mat");
     expect(within(plate).getByText(BODY).props.numberOfLines).toBe(3);
-    expect(plate.props.accessibilityLabel).toContain("check you're at the same gym before you roll.");
+    expect(plate.props.accessibilityLabel).toContain("check you're at the same gym.");
   });
 
   it("Accept and Decline are unchanged with the plate up", () => {

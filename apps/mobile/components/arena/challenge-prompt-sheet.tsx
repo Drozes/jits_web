@@ -859,13 +859,13 @@ function AcceptSweep({ accepted, fill }: { accepted: boolean; fill: string }) {
  * rail, and Accept / Decline are unchanged.
  */
 function DifferentMatPlate({ name, band }: { name: string; band: { label: string; spoken: string } }) {
-  const tail = "Indoor GPS can be off by a lot, so check you're at the same gym before you roll.";
+  const tail = "GPS can be off indoors, so check you're at the same gym.";
   return (
     <InfoPlate
       testID="challenge-prompt-different-mat"
       title="Maybe a different mat"
-      body={`${name} shows up ${band.label} from you. ${tail}`}
-      accessibilityLabel={`Maybe a different mat. ${name} shows up ${band.spoken} from you. ${tail}`}
+      body={`${name} shows up ${band.label} away. ${tail}`}
+      accessibilityLabel={`Maybe a different mat. ${name} shows up ${band.spoken} away. ${tail}`}
       maxFontSizeMultiplier={MAX_FONT_SCALE}
       bodyNumberOfLines={DIFFERENT_MAT_BODY_LINES}
     />
