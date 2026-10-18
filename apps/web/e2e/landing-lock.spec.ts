@@ -30,9 +30,11 @@ test.describe("Landing page at /", () => {
     const heroLine = page.locator('[data-testid="landing-hero"] [data-lk="soon"]:visible');
     await expect(heroLine).toHaveCount(1);
     await expect(heroLine).toHaveText(HERO_LINE);
-    // Hero download moment and footer: both official badges, never red.
+    // Footer badges always; the hero repeats them only once the App Store
+    // URL is set (owner, 2026-10-18). Official badges, never red.
     const badgeBlocks = page.getByTestId("store-badges");
-    await expect(badgeBlocks).toHaveCount(2);
+    await expect(badgeBlocks).toHaveCount(APP_STORE_LIVE ? 2 : 1);
+    await expect(page.getByTestId("hero-badges")).toHaveCount(APP_STORE_LIVE ? 1 : 0);
     await expectStoreBadges(page, badgeBlocks.first());
     await expectStoreBadges(page, badgeBlocks.last());
     await expect(page.locator("main [style*='--accent-cta)']")).toHaveCount(0);
@@ -206,10 +208,10 @@ test.describe("Landing page at /", () => {
         const hero = await box('[data-testid="landing-hero"]');
         const logo = await box('[data-testid="hero-header-logo"] svg');
         expect([Math.round(logo.width), Math.round(logo.height)]).toEqual([137, 31]);
-        const parts = {
+        const parts: Record<string, typeof logo> = {
           logo,
           line: await box('[data-testid="landing-hero"] [data-lk="soon"]:visible'),
-          badges: await box('[data-testid="hero-badges"]'),
+          ...(APP_STORE_LIVE ? { badges: await box('[data-testid="hero-badges"]') } : {}),
           ticker: await box('[data-testid="hero-ticker"]'),
         };
         const corners = page.getByTestId("hero-corner");
@@ -217,17 +219,17 @@ test.describe("Landing page at /", () => {
         for (let i = 0; i < 4; i++) {
           const b = await corners.nth(i).boundingBox();
           expect(b).not.toBeNull();
-          (parts as Record<string, typeof logo>)[`corner${i + 1}`] = b!;
+          parts[`corner${i + 1}`] = b!;
         }
-        const names = Object.keys(parts) as Array<keyof typeof parts>;
+        const names = Object.keys(parts);
         for (const n of names) {
-          const b = parts[n];
+          const b = parts[n]!;
           expect(b.x >= hero.x && b.y >= hero.y && b.x + b.width <= hero.x + hero.width && b.y + b.height <= hero.y + hero.height, `${n} inside the hero`).toBe(true);
         }
         for (let i = 0; i < names.length; i++) {
           for (let j = i + 1; j < names.length; j++) {
-            const a = parts[names[i]];
-            const b = parts[names[j]];
+            const a = parts[names[i]!]!;
+            const b = parts[names[j]!]!;
             const overlap = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
             expect(overlap, `${names[i]} overlaps ${names[j]}`).toBe(false);
           }
