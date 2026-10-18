@@ -97,6 +97,11 @@
   padding: var(--pad-top) var(--pad-x) var(--pad-bot);
 }
 
+/* No hero badges before launch: the lockup gets their height back. */
+.hero[data-badges="off"] {
+  --badges-h: 0px;
+}
+
 .badges {
   margin-top: var(--badges-gap);
 }
