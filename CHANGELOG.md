@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Web: teaser v2 landing hero (jits-2hju)
+
+The public landing at elorated.com (`/welcome`, served at `/` while the web app is locked) gets Thomas's teaser v2 hero. Spec: `specs/web-landing/addendum-teaser-v2.md`. No backend, shared or mobile change; title, description, OpenGraph and Twitter metadata are unchanged.
+
+**Changed**
+- The landing hero is replaced by Thomas's teaser v2: his crown lockups copied verbatim as data (`apps/web/components/landing/lockups/`, pinned by SHA-256 fingerprints in `lockups.test.ts`): the 137 x 31 horizontal lockup in the header, the B3 block lockup on portrait screens and the one-line lockup from 4:5, each in Thomas's device-pixel drawing tiers (`lockup-tier.ts`, `lockup-tier-sync.tsx`); the dimmed greyscale sparring video behind a Void overlay; static viewfinder corners; a one-time CSS intro (WE ARE, ELO RATED, the crown, ARE YOU?, then the red line) that never plays under reduced motion, where the end state renders on the first frame; the red line "Coming Soon" (`--accent-cta-text`), which reads "Get the app" once `NEXT_PUBLIC_APP_STORE_URL` is set (build-time, `hero-copy.ts`); the store badges (`size="sm"`) directly under it; and a bottom-right SAMPLE ticker (weight class and one athlete's outcome, for example `175.5 LBS · WIN ▲14`; no names and no belts; draws labelled DRAW in the neutral tone) that starts after 4 s, pauses while the tab is hidden and is not shown under reduced motion. The endless corner pulse and letter shimmer were dropped.
+- The tagline, body line and data strip moved below the hero into `LandingIntro`; HOW IT WORKS and the footer are unchanged.
+- Videos under `/landing/videos/` (`sparring-01-v1-720.mp4` 2.6 MB for screens under 1024 px, `sparring-01-v1-1080.mp4` 6.1 MB, poster `sparring-01-v1-poster.jpg`), versioned names with a one-year immutable `Cache-Control` (`next.config.ts`). The video starts by script only when motion is allowed and the visitor has not asked to save data (`preload="none"`, no `autoplay` attribute), so a reduced-motion visitor downloads no video.
+- The proxy matcher skips `.mp4` (`apps/web/proxy.ts`), so the videos serve while the web app is locked (they were redirected to `/`).
+
+**Tests**
+- New: `proxy.test.ts`, `next-config.test.ts`, `components/landing/` `hero-copy`, `lockups/lockups`, `lockup-tier`, `lockup-tier-sync`, `ticker-samples`, `hero-ticker`, `hero-video`; `landing-page.test.tsx` and `lib/supabase/public-paths.test.ts` updated; `e2e/landing-lock.spec.ts` adds the video, range request, intro end state, reduced motion, ticker, icons, console and a seven-viewport layout matrix.
+
 ### Mobile: report and block, consent before AI processing, chat leftovers removed (jits-rog5.11, App Review 1.2 and 5.1.2(i))
 
 JavaScript only (ships as an OTA to runtime 1.0). Needs jr_be `20261014300000_report_block_consent` (jr_be-m2s) on prod BEFORE the OTA: `block_athlete`, `unblock_athlete`, `get_my_blocked_athletes`, `get_my_block_ids`, `report_content`, `record_ai_processing_consent` and `athletes.ai_processing_consent_at` / `ai_processing_consent_version`. The consent columns are read by their own query, never through the athlete guard select, so sign-in cannot break on an older backend; the moderation calls fail soft without the migration.
@@ -140,6 +153,30 @@ Both documents are fully navigable on native, and the shared parser gives the we
 - A document's title inside a clause's own bold heading ("1.6 **Privacy Policy and feature rules.**") is not linked.
 - `PRIVACY_POLICY.md`: "(see 16.3)" reads "(see section 16.3)" in the US sensitive information row, matching the French and linking like it (owner-approved wording fix; the English Privacy Policy version hash changes).
 
+## OTA "Reel viewer Instagram handle" (runtime 0.5.0), 2026-10-14
+
+Production OTA group `9836f765-29f9-4fa0-8592-bc92db02e549` (iOS `01a13d1b-5124-7651-be64-9de64e66ffbc`, Android `01a13d1b-5124-7208-b591-64f178780975`), published from the new branch `release/0.5.x` at `8dc39ed8`. That branch was cut from `56c0ef2c` (the base of OTA 88d790c9) and carries cherry-picks of `f68e7963` and `0c762444` from feature PR #94; it exists because, since the 1.0 change (jits-8s9v), `development` and `main` publish OTAs for runtime 1.0 only. JS-only, non-critical (`updateCriticalIndex` unchanged). Gate on `release/0.5.x`: typecheck clean, mobile 6175 passed (1 skipped), web 678, shared 1203, `expo export` iOS ok. Consumes the jr_be specs 021 and 022 (reels name the recorded submission, for example `WIN BY REAR NAKED CHOKE`, and carry `@elorated`; every prod reel was re-rendered 2026-10-15). Device QA (the universal link opening the Instagram app) was not run on hardware. Rollback target: "Highlight viewer drops the title" group `88d790c9-b611-4bef-a1d9-e15ca49ef2ba`.
+
+### Mobile: reel viewer shows the subject's Instagram handle (jits-uq3j, PR #94)
+
+Owner decision 2026-10-14: the full-screen reel viewer drops its secondary action (Open match for a participant, View profile otherwise). Under the mono date and duration line it now shows the reel subject's Instagram handle as a small tappable `@handle` (`font-body text-small`, `ON_MEDIA.text`) that opens `https://www.instagram.com/<handle>/` with `Linking.openURL` (failures are ignored); nothing renders when the subject has no handle. JS-only (OTA-eligible).
+
+**Added**
+- `packages/shared/src/utils/instagram-handle.ts`: `instagramProfileUrl(handle)`, the shared profile URL builder, with tests in `instagram-handle.test.ts`.
+- `apps/mobile/components/highlight-viewer/viewer-meta.tsx`: the `@handle` link under the date line (accessibility role `link`, label and hint from `VIEWER_COPY`), with a hit slop that reaches the 44 pt target (`0c762444`).
+
+**Changed**
+- `packages/shared/src/api/queries.ts`: `instagram_handle` joins `ATHLETE_GUARD_SELECT` and `AthleteGuardRow`, so the signed-in athlete's handle is in the auth context.
+- `apps/mobile/lib/highlight/reel-meta.ts`, `reel-types.ts`, `use-reel-lane.ts`, `apps/mobile/components/highlight-viewer/viewer-ready.tsx`, `reel-binding.ts`: own lane items and the single-reel viewer take the viewer's live handle at render (`pageMeta`); `ReelItem` gains an optional `subjectInstagramHandle` for the reserved non-own lanes.
+- Tests: `apps/mobile/__tests__/components/highlight-viewer/reel-pager.test.tsx`, `viewer-actions.test.tsx`, `viewer-screen.test.tsx`, `apps/mobile/__tests__/lib/highlight/reel-meta.test.ts`, `reel-types.test.ts` and the reel fixtures.
+
+**Removed**
+- `reelSecondaryAction`, `secondaryHref`, `metaFromItem` / `metaFromDetail`, `VIEWER_COPY.openMatch` / `viewProfile`, `viewerIsParticipant`, `subjectAthleteId`, and the `viewer-open-match` / `viewer-view-profile` testIDs.
+
+## OTA "Highlight viewer drops the title" (runtime 0.5.0), 2026-10-14
+
+Production OTA group `88d790c9-b611-4bef-a1d9-e15ca49ef2ba` (iOS `01a13ac9-32c0-7296-aad3-8a9d4ac5bf91`, Android `01a13ac9-32c0-7c36-93d4-c4b4040c4348`) from jits_web `main` `56c0ef2c` (release PR #83 of development `9323a2d4`, feature PR #82), published from a clean worktree so local `.env` files could not leak in. JS-only, non-critical (`updateCriticalIndex` unchanged). Needs the jr_be spec 020 backend, live on prod since 2026-10-14T00:59:56Z (reels now carry the name only, the result on the frame, the centred watermark and the 4 s endcard; every existing prod reel was re-rendered; `multi_angle_highlights_enabled` turned on). Rollback target: "ELO in the header" group `bcbc74ea-3164-4bd6-b030-655193b3d5bc`.
+
 ### Mobile: highlight viewer drops the title (spec 020)
 
 Spec 020 section D (owner decision 2026-10-13): the full-screen reel viewer no longer draws a title line (`vs {opp}` on your own reel, the subject's name on someone else's); the mono date and duration line and Open match / View profile stay. The play / pause VoiceOver label now names whose reel it is. JS-only (OTA-eligible).
@@ -155,6 +192,9 @@ Spec 020 section D (owner decision 2026-10-13): the full-screen reel viewer no l
 **Fixed**
 - `apps/mobile/components/highlight-viewer/reel-video.tsx`: VoiceOver read "Your highlight reel, N seconds" on someone else's reel; it now reads "{Name}'s highlight reel, N seconds" ("Highlight reel, N seconds" when the name is missing).
 
+## OTA "ELO in the header" (runtime 0.5.0), 2026-10-09
+
+Production OTA group `bcbc74ea-3164-4bd6-b030-655193b3d5bc` (iOS `01a1225b-9979-7309-bbf5-1b91bdc33dc2`, Android `01a1225b-9979-7073-9f74-868479146baa`) from jits_web `main` `cb06ce8a` (release PR #79 of #78). JS-only, non-critical. Heading added 2026-10-14; the release was recorded in CLAUDE.md by PR #80.
 
 ### Mobile: Elo in the header, wordmark + rating on every tab root (epic jits-1ez5)
 

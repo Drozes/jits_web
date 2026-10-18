@@ -1,0 +1,68 @@
+/* The hero's sample ticker (specs/web-landing/addendum-teaser-v2.md 7.4). */
+
+.ticker {
+  position: absolute;
+  bottom: 24px;
+  right: 32px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--easing-default);
+}
+
+.shown {
+  opacity: 1;
+}
+
+.tag {
+  margin-right: 10px;
+  padding: 0 5px;
+  font-size: var(--size-num-xs);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-hairline-strong);
+  border-radius: var(--radius-sm);
+}
+
+.line {
+  display: inline-block;
+}
+
+.enter {
+  animation: tick-enter var(--duration-fast) var(--easing-default) both;
+}
+
+.leave {
+  animation: tick-leave var(--duration-fast) var(--easing-default) both;
+}
+
+.arrow {
+  font-size: max(10px, 0.7em); /* never under 10 px */
+  margin-right: 0.35em;
+}
+
+@keyframes tick-enter {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes tick-leave {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-20px); }
+}
+
+@media (max-width: 540px) {
+  .ticker { right: 16px; bottom: 16px; font-size: 10px; }
+}
+
+@media (max-height: 500px) and (min-aspect-ratio: 4/5) {
+  .ticker { bottom: 12px; font-size: 10px; }
+}

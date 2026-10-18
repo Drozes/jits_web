@@ -15,8 +15,6 @@ export function reel(n: number, over: Partial<ReelItem> = {}): ReelItem {
     opponentName: `Opp ${n}`,
     readyAt: "2026-10-04T12:00:00Z",
     unseen: true,
-    viewerIsParticipant: true,
-    subjectAthleteId: "me",
     ...over,
   };
 }

@@ -16,9 +16,9 @@ export const VIEWER_COPY = {
   swipeHint: "Swipe up for the next one",
   /** C-V2. */
   caughtUp: "You're all caught up",
-  openMatch: "Open match",
-  /** C-V5. */
-  viewProfile: "View profile",
+  /** The reel subject's `@handle` line (owner decision 2026-10-14; replaced Open match / View profile). */
+  instagramLabel: (handle: string) => `Instagram, ${handle}`,
+  instagramHint: "Opens Instagram",
   /** Short visible rail labels (C-V6 to C-V8); a11y labels stay the full strings. */
   railShare: "Share",
   railSave: "Save",

@@ -65,11 +65,11 @@ type Client = SupabaseClient<Database>;
  * consume this projection — keep it in sync with `AthleteGuardRow` below.
  *
  * Includes `platform_role` and `is_bot` so the apps can gate admin tooling on
- * every load. Excludes `created_at`, `push_token`, `role`, `avatar_url`,
+ * every load, and `instagram_handle` for the reel viewer's `@handle` line. Excludes `created_at`, `push_token`, `role`, `avatar_url`,
  * `default_still_url`, and `is_scoutable` to keep payloads small.
  */
 export const ATHLETE_GUARD_SELECT =
-  "id, auth_user_id, display_name, first_name, last_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city, platform_role, is_bot, practice_match_offered_at, practice_match_completed_at" as const;
+  "id, auth_user_id, display_name, first_name, last_name, current_elo, highest_elo, current_weight, primary_gym_id, profile_photo_url, looking_for_casual, looking_for_ranked, status, free_agent, gender, date_of_birth, city, platform_role, is_bot, practice_match_offered_at, practice_match_completed_at, instagram_handle" as const;
 
 /**
  * The subset of the `athletes` row returned by `getCurrentAthlete`.
@@ -99,6 +99,7 @@ export type AthleteGuardRow = Pick<
   | "is_bot"
   | "practice_match_offered_at"
   | "practice_match_completed_at"
+  | "instagram_handle"
 >;
 
 /**

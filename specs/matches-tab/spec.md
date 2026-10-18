@@ -273,6 +273,7 @@ The contract is `apps/mobile/lib/highlight/reel-types.ts`, already committed on 
 - The bottom meta shows the subject athlete's short name for a non-own reel (with the source chip text from section 5 as a mono tag after it), and `vs {opp}` for an own reel.
 - **Open match** shows only when the viewer is a participant in the reel's match, and opens `match-detail/[matchId]`. When the viewer is not a participant, the same slot reads `View profile` (C-V5) and opens the subject athlete's profile (the existing route `app/(app)/athlete/[id].tsx`). This needs two additive fields on `ReelItem`, added in `jits-a4fw.5`: `viewerIsParticipant: boolean` and `subjectAthleteId: string | null`; `ownReelItem` sets `viewerIsParticipant: true` and `subjectAthleteId` to the caller's athlete id. Every future source's read RPC must return both (noted on `jr_be-tjx`, `jr_be-o7c`, `jr_be-880`). Note a participant's non-own reel is possible later (a friend's reel of a match against you): it shows Open match but still hides the owner-only actions.
 - Phase 1 only ever builds own items, but this rule is implemented now and unit tested with fixture items (`isOwn: false` with and without `viewerIsParticipant`), section 16.
+- **Note (2026-10-14 owner decision):** the full-screen reel viewer no longer shows Open match or View profile (C-V5); both were removed (jits-uq3j, jits_web PR #94, OTA `9836f765`). In their place, under the mono date and duration line, the viewer shows the reel subject's Instagram handle as a small tappable `@handle` that opens `https://www.instagram.com/<handle>/`, and nothing when the subject has no handle. The handle comes from `instagram_handle`, now part of `ATHLETE_GUARD_SELECT`, and the URL from the shared `instagramProfileUrl`. `viewerIsParticipant` and `subjectAthleteId` were removed from `ReelItem`; `ReelItem` gained an optional `subjectInstagramHandle` for future non-own sources. The text above is kept as the historical record.
 
 ### 8.7 Telemetry (per page)
 
@@ -416,7 +417,7 @@ All strings are final source strings (sentence case; tags render in mono caps by
 | C-V2 | Viewer, swipe past the last reel | `You're all caught up` |
 | C-V3 | a11y, mute toggle | `Mute` / `Unmute` |
 | C-V4 | a11y, close | `Close` |
-| C-V5 | Viewer, non-participant on a non-own reel (8.6) | `View profile` |
+| C-V5 | Viewer, non-participant on a non-own reel (8.6) | `View profile` (removed 2026-10-14, replaced by the tappable `@handle`; see the 8.6 note) |
 | C-V6 | Viewer rail label under the share plate (8.2) | `Share` |
 | C-V7 | Viewer rail label under the save plate (8.2) | `Save` |
 | C-V8 | Viewer rail label under the improve plate (8.2) | `Improve` |

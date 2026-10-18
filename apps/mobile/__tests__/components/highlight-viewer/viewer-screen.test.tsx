@@ -39,6 +39,13 @@ jest.mock("expo-image", () => {
   return { Image: (props: Record<string, unknown>) => R.createElement(RN.View, props) };
 });
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// The signed-in athlete: the single-reel viewer is always their own reel.
+// The factory runs before this file's consts exist, so the value lives in the mock.
+jest.mock("@/lib/auth/auth-context", () => {
+  const value = { athlete: { instagram_handle: "ana.bjj" } as { instagram_handle: string | null } | null };
+  return { AuthContext: require("react").createContext(value), __auth: value };
+});
+const mockAuth = (): { athlete: { instagram_handle: string | null } | null } => jest.requireMock("@/lib/auth/auth-context").__auth;
 jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ bgSecondary: "#13151B", textPrimary: "#E8EDF2", textTertiary: "#8D929D" }),
 }));
@@ -452,6 +459,32 @@ describe("viewer states", () => {
     expect(utils.getByLabelText("Improve this reel")).toBeTruthy();
     expect(redCtas(utils)).toHaveLength(1);
     expect(redCtas(utils)[0].props.testID).toBe("viewer-share");
+  });
+
+  it("ready: the athlete's own @handle under the date line opens Instagram; no Open match (owner decision 2026-10-14)", async () => {
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    const utils = await renderViewer();
+    await waitFor(() => expect(utils.getByTestId("highlight-player")).toBeTruthy());
+    const link = utils.getByTestId("viewer-instagram-handle");
+    expect(link).toHaveTextContent("@ana.bjj");
+    expect(link.props.accessibilityLabel).toBe("Instagram, @ana.bjj");
+    fireEvent.press(link);
+    expect(openURL).toHaveBeenCalledWith("https://www.instagram.com/ana.bjj/");
+    expect(utils.queryByText("Open match")).toBeNull();
+    expect(utils.queryByText("View profile")).toBeNull();
+    expect(redCtas(utils)).toHaveLength(1);
+    openURL.mockRestore();
+  });
+
+  it("ready, no handle on the profile: no handle line", async () => {
+    mockAuth().athlete = { instagram_handle: null };
+    try {
+      const utils = await renderViewer();
+      await waitFor(() => expect(utils.getByTestId("highlight-player")).toBeTruthy());
+      expect(utils.queryByTestId("viewer-instagram-handle")).toBeNull();
+    } finally {
+      mockAuth().athlete = { instagram_handle: "ana.bjj" };
+    }
   });
 
   it("player error re-signs (phase-1 renewal), a second fresh error shows cannot-play + Try again", async () => {

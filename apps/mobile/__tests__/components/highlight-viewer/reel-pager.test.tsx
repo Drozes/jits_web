@@ -9,7 +9,7 @@
  */
 import * as React from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, within } from "@testing-library/react-native";
 
 jest.mock("expo-video", () => require("../../support/fake-expo-video"));
 const mockRouter = { back: jest.fn(), replace: jest.fn(), push: jest.fn(), canGoBack: jest.fn(() => true) };
@@ -40,6 +40,13 @@ jest.mock("expo-image", () => {
   return { Image };
 });
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
+// The signed-in athlete (own reels show their handle); mutate per test.
+// The factory runs before this file's consts exist, so the value lives in the mock.
+jest.mock("@/lib/auth/auth-context", () => {
+  const value = { athlete: { instagram_handle: "me.bjj" } as { instagram_handle: string | null } | null };
+  return { AuthContext: require("react").createContext(value), __auth: value };
+});
+const mockAuth = (): { athlete: { instagram_handle: string | null } | null } => jest.requireMock("@/lib/auth/auth-context").__auth;
 jest.mock("@/lib/theme/use-theme", () => ({ useThemedTokens: () => ({ textPrimary: "#E8EDF2", textTertiary: "#8D929D" }) }));
 jest.mock("@/lib/theme/theme-provider", () => ({ darkVarsStyle: {} }));
 jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
@@ -201,6 +208,7 @@ beforeEach(async () => {
   __resetReelSessionsForTests();
   __resetReelPrefsForTests();
   await AsyncStorage.clear();
+  mockAuth().athlete = { instagram_handle: "me.bjj" };
 });
 
 describe("ReelPager", () => {
@@ -287,14 +295,18 @@ describe("ReelPager", () => {
   });
 
   it("not yours: no Share, Save or Improve on that page, never marked seen; mute and close stay", async () => {
-    const other = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
+    const other = reel(1, { isOwn: false, source: "friend", opponentName: "C. Ruiz", subjectInstagramHandle: "cruiz" });
     const utils = await open(session([other], 0));
     const page = utils.getByTestId("reel-page-0");
     expect(page.findAll((n: { props: { testID?: string } }) => n.props.testID === "viewer-share")).toHaveLength(0);
     expect(utils.queryByLabelText("Share to Instagram")).toBeNull();
     expect(utils.queryByLabelText("Save to Photos")).toBeNull();
     expect(utils.queryByLabelText("Improve this reel")).toBeNull();
-    expect(utils.getByText("View profile")).toBeTruthy();
+    // The subject's handle, never the viewer's; no View profile / Open match (owner decision 2026-10-14).
+    expect(utils.getByTestId("viewer-instagram-handle")).toHaveTextContent("@cruiz");
+    expect(utils.queryByText("@me.bjj")).toBeNull();
+    expect(utils.queryByText("View profile")).toBeNull();
+    expect(utils.queryByText("Open match")).toBeNull();
     expect(utils.getByLabelText("Close")).toBeTruthy();
     expect(utils.getByTestId("viewer-mute")).toBeTruthy();
     expect(mockMarkSeen).not.toHaveBeenCalled();
@@ -308,7 +320,7 @@ describe("ReelPager", () => {
   });
 
   it("not yours with no subject name: a neutral VoiceOver label", async () => {
-    const other = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: null });
+    const other = reel(1, { isOwn: false, source: "friend", opponentName: null });
     const utils = await open(session([other], 0));
     expect(utils.getByTestId("highlight-player-toggle").props.accessibilityLabel).toBe("Highlight reel, 28 seconds");
   });
@@ -319,10 +331,31 @@ describe("ReelPager", () => {
     expect(utils.getByTestId("highlight-player-toggle").props.accessibilityLabel).toBe("Your highlight reel, 28 seconds");
   });
 
+  it("own reel: the signed-in athlete's @handle under the date line opens their Instagram; no Open match / View profile", async () => {
+    const { Linking } = require("react-native");
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(undefined);
+    const utils = await open(session([reel(1), reel(2)], 0));
+    const link = within(utils.getByTestId("reel-page-0")).getByTestId("viewer-instagram-handle");
+    expect(link).toHaveTextContent("@me.bjj");
+    fireEvent.press(link);
+    expect(openURL).toHaveBeenCalledWith("https://www.instagram.com/me.bjj/");
+    expect(utils.queryByText("Open match")).toBeNull();
+    expect(utils.queryByText("View profile")).toBeNull();
+    expect(utils.queryByTestId("viewer-open-match")).toBeNull();
+    expect(utils.queryByTestId("viewer-view-profile")).toBeNull();
+    openURL.mockRestore();
+  });
+
+  it("own reel, no handle on the profile: no handle line", async () => {
+    mockAuth().athlete = { instagram_handle: null };
+    const utils = await open(session([reel(1), reel(2)], 0));
+    expect(utils.queryByTestId("viewer-instagram-handle")).toBeNull();
+    expect(utils.queryByText("Open match")).toBeNull();
+  });
+
   it("own reel: Share to Instagram is the page's one red CTA; opening it suspends paging and pauses", async () => {
     const utils = await open(session([reel(1), reel(2)], 0));
     expect(utils.getByLabelText("Share to Instagram")).toBeTruthy();
-    expect(utils.getByText("Open match")).toBeTruthy();
     expect(utils.getByTestId("reel-scrim-rail")).toBeTruthy();
     expect(list(utils).props.scrollEnabled).toBe(true);
     await act(async () => fireEvent.press(utils.getByTestId("viewer-share")));
@@ -333,7 +366,7 @@ describe("ReelPager", () => {
   });
 
   it("not yours: opening Report suspends paging and pauses, like the other sheets (jits-rog5.11)", async () => {
-    const other = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
+    const other = reel(1, { isOwn: false, source: "friend", subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
     const utils = await open(session([other, reel(2)], 0));
     expect(list(utils).props.scrollEnabled).toBe(true);
     await act(async () => fireEvent.press(utils.getByTestId("viewer-report")));
@@ -429,10 +462,9 @@ describe("ReelPager", () => {
       expect(pool()[0].playing).toBe(false);
     });
 
-    it("a blur during the buffer (match detail pushed): it stays paused", async () => {
+    it("a blur during the buffer (navigated away): it stays paused", async () => {
       const utils = await openBuffering();
-      await act(async () => fireEvent.press(utils.getByText("Open match")));
-      // The focus effect's cleanup is the blur; unmounting runs it too.
+      // The focus effect's cleanup is the blur; unmounting runs it.
       utils.unmount();
       act(() => bufferEnd(0));
       expect(pool()[0].playing).toBe(false);

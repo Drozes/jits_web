@@ -1,5 +1,5 @@
 import type { MyHighlightItem } from "@jits/shared/api/highlight-share";
-import { canManageReel, ownReelItem, reelSecondaryAction } from "@/lib/highlight/reel-types";
+import { canManageReel, ownReelItem } from "@/lib/highlight/reel-types";
 
 const row = {
   highlightId: "h1",
@@ -14,27 +14,14 @@ const row = {
 } as unknown as MyHighlightItem;
 
 describe("reel item contract", () => {
-  it("an own reel is always participant, with the viewer as its subject when known", () => {
-    const item = ownReelItem(row, "https://signed/p.jpg", "me-1");
-    expect(item).toMatchObject({ source: "own", isOwn: true, viewerIsParticipant: true, subjectAthleteId: "me-1" });
+  it("an own reel is own and manageable; its handle is filled at render, not here", () => {
+    const item = ownReelItem(row, "https://signed/p.jpg");
+    expect(item).toMatchObject({ source: "own", isOwn: true, posterUrl: "https://signed/p.jpg" });
     expect(canManageReel(item)).toBe(true);
-    expect(reelSecondaryAction(item)).toBe("open_match");
+    expect("subjectInstagramHandle" in item).toBe(false);
   });
 
   it("ownership never comes from source: an own-source fixture with isOwn false manages nothing", () => {
     expect(canManageReel({ ...ownReelItem(row, null), isOwn: false })).toBe(false);
-  });
-
-  it("leaves the subject unset when the viewer id is not available", () => {
-    const item = ownReelItem(row, null);
-    expect(item.viewerIsParticipant).toBe(true);
-    expect("subjectAthleteId" in item).toBe(false);
-  });
-
-  it("offers View profile for a reel the viewer did not fight in, and nothing without a subject", () => {
-    expect(reelSecondaryAction({ viewerIsParticipant: false, subjectAthleteId: "ath-9" })).toBe("view_profile");
-    expect(reelSecondaryAction({ subjectAthleteId: "ath-9" })).toBe("view_profile");
-    expect(reelSecondaryAction({ viewerIsParticipant: false, subjectAthleteId: null })).toBeNull();
-    expect(reelSecondaryAction({})).toBeNull();
   });
 });

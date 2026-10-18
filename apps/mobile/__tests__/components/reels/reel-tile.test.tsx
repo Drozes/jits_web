@@ -79,7 +79,7 @@ describe("ready tile", () => {
     ["local", "NEARBY", ", nearby"],
     ["elo", "ELO RATED", ", from ELO RATED"],
   ] as const)("a %s item shows the %s chip, the subject's name and the chip in its label", (source, chip, a11y) => {
-    const item = reelItem("x", { source, isOwn: false, opponentName: "S. Whitfield", viewerIsParticipant: false });
+    const item = reelItem("x", { source, isOwn: false, opponentName: "S. Whitfield" });
     const { getByText, getByTestId, getByLabelText, queryByText } = renderTile({ kind: "ready", key: "x", item });
     expect(getByTestId("reel-source-chip", hidden)).toBeTruthy();
     expect(getByText(chip)).toBeTruthy();

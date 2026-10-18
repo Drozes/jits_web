@@ -1,7 +1,7 @@
 {
   "canvas": "https://claude.ai/artifact/PJWm2WeqsG56HS13jHsd5D",
-  "commit": "1b80e4da9b2b60ab349403c8d0d8c2fe9b598237",
-  "synced_at": "2026-10-09T15:51:59-04:00",
-  "version": "1791575500-0a66",
-  "note": "Synced 2026-10-09 to production OTA 91e6cddd-18e2-487e-8f27-92df29c532d1 (main 38924821, development 1b80e4da). Redrew the 22 boards drift.mjs reported: the tab bar label reads Film instead of Matches on every board that draws it (Main, 11 to 19c, 42, 48, 57 to 61); the tab header h1 reads Film on 19, 19b, 19c and 19d; playable feed-card media on 19, 19d and 38 now link to 32-Match-Detail with 'Open match vs ...' labels (play glyph and duration kept, as in code); 19d's See all a11y label is 'See all, open Film'; 46-Help says 'the Film tab'. Text-only edits, no height changes, canvas.json untouched; board titles ('Matches tab: ...') and file names kept since the route is still matches. Independently reviewed (clean)."
+  "commit": "8dc39ed81687104757d12a7588b7226a0a26af06",
+  "synced_at": "2026-10-14T21:30:00-04:00",
+  "version": "1792027277-7701",
+  "note": "OTA 9836f765 \"Reel viewer Instagram handle\" (jits-uq3j, release/0.5.x 8dc39ed8): redrew 34-Highlight-Viewer and 35-Highlight-Share (Open match replaced by the tappable @handle under the date line; sample @marcusreyes). Reel frames on these boards are placeholders, so spec 022 (submission name, @elorated) needs no board change."
 }
