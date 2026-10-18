@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Web: landing intro and HOW IT WORKS hidden
+
+- The landing at elorated.com now shows only the teaser hero and the footer (owner, 2026-10-18). `LandingIntro` (What's your number?, body line, data strip) and `LandingSteps` (HOW IT WORKS) are no longer rendered by `landing-page.tsx`; both components are kept so they can return. The footer keeps the store badges and the Terms, Privacy and Support links.
+
 ### Web: teaser v2 landing hero (jits-2hju)
 
 The public landing at elorated.com (`/welcome`, served at `/` while the web app is locked) gets Thomas's teaser v2 hero. Spec: `specs/web-landing/addendum-teaser-v2.md`. No backend, shared or mobile change; title, description, OpenGraph and Twitter metadata are unchanged.

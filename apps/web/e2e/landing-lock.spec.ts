@@ -24,7 +24,9 @@ test.describe("Landing page at /", () => {
     expect(new URL(page.url()).pathname).toBe("/");
     await expect(page).toHaveTitle("ELO RATED: Ranked Jiu-Jitsu");
     await expect(page.getByRole("heading", { level: 1, name: "We are ELO RATED. Are you?" })).toBeVisible();
-    await expect(page.getByText("What's your number?")).toBeVisible();
+    // Intro and HOW IT WORKS are hidden for now (owner, 2026-10-18).
+    await expect(page.getByText("What's your number?")).toHaveCount(0);
+    await expect(page.getByText("HOW IT WORKS")).toHaveCount(0);
     const heroLine = page.locator('[data-testid="landing-hero"] [data-lk="soon"]:visible');
     await expect(heroLine).toHaveCount(1);
     await expect(heroLine).toHaveText(HERO_LINE);

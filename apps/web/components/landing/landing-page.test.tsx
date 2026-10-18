@@ -17,25 +17,14 @@ afterEach(() => {
 const THOMAS_NAMES = ["Hiroshi Tanaka", "Maria Cruz", "Kenji Sato", "Yuki Tanaka", "Marcus Whitfield"];
 
 describe("LandingPage", () => {
-  it("renders the hidden brand line, the intro copy and the steps", () => {
+  it("renders the hidden brand line and the footer, with the intro and steps hidden", () => {
     vi.stubEnv("NEXT_PUBLIC_APP_STORE_URL", "");
     render(<LandingPage />);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1, name: "We are ELO RATED. Are you?" })).toBeInTheDocument();
-    const intro = screen.getByTestId("landing-intro");
-    expect(intro).toHaveTextContent("What's your number?");
-    expect(intro).toHaveTextContent("BJJ matches, filmed and rated. Go live, roll, confirm the result. Your ELO moves.");
-    expect(intro).toHaveTextContent("NO-GI · SUBMISSION ONLY · EVERY MATCH RANKED");
-    expect(screen.getByRole("heading", { name: "HOW IT WORKS" })).toBeInTheDocument();
-    for (const [n, title, body] of [
-      ["01", "Go live", "Show the room you're ready to roll."],
-      ["02", "Roll", "Challenge someone on the mat. Your phone films the match."],
-      ["03", "Get rated", "You both confirm the result. Beat someone bigger, earn more."],
-    ]) {
-      expect(screen.getByText(n)).toBeInTheDocument();
-      expect(screen.getByRole("heading", { level: 3, name: title })).toBeInTheDocument();
-      expect(screen.getByText(body)).toBeInTheDocument();
-    }
+    expect(screen.queryByTestId("landing-intro")).toBeNull();
+    expect(screen.queryByText("What's your number?")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "HOW IT WORKS" })).toBeNull();
     expect(screen.getByText("© 2026 ELO RATED")).toBeInTheDocument();
   });
 
