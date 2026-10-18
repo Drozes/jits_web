@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Web: teaser v2 landing hero (jits-2hju)
+
+The public landing at elorated.com (`/welcome`, served at `/` while the web app is locked) gets Thomas's teaser v2 hero. Spec: `specs/web-landing/addendum-teaser-v2.md`. No backend, shared or mobile change; title, description, OpenGraph and Twitter metadata are unchanged.
+
+**Changed**
+- The landing hero is replaced by Thomas's teaser v2: his crown lockups copied verbatim as data (`apps/web/components/landing/lockups/`, pinned by SHA-256 fingerprints in `lockups.test.ts`): the 137 x 31 horizontal lockup in the header, the B3 block lockup on portrait screens and the one-line lockup from 4:5, each in Thomas's device-pixel drawing tiers (`lockup-tier.ts`, `lockup-tier-sync.tsx`); the dimmed greyscale sparring video behind a Void overlay; static viewfinder corners; a one-time CSS intro (WE ARE, ELO RATED, the crown, ARE YOU?, then the red line) that never plays under reduced motion, where the end state renders on the first frame; the red line "Coming Soon" (`--accent-cta-text`), which reads "Get the app" once `NEXT_PUBLIC_APP_STORE_URL` is set (build-time, `hero-copy.ts`); the store badges (`size="sm"`) directly under it; and a bottom-right SAMPLE ticker (weight class and one athlete's outcome, for example `175.5 LBS · WIN ▲14`; no names and no belts; draws labelled DRAW in the neutral tone) that starts after 4 s, pauses while the tab is hidden and is not shown under reduced motion. The endless corner pulse and letter shimmer were dropped.
+- The tagline, body line and data strip moved below the hero into `LandingIntro`; HOW IT WORKS and the footer are unchanged.
+- Videos under `/landing/videos/` (`sparring-01-v1-720.mp4` 2.6 MB for screens under 1024 px, `sparring-01-v1-1080.mp4` 6.1 MB, poster `sparring-01-v1-poster.jpg`), versioned names with a one-year immutable `Cache-Control` (`next.config.ts`). The video starts by script only when motion is allowed and the visitor has not asked to save data (`preload="none"`, no `autoplay` attribute), so a reduced-motion visitor downloads no video.
+- The proxy matcher skips `.mp4` (`apps/web/proxy.ts`), so the videos serve while the web app is locked (they were redirected to `/`).
+
+**Tests**
+- New: `proxy.test.ts`, `next-config.test.ts`, `components/landing/` `hero-copy`, `lockups/lockups`, `lockup-tier`, `lockup-tier-sync`, `ticker-samples`, `hero-ticker`, `hero-video`; `landing-page.test.tsx` and `lib/supabase/public-paths.test.ts` updated; `e2e/landing-lock.spec.ts` adds the video, range request, intro end state, reduced motion, ticker, icons, console and a seven-viewport layout matrix.
+
 ### Mobile: report and block, consent before AI processing, chat leftovers removed (jits-rog5.11, App Review 1.2 and 5.1.2(i))
 
 JavaScript only (ships as an OTA to runtime 1.0). Needs jr_be `20261014300000_report_block_consent` (jr_be-m2s) on prod BEFORE the OTA: `block_athlete`, `unblock_athlete`, `get_my_blocked_athletes`, `get_my_block_ids`, `report_content`, `record_ai_processing_consent` and `athletes.ai_processing_consent_at` / `ai_processing_consent_version`. The consent columns are read by their own query, never through the athlete guard select, so sign-in cannot break on an older backend; the moderation calls fail soft without the migration.

@@ -1,0 +1,265 @@
+/*
+ * Teaser v2 hero (specs/web-landing/addendum-teaser-v2.md). Ported from
+ * Thomas's teaser v2 CSS to the brand tokens: colours only as var(--...),
+ * the lockup SVG fills excepted (they live in lockups/*.ts). Hooks are data
+ * attributes, never class names, because CSS modules rename classes (P20).
+ */
+
+.hero {
+  /* Lockup box: the space inside the viewfinder corners (section 1.1, P6). */
+  --vh: 100svh;
+  --pad-x: clamp(20px, 6vw, 120px);
+  --pad-top: clamp(96px, 13svh, 150px);
+  --pad-bot: clamp(104px, 13svh, 160px);
+  /* The hero badge block under the lockup: 57px measured (40px badges plus
+     their "Coming soon" captions), plus the gap above it. */
+  --badges-gap: var(--space-5);
+  --badges-h: calc(57px + var(--badges-gap));
+  --avail-h: max(160px, calc(var(--vh) - var(--pad-top) - var(--pad-bot) - var(--badges-h)));
+  /* Composed lockup aspect ratios (width / height), from Thomas's build. */
+  --ar-block: 0.7293;
+  --ar-oneline: 1.1227;
+  /* B3's ceiling in device px, divided by --dpr. The resolution ladder below
+     sets --dpr for the first paint; LockupTierSync refines it to the exact
+     devicePixelRatio, so the lockup does not resize at hydration (P23). */
+  --block-max: 864px;
+  --dpr: 1;
+
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  display: flex;
+  background: var(--color-void);
+}
+
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  filter: grayscale(0.7) brightness(0.55) contrast(1.05);
+  pointer-events: none;
+}
+
+/* Thomas's overlay, its rgba(13, 15, 20, a) stops rewritten on Void (P22). */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 50%, color-mix(in srgb, var(--color-void) 35%, transparent) 0%, transparent 100%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--color-void) 55%, transparent) 0%,
+      color-mix(in srgb, var(--color-void) 78%, transparent) 60%,
+      color-mix(in srgb, var(--color-void) 88%, transparent) 100%);
+}
+
+/* Header lockup H1 at its 137 x 31 pixel grid, Thomas's placement. */
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  padding: 20px 32px;
+  line-height: 0;
+}
+
+.header svg {
+  display: block;
+  margin-left: -2px;
+  transform: translateY(-2px);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.column {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--pad-top) var(--pad-x) var(--pad-bot);
+}
+
+.badges {
+  margin-top: var(--badges-gap);
+}
+
+/* ---------- Lockup sets: block on portrait, one-line on landscape ---------- */
+
+.set {
+  display: none;
+  flex: none;
+  max-width: 100%;
+  container-type: inline-size; /* the hero line sizes off this width (cqw) */
+}
+
+.hero [data-lockup-set="block"] {
+  width: min(100%, var(--avail-h) * var(--ar-block), var(--block-max) / var(--dpr));
+  --soon-size: 5.056cqw;
+  --soon-gap: 16.25cqw;
+}
+
+.hero [data-lockup-set="oneline"] {
+  width: min(100%, var(--avail-h) * var(--ar-oneline));
+  --soon-size: 3.182cqw;
+  --soon-gap: 10.227cqw;
+}
+
+/* Exactly one set shows: the block lockup by default, the one-line lockup
+   from 4:5 (P24; Thomas's two queries left 0.799 to 0.8 with neither). */
+.hero [data-lockup-set="block"] { display: block; }
+
+@media (min-aspect-ratio: 4/5) {
+  .hero [data-lockup-set="block"] { display: none; }
+  .hero [data-lockup-set="oneline"] { display: block; }
+}
+
+.hero [data-tier-art] {
+  display: none;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.hero [data-tier="b3"] [data-tier-art="b3"],
+.hero [data-tier="b3sm"] [data-tier-art="b3sm"],
+.hero [data-tier="detail"] [data-tier-art="detail"],
+.hero [data-tier="fine"] [data-tier-art="fine"],
+.hero [data-tier="small"] [data-tier-art="small"] {
+  display: block;
+}
+
+/* Optional one-red version (P21): the crown's bar goes white. */
+[data-crown="mono"] .hero [data-part="crown-belt-bar"] {
+  fill: var(--text-primary);
+}
+
+/* The hero line ("Coming Soon" / "Get the app"); colour is inline (P20). */
+.soon {
+  margin: var(--soon-gap, 24px) 0 0;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 15px; /* fallback without container query units (R1) */
+  font-size: max(10px, var(--soon-size));
+  line-height: 1;
+  letter-spacing: 0.16em;
+  padding-left: 0.16em; /* balances the trailing tracking so the line centres on its ink */
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ---------- Viewfinder corners (static, O11) ---------- */
+
+.corner {
+  position: absolute;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  opacity: 0.5;
+  pointer-events: none;
+  border: 0 solid var(--text-secondary);
+}
+
+.tl { top: 84px; left: 32px; border-top-width: 2px; border-left-width: 2px; }
+.tr { top: 84px; right: 32px; border-top-width: 2px; border-right-width: 2px; }
+.bl { bottom: 96px; left: 32px; border-bottom-width: 2px; border-left-width: 2px; }
+.br { bottom: 96px; right: 32px; border-bottom-width: 2px; border-right-width: 2px; }
+
+@media (max-width: 540px) {
+  .header { padding: 18px 20px; }
+  .corner { width: 22px; height: 22px; }
+  .tl, .tr { top: 72px; }
+  .bl, .br { bottom: 80px; }
+  .tl, .bl { left: 16px; }
+  .tr, .br { right: 16px; }
+}
+
+/* Short landscape screens (phones on their side): pull the frame in. */
+@media (max-height: 500px) and (min-aspect-ratio: 4/5) {
+  .hero { --pad-top: 64px; --pad-bot: 56px; }
+  .corner { width: 20px; height: 20px; }
+  .tl, .tr { top: 56px; }
+  .bl, .br { bottom: 44px; }
+}
+
+/* ---------- Intro (section 6.1): CSS only, once, never under reduced motion ---------- */
+
+@media (min-resolution: 1.25dppx) { .hero { --dpr: 1.25; } }
+@media (min-resolution: 1.5dppx) { .hero { --dpr: 1.5; } }
+@media (min-resolution: 1.75dppx) { .hero { --dpr: 1.75; } }
+@media (min-resolution: 2dppx) { .hero { --dpr: 2; } }
+@media (min-resolution: 2.25dppx) { .hero { --dpr: 2.25; } }
+@media (min-resolution: 2.5dppx) { .hero { --dpr: 2.5; } }
+@media (min-resolution: 2.625dppx) { .hero { --dpr: 2.625; } }
+@media (min-resolution: 2.75dppx) { .hero { --dpr: 2.75; } }
+@media (min-resolution: 3dppx) { .hero { --dpr: 3; } }
+@media (min-resolution: 3.5dppx) { .hero { --dpr: 3.5; } }
+@media (min-resolution: 4dppx) { .hero { --dpr: 4; } }
+
+.hero {
+  /* Start times from the addendum's section 6.1 table. */
+  --intro-we: 200ms;
+  --intro-w1: 550ms;
+  --intro-w2: 670ms;
+  --intro-crown: 1070ms;
+  --intro-you: 1590ms;
+  --intro-soon: 2170ms;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(var(--intro-from)); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero [data-lk="we"] {
+    --intro-from: calc(var(--x) * 0.14px);
+    animation: rise var(--duration-base) var(--easing-default) var(--intro-we) both;
+  }
+  .hero [data-lk="w1"] {
+    --intro-from: calc(var(--x) * 0.4px);
+    animation: rise var(--duration-slow) var(--easing-default) var(--intro-w1) both;
+  }
+  .hero [data-lk="w2"] {
+    --intro-from: calc(var(--x) * 0.4px);
+    animation: rise var(--duration-slow) var(--easing-default) var(--intro-w2) both;
+  }
+  .hero [data-lk="crown"] {
+    --intro-from: calc(var(--x) * -0.7px);
+    animation: rise var(--duration-slow) var(--easing-default) var(--intro-crown) both;
+  }
+  .hero [data-lk="you"] {
+    --intro-from: calc(var(--x) * 0.14px);
+    animation: rise var(--duration-base) var(--easing-default) var(--intro-you) both;
+  }
+  .hero [data-lk="soon"] {
+    animation: fade var(--duration-base) var(--easing-default) var(--intro-soon) both;
+  }
+  /* P18: once the intro is done, a tier change shows its end state. */
+  .hero[data-intro="done"] [data-lk] {
+    animation: none;
+  }
+}
