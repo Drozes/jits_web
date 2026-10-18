@@ -34,6 +34,12 @@ const nextConfig: NextConfig = {
         source: "/.well-known/apple-app-site-association",
         headers: [{ key: "Content-Type", value: "application/json" }],
       },
+      {
+        // Landing videos: versioned file names (a recut gets -v2-), so a
+        // one-year immutable cache is safe (specs/web-landing/addendum-teaser-v2.md P14).
+        source: "/landing/videos/:file*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
     ];
   },
 };

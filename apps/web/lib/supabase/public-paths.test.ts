@@ -66,6 +66,10 @@ describe("isLockedAllowedPath", () => {
     expect(isLockedAllowedPath(p)).toBe(false);
   });
 
+  it("does not list the landing videos: the proxy matcher skips .mp4 instead (addendum P13)", () => {
+    expect(isLockedAllowedPath("/landing/videos/sparring-01-v1-720.mp4")).toBe(false);
+  });
+
   it("only allows paths that are also public, so no signed-out bounce through /login", () => {
     for (const p of ["/", ...LOCKED_ALLOWED_PATHS]) expect(isPublicPath(p)).toBe(true);
   });
