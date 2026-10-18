@@ -104,13 +104,13 @@ describe("LandingPage", () => {
   /** The hero line, one per lockup set (CSS shows one). */
   const heroLines = (root: HTMLElement) => Array.from(root.querySelectorAll<HTMLElement>('[data-lk="soon"]'));
 
-  it("shows both badges as Coming soon in the hero and footer while the store URLs are unset", async () => {
+  it("shows the Coming soon badges only in the footer while the store URLs are unset", async () => {
     const { container } = await renderWith("", "");
-    const blocks = screen.getAllByTestId("store-badges");
-    expect(blocks).toHaveLength(2);
-    expect(screen.getByTestId("hero-badges")).toContainElement(blocks[0]);
-    expect(screen.getAllByRole("group", { name: "App Store: coming soon" })).toHaveLength(2);
-    expect(screen.getAllByRole("group", { name: "Google Play: coming soon" })).toHaveLength(2);
+    expect(screen.getAllByTestId("store-badges")).toHaveLength(1);
+    expect(screen.queryByTestId("hero-badges")).toBeNull();
+    expect(screen.getByTestId("landing-hero")).toHaveAttribute("data-badges", "off");
+    expect(screen.getAllByRole("group", { name: "App Store: coming soon" })).toHaveLength(1);
+    expect(screen.getAllByRole("group", { name: "Google Play: coming soon" })).toHaveLength(1);
     expect(screen.queryByRole("link", { name: /app store|google play/i })).toBeNull();
     // The red hero line names the moment in the red text token; nothing is red-filled.
     const lines = heroLines(container);
@@ -123,10 +123,14 @@ describe("LandingPage", () => {
     expect(redFills(container)).toHaveLength(0);
   });
 
-  it("links both badges once the store URLs are set, never as a red fill", async () => {
+  it("adds the hero badges and links them once the store URLs are set, never as a red fill", async () => {
     const apple = "https://apps.apple.com/app/id6774629438";
     const play = "https://play.google.com/store/apps/details?id=com.elorated.mobile";
     const { container } = await renderWith(apple, play);
+    const blocks = screen.getAllByTestId("store-badges");
+    expect(blocks).toHaveLength(2);
+    expect(screen.getByTestId("hero-badges")).toContainElement(blocks[0]);
+    expect(screen.getByTestId("landing-hero")).toHaveAttribute("data-badges", "on");
     const appLinks = screen.getAllByRole("link", { name: "Download ELO RATED on the App Store" });
     expect(appLinks).toHaveLength(2);
     for (const link of appLinks) expect(link).toHaveAttribute("href", apple);

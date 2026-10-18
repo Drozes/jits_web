@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Web: hero store badges wait for launch
+
+- The landing hero no longer shows the store badges while the App Store URL is unset (owner, 2026-10-18): before launch the footer carries the Coming soon badges, so the hero shows only the red "Coming Soon" line and the lockup gets the badge block's height back (`data-badges="off"` sets `--badges-h: 0px`). Once `NEXT_PUBLIC_APP_STORE_URL` is set and the site redeployed, the hero line reads "Get the app" and the linked badges return under it automatically.
+
 ### Web: landing intro and HOW IT WORKS hidden
 
 - The landing at elorated.com now shows only the teaser hero and the footer (owner, 2026-10-18). `LandingIntro` (What's your number?, body line, data strip) and `LandingSteps` (HOW IT WORKS) are no longer rendered by `landing-page.tsx`; both components are kept so they can return. The footer keeps the store badges and the Terms, Privacy and Support links.
