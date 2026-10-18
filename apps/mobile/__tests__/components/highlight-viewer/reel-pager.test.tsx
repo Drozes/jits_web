@@ -366,7 +366,7 @@ describe("ReelPager", () => {
   });
 
   it("not yours: opening Report suspends paging and pauses, like the other sheets (jits-rog5.11)", async () => {
-    const other = reel(1, { isOwn: false, source: "friend", viewerIsParticipant: false, subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
+    const other = reel(1, { isOwn: false, source: "friend", subjectAthleteId: "ath-9", opponentName: "C. Ruiz" });
     const utils = await open(session([other, reel(2)], 0));
     expect(list(utils).props.scrollEnabled).toBe(true);
     await act(async () => fireEvent.press(utils.getByTestId("viewer-report")));
