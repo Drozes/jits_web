@@ -1,7 +1,5 @@
 import { LandingFooter } from "./landing-footer";
 import { LandingHero } from "./landing-hero";
-import { LandingIntro } from "./landing-intro";
-import { LandingSteps } from "./landing-steps";
 
 /**
  * The public landing page served at "/" while the web app is locked
@@ -9,6 +7,8 @@ import { LandingSteps } from "./landing-steps";
  * tokens even when a visitor stored the light theme. Brand variables only.
  * data-crown="colour" gives the crown lockups their red belt bar ("mono"
  * turns it white; specs/web-landing/addendum-teaser-v2.md P21).
+ * LandingIntro and LandingSteps are hidden for now (owner, 2026-10-18);
+ * the components are kept so they can return.
  */
 export function LandingPage() {
   return (
@@ -24,8 +24,6 @@ export function LandingPage() {
       }}
     >
       <LandingHero />
-      <LandingIntro />
-      <LandingSteps />
       <LandingFooter />
     </main>
   );
