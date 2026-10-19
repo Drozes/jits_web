@@ -6,7 +6,7 @@ import { getEloStakes } from "@jits/shared/api/queries";
 import type { EloStakes } from "@jits/shared/types/composites";
 import type { MobileOpponent } from "../bot/opponent";
 import type { MatchSide, ReadyOutcome } from "../bot/match-side";
-import { db, type ChallengeDb, type MatchDb } from "../oracle/db";
+import { db, type ChallengeDb, type MatchDb, type ParticipantDb } from "../oracle/db";
 import { parseDelta, ToastWatch, waitLivePill } from "../oracle/ui";
 import { resetFixtures, type ResetOptions } from "../fixtures/reset";
 import { proveAppOnLocalStack } from "../bot/app-on-local";
@@ -113,10 +113,64 @@ export async function normaliseApp(ctx: ScenarioCtx): Promise<void> {
   await idb.waitFor({ label: "Arena", type: "Button" }, 10_000);
 }
 
-export async function stakesFor(red: MobileOpponent, challengerElo = 1000, opponentElo = 1000, cw = 170, ow = 170): Promise<EloStakes> {
-  const s = await getEloStakes(red.client, challengerElo, opponentElo, cw, ow);
-  if (!s) throw new HarnessError("calculate_elo_stakes returned nothing");
-  return s;
+/** The rating every fixture athlete starts a scenario at (`resetFixtures`). */
+export const FIXTURE_ELO = 1000;
+
+/** Why a stakes oracle was skipped. */
+export const STAKES_UNAVAILABLE =
+  "calculate_elo_stakes returned nothing (Rating V9 made it a stub that returns NULL; stakes leave the app in both modes, decision O1)";
+
+/**
+ * The pre-match stakes preview (challenger's perspective), or null. Stakes
+ * are INFORMATIONAL only: Rating V9 (jr_be 20261013100200) turned
+ * `calculate_elo_stakes` into a stub that returns NULL, and decision O1
+ * removes stakes and every Elo hint from the app in both modes. So nothing
+ * waits or gates on them: an oracle compares a stake only when this
+ * returned one (`stakeOracle`); the rating a match actually moved is read
+ * from the database instead (`checkRatingMoved`, `checkSummary`).
+ */
+export async function stakesFor(
+  ctx: ScenarioCtx,
+  red: MobileOpponent,
+  challengerElo = FIXTURE_ELO,
+  opponentElo = FIXTURE_ELO,
+  cw = 170,
+  ow = 170,
+): Promise<EloStakes | null> {
+  let s: EloStakes | null = null;
+  try {
+    s = await getEloStakes(red.client, challengerElo, opponentElo, cw, ow);
+  } catch (e) {
+    ctx.trace.note("harness", "stakes_error", e instanceof Error ? e.message : String(e));
+  }
+  if (!s) ctx.trace.note("harness", "stakes_unavailable", STAKES_UNAVAILABLE);
+  return s ?? null;
+}
+
+/**
+ * Compare a stake with what the match really did, only when the stakes RPC
+ * returned one; otherwise record the oracle as SKIPPED (never as a pass).
+ */
+export function stakeOracle(ctx: ScenarioCtx, id: string, expected: unknown, actual: unknown, haveStakes: boolean): void {
+  if (haveStakes) ctx.eq(id, expected, actual);
+  else ctx.skip(id, STAKES_UNAVAILABLE);
+}
+
+/** A participant row's rating change: `elo_delta`, else after minus before. */
+export function participantDelta(p: Pick<ParticipantDb, "elo_before" | "elo_after" | "elo_delta"> | null | undefined): number | null {
+  if (!p) return null;
+  if (p.elo_delta != null) return p.elo_delta;
+  return p.elo_before != null && p.elo_after != null ? p.elo_after - p.elo_before : null;
+}
+
+/**
+ * The delta the verdict shows for a rating change: `RatingMoment` renders
+ * the chip (`summary-elo-delta`) and speaks "up N" / "down N" in the rating
+ * card's label only for a non-zero delta, so a zero or unknown change shows
+ * none at all.
+ */
+export function verdictChipDelta(delta: number | null): number | null {
+  return delta == null || delta === 0 ? null : delta;
 }
 
 // --- handshake ------------------------------------------------------------------
@@ -266,10 +320,7 @@ export async function checkStillOneMatch(ctx: ScenarioCtx, challengeIds: string[
  */
 export async function blueCancelsFromReady(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
   side.enter("weight");
-  await ctx.step("Blue confirms weights", async () => {
-    await ctx.ui.confirmWeights();
-    await ctx.ui.waitStep("ready", T.step);
-  });
+  await blueConfirmsWeights(ctx);
   await ctx.step("Blue cancels the match", () => ctx.ui.cancelMatch());
   await ctx.expect("protocol:blue-in-the-same-match", true, async () => {
     await side.spy.waitFor("Blue's match_cancelled on the bot's match topic", (e) => e.event === "match_cancelled", 10_000, 0);
@@ -358,17 +409,35 @@ export async function blueOnWeight(ctx: ScenarioCtx): Promise<void> {
   await ctx.step("Blue lands on the weight step", () => ctx.ui.waitStep("weight", T.step));
 }
 
+/**
+ * Blue's weigh-in, through to the ready step: Confirm my weight, then Blue's
+ * own check of Red's weigh-in on the face-off check plate (jr_be-ahn.4,
+ * "Confirm"), which the app waits for before it moves to ready (jits-c3vd).
+ * Every Arena match is challenge-backed, so the plate must be there.
+ */
+export async function blueConfirmsWeights(ctx: ScenarioCtx): Promise<void> {
+  const weighIn = await ctx.step("Blue confirms weights", async () => {
+    const r = await ctx.ui.confirmWeights(T.step);
+    await ctx.ui.waitStep("ready", T.step);
+    return r;
+  });
+  ctx.eq("ui:weight-check-plate-answered", true, weighIn.weightCheck, "Blue confirmed Red's weigh-in on the face-off check plate");
+}
+
 /** Both confirm weights and ready up; returns the bot's view of the start. */
 export async function readyToLive(ctx: ScenarioCtx, side: MatchSide): Promise<ReadyOutcome> {
   const botRun = side.confirmWeights().then(() => side.readyAndStart(T.handshake));
-  await ctx.step("Blue confirms weights", async () => {
-    await ctx.ui.confirmWeights();
-    await ctx.ui.waitStep("ready", T.step);
-  });
+  botRun.catch(() => undefined); // awaited below; never an unhandled rejection
+  await blueConfirmsWeights(ctx);
   await ctx.step("Blue taps Ready", () => ctx.ui.tapReady());
   const [outcome] = await Promise.all([
     ctx.step("bot completes the ready handshake", () => botRun),
-    ctx.step("Blue reaches the live step", () => ctx.ui.waitStep("live", T.handshake)),
+    ctx.step("Blue reaches the live step", async () => {
+      await ctx.ui.waitStep("live", T.handshake);
+      // The step reads "live" during the 3-2-1 already; the live screen
+      // (End, Pause and its channel) mounts at GO.
+      await ctx.ui.waitLiveScreen(T.step);
+    }),
   ]);
   const m = await db.match(side.matchId);
   ctx.eq("db:match-in-progress", { status: "in_progress", started: true }, { status: m?.status, started: !!m?.started_at });
@@ -474,7 +543,22 @@ export async function bothConfirm(
   else ctx.oracle("bot:confirm-channel-received-blue-result_confirmed", true, "informational", received, `bot finished confirm via ${outcome.via}`);
 }
 
-export async function checkSummary(ctx: ScenarioCtx, verdict: string, delta: number | null): Promise<void> {
+/** What the verdict's rating change is checked against. */
+export interface SummaryDelta {
+  /** The match on screen: Blue's own participant row is what the verdict shows. */
+  matchId: string;
+  /** Blue's delta in the stakes preview, or null when the stakes RPC returned none. */
+  stake: number | null;
+}
+
+/**
+ * The verdict: the headline, the exit and (with `delta`) the rating chip.
+ * The chip is checked against Blue's own `match_participants` row, the
+ * row the verdict reads (`MatchAthleteView.eloDelta`), so it holds whatever
+ * the rating engine computed; the stakes preview is compared only when the
+ * stakes RPC returned one.
+ */
+export async function checkSummary(ctx: ScenarioCtx, verdict: string, delta: SummaryDelta | null): Promise<void> {
   const s = await pollUntil(
     "summary verdict",
     async () => {
@@ -485,9 +569,24 @@ export async function checkSummary(ctx: ScenarioCtx, verdict: string, delta: num
   ).catch(() => ctx.ui.readSummary());
   ctx.eq("ui:summary-verdict", verdict, s.verdict?.toUpperCase() ?? null);
   if (delta !== null) {
-    // The delta renders once the refresh lands; give it a moment.
-    const d = await pollUntil("summary elo delta", async () => parseDelta((await ctx.ui.readSummary()).eloDelta) ?? undefined, { timeoutMs: 8_000 }).catch(() => null);
-    ctx.eq("ui:summary-elo-delta", delta, d);
+    const mine = (await db.participants(delta.matchId)).find((p) => p.athlete_id === ctx.ids.blue);
+    const dbDelta = participantDelta(mine);
+    const want = verdictChipDelta(dbDelta);
+    // The delta shows once the verdict's refresh lands; give it a moment.
+    // With none due, one read after the verdict settled is the check.
+    const d =
+      want === null
+        ? parseDelta((await ctx.ui.readSummary()).eloDelta)
+        : await pollUntil(
+            "summary elo delta",
+            async () => {
+              const v = parseDelta((await ctx.ui.readSummary()).eloDelta);
+              return v === want ? v : undefined;
+            },
+            { timeoutMs: 8_000 },
+          ).catch(async () => parseDelta((await ctx.ui.readSummary()).eloDelta));
+    ctx.eq("ui:summary-elo-delta", want, d, `Blue's match_participants elo_delta is ${dbDelta}`);
+    stakeOracle(ctx, "stakes:blue-delta-matches-preview", delta.stake, dbDelta, delta.stake !== null);
   }
   ctx.eq("ui:summary-exit-visible", true, s.hasExit);
 }
@@ -505,11 +604,55 @@ export interface DecisiveExpectation {
   handshake: Handshake;
   winner: string;
   loser: string;
-  winnerDelta: number;
-  loserDelta: number;
+  /** The stakes preview's deltas, or null when the stakes RPC returned none. */
+  winnerDelta: number | null;
+  loserDelta: number | null;
   code: string;
   finish: number;
   confirmations: number;
+}
+
+/**
+ * The rating change landed everywhere the app reads it: one `elo_history`
+ * row per athlete that agrees with its participant row, and `current_elo`
+ * equal to `elo_after`. Engine independent (Elo or Rating V9).
+ */
+export async function checkRatingApplied(ctx: ScenarioCtx, matchId: string, parts: ParticipantDb[]): Promise<void> {
+  const hist = await db.eloHistory(matchId);
+  ctx.eq("db:elo-history-rows", 2, hist.length);
+  const byAthlete = <T extends { athlete_id: string }>(rows: T[]) => [...rows].sort((a, b) => a.athlete_id.localeCompare(b.athlete_id));
+  ctx.eq(
+    "db:elo-history-matches-participants",
+    byAthlete(parts).map((p) => ({ athlete_id: p.athlete_id, before: p.elo_before, after: p.elo_after, delta: participantDelta(p) })),
+    byAthlete(hist).map((h) => ({ athlete_id: h.athlete_id, before: h.rating_before, after: h.rating_after, delta: h.delta })),
+  );
+  const athletes = await Promise.all(byAthlete(parts).map((p) => db.athlete(p.athlete_id)));
+  ctx.eq("db:current-elo-updated", byAthlete(parts).map((p) => p.elo_after), athletes.map((a) => a?.current_elo ?? null));
+}
+
+/**
+ * A decisive result moved the ratings the right way: the winner gained and
+ * the loser lost (both engines guarantee it: Elo by construction, Rating V9
+ * by its WIN_FLOOR / LOSS_FLOOR of 1), the stakes preview matched when it
+ * exists, and the change was applied (`checkRatingApplied`).
+ */
+export async function checkRatingMoved(
+  ctx: ScenarioCtx,
+  x: { matchId: string; winner: string; loser: string; winnerDelta: number | null; loserDelta: number | null },
+): Promise<ParticipantDb[]> {
+  const parts = await db.participants(x.matchId);
+  const wd = participantDelta(parts.find((p) => p.athlete_id === x.winner));
+  const ld = participantDelta(parts.find((p) => p.athlete_id === x.loser));
+  ctx.eq("db:rating-moved-by-outcome", { winnerGained: true, loserLost: true }, { winnerGained: wd != null && wd > 0, loserLost: ld != null && ld < 0 }, `winner ${wd}, loser ${ld}`);
+  stakeOracle(
+    ctx,
+    "stakes:deltas-match-preview",
+    [x.winnerDelta, x.loserDelta],
+    [wd, ld],
+    x.winnerDelta !== null && x.loserDelta !== null,
+  );
+  await checkRatingApplied(ctx, x.matchId, parts);
+  return parts;
 }
 
 /** Everything that must be true in the DB after a recorded submission. */
@@ -523,25 +666,20 @@ export async function checkDecisiveDb(ctx: ScenarioCtx, x: DecisiveExpectation):
   ctx.eq("db:match-completed", { status: "completed", result: "submission" }, { status: m?.status, result: m?.result });
   const sub = await db.submission(matchId);
   ctx.eq("db:submission-row", { winner_id: x.winner, loser_id: x.loser, code: x.code, finish_time_seconds: x.finish }, sub);
-  const parts = await db.participants(matchId);
+  const parts = await checkRatingMoved(ctx, { matchId, winner: x.winner, loser: x.loser, winnerDelta: x.winnerDelta, loserDelta: x.loserDelta });
   const w = parts.find((p) => p.athlete_id === x.winner);
   const l = parts.find((p) => p.athlete_id === x.loser);
   ctx.eq(
     "db:participants",
     [
-      { outcome: "win", elo_before: 1000, elo_after: 1000 + x.winnerDelta, gap: 0 },
-      { outcome: "loss", elo_before: 1000, elo_after: 1000 + x.loserDelta, gap: 0 },
+      { outcome: "win", elo_before: FIXTURE_ELO, gap: 0 },
+      { outcome: "loss", elo_before: FIXTURE_ELO, gap: 0 },
     ],
     [
-      { outcome: w?.outcome, elo_before: w?.elo_before, elo_after: w?.elo_after, gap: w?.weight_division_gap },
-      { outcome: l?.outcome, elo_before: l?.elo_before, elo_after: l?.elo_after, gap: l?.weight_division_gap },
+      { outcome: w?.outcome, elo_before: w?.elo_before, gap: w?.weight_division_gap },
+      { outcome: l?.outcome, elo_before: l?.elo_before, gap: l?.weight_division_gap },
     ],
   );
-  const hist = await db.eloHistory(matchId);
-  ctx.eq("db:elo-history-rows", 2, hist.length);
-  const wa = await db.athlete(x.winner);
-  const la = await db.athlete(x.loser);
-  ctx.eq("db:current-elo-updated", [1000 + x.winnerDelta, 1000 + x.loserDelta], [wa?.current_elo, la?.current_elo]);
   const conf = await pollUntil(
     `${x.confirmations} confirmations`,
     async () => {
@@ -553,20 +691,27 @@ export async function checkDecisiveDb(ctx: ScenarioCtx, x: DecisiveExpectation):
   ctx.eq("db:confirmations", x.confirmations, conf.length);
 }
 
-export async function checkDrawDb(ctx: ScenarioCtx, h: Handshake, delta: number): Promise<void> {
+/**
+ * A recorded draw. Both athletes are rated (two history rows, current_elo
+ * applied); the size and sign of the change are the engine's business
+ * (the Elo Pressure Score always cost both, Rating V9 scores a draw between
+ * equals as no change), so they are compared only with the stakes preview,
+ * when there is one.
+ */
+export async function checkDrawDb(ctx: ScenarioCtx, h: Handshake, stakeDelta: number | null): Promise<void> {
   const m = await db.match(h.matchId);
   ctx.eq("db:match-completed-draw", { status: "completed", result: "draw" }, { status: m?.status, result: m?.result });
   const parts = await db.participants(h.matchId);
   ctx.eq(
     "db:draw-participants",
     [
-      { outcome: "draw", elo_after: 1000 + delta },
-      { outcome: "draw", elo_after: 1000 + delta },
+      { outcome: "draw", elo_before: FIXTURE_ELO },
+      { outcome: "draw", elo_before: FIXTURE_ELO },
     ],
-    parts.map((p) => ({ outcome: p.outcome, elo_after: p.elo_after })),
+    parts.map((p) => ({ outcome: p.outcome, elo_before: p.elo_before })),
   );
-  const hist = await db.eloHistory(h.matchId);
-  ctx.eq("db:elo-history-rows", 2, hist.length);
+  stakeOracle(ctx, "stakes:draw-deltas-match-preview", [stakeDelta, stakeDelta], parts.map(participantDelta), stakeDelta !== null);
+  await checkRatingApplied(ctx, h.matchId, parts);
   const conf = await pollUntil(
     "2 confirmations",
     async () => {
@@ -586,7 +731,7 @@ export async function checkAbortDb(ctx: ScenarioCtx, h: Handshake): Promise<void
   ctx.eq("db:no-elo-history", 0, hist.length);
   const b = await db.athlete(ctx.ids.blue);
   const r = await db.athlete(ctx.ids.red);
-  ctx.eq("db:elo-unchanged", [1000, 1000], [b?.current_elo, r?.current_elo]);
+  ctx.eq("db:elo-unchanged", [FIXTURE_ELO, FIXTURE_ELO], [b?.current_elo, r?.current_elo]);
 }
 
 /** Blue records a draw from the result step, both confirm, back to Arena. */

@@ -1,5 +1,5 @@
 import type { Scenario } from "../context";
-import { blueChallengesRed, blueOnWeight, checkAbortDb, checkLiveAfterExit, prepare, T } from "../flows";
+import { blueChallengesRed, blueConfirmsWeights, blueOnWeight, checkAbortDb, checkLiveAfterExit, prepare, T } from "../flows";
 
 const scenario: Scenario = {
   id: "E3",
@@ -12,10 +12,7 @@ const scenario: Scenario = {
     const h = await blueChallengesRed(ctx, red);
     const side = await ctx.matchSide(red, h.matchId);
     await blueOnWeight(ctx);
-    await ctx.step("Blue confirms weights", async () => {
-      await ctx.ui.confirmWeights();
-      await ctx.ui.waitStep("ready", T.step);
-    });
+    await blueConfirmsWeights(ctx);
     await ctx.step("Red reaches the ready step", () => side.confirmWeights());
     await ctx.step("Red cancels", () => side.cancelReady());
     await ctx.step("Blue is returned to the Arena", () =>

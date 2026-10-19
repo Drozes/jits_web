@@ -44,7 +44,7 @@ const scenario: Scenario = {
     await prepare(ctx);
     const red = await ctx.bot("red");
     await red.goLive();
-    const stakes = await stakesFor(red);
+    const stakes = await stakesFor(ctx, red);
     const h = await blueChallengesRed(ctx, red);
     const side = await ctx.matchSide(red, h.matchId);
     await blueOnWeight(ctx);
@@ -56,8 +56,8 @@ const scenario: Scenario = {
       handshake: h,
       winner: ctx.ids.blue,
       loser: ctx.ids.red,
-      winnerDelta: stakes.challenger_win,
-      loserDelta: stakes.opponent_loss,
+      winnerDelta: stakes?.challenger_win ?? null,
+      loserDelta: stakes?.opponent_loss ?? null,
       code: "armbar",
       finish: 90,
       confirmations: 2,

@@ -134,7 +134,11 @@ Other flags: `--only C1,E4`, `--repeat N`, `--fidelity strict|lenient`
 Exit code: 0 when every scenario is `pass`, `flake` or `known`; 1 when any is
 `fail`, `harness_error` or `env_error`; 2 for a preflight/env refusal.
 
-Target: the core tier takes about 2.5 to 3 minutes; the extended tier about
+Core is expected fully green (7 of 7: C1 to C6B) on the local stack, with
+Rating V9 applied and face-off weight checks on; it is the flag-OFF guard for
+the timekeeper mode build. Any core failure is a regression to triage.
+
+Target: the core tier takes about 3.5 minutes; the extended tier about
 13 to 16 minutes (E18 to E20 add roughly 1.5 to 2 minutes each: the toast
 control once per run, the 12 s accepted fallback in E20, and the
 accept + 14 s re-count in E18 and E19).
@@ -221,7 +225,8 @@ already appends a `{"type":"run",...}` line per run):
 
 ## Known harness facts
 
-- The incoming-challenge prompt is a gorhom `BottomSheetModal`. Since
+- The incoming-challenge prompt is a centered React Native `Modal` (a gorhom
+  sheet before jits-02vo.3). Since
   jits-ef2a its Accept/Decline buttons are in the accessibility tree by label,
   and the harness taps them only by label (the old offset-from-handle fallback
   is gone). The prompt ignores taps for `PROMPT_INPUT_GUARD_MS` (600ms) after
@@ -237,9 +242,77 @@ already appends a `{"type":"run",...}` line per run):
   without a simulator.
 - Text testIDs do not surface through idb; the wizard step is read from the
   step name in the step marker's accessibility label ("Step N of T, <Label>",
-  pinned to the app's labels by `tests/label-contract.test.ts`).
+  pinned to the app's labels by `tests/label-contract.test.ts`). A
+  `match-step-<step>` testID counts only for one of the app's `MATCH_STEPS`
+  (`stepFromTestId`). On the full-bleed live step idb sometimes reports no
+  marker at all, so `currentStep` falls back to controls only one step
+  renders (`STEP_BY_CONTROL`: `#live-end` / `#live-pause-toggle` mean live,
+  `#summary-exit` means summary).
+- Stakes are informational only. Rating V9 (jr_be `20261013100200`) made
+  `calculate_elo_stakes` a stub that returns NULL, and decision O1 removes
+  stakes and Elo hints from the app in both modes. `stakesFor` returns null
+  then, and every stakes oracle (`stakes:*`, `stakeOracle`) is recorded as
+  SKIPPED, never as a pass and never as a gate. The rating a match moved is
+  checked from the database instead: the winner gained and the loser lost
+  (`db:rating-moved-by-outcome`; V9 has a WIN_FLOOR / LOSS_FLOOR of 1), one
+  `elo_history` row per athlete that agrees with its participant row, and
+  `current_elo` = `elo_after` (`checkRatingApplied`). The size of a change is
+  never predicted. A V9 draw between equals is no change at all.
+- The verdict's rating card is ONE accessible element labelled "Rating N, up
+  D" / "Rating N, down D" (just "Rating N" for no change), so idb never sees
+  the delta chip inside it; `readSummary` / `parseDelta` read the card's
+  label, and `ui:summary-elo-delta` is compared with Blue's own
+  `match_participants.elo_delta` (the row the verdict reads), null for a
+  zero change.
+- The fixture reset also sets V9's `athletes.rating` to the fixture
+  `current_elo` (1000) where the column exists: V9 rates from `rating` and
+  writes `current_elo` back from it, so resetting `current_elo` alone would
+  start every match from whatever rating the last run left. RD, volatility
+  and the match history are kept.
+- Face-off weigh-in (jits-c3vd): after "Confirm <N> lbs" (`#weight-confirm`)
+  the opponent's plate becomes Blue's check of their weigh-in
+  (`#faceoff-weight-check-plate`, Confirm `#weight-check-confirm`, "Doesn't
+  look right" `#weight-check-flag`), and the app stays on the weight step
+  until Blue's OWN check is confirmed. `Screens.confirmWeights` answers
+  Confirm and `blueConfirmsWeights` records `ui:weight-check-plate-answered`
+  (every Arena match is challenge-backed, so the plate must be there). The
+  bot mirrors it: `MatchSide.confirmWeights` reads the checks and confirms
+  its own (`check_opponent_weight`, `weightCheckAction`) before entering
+  ready. The flag-OFF tiers never flag.
+- Live: the wizard reads "live" from the start of the 3-2-1 countdown, but
+  the live step (End, Pause and its channel) mounts only at GO (server
+  `started_at` plus `COUNTDOWN_MS`, `LiveStage`). The harness waits for
+  `#live-end` before it treats Blue as live, and the bot waits for GO
+  (`liveGoAt`) before it ends or pauses; ending during the countdown would
+  end before the other phone's live channel exists. The bot's auto-end
+  counts the clock from GO too.
+- End is "Hold to end match": a tap never ends. `Screens.endMatch` presses
+  `#live-end` for `HOLD_TO_END_MS` (1.2 s, pinned to the app) plus a margin
+  and checks the press took.
+- `fillField` clears a field before typing (the finish time is prefilled
+  from the match clock) and compares case-insensitively (iOS capitalises a
+  text field's first letter).
+- A dev-build LogBox toast can also cover the verdict's Back to Arena;
+  `exitSummary` closes it, scrolls the exit clear of that band and re-taps
+  if the verdict is still up.
+- C4: the app declines with the RPC first and broadcasts `declined` after
+  it, so the challenger's status UPDATE and the broadcast race. C4 asserts
+  the outcome and that the broadcast was delivered
+  (`bot:declined-broadcast-received`); which arrived first is
+  informational.
+- Keep the host awake with its lid open. On 2026-10-19 two runs stalled
+  for 2 and 12 minutes on one idb `describe-all`: both were the Mac in
+  clamshell sleep on battery (`pmset -g log`: "Entering Sleep state due to
+  'Clamshell Sleep'"), with the app's device log silent for exactly that
+  window. A long gap in `idb-commands.log` is that, not the app.
 - Pressables surface as Button, Link, Slider or GenericElement depending on
-  what else is mounted; selectors match by label/testID, not type.
+  what else is mounted, and sometimes even as StaticText (2026-10-19: the
+  prompt's Accept / Decline and the face-off's Leave, all
+  `accessibilityRole="button"`, while a status plate beside them read as
+  Button); selectors match by label/testID, not type. Controls with a
+  testID are selected by testID plus label (`PROMPT_BUTTONS`,
+  `FACEOFF_LEAVE`); `type: "Button"` stays only where a same-label text
+  could otherwise match (the Arena's Go live / Go offline, the tabs).
 - A dev-build LogBox toast can cover the tab bar; the harness closes it.
 - E13 (camera granted) is not implemented: the simulator has no camera.
 - Session-match channels use `ack: true` since 55061f5, so a websocket "ok"

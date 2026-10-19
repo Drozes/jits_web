@@ -6,6 +6,7 @@ import {
   checkBlueInLobbyBeforeMatch,
   checkLiveAfterExit,
   checkOfflineInMatch,
+  checkRatingMoved,
   checkSummary,
   exitToArena,
   prepare,
@@ -23,7 +24,7 @@ const scenario: Scenario = {
     const red = await ctx.bot("red");
     await red.goLive();
     await checkBlueInLobbyBeforeMatch(ctx, red);
-    const stakes = await stakesFor(red); // Blue is the challenger
+    const stakes = await stakesFor(ctx, red); // Blue is the challenger
     const h = await blueChallengesRed(ctx, red);
     const side = await ctx.matchSide(red, h.matchId);
     await blueOnWeight(ctx);
@@ -42,9 +43,14 @@ const scenario: Scenario = {
     ctx.eq("db:match-disputed", "disputed", m?.status);
     const disputes = await db.disputes(h.matchId);
     ctx.eq("db:dispute-row", [{ raised_by: ctx.ids.blue }], disputes.map((d) => ({ raised_by: d.raised_by })));
-    const b = await db.athlete(ctx.ids.blue);
-    const r = await db.athlete(ctx.ids.red);
-    ctx.eq("db:elo-still-applied", [1000 + stakes.opponent_win, 1000 + stakes.challenger_loss], [r?.current_elo, b?.current_elo]);
+    // A dispute does not undo the rating: Red's win is still applied.
+    await checkRatingMoved(ctx, {
+      matchId: h.matchId,
+      winner: ctx.ids.red,
+      loser: ctx.ids.blue,
+      winnerDelta: stakes?.opponent_win ?? null,
+      loserDelta: stakes?.challenger_loss ?? null,
+    });
     // Blue's app sends match_disputed (awaited) before leaving confirm
     // (jits-wfpo); Red's confirm step must receive it and leave on it.
     await ctx.expect("protocol:blue-sent-match_disputed", { athlete_id: ctx.ids.blue }, async () => {

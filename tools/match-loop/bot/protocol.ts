@@ -45,6 +45,12 @@ export const APP_TIMING = {
    * confirm; the bot still starts it once both have confirmed
    * (`confirmDecision`, scenario drift owned by jits-c3vd). */
   CONFIRM_ADVANCE_MS: 1_500,
+  /** `COUNTDOWN_MS` (apps/mobile/components/match-flow/countdown/countdown.tsx):
+   * the 3-2-1 in front of the live step. GO is the server's `started_at`
+   * plus this (never more than this after the stage mounted), the clock runs
+   * from GO, and until GO the live step (End, Pause, its channel) is not
+   * mounted at all (`LiveStage`). */
+  COUNTDOWN_MS: 3_000,
   /** `ACCEPTED_FALLBACK_MS` (apps/mobile/lib/arena/use-arena-challenge.ts): how
    * long a challenger lets its challenge sit at `accepted` before it starts
    * the match itself (the accepter's start failed or its app died). */

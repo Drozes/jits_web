@@ -1,6 +1,6 @@
 import type { Scenario } from "../context";
 import { pace } from "../../lib/util";
-import { blueChallengesRed, blueOnWeight, prepare, T } from "../flows";
+import { blueChallengesRed, blueConfirmsWeights, blueOnWeight, prepare } from "../flows";
 
 const scenario: Scenario = {
   id: "E3B",
@@ -14,10 +14,7 @@ const scenario: Scenario = {
     const side = await ctx.matchSide(red, h.matchId);
     side.enter("weight"); // Red is reading the scale (the weight step mounts a channel since jits-bh2v)
     await blueOnWeight(ctx);
-    await ctx.step("Blue confirms weights", async () => {
-      await ctx.ui.confirmWeights();
-      await ctx.ui.waitStep("ready", T.step);
-    });
+    await blueConfirmsWeights(ctx);
     await ctx.step("Blue cancels the match", () => ctx.ui.cancelMatch());
     await ctx.step("spy sees match_cancelled", () => side.spy.waitFor("match_cancelled", (e) => e.event === "match_cancelled", 10_000, 0));
     await pace(1_500);

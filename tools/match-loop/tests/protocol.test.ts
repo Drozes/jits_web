@@ -8,7 +8,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { APP_TIMING, SESSION_MATCH_EVENTS, validatePayload } from "../bot/protocol";
-import { confirmDecision, handlerToEvent, readyFromSnapshot, type ConfirmSignals } from "../bot/match-side";
+import { confirmDecision, handlerToEvent, liveGoAt, readyFromSnapshot, weightCheckAction, type ConfirmSignals } from "../bot/match-side";
+import type { MatchWeightChecks, WeightCheck, WeightCheckStatus } from "@jits/shared/api/match-weight-checks";
 
 const ROOT = join(__dirname, "..", "..", "..");
 const src = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -54,6 +55,24 @@ test("APP_TIMING matches the app sources", () => {
     "ConfirmStep no longer schedules its advance on ADVANCE_AFTER_CONFIRM_MS",
   );
   assert.equal(APP_TIMING.CONFIRM_ADVANCE_MS, appConst(confirmPath, "ADVANCE_AFTER_CONFIRM_MS"));
+  // The 3-2-1 in front of the live step, and that GO is what the live stage
+  // and the clock use (the bot's `liveGoAt` / auto-end).
+  assert.equal(APP_TIMING.COUNTDOWN_MS, appConst("apps/mobile/components/match-flow/countdown/countdown.tsx", "COUNTDOWN_MS"));
+  const stage = src("apps/mobile/components/match-flow/countdown/live-stage.tsx");
+  assert.match(stage, /const serverGo = Date\.parse\(startedAt\) \+ COUNTDOWN_MS;/);
+  assert.match(stage, /Math\.min\(serverGo, mountedAt \+ COUNTDOWN_MS\)/);
+  assert.match(stage, /new Date\(t \+ COUNTDOWN_MS\)\.toISOString\(\)/);
+});
+
+test("live: GO is the server's start plus the countdown, capped at one countdown after mount", () => {
+  const t0 = Date.parse("2026-10-19T20:00:00.000Z");
+  // Mounted when the server started: GO = start + countdown.
+  assert.equal(liveGoAt(new Date(t0).toISOString(), t0), t0 + APP_TIMING.COUNTDOWN_MS);
+  // A phone that mounts late still has GO at the server's GO...
+  assert.equal(liveGoAt(new Date(t0).toISOString(), t0 + 1_000), t0 + APP_TIMING.COUNTDOWN_MS);
+  // ...and one that is ahead of the server never waits more than one countdown.
+  assert.equal(liveGoAt(new Date(t0 + 10_000).toISOString(), t0), t0 + APP_TIMING.COUNTDOWN_MS);
+  assert.equal(liveGoAt("not a date", t0), t0);
 });
 
 test("the confirm step does not treat a completed status as done (app source)", () => {
@@ -155,4 +174,56 @@ test("confirm: my tap plus the opponent's DB row finishes it after the delay", (
     outcome: { kind: "confirmed", via: "reconciler" },
     delayMs: APP_TIMING.CONFIRM_ADVANCE_MS,
   });
+});
+
+// --- face-off weight check (jr_be-ahn.4, jits-c3vd) --------------------------------
+
+function checks(mine: Partial<WeightCheck> & { status: WeightCheckStatus }): MatchWeightChecks {
+  const base = { weightSeen: null, flagCount: 0, flaggedAt: null, reweighedAt: null, updatedAt: null };
+  return {
+    matchId: "m",
+    required: false,
+    blocked: false,
+    canStart: true,
+    weights: { [ME]: 170, [OPP]: 170 },
+    checks: [
+      { ...base, checkerId: OPP, subjectId: ME, status: "pending" },
+      { ...base, checkerId: ME, subjectId: OPP, ...mine },
+    ],
+  };
+}
+
+test("weight step: the face-off waits for this athlete's own check (app source)", () => {
+  // useFaceoff moves to ready only once my weight is in AND my check of the
+  // opponent is confirmed (or the match has no checks). That is why the bot
+  // confirms its check before entering ready.
+  const faceoff = src("apps/mobile/lib/match-flow/use-faceoff.ts");
+  assert.match(faceoff, /const myCheckDone = checkState\.mine\?\.status === "confirmed";/);
+  assert.match(
+    faceoff,
+    /if \(checks\.status === "unavailable" \|\| checks\.status === "idle" \|\| myCheckDone\) pRef\.current\.onWeighedIn\(\);/,
+  );
+});
+
+test("weight step: no checks (unavailable) or my check confirmed means straight to ready", () => {
+  assert.equal(weightCheckAction(null, ME), "none");
+  assert.equal(weightCheckAction(checks({ status: "confirmed" }), ME), "none");
+});
+
+test("weight step: a pending or recheck verdict is owed, so the bot confirms it", () => {
+  assert.equal(weightCheckAction(checks({ status: "pending" }), ME), "confirm");
+  assert.equal(weightCheckAction(checks({ status: "recheck" }), ME), "confirm");
+});
+
+test("weight step: my open flag holds the match; a re-weigh since the flag reopens the verdict", () => {
+  const flaggedAt = "2026-10-19T10:00:00Z";
+  assert.equal(weightCheckAction(checks({ status: "flagged", flaggedAt }), ME), "hold");
+  assert.equal(weightCheckAction(checks({ status: "flagged", flaggedAt, reweighedAt: "2026-10-19T10:01:00Z" }), ME), "confirm");
+});
+
+test("weight step: only this athlete's own check counts", () => {
+  // The opponent's check of me is pending above; mine decides.
+  const state = checks({ status: "confirmed" });
+  assert.equal(state.checks.find((c) => c.checkerId === OPP)?.status, "pending");
+  assert.equal(weightCheckAction(state, ME), "none");
 });

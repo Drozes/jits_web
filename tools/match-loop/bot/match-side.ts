@@ -1,15 +1,23 @@
 /**
- * The bot's half of the 8-step match wizard.
+ * The bot's half of the match wizard: the 7 steps of `MATCH_STEPS`
+ * (apps/mobile/lib/match-flow/step-router.ts; the old `wait` step is gone).
  *
  * Emulates `apps/mobile/components/match-flow/steps/*` and
  * `apps/mobile/lib/match-flow/*` (Team A protocol, 55061f5):
- *   weight  mounts a channel; a match_cancelled here exits the match
+ *   weight  the face-off weigh-in; mounts a channel, and a match_cancelled
+ *           here exits the match. On a match with weight checks
+ *           (jr_be-ahn.4) the app moves on to ready only once this
+ *           athlete's own check of the opponent's weigh-in is confirmed
+ *           (`useFaceoff`), so the bot confirms its check
+ *           (`check_opponent_weight`, `weightCheckAction`) like the app's
+ *           Confirm button. No checks (unavailable): straight to ready.
  *   ready   ready_signal, repeated every READY_REPEAT_MS until the
  *           opponent's arrives; when both ready, race start_match, broadcast
  *           timer_started (awaited, bounded), loser falls back to
  *           get_match_details
- *   live    pause/resume RPC + broadcast; End = broadcast match_ended
- *           (awaited, bounded; no RPC)
+ *   live    the 3-2-1 countdown first: End and Pause exist only from GO
+ *           (`liveGoAt`, the app's `LiveStage`). Then pause/resume RPC +
+ *           broadcast; End = broadcast match_ended (awaited, bounded; no RPC)
  *   end     local 800ms, then result
  *   result  record_match_result + result_submitted (awaited); or receive it
  *   confirm confirm_match_result + result_confirmed; dispute = RPC +
@@ -56,6 +64,13 @@ import {
   startMatch,
 } from "@jits/shared/api/mutations";
 import { getMatchConfirmations, getMatchDetails } from "@jits/shared/api/queries";
+import {
+  checkOpponentWeight,
+  checksFor,
+  getMatchWeightChecks,
+  reweighedSinceFlag,
+  type MatchWeightChecks,
+} from "@jits/shared/api/match-weight-checks";
 import {
   APP_TIMING,
   createSessionMatchChannel,
@@ -168,6 +183,23 @@ export function readyFromSnapshot(target: Snapshot["target"]): "cancelled" | "st
   return null;
 }
 
+/**
+ * What the weight step must do about this side's check of the opponent's
+ * weigh-in, mirroring the app's `deriveWeightCheckView` + `useFaceoff`:
+ *  - none: no checks for this match (unavailable: the pre-check flow) or
+ *    my check is already confirmed; on to ready.
+ *  - confirm: my verdict is owed (pending, recheck, or a flag the opponent
+ *    has re-weighed since); the app shows Confirm and waits for it.
+ *  - hold: my flag is open (only Withdraw is offered); the bot never flags.
+ */
+export function weightCheckAction(state: MatchWeightChecks | null, meId: string): "none" | "confirm" | "hold" {
+  if (!state) return "none";
+  const { mine } = checksFor(state, meId);
+  if (!mine || mine.status === "confirmed") return "none";
+  if (mine.status === "flagged" && !reweighedSinceFlag(mine)) return "hold";
+  return "confirm";
+}
+
 export interface ConfirmSignals {
   meId: string;
   opponentId: string;
@@ -207,6 +239,16 @@ export function confirmDecision(s: ConfirmSignals): { outcome: ConfirmOutcome; d
   return null;
 }
 
+/**
+ * GO on this side, as the app's `LiveStage` computes it: the server's
+ * `started_at` plus the countdown, but never more than one countdown after
+ * the live stage mounted. Unparseable: GO at mount (no countdown).
+ */
+export function liveGoAt(startedAt: string, mountedAt: number): number {
+  const serverGo = Date.parse(startedAt) + APP_TIMING.COUNTDOWN_MS;
+  return Number.isFinite(serverGo) ? Math.min(serverGo, mountedAt + APP_TIMING.COUNTDOWN_MS) : mountedAt;
+}
+
 const TICK_MS = 100;
 
 export class MatchSide {
@@ -229,6 +271,8 @@ export class MatchSide {
   private reconcileAgain = false;
   private closed = false;
   private myConfirmed = false;
+  /** GO on this side (`liveGoAt`), once the match started. */
+  private goAt: number | null = null;
   private readonly pendingSends: Promise<unknown>[] = [];
 
   constructor(
@@ -487,7 +531,36 @@ export class MatchSide {
       this.enter("exited");
       return;
     }
+    await this.checkOpponentWeight();
+    if (this.cancelledOnWeight()) {
+      this.enter("exited");
+      return;
+    }
     this.enter("ready");
+  }
+
+  /**
+   * The face-off weight check (jr_be-ahn.4), this side: read the checks as
+   * the app does (`useMatchWeightChecks`) and, when my verdict on the
+   * opponent's weigh-in is owed, Confirm it at the weight on screen (the
+   * opponent's rated weight). The app moves to ready only once my check is
+   * confirmed, so neither may the bot.
+   */
+  private async checkOpponentWeight(): Promise<void> {
+    const read = await this.trace.rpc(this.actor, "getMatchWeightChecks", { matchId: this.matchId }, () =>
+      getMatchWeightChecks(this.client, this.matchId),
+    );
+    const state = read.ok ? read.data : null;
+    const action = weightCheckAction(state, this.meId);
+    this.trace.note(this.actor, "weight_check", { action, mine: state ? checksFor(state, this.meId).mine?.status ?? null : "unavailable" });
+    if (action === "none") return;
+    if (action === "hold") throw new Error("weight check: this side's flag is open; the bot never flags, so the match is on hold");
+    await this.think();
+    const seen = state?.weights[this.opponentId] ?? null;
+    const r = await this.trace.rpc(this.actor, "checkOpponentWeight", { matchId: this.matchId, verdict: "confirm", seen }, () =>
+      checkOpponentWeight(this.client, this.matchId, "confirm", seen),
+    );
+    if (!r.ok) throw new Error(`checkOpponentWeight failed: ${r.error.code} ${r.error.message}`);
   }
 
   /**
@@ -523,14 +596,14 @@ export class MatchSide {
         if (r.ok) {
           const startedAt = r.data.started_at ?? new Date().toISOString();
           await this.sendAwaited(E.TIMER_STARTED, { started_at: startedAt });
-          this.enter("live");
+          this.enterLive(startedAt);
           return { kind: "started", startedAt, via: "self" };
         }
         const m = await this.trace.rpc(this.actor, "getMatchDetails", { matchId: this.matchId }, () =>
           getMatchDetails(this.client, this.matchId),
         );
         if (m?.status === "in_progress" && m.started_at) {
-          this.enter("live");
+          this.enterLive(m.started_at);
           return { kind: "started", startedAt: m.started_at, via: "fallback" };
         }
         throw new Error(`startMatch failed and match is ${m?.status}: ${r.error.message}`);
@@ -541,7 +614,7 @@ export class MatchSide {
       }
       const started = this.seenOn("ready", E.TIMER_STARTED);
       if (started) {
-        this.enter("live");
+        this.enterLive(String(started.args[0]));
         return { kind: "started", startedAt: String(started.args[0]), via: "broadcast" };
       }
       // Repeated ready_signals are harmless: once is enough.
@@ -558,7 +631,7 @@ export class MatchSide {
       }
       if (fromDb === "started") {
         const startedAt = snap!.startedAt ?? new Date().toISOString();
-        this.enter("live");
+        this.enterLive(startedAt);
         return { kind: "started", startedAt, via: "reconciler" };
       }
       // ReadyStep repeats ready_signal until the opponent's arrives, because
@@ -576,6 +649,22 @@ export class MatchSide {
     }
   }
 
+  /** Into the live step: the countdown runs until GO (`liveGoAt`). */
+  private enterLive(startedAt: string): void {
+    this.goAt = liveGoAt(startedAt, Date.now());
+    this.enter("live");
+  }
+
+  /**
+   * Wait out the countdown: before GO the app has no live step, so no End
+   * and no Pause to tap (ending during the 3-2-1 would also end before the
+   * opponent's live step, and its channel, exist).
+   */
+  private async untilGo(): Promise<void> {
+    const wait = (this.goAt ?? 0) - Date.now();
+    if (wait > 0) await pace(wait);
+  }
+
   async cancelReady(): Promise<void> {
     await this.think();
     const r = await this.trace.rpc(this.actor, "cancelSessionMatch", { matchId: this.matchId }, () =>
@@ -589,6 +678,7 @@ export class MatchSide {
   // --- live -------------------------------------------------------------------
 
   async pause(): Promise<string> {
+    await this.untilGo();
     await this.think();
     const r = await this.trace.rpc(this.actor, "pauseMatch", { matchId: this.matchId }, () => pauseMatch(this.client, this.matchId));
     if (!r.ok) throw new Error(`pauseMatch failed: ${r.error.message}`);
@@ -597,6 +687,7 @@ export class MatchSide {
   }
 
   async resume(): Promise<number> {
+    await this.untilGo();
     await this.think();
     const r = await this.trace.rpc(this.actor, "resumeMatch", { matchId: this.matchId }, () => resumeMatch(this.client, this.matchId));
     if (!r.ok) throw new Error(`resumeMatch failed: ${r.error.message}`);
@@ -606,6 +697,7 @@ export class MatchSide {
 
   /** Tap End: broadcast only (no RPC, awaited like useLiveControls), then end -> result. */
   async endMatch(): Promise<void> {
+    await this.untilGo();
     await this.think();
     await this.sendAwaited(E.MATCH_ENDED, {});
     await this.passEndStep();
@@ -620,9 +712,10 @@ export class MatchSide {
   /**
    * LiveStep's auto-end: when the timer hits zero, wait AUTO_END_DELAY_MS
    * (1000) and end unless an end already arrived. Mirrors live-step.tsx.
+   * The clock runs from GO (`clockStartFor`: started_at plus the countdown).
    */
   async waitForEndOrAutoEnd(startedAt: string, durationSeconds: number, pausedSeconds = 0): Promise<"received" | "auto"> {
-    const endAt = Date.parse(startedAt) + (durationSeconds + pausedSeconds) * 1000 + 1000;
+    const endAt = Date.parse(startedAt) + APP_TIMING.COUNTDOWN_MS + (durationSeconds + pausedSeconds) * 1000 + 1000;
     const wait = Math.max(0, endAt - Date.now());
     try {
       await this.waitEvent(E.MATCH_ENDED, wait);

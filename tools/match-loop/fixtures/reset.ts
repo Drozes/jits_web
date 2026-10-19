@@ -5,6 +5,13 @@
  *  - stranded pending / in_progress matches involving them -> cancelled
  *  - pending / accepted challenges involving them -> cancelled
  *  - current_elo = 1000, current_weight = 170 (or per-scenario overrides)
+ *  - Rating V9 (jr_be 20261013100000, where the column exists): the
+ *    engine's rating = that same current_elo. V9 rates a match from
+ *    `athletes.rating` (elo_before = round(rating)) and writes current_elo
+ *    back from it, so resetting current_elo alone would start every match
+ *    from whatever rating the last run left (and the app would show 1000
+ *    while the engine rates from, say, 1559). RD, volatility and the rating
+ *    history are kept: the harness never predicts the size of a change.
  *  - Red and Green (bot-only accounts) have looking_for_ranked cleared, in
  *    case a crashed run left them advertised. Blue's live state is owned by
  *    the running app and is normalised through the UI only.
@@ -41,6 +48,12 @@ export async function resetFixtures(ids: AthleteIds, opts: ResetOptions = {}): P
     )
     select (select count(*) from stranded) || ' matches, ' || (select count(*) from ch) || ' challenges cancelled';
     ${sets}
+    do $v9$ begin
+      if exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'athletes' and column_name = 'rating') then
+        execute 'update public.athletes set rating = current_elo where id in (${all.replace(/'/g, "''")})';
+      end if;
+    end $v9$;
     update public.athletes set looking_for_ranked = false, looking_for_casual = false
       where id in (${lit(ids.red)}, ${lit(ids.green)});
     commit;`;

@@ -5,11 +5,11 @@
  * accessibility label, labels are matched case-insensitively (text-transform
  * uppercases rendered text) and filtered to Buttons where it matters.
  */
-import { Idb, summarise, type AXElement, type Query } from "./idb";
+import { Idb, matches, summarise, type AXElement, type Query } from "./idb";
 import type { Simctl } from "./simctl";
 import { ExpectationTimeout, HarnessError } from "../lib/util";
 import { PROMPT_INPUT_GUARD_MS } from "../../../apps/mobile/lib/arena/constants";
-import type { MatchStep } from "../../../apps/mobile/lib/match-flow/step-router";
+import { MATCH_STEPS, type MatchStep } from "../../../apps/mobile/lib/match-flow/step-router";
 
 /**
  * How long to wait after the prompt is detected before trying its buttons:
@@ -43,6 +43,71 @@ export const STEP_BY_LABEL: Readonly<Record<string, WizardStep>> = {
   summary: "summary",
 };
 
+/** The step marker's testID prefix (`match-step-<step>`, StepMarker). */
+export const STEP_TEST_ID_PREFIX = "match-step-";
+
+/**
+ * The step a `match-step-<step>` testID names, or null when the suffix is
+ * not one of the app's `MATCH_STEPS` (a stale id such as the deleted
+ * `match-step-wait` must never read as a step).
+ */
+export function stepFromTestId(id: string | null | undefined): WizardStep | null {
+  if (!id?.startsWith(STEP_TEST_ID_PREFIX)) return null;
+  const s = id.slice(STEP_TEST_ID_PREFIX.length);
+  return (MATCH_STEPS as readonly string[]).includes(s) ? (s as WizardStep) : null;
+}
+
+/**
+ * Controls that only one wizard step renders, for when the step marker is
+ * missing from idb's tree. Seen on 8ae02d71 (2026-10-19): on the full-bleed
+ * live step idb intermittently reports no `StepMarker` at all (neither its
+ * label nor its testID), only the broadcast layout, so the live step is
+ * also read from its own controls. The marker always wins when it is there.
+ */
+export const STEP_BY_CONTROL: ReadonlyArray<{ id: string; step: WizardStep }> = [
+  { id: "live-end", step: "live" },
+  { id: "live-pause-toggle", step: "live" },
+  { id: "summary-exit", step: "summary" },
+];
+
+/** The step `STEP_BY_CONTROL` reads off the screen, or null. */
+export function stepFromControls(els: AXElement[]): WizardStep | null {
+  for (const { id, step } of STEP_BY_CONTROL) {
+    if (els.some((e) => e.AXUniqueId === id)) return step;
+  }
+  return null;
+}
+
+/**
+ * `HOLD_TO_END_MS` (apps/mobile/lib/match-flow/live-view-state.ts): how long
+ * the live step's End must be held. Copied (that module is not loadable
+ * here); `tests/label-contract.test.ts` pins the value to the app source.
+ */
+export const HOLD_TO_END_MS = 1_200;
+/** Keep a bottom control this far above the screen edge: clear of the dev LogBox banner. */
+const LOGBOX_CLEAR_INSET = 150;
+
+/** Held this much longer than the app needs, so a slow frame never cuts it short. */
+const HOLD_MARGIN_MS = 600;
+
+/** testIDs of the face-off weight check (components/match-flow/faceoff/). */
+export const WEIGHT_CHECK = {
+  /** "YOUR CHECK": Blue's verdict on the opponent's weigh-in. */
+  plate: "faceoff-weight-check-plate",
+  confirm: "weight-check-confirm",
+  /** "Doesn't look right". The flag-OFF tiers never tap it. */
+  flag: "weight-check-flag",
+} as const;
+
+/** How long a Confirm tap may take to land before the harness taps again. */
+const WEIGHT_CHECK_RETAP_MS = 3_000;
+
+/** What Blue's weigh-in met on the face-off. */
+export interface WeighIn {
+  /** The weight-check plate asked for Blue's check and the harness confirmed. */
+  weightCheck: boolean;
+}
+
 const VERDICT_RE = /^(YOU WON|YOU LOST|DRAW|DISPUTED|MATCH COMPLETE)$/i;
 
 export interface SummaryView {
@@ -50,6 +115,20 @@ export interface SummaryView {
   eloDelta: string | null;
   hasExit: boolean;
 }
+
+/**
+ * Controls the harness selects by testID AND label, never by element type:
+ * idb sometimes reports a `accessibilityRole="button"` Pressable as
+ * StaticText (seen 2026-10-19 on the prompt's Accept / Decline and the
+ * face-off's Leave, while a status plate next to them read as Button), so
+ * a `type: "Button"` filter would miss them. The testID plus the exact label
+ * is unique.
+ */
+export const PROMPT_BUTTONS = {
+  "Accept challenge": { id: "challenge-prompt-accept", label: "Accept challenge" },
+  "Decline challenge": { id: "challenge-prompt-decline", label: "Decline challenge" },
+} as const satisfies Record<string, Query>;
+export const FACEOFF_LEAVE: Query = { id: "faceoff-leave", label: "Cancel match" };
 
 /** testIDs from apps/mobile/components/layout/header-status-chip.tsx / header-live-dot.tsx. */
 export const HEADER_CHIP_ID = "header-status-chip";
@@ -203,7 +282,7 @@ export class Screens {
 
   async isPromptVisible(els?: AXElement[]): Promise<boolean> {
     const all = els ?? (await this.idb.describe());
-    return !!(await this.idb.find({ label: "Accept challenge", type: "Button" }, all)) || !!this.promptSheet(all);
+    return !!(await this.idb.find(PROMPT_BUTTONS["Accept challenge"], all)) || !!this.promptSheet(all);
   }
 
   async waitPrompt(timeoutMs = 15_000): Promise<void> {
@@ -239,7 +318,7 @@ export class Screens {
   private async tapPromptButton(label: "Accept challenge" | "Decline challenge", timeoutMs = 5_000): Promise<void> {
     await new Promise((r) => setTimeout(r, this.promptTapDelayMs));
     try {
-      await this.idb.tapQ({ label, type: "Button", enabled: true }, timeoutMs);
+      await this.idb.tapQ({ ...PROMPT_BUTTONS[label], enabled: true }, timeoutMs);
     } catch (e) {
       if (e instanceof ExpectationTimeout) {
         throw new ExpectationTimeout(
@@ -272,9 +351,10 @@ export class Screens {
     for (const e of all) {
       const m = (e.AXLabel ?? "").match(STEP_MARKER_RE);
       if (m && STEP_BY_LABEL[m[1].toLowerCase()]) return STEP_BY_LABEL[m[1].toLowerCase()];
-      if (e.AXUniqueId?.startsWith("match-step-")) return e.AXUniqueId.slice("match-step-".length) as WizardStep;
+      const fromId = stepFromTestId(e.AXUniqueId);
+      if (fromId) return fromId;
     }
-    return null;
+    return stepFromControls(all);
   }
 
   async waitStep(step: WizardStep, timeoutMs = 15_000): Promise<void> {
@@ -304,8 +384,43 @@ export class Screens {
     }
   }
 
-  async confirmWeights(): Promise<void> {
+  /**
+   * Blue's weigh-in on the face-off: tap "Confirm <N> lbs" (#weight-confirm).
+   * On a match with weight checks (jr_be-ahn.4: every challenge-backed
+   * match) the opponent's plate then turns into Blue's check of their
+   * weigh-in (#faceoff-weight-check-plate) with Confirm and "Doesn't look
+   * right", and the app stays on the weight step until Blue's OWN check is
+   * confirmed (`useFaceoff`; jits-c3vd). Answer Confirm, re-tapping only if
+   * the tap was dropped (the button stays up and enabled). Without checks
+   * (the pre-check flow) the app moves on by itself. Resolves once the
+   * wizard has left the weight step; the caller waits for the step it wants.
+   */
+  async confirmWeights(timeoutMs = 25_000): Promise<WeighIn> {
     await this.idb.tapQ({ id: "weight-confirm" }, 10_000);
+    const start = Date.now();
+    let weightCheck = false;
+    let lastTap = 0;
+    for (;;) {
+      const els = await this.idb.describe();
+      const step = await this.currentStep(els);
+      if (step && step !== "weight") return { weightCheck };
+      const plate = els.find((e) => e.AXUniqueId === WEIGHT_CHECK.plate);
+      const confirm = els.find((e) => matches(e, { id: WEIGHT_CHECK.confirm, enabled: true }));
+      if (plate && confirm && Date.now() - lastTap > WEIGHT_CHECK_RETAP_MS) {
+        const target = this.idb.onScreen(confirm) ? confirm : await this.idb.scrollTo({ id: WEIGHT_CHECK.confirm });
+        await this.idb.tap(target);
+        weightCheck = true;
+        lastTap = Date.now();
+      }
+      if (Date.now() - start > timeoutMs) {
+        throw new ExpectationTimeout("the weigh-in (and Blue's weight check) to leave the weight step", timeoutMs, {
+          currentStep: step,
+          weightCheckAnswered: weightCheck,
+          screen: summarise(els),
+        });
+      }
+      await new Promise((r) => setTimeout(r, 350));
+    }
   }
 
   async tapReady(): Promise<void> {
@@ -326,9 +441,9 @@ export class Screens {
     }
   }
 
-  /** "Cancel match" -> alert -> "Cancel Match". */
+  /** "Cancel match" (the face-off's Leave) -> alert -> "Cancel Match". */
   async cancelMatch(): Promise<void> {
-    await this.idb.tapQ({ label: "Cancel match", type: "Button" });
+    await this.idb.tapQ(FACEOFF_LEAVE);
     await this.tapAlertButton("Cancel Match", "Keep Waiting");
   }
 
@@ -352,8 +467,34 @@ export class Screens {
     return this.idb.scrollTo({ id: "result-record" });
   }
 
+  /**
+   * Wait for the live screen itself: the wizard is on "live" from the start
+   * of the 3-2-1 countdown, but the live step (End, Pause, and the step's
+   * channel) mounts only at GO (`LiveStage`).
+   */
+  async waitLiveScreen(timeoutMs = 15_000): Promise<void> {
+    await this.idb.waitFor({ id: "live-end" }, timeoutMs);
+  }
+
+  /**
+   * End the match from the live step. The red CTA is "Hold to end match"
+   * (`HoldToEndButton`): a tap never ends, the press must last
+   * `HOLD_TO_END_MS`, so hold it with a margin, then confirm the press took
+   * (the button leaves the screen with the live step, or reads ENDING).
+   */
   async endMatch(): Promise<void> {
-    await this.idb.tapQ({ id: "live-end" });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const el = await this.idb.waitFor({ id: "live-end", enabled: true }, 10_000);
+      await this.idb.longPress(el, (HOLD_TO_END_MS + HOLD_MARGIN_MS) / 1000);
+      const start = Date.now();
+      while (Date.now() - start < 3_000) {
+        const els = await this.idb.describe();
+        const btn = els.find((e) => e.AXUniqueId === "live-end");
+        if (!btn || btn.enabled === false || (await this.currentStep(els)) !== "live") return;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
+    throw new HarnessError("holding #live-end did not end the match");
   }
 
   /**
@@ -379,8 +520,11 @@ export class Screens {
   }
 
   /**
-   * Focus a text field and type into it, verifying the value landed (a type
-   * issued before focus settles is silently dropped). Retries up to 3 times.
+   * Focus a text field, clear what it holds and type into it, verifying the
+   * value landed (a type issued before focus settles is silently dropped).
+   * Clearing matters for prefilled fields: the finish time is prefilled
+   * from the match clock ("0:07"), and typing onto it would append.
+   * Retries up to 3 times.
    */
   async fillField(id: string, text: string): Promise<void> {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -388,11 +532,16 @@ export class Screens {
       await this.idb.tap(field);
       // Let focus land; then verify rather than trust.
       await new Promise((r) => setTimeout(r, 600 + attempt * 400));
+      // The tap may put the caret anywhere in the text, so delete both ways.
+      // An empty field may report its placeholder as the value: the extra
+      // deletes are then no-ops.
+      await this.idb.clearFocused((field.AXValue ?? "").length + 2);
       await this.idb.typeText(text);
       const start = Date.now();
       while (Date.now() - start < 2_000) {
         const el = await this.idb.find({ id });
-        if ((el?.AXValue ?? "").includes(text)) return;
+        // Case-insensitive: iOS auto-capitalises a text field's first letter.
+        if ((el?.AXValue ?? "").toLowerCase() === text.toLowerCase()) return;
         await new Promise((r) => setTimeout(r, 250));
       }
     }
@@ -440,14 +589,35 @@ export class Screens {
   async readSummary(): Promise<SummaryView> {
     const els = await this.idb.describe();
     const v = els.find((e) => e.AXUniqueId === "summary-verdict") ?? els.find((e) => e.type === "StaticText" && VERDICT_RE.test(e.AXLabel ?? ""));
-    const d = els.find((e) => e.AXUniqueId === "summary-elo-delta") ?? els.find((e) => e.type === "StaticText" && /^[▲▼]/.test(e.AXLabel ?? ""));
+    // The chip, when idb exposes it; else the rating card (one accessible
+    // element whose label speaks the delta, see `parseDelta`).
+    const d =
+      els.find((e) => e.AXUniqueId === "summary-elo-delta") ??
+      els.find((e) => e.type === "StaticText" && /^[▲▼]/.test(e.AXLabel ?? "")) ??
+      els.find((e) => e.AXUniqueId === "verdict-rating-card" || /^Rating -?\d+(, |$)/.test(e.AXLabel ?? ""));
     const exit = els.find((e) => e.AXUniqueId === "summary-exit");
     return { verdict: v?.AXLabel ?? null, eloDelta: d?.AXLabel ?? null, hasExit: !!exit };
   }
 
+  /**
+   * Tap the verdict's exit ("Back to Arena"). It sits at the bottom of the
+   * verdict, where a dev build's LogBox banner ("Open debugger to view
+   * warnings") can lie over it and swallow the tap: close the banner, scroll
+   * the exit clear of that band, tap, and tap once more if the verdict is
+   * still up.
+   */
   async exitSummary(): Promise<void> {
-    const el = await this.idb.scrollTo({ id: "summary-exit" });
-    await this.idb.tap(el);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await this.idb.dismissLogBox();
+      const el = await this.idb.scrollTo({ id: "summary-exit" }, 8, "up", LOGBOX_CLEAR_INSET);
+      await this.idb.tap(el);
+      try {
+        await this.idb.waitGone({ id: "summary-exit" }, 5_000);
+        return;
+      } catch {
+        /* tap again */
+      }
+    }
   }
 
   // --- auth -----------------------------------------------------------------

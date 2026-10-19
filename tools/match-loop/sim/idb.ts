@@ -129,6 +129,13 @@ export class Idb {
     await this.tapXY(el.frame.x + el.frame.width / 2, el.frame.y + el.frame.height / 2);
   }
 
+  /** Press and hold an element's frame centre for `seconds` (idb `ui tap --duration`). */
+  async longPress(el: AXElement, seconds: number): Promise<void> {
+    const x = el.frame.x + el.frame.width / 2;
+    const y = el.frame.y + el.frame.height / 2;
+    await this.idb(["ui", "tap", "--duration", String(seconds), "--udid", this.udid, String(Math.round(x)), String(Math.round(y))]);
+  }
+
   /** Wait for an element, then tap its frame centre. */
   async tapQ(q: Query, timeoutMs = 10_000): Promise<AXElement> {
     const el = await this.waitFor(q, timeoutMs);
@@ -145,6 +152,16 @@ export class Idb {
    */
   async typeText(text: string): Promise<void> {
     await this.idb(["ui", "text", "--udid", this.udid, text]);
+  }
+
+  /**
+   * Delete up to `n` characters on each side of the caret in the focused
+   * field (HID Backspace 42, then Delete Forward 76).
+   */
+  async clearFocused(n: number): Promise<void> {
+    if (n <= 0) return;
+    const keys = [...Array(n).fill("42"), ...Array(n).fill("76")];
+    await this.idb(["ui", "key-sequence", "--udid", this.udid, ...keys]);
   }
 
   async swipe(x1: number, y1: number, x2: number, y2: number, durationS = 0.3): Promise<void> {

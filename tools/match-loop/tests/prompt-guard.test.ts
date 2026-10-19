@@ -1,5 +1,6 @@
 /**
- * The harness answers the incoming prompt by label, after the app's input
+ * The harness answers the incoming prompt by testID and label (never by
+ * element type, which idb reports inconsistently), after the app's input
  * guard (AC-S3). The app drops (does not queue) a tap inside the guard, so the
  * harness must wait for the button to report itself enabled, and fail naming
  * the guard when it never does, rather than stalling on a lost tap.
@@ -43,13 +44,13 @@ test("acceptPrompt waits out the guard by default, then taps only an ENABLED Acc
   await new Screens(idb, simctl).acceptPrompt();
   assert.ok(Date.now() - started >= PROMPT_TAP_DELAY_MS - 20, "tapped before the guard delay");
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0].q, { label: "Accept challenge", type: "Button", enabled: true });
+  assert.deepEqual(calls[0].q, { id: "challenge-prompt-accept", label: "Accept challenge", enabled: true });
 });
 
 test("declinePrompt taps only an ENABLED Decline button", async () => {
   const { idb, calls } = fakeIdb(["ok"]);
   await new Screens(idb, simctl, NO_DELAY).declinePrompt();
-  assert.deepEqual(calls[0].q, { label: "Decline challenge", type: "Button", enabled: true });
+  assert.deepEqual(calls[0].q, { id: "challenge-prompt-decline", label: "Decline challenge", enabled: true });
 });
 
 test("a button that never enables fails naming the input guard", async () => {
@@ -60,7 +61,7 @@ test("a button that never enables fails naming the input guard", async () => {
     assert.match(e.message, /Accept challenge/);
     return true;
   });
-  assert.deepEqual(calls[0].q, { label: "Accept challenge", type: "Button", enabled: true });
+  assert.deepEqual(calls[0].q, { id: "challenge-prompt-accept", label: "Accept challenge", enabled: true });
 });
 
 test("a non-timeout failure is passed through unchanged", async () => {
