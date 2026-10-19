@@ -7,11 +7,13 @@ import { FightButton, InitialsBlock, Mono, shortName } from "../fight/fight-ui";
 import type { ResultAthlete } from "./result-form";
 
 /**
- * The other phone while one athlete records the result. Nothing to do here
- * but wait: the result arrives by broadcast or the reconciler and moves this
- * phone to confirm. There is no "leave and confirm later" button (jits-02vo.7):
- * closing the app is still allowed, and an undisputed result is confirmed by
- * the backend once its lock window passes (jr_be-ahn.5).
+ * The other phone while someone else records the result: the claimer of a
+ * claim-first entry, or whoever records it for this match (`ResultStep`'s
+ * "wait" entry, with no take-over). Nothing to do here but wait: the result
+ * arrives by broadcast or the reconciler and moves this phone to confirm.
+ * There is no "leave and confirm later" button (jits-02vo.7): closing the
+ * app is still allowed, and an undisputed result is confirmed by the backend
+ * once its lock window passes (jr_be-ahn.5).
  */
 export function ResultWaiting({
   claimer,
@@ -21,7 +23,8 @@ export function ResultWaiting({
   endedAtSeconds,
   onTakeOver,
 }: {
-  claimer: ResultAthlete;
+  /** Who is recording; only the name is shown. */
+  claimer: Pick<ResultAthlete, "displayName">;
   me: ResultAthlete;
   opponent: ResultAthlete;
   durationSeconds: number;

@@ -39,6 +39,13 @@ interface ConfirmStepProps {
   disputeLocksAt: string | null;
   /** Lock-time fallback: completed_at + match_result_lock_seconds(). */
   completedAt?: string | null;
+  /**
+   * Who recorded the result, named in the kicker (timekeeper mode
+   * ARCHITECTURE 2.3). Omitted: today's two-athlete reading, where the
+   * recorder can only be the opponent and is named once their confirmation
+   * shows (the server confirms the recorder's side with the result, B2).
+   */
+  recorderName?: string;
   onCompleted: () => void;
 }
 
@@ -71,7 +78,7 @@ export function confirmVerdict(resultData: BroadcastResult | null, meId: string)
  */
 export function ConfirmStep(props: ConfirmStepProps) {
   const p = usePalette();
-  const { matchId, me, opponent, resultData, confirmedAthleteIds, submissionName, finishTimeSeconds, disputeLocksAt: rawLocksAt, completedAt = null, onCompleted } = props;
+  const { matchId, me, opponent, resultData, confirmedAthleteIds, submissionName, finishTimeSeconds, disputeLocksAt: rawLocksAt, completedAt = null, recorderName, onCompleted } = props;
   const disputeLocksAt = useDisputeLocksAt(rawLocksAt, completedAt);
   const [myConfirmedLocal, setMyConfirmed] = React.useState(false);
   const [opponentConfirmedLocal, setOpponentConfirmed] = React.useState(false);
@@ -162,12 +169,13 @@ export function ConfirmStep(props: ConfirmStepProps) {
     .filter(Boolean)
     .join(" · ");
   const oppShort = shortName(opponent.displayName);
+  const recordedBy = recorderName != null ? shortName(recorderName) : opponentConfirmed ? oppShort : null;
   const lockNote = windowClosed ? "The dispute window has closed." : disputeLockNote(disputeLocksAt);
 
   return (
     <View style={{ gap: 20 }}>
       <View style={{ gap: 10 }}>
-        <Mono>{opponentConfirmed ? `RESULT RECORDED BY ${oppShort.toUpperCase()}` : "RESULT RECORDED"}</Mono>
+        <Mono>{recordedBy ? `RESULT RECORDED BY ${recordedBy.toUpperCase()}` : "RESULT RECORDED"}</Mono>
         <Text accessibilityRole="header" className="font-heading uppercase" style={[typeStep("headline-2xl"), { letterSpacing: TRACKING.loose, color: p.text }]}>
           Confirm result
         </Text>

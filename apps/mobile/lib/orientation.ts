@@ -53,6 +53,22 @@ export async function allowRotation(): Promise<void> {
 }
 
 /**
+ * Ready check under a landscape-only capture policy (`landscape_locked`):
+ * either landscape side, following the phone. Going live then locks the
+ * specific side (`lockToCurrent`), never this generic lock.
+ */
+export async function lockLandscape(): Promise<void> {
+  generation++;
+  const so = load();
+  if (!so) return;
+  try {
+    await so.lockAsync(so.OrientationLock.LANDSCAPE);
+  } catch (e) {
+    warnOnce(e);
+  }
+}
+
+/**
  * Everywhere outside the ready check and the live step. The root layout
  * calls it once at launch: on Android the plugin's portrait launch mask does
  * not apply, so without it non-match screens would rotate freely.

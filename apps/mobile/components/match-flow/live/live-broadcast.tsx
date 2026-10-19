@@ -19,6 +19,9 @@ import { NoVideoPlate } from "./no-video-plate";
 import { OpponentEndedPlate } from "./opponent-ended-plate";
 import { LiveLandscapeLayout } from "./live-landscape-layout";
 
+/** Who runs the clock on this phone: "full" (pause and hold to end), or "none" (read-only). */
+export type LiveControls = "full" | "none";
+
 export interface LiveBroadcastProps {
   /** Only a practice bout carries a kind tag; a real match needs no label. */
   kindLabel?: "PRACTICE";
@@ -37,7 +40,10 @@ export interface LiveBroadcastProps {
   onPauseResume: () => void;
   /** Called once, when the hold completes or a screen reader action fires. */
   onEnd: () => void;
-  /** R-P8, real match only: the opponent ended it; the clock is frozen. */
+  /**
+   * R-P8, real match only: the other side ended it (the opponent, unless
+   * the live step names someone else); the clock is frozen.
+   */
   opponentEnded?: { name: string; finalFormatted: string; finalRemaining: number } | null;
   /** Extra HUD item right of the tag (the practice EXIT pill). */
   hudExtra?: React.ReactNode;
@@ -45,6 +51,14 @@ export interface LiveBroadcastProps {
   practice?: boolean;
   /** This athlete chose not to record from this phone (face-off opt-in). */
   recordingOff?: boolean;
+  /**
+   * The pause and end controls (timekeeper mode ARCHITECTURE 2.3). Default
+   * "full": this phone runs the clock. "none": no controls, for a phone
+   * whose clock someone else runs.
+   */
+  controls?: LiveControls;
+  /** With `controls` "none": shown in the controls' place (the timekeeper-mode strip). */
+  controlsStrip?: React.ReactNode;
 }
 
 /**
@@ -75,6 +89,8 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
     hudExtra,
     practice = false,
     recordingOff = false,
+    controls: controlsMode = "full",
+    controlsStrip,
   } = props;
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -159,7 +175,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
       />
     </View>
   );
-  const controls = opponentEnded ? null : (
+  const controls = opponentEnded || controlsMode === "none" ? null : (
     <>
       <PauseButton paused={paused} disabled={controlsDisabled || endPending} onPress={onPauseResume} tile={landscape} />
       <HoldToEndButton
@@ -171,6 +187,8 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
       />
     </>
   );
+  // A read-only phone shows the strip where the controls would be.
+  const strip = opponentEnded || controlsMode === "full" ? null : (controlsStrip ?? null);
 
   return (
     <View testID="live-broadcast" pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -204,7 +222,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
               {plates}
             </>
           }
-          rail={controls}
+          rail={controls ?? strip}
           renderNoVideo={renderNoVideo}
         />
       ) : (
@@ -239,7 +257,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
             {plates}
             {controls ? (
               <View style={{ height: BROADCAST_SIZE.controls, flexDirection: "row", gap: 12 }}>{controls}</View>
-            ) : null}
+            ) : strip}
           </View>
         </View>
       )}

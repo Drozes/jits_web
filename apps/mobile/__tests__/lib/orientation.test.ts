@@ -48,6 +48,12 @@ describe("without the native module (old binary, web, Expo Go)", () => {
     expect(so.getOrientationAsync).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
   });
+
+  it("the landscape-only ready lock is a no-op too", async () => {
+    const { so, lib } = setup(false);
+    await expect(lib.lockLandscape()).resolves.toBeUndefined();
+    expect(so.lockAsync).not.toHaveBeenCalled();
+  });
 });
 
 describe("with the native module", () => {
@@ -57,6 +63,12 @@ describe("with the native module", () => {
     expect(so.lockAsync).toHaveBeenLastCalledWith(OrientationLock.DEFAULT);
     await lib.lockPortrait();
     expect(so.lockAsync).toHaveBeenLastCalledWith(OrientationLock.PORTRAIT_UP);
+  });
+
+  it("a landscape-only ready check allows either landscape side (LANDSCAPE)", async () => {
+    const { so, lib } = setup(true);
+    await lib.lockLandscape();
+    expect(so.lockAsync).toHaveBeenLastCalledWith(OrientationLock.LANDSCAPE);
   });
 
   it.each([

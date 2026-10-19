@@ -2,7 +2,7 @@ import * as React from "react";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 import type { LiveParticipant } from "@/lib/match-flow/live-view-state";
-import { LiveStep } from "../steps/live-step";
+import { LiveStep, type LiveStepProps } from "../steps/live-step";
 import { COUNTDOWN_MS, Countdown, GoFlash } from "./countdown";
 
 /** How long "GRAPPLE" stays over the live screen after GO. */
@@ -19,7 +19,11 @@ export function clockStartFor(startedAt: string): string {
   return Number.isFinite(t) ? new Date(t + COUNTDOWN_MS).toISOString() : startedAt;
 }
 
-interface LiveStageProps {
+/**
+ * The live step's seams pass straight through (timekeeper mode ARCHITECTURE
+ * 2.3); each one's default is today's two-athlete screen.
+ */
+type LiveStageProps = Pick<LiveStepProps, "endedByName" | "controls" | "controlsStrip"> & {
   matchId: string;
   me: LiveParticipant;
   opponent: LiveParticipant;
@@ -35,7 +39,9 @@ interface LiveStageProps {
   myWeight: number | null;
   opponentWeight: number | null;
   onEnded: (finishSeconds: number) => void;
-}
+  /** The countdown's caption (`Countdown`); default the two-phone one. */
+  countdownCaption?: string;
+};
 
 /**
  * The live step with its 3-2-1 in front. Until GO the countdown is up and the
@@ -48,7 +54,7 @@ interface LiveStageProps {
  * not sit on "3" for longer than the countdown lasts.
  */
 export function LiveStage(props: LiveStageProps) {
-  const { startedAt, recording, me, opponent, myWeight, opponentWeight, ...liveProps } = props;
+  const { startedAt, recording, me, opponent, myWeight, opponentWeight, countdownCaption, ...liveProps } = props;
   const [mountedAt] = React.useState(() => Date.now());
   const serverGo = Date.parse(startedAt) + COUNTDOWN_MS;
   const goAt = Number.isFinite(serverGo) ? Math.min(serverGo, mountedAt + COUNTDOWN_MS) : mountedAt;
@@ -86,6 +92,7 @@ export function LiveStage(props: LiveStageProps) {
         opponent={opponent}
         myWeight={myWeight}
         opponentWeight={opponentWeight}
+        caption={countdownCaption}
       />
     );
   }

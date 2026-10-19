@@ -11,9 +11,12 @@ import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { TRACKING, typeSize, typeStep } from "@/lib/typography";
 import { InitialsBlock, Mono, initialsOf, shortName } from "../fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
-import type { MatchAthleteView } from "@/lib/match-flow/match-roles";
+import type { MatchAthleteView, MatchCaps } from "@/lib/match-flow/match-roles";
 
 export type ResultAthlete = Pick<MatchAthleteView, "athleteId" | "displayName" | "currentElo" | "weightLbs">;
+
+/** How the finishes are offered (`MatchCaps.submissionLayout`). */
+export type SubmissionLayout = MatchCaps["submissionLayout"];
 
 /** The eight finishes offered as one-tap chips, most common first. Codes
  * missing from the catalogue are skipped; the search covers everything. */
@@ -145,6 +148,12 @@ export function SubmissionGrid({
   submissionTypes: SubmissionType[];
   value: string;
   onChange: (code: string) => void;
+  /**
+   * The timekeeper-mode layout input (ARCHITECTURE 2.3, A12). Default and
+   * today: "chips", this grid. "list" (the full scrollable list) is built by
+   * the timekeeper result slice (M5); until then every layout renders the grid.
+   */
+  layout?: SubmissionLayout;
 }) {
   const p = usePalette();
   const common = React.useMemo(() => commonSubmissions(submissionTypes), [submissionTypes]);

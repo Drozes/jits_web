@@ -43,13 +43,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import {
-  acceptChallenge,
   cancelChallenge,
   cancelStaleOutgoingChallenges,
-  createChallenge,
   declineChallenge,
   declineOtherPendingChallenges,
-  startMatchFromChallenge,
 } from "@jits/shared/api/mutations";
 import {
   getChallengeStatus,
@@ -88,6 +85,7 @@ import { markMatchProximityRequired } from "./location-flags";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
 import { isBlocked } from "@/lib/moderation/block-store";
+import { acceptArenaChallenge, createArenaChallenge, startArenaMatch } from "./challenge-api";
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -980,7 +978,7 @@ export function useArenaChallenge({
         if (tookReading) {
           await reportArenaReading(challengeId, { ask: false });
         }
-        let started = await startMatchFromChallenge(supabase, challengeId);
+        let started = await startArenaMatch(challengeId);
         if (!started.ok && isProximityRefusal(started.error.code)) {
           markMatchProximityRequired(true);
           // Like the accepter (N5): a server that still gates on proximity
@@ -990,7 +988,7 @@ export function useArenaChallenge({
           if (!tookReading && status === "accepted") {
             markMatchLocationRequired(true);
             await reportArenaReading(challengeId, { ask: false });
-            started = await startMatchFromChallenge(supabase, challengeId);
+            started = await startArenaMatch(challengeId);
           }
         }
         if (started.ok) {
@@ -1139,7 +1137,7 @@ export function useArenaChallenge({
   const joinAccepted = React.useCallback(
     async (challengeId: string, challengerId: string) => {
       if (busyRef.current || enteredIdsRef.current.has(challengeId)) return;
-      const started = await startMatchFromChallenge(supabase, challengeId);
+      const started = await startArenaMatch(challengeId);
       if (started.ok) enterMatch(challengeId, started.data.match_id, challengerId);
     },
     [enterMatch],
@@ -1377,7 +1375,7 @@ export function useArenaChallenge({
             // `not_accepted` and strands them (jits-njyd). `started` means the
             // match exists, and asking for it again just returns it.
             if (row.status === "started") {
-              const started = await startMatchFromChallenge(supabase, row.id);
+              const started = await startArenaMatch(row.id);
               if (started.ok) {
                 enterMatch(row.id, started.data.match_id, mine.opponentId);
               } else {
@@ -1697,7 +1695,7 @@ export function useArenaChallenge({
           return;
         }
         const create = () =>
-          createChallenge(supabase, {
+          createArenaChallenge({
             opponentId,
             challengerWeight: weightRef.current ?? undefined,
           });
@@ -1789,7 +1787,7 @@ export function useArenaChallenge({
       const status = read.data?.status ?? null;
 
       if (status === "started") {
-        const started = await startMatchFromChallenge(supabase, mine.challengeId);
+        const started = await startArenaMatch(mine.challengeId);
         if (!started.ok) {
           toast.error("Couldn't start the match. Try again.");
           return "stop";
@@ -1847,7 +1845,7 @@ export function useArenaChallenge({
           if ((await resolveOwnOutgoing(mine, current)) === "stop") return;
         }
 
-        const accepted = await acceptChallenge(supabase, {
+        const accepted = await acceptArenaChallenge({
           challengeId: current.challengeId,
           opponentWeight: weightRef.current ?? undefined,
         });
@@ -1884,9 +1882,9 @@ export function useArenaChallenge({
         if (tookReading) {
           await reportArenaReading(current.challengeId, { ask: true });
         }
-        let started = await startMatchFromChallenge(supabase, current.challengeId);
+        let started = await startArenaMatch(current.challengeId);
         if (!started.ok && !isProximityRefusal(started.error.code)) {
-          started = await startMatchFromChallenge(supabase, current.challengeId);
+          started = await startArenaMatch(current.challengeId);
         }
         if (!started.ok && isProximityRefusal(started.error.code) && !tookReading) {
           // The server still gates on proximity though the app read the flag
@@ -1896,7 +1894,7 @@ export function useArenaChallenge({
           markMatchProximityRequired(true);
           markMatchLocationRequired(true);
           await reportArenaReading(current.challengeId, { ask: true });
-          started = await startMatchFromChallenge(supabase, current.challengeId);
+          started = await startArenaMatch(current.challengeId);
         }
         if (!started.ok && isProximityRefusal(started.error.code)) {
           // Not on one mat yet. Never a generic error, never withdrawn: the
@@ -1929,7 +1927,7 @@ export function useArenaChallenge({
             clearAccepted(athleteIdRef.current);
           }
           if (withdrawn.ok && !withdrawn.data.cancelled) {
-            started = await startMatchFromChallenge(supabase, current.challengeId);
+            started = await startArenaMatch(current.challengeId);
           }
         }
         if (!started.ok) {
@@ -1980,7 +1978,7 @@ export function useArenaChallenge({
         if (proximityRequiredRef.current) {
           await reportArenaReading(blocked.challengeId, { ask: true });
         }
-        const started = await startMatchFromChallenge(supabase, blocked.challengeId);
+        const started = await startArenaMatch(blocked.challengeId);
         if (startBlockedRef.current?.challengeId !== blocked.challengeId) return;
         if (started.ok) {
           setStartBlocked(null);
@@ -2025,7 +2023,7 @@ export function useArenaChallenge({
         if (!res.data.cancelled) {
           // Not accepted any more: most likely the challenger's fallback
           // started it a moment ago. Join it rather than leave them alone.
-          const started = await startMatchFromChallenge(supabase, blocked.challengeId);
+          const started = await startArenaMatch(blocked.challengeId);
           setStartBlocked(null);
           if (started.ok) {
             enterMatch(blocked.challengeId, started.data.match_id, blocked.challengerId);
@@ -2095,10 +2093,7 @@ export function useArenaChallenge({
           // `start_match_from_challenge` is idempotent and returns the
           // existing match for a started challenge, so ask it: joining beats
           // leaving the opponent alone in a match nobody else entered.
-          const started = await startMatchFromChallenge(
-            supabase,
-            current.challengeId,
-          );
+          const started = await startArenaMatch(current.challengeId);
           if (started.ok) {
             enterMatch(current.challengeId, started.data.match_id, current.opponentId);
             return;

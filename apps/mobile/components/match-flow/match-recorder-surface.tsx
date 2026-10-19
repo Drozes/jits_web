@@ -5,6 +5,20 @@ import { CameraOverlay } from "./camera-overlay";
 import { useMatchRecorder } from "./match-recorder-context";
 
 /**
+ * The framing hint under the ready preview, by copy id (timekeeper mode
+ * ARCHITECTURE 2.3; the capture policy picks it). "rotate", the default and
+ * today's hint, invites a sideways wide shot.
+ */
+const READY_HINTS = {
+  rotate: {
+    testID: "ready-rotate-hint",
+    text: "Turn your phone sideways for a wide shot. It locks when the match starts.",
+  },
+} as const;
+
+export type ReadyHintId = keyof typeof READY_HINTS;
+
+/**
  * The camera viewfinder, hoisted out of the live step so one native
  * capture session spans the steps that need it.
  *
@@ -32,6 +46,7 @@ import { useMatchRecorder } from "./match-recorder-context";
 export function MatchRecorderCamera({
   step,
   optedIn = true,
+  hintId = "rotate",
 }: {
   /** The wizard's step; null before any match step (practice's lobby and wait). */
   step: MatchStep | null;
@@ -41,6 +56,8 @@ export function MatchRecorderCamera({
    * screen shows its no-video plate instead.
    */
   optedIn?: boolean;
+  /** The framing hint under the ready preview. Default "rotate". */
+  hintId?: ReadyHintId;
 }) {
   const recorder = useMatchRecorder();
   const warming = step === "ready";
@@ -91,11 +108,12 @@ export function MatchRecorderCamera({
           Preview only. Recording starts with the match.
         </Text>
       ) : null}
-      {/* Rotation is the control: the ready check follows the phone and
-          going live locks it (MatchOrientationController). */}
+      {/* The framing hint. By default rotation is the control: the ready
+          check follows the phone and going live locks it
+          (MatchOrientationController). */}
       {warming && granted ? (
-        <Text testID="ready-rotate-hint" className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
-          Turn your phone sideways for a wide shot. It locks when the match starts.
+        <Text testID={READY_HINTS[hintId].testID} className="font-mono tabular-nums text-micro text-ink-3 uppercase tracking-caps-l">
+          {READY_HINTS[hintId].text}
         </Text>
       ) : null}
     </View>

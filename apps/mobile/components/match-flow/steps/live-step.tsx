@@ -13,9 +13,9 @@ import {
   toLiveAthlete,
   type LiveParticipant,
 } from "@/lib/match-flow/live-view-state";
-import { LiveBroadcast } from "../live/live-broadcast";
+import { LiveBroadcast, type LiveControls } from "../live/live-broadcast";
 
-interface LiveStepProps {
+export interface LiveStepProps {
   matchId: string;
   /** This device's athlete (left on the athlete bar). */
   me: LiveParticipant;
@@ -52,6 +52,16 @@ interface LiveStepProps {
    * moment (one haptic per event, Motion Rule).
    */
   startHaptic?: boolean;
+  /**
+   * Who is named on the ended plate when a `match_ended` arrives from the
+   * other side. Default: the opponent (in a self-run match only the two
+   * athletes can end it).
+   */
+  endedByName?: string;
+  /** The live screen's pause and end controls (`LiveBroadcast`). Default "full". */
+  controls?: LiveControls;
+  /** With `controls` "none": shown in the controls' place. */
+  controlsStrip?: React.ReactNode;
 }
 
 const TIME_WARNING_SECONDS = 10;
@@ -88,6 +98,9 @@ export function LiveStep(props: LiveStepProps) {
     onEnded,
     recordingEnabled = true,
     startHaptic = true,
+    endedByName,
+    controls,
+    controlsStrip,
   } = props;
   const endedRef = React.useRef(false);
   const startHapticFiredRef = React.useRef(false);
@@ -135,8 +148,8 @@ export function LiveStep(props: LiveStepProps) {
     onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
     onTimerResumed: (d) =>
       timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: d }),
-    // The opponent ended it. Read the finish and stop the recorder NOW,
-    // then hold the "opponent ended" plate briefly before the END step.
+    // The other side ended it. Read the finish and stop the recorder NOW,
+    // then hold the "ended" plate briefly before the END step.
     onMatchEnded: () => {
       if (endedRef.current) return;
       endedRef.current = true;
@@ -144,7 +157,7 @@ export function LiveStep(props: LiveStepProps) {
       void recorder.stop();
       fireEndHaptic();
       setOpponentEnded({
-        name: opponent.displayName,
+        name: endedByName ?? opponent.displayName,
         finalFormatted: formattedRef.current,
         finalRemaining: remainingRef.current,
       });
@@ -271,6 +284,8 @@ export function LiveStep(props: LiveStepProps) {
         onEnd={onHoldEnd}
         opponentEnded={opponentEnded}
         recordingOff={!recordingEnabled}
+        controls={controls}
+        controlsStrip={controlsStrip}
       />
     </View>
   );

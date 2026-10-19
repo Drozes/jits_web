@@ -18,10 +18,11 @@ import {
   WinnerChip,
   WinnerTiles,
   type ResultAthlete,
+  type SubmissionLayout,
 } from "./result-form";
 import { ResultWaiting } from "./result-waiting";
 
-interface ResultStepProps {
+interface ResultStepBaseProps {
   matchId: string;
   /** Match length in seconds; finish time can't exceed it. */
   durationSeconds: number;
@@ -31,20 +32,38 @@ interface ResultStepProps {
   opponent: ResultAthlete;
   submissionTypes: SubmissionType[];
   onRecorded: (result: BroadcastResult, meta: RecordedMeta) => void;
+  /** How the finishes are offered (`SubmissionGrid`). Default "chips". */
+  submissionLayout?: SubmissionLayout;
 }
 
 /**
- * The result step: record the result, claim-first. The first athlete to start (tap a
- * winner or Draw) claims the form; the other phone shows a live "recording
- * the result" view and cannot open it, until a result lands (they move on
- * to confirm) or the claim goes quiet for 20 s (the form unlocks).
+ * How this viewer enters the result (`MatchCaps.resultEntry`, timekeeper
+ * mode ARCHITECTURE 2.3):
+ *  - "claim" (the default, today): either athlete may record, claim-first;
+ *  - "sole": only this viewer records, so nothing is claimed or waited on;
+ *  - "wait": `recorderName` records; this phone waits, with no take-over.
+ */
+type ResultEntryProps =
+  | { entryPolicy?: "claim" | "sole"; recorderName?: undefined }
+  | { entryPolicy: "wait"; recorderName: string };
+
+type ResultStepProps = ResultStepBaseProps & ResultEntryProps;
+
+/**
+ * The result step: record the result, claim-first by default (`entryPolicy`).
+ * The first athlete to start (tap a winner or Draw) claims the form; the
+ * other phone shows a live "recording the result" view and cannot open it,
+ * until a result lands (they move on to confirm) or the claim goes quiet for
+ * 20 s (the form unlocks).
  *
  * Winner = two big tiles plus Draw; then eight one-tap finishes with the
  * full catalogue search, and the finish time prefilled from the clock.
  */
 export function ResultStep(props: ResultStepProps) {
   const p = usePalette();
-  const { matchId, durationSeconds, initialFinishSeconds, me, opponent, submissionTypes, onRecorded } = props;
+  const { matchId, durationSeconds, initialFinishSeconds, me, opponent, submissionTypes, onRecorded, submissionLayout } = props;
+  // Only claim-first entry claims the form or hears the other side's claims.
+  const claims = (props.entryPolicy ?? "claim") === "claim";
   const [outcome, setOutcome] = React.useState<"submission" | "draw" | null>(null);
   const [winnerId, setWinnerId] = React.useState("");
   const [submissionCode, setSubmissionCode] = React.useState("");
@@ -58,7 +77,7 @@ export function ResultStep(props: ResultStepProps) {
     onResultClaimed: (athleteId, at, supersedes) => remoteClaimRef.current?.(athleteId, at, supersedes),
   });
   const claim = useResultClaim({ meId: me.athleteId, broadcast: broadcastResultClaimed });
-  remoteClaimRef.current = claim.onRemoteClaim;
+  remoteClaimRef.current = claims ? claim.onRemoteClaim : null;
 
   const finishValid = isFinishTimeValid(finish.finishTimeStr, durationSeconds);
   const finishProvided = finish.finishTimeStr.trim() !== "";
@@ -66,6 +85,18 @@ export function ResultStep(props: ResultStepProps) {
   const canSubmit =
     outcome === "draw" ||
     (outcome === "submission" && winnerId !== "" && submissionCode !== "" && finishProvided && finishValid);
+
+  if (props.entryPolicy === "wait") {
+    return (
+      <ResultWaiting
+        claimer={{ displayName: props.recorderName }}
+        me={me}
+        opponent={opponent}
+        durationSeconds={durationSeconds}
+        endedAtSeconds={initialFinishSeconds}
+      />
+    );
+  }
 
   if (claim.state === "theirs") {
     const claimer = claim.claimerId === opponent.athleteId ? opponent : me;
@@ -82,12 +113,12 @@ export function ResultStep(props: ResultStepProps) {
   }
 
   function pickWinner(id: string) {
-    if (!claim.claimNow()) return;
+    if (claims && !claim.claimNow()) return;
     setOutcome("submission");
     setWinnerId(id);
   }
   function pickDraw() {
-    if (!claim.claimNow()) return;
+    if (claims && !claim.claimNow()) return;
     setOutcome("draw");
     setWinnerId("");
   }
@@ -133,7 +164,12 @@ export function ResultStep(props: ResultStepProps) {
       ) : winner ? (
         <>
           <WinnerChip winner={winner} onChange={reset} />
-          <SubmissionGrid submissionTypes={submissionTypes} value={submissionCode} onChange={setSubmissionCode} />
+          <SubmissionGrid
+            submissionTypes={submissionTypes}
+            value={submissionCode}
+            onChange={setSubmissionCode}
+            layout={submissionLayout}
+          />
           <FinishTimeField
             value={finish.finishTimeStr}
             onChange={finish.onChange}
