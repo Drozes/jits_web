@@ -2,27 +2,43 @@
  * Flag-OFF golden test (timekeeper mode, TEST-PLAN 3.1 item 3, spec 14.7 P4).
  *
  * The real wizard, the real step renderer and the real steps render every
- * step of a two-athlete (self-run) match three times: with the match payload
- * as an older backend sends it (no `requires_timekeeper`), with
+ * screen of a two-athlete (self-run) match three times: with the match
+ * payload as an older backend sends it (no `requires_timekeeper`), with
  * `requires_timekeeper: false`, and with every timekeeper-mode key present at
  * its flag-OFF value (the backend after BE-G, for a flag-OFF match; the
  * challenger is the OTHER athlete there, so athlete order cannot leak into
  * the output either). All three trees must be identical, and equal to the
  * committed snapshot.
  *
- * The snapshot is the baseline. It was captured from a clean tree before the
- * roles refactor (PR2) touched any source, and the same test passes,
- * unchanged, against a clean export of origin/development f88a9920: the only
- * raw difference there is the step marker's index, which PR1 changed by
- * deleting the dead `wait` step. Only the slices that change flag-OFF output
- * by owner decision may re-capture it (M5 for A25, M6 for A11 and O1, M9 for
- * A21; ARCHITECTURE M-R5), each reviewed as exactly that change.
+ * Two match shapes are pinned. The challenge-free one (`challenge_id: null`)
+ * is the original seven steps. The challenge-backed one is what production
+ * renders, since every mobile Arena match has a challenge: the wizard then
+ * reads the challenge's rated weights (useMatchWeights) and, on the
+ * face-off, the weight checks (useMatchWeightChecks), so its cases pin the
+ * rated weights on the fight card, the chip and the countdown, the gap line,
+ * the stakes strip (null on Rating V9, and one case with stakes), the weight
+ * check plate and panel, and the ready step's weight hold. The countdown
+ * (started_at one second before NOW) and the confirm and verdict screens for
+ * a win, a loss and a draw are pinned too.
+ *
+ * The snapshot is the baseline (PLAN.md section 5, "Golden baseline", R3-6).
+ * Every entry was captured by running this file, unchanged, in a clean
+ * worktree of f88a9920 (before PR1 touched any source), then copied here.
+ * Only the slices that change flag-OFF output by owner decision may
+ * re-capture it (M5 for A25, M6 for A11 and O1, M9 for A21; ARCHITECTURE
+ * M-R5), each reviewed as exactly that change.
  *
  * Only the data layer, the realtime hook, the recorder and the native
- * modules are stubbed (the same set `wizard-reconcile.test.tsx` uses). The
- * dev-only step marker's "Step N of T" index is normalized: it is a harness
- * hook hidden in release builds, and the step count is not flag-OFF output
- * (the marker's step name stays in the tree).
+ * modules are stubbed (the same set `wizard-reconcile.test.tsx` uses, plus
+ * the challenge weight, weight check and stakes reads). Exactly two raw
+ * differences between f88a9920 and the refactor are accepted, and each is
+ * normalized narrowly in `serialize` / `normalize` below:
+ *  - the dev-only step marker's "Step N of T" index (PR1 deleted the dead
+ *    `wait` step: "of 8" became "of 7"). It is a harness hook hidden in
+ *    release builds; the marker's step name stays in the tree.
+ *  - the countdown caption's text children (PR3 made the caption a prop:
+ *    JSX's three adjacent children "SYNCED TO SERVER CLOCK ", "·",
+ *    " BOTH PHONES" became one string). The rendered text is the same.
  */
 import * as React from "react";
 import { AppState } from "react-native";
@@ -140,17 +156,36 @@ jest.mock("@/components/match-flow/match-recorder-surface", () => ({
 
 const mockGetMatchDetails = jest.fn();
 const mockGetMatchConfirmations = jest.fn();
+const mockGetEloStakes = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: (...a: unknown[]) => mockGetMatchDetails(...a),
   getMatchConfirmations: (...a: unknown[]) => mockGetMatchConfirmations(...a),
   getSubmissionTypes: async () => [],
-  getEloStakes: async () => null,
+  getEloStakes: (...a: unknown[]) => mockGetEloStakes(...a),
   getMatchDetailView: async () => ({ ok: true, data: { videos: [] } }),
 }));
 jest.mock("@jits/shared/api/match-rank-change", () => ({
   getMatchRankChange: async () => ({ ok: false, error: { code: "UNKNOWN", message: "n/a" } }),
 }));
 jest.mock("expo-image", () => ({ Image: () => null }));
+
+// The challenge's rated weights (useMatchWeights) and the face-off weight
+// checks (useMatchWeightChecks, and the check RPC behind its Confirm). Only
+// the reads and that RPC are stubbed: `weightsFor`, the payload parser and
+// every check helper stay real, so the replies below go through the same
+// shaping the app applies to the backend's.
+const mockGetMatchChallengeWeights = jest.fn();
+jest.mock("@jits/shared/api/match-weights", () => ({
+  ...jest.requireActual("@jits/shared/api/match-weights"),
+  getMatchChallengeWeights: (...a: unknown[]) => mockGetMatchChallengeWeights(...a),
+}));
+const mockGetMatchWeightChecks = jest.fn();
+const mockCheckOpponentWeight = jest.fn();
+jest.mock("@jits/shared/api/match-weight-checks", () => ({
+  ...jest.requireActual("@jits/shared/api/match-weight-checks"),
+  getMatchWeightChecks: (...a: unknown[]) => mockGetMatchWeightChecks(...a),
+  checkOpponentWeight: (...a: unknown[]) => mockCheckOpponentWeight(...a),
+}));
 
 jest.mock("@jits/shared/api/mutations", () => ({
   confirmMatchResult: async () => ({ ok: true, data: {} }),
@@ -190,13 +225,22 @@ import { OPPONENT_ENDED_INTERSTITIAL_MS } from "@/lib/match-flow/live-view-state
 import { __resetFreshForTests, __resetPlayedMomentsForTests } from "@/components/ui/elo-system/play-once";
 import { __resetHeaderEloForTests } from "@/lib/rating/header-elo";
 import { __resetStripSuppressionsForTests } from "@/lib/video/upload-strip-visibility";
+import { parseMatchWeightChecks } from "@jits/shared/api/match-weight-checks";
 
 // ---- fixtures ----
 
 /** A fixed clock, so every time-derived line (dispute window, freshness) is stable. */
 const NOW = new Date("2026-09-25T12:12:00.000Z");
+/** A `started_at` one second before NOW: the 3-2-1 is still on "2". */
+const ONE_SECOND_AGO = "2026-09-25T12:11:59.000Z";
 
-function participant(id: string, name: string, outcome: string | null, elo: number, weight: number) {
+type Outcome = "win" | "loss" | "draw";
+
+/** A draw costs both athletes rating (Pressure Score); the higher rated loses more. */
+const DRAW_DELTA: Record<string, number> = { "me-1": -6, "opp-1": -2 };
+
+function participant(id: string, name: string, outcome: Outcome | null, elo: number, weight: number, gap: number) {
+  const delta = outcome === "win" ? 16 : outcome === "loss" ? -16 : outcome === "draw" ? DRAW_DELTA[id] : 0;
   return {
     athlete_id: id,
     display_name: name,
@@ -206,11 +250,88 @@ function participant(id: string, name: string, outcome: string | null, elo: numb
     role: "competitor",
     outcome,
     elo_before: outcome ? elo : null,
-    elo_after: outcome === "win" ? elo + 16 : outcome === "loss" ? elo - 16 : null,
-    elo_delta: outcome === "win" ? 16 : outcome === "loss" ? -16 : 0,
-    weight_division_gap: 0,
+    elo_after: outcome ? elo + delta : null,
+    elo_delta: delta,
+    weight_division_gap: gap,
   };
 }
+
+/**
+ * The challenge (sent by opp-1, accepted by me-1) and its stamped weights,
+ * lbs. They differ from both profile weights (172.5 and 171.4) on purpose,
+ * so a screen that shows the profile pair instead of the rated one shows up
+ * in the snapshot. 168 and 170.2 sit one IBJJF division apart.
+ */
+const CHALLENGE_WEIGHTS = {
+  challengerId: "opp-1",
+  opponentId: "me-1",
+  challengerWeight: 168,
+  opponentWeight: 170.2,
+};
+
+type CheckStatus = "pending" | "confirmed" | "flagged" | "recheck";
+
+interface ChecksSpec {
+  /** feature flag opponent_weight_check_required. */
+  required?: boolean;
+  /** My check of the opponent. */
+  mine?: CheckStatus;
+  /** The opponent's check of me. */
+  theirs?: CheckStatus;
+}
+
+/**
+ * `get_match_weight_checks`'s raw payload (jr_be 20260930201044): the
+ * challenger's check first, the rated weights as {athlete_id, weight} rows.
+ * `check_opponent_weight` returns the same payload.
+ */
+function checksPayload({ required = false, mine = "pending", theirs = "pending" }: ChecksSpec = {}) {
+  const blocked = [mine, theirs].some((s) => s === "flagged" || s === "recheck");
+  const confirmed = [mine, theirs].filter((s) => s === "confirmed").length;
+  const check = (checker: string, subject: string, status: CheckStatus, seen: number) => ({
+    checker_id: checker,
+    subject_id: subject,
+    status,
+    weight_seen: status === "pending" ? null : seen,
+    flag_count: status === "flagged" ? 1 : 0,
+    flagged_at: status === "flagged" ? "2026-09-25T12:10:00.000Z" : null,
+    reweighed_at: null,
+    updated_at: status === "pending" ? null : "2026-09-25T12:10:00.000Z",
+  });
+  return {
+    match_id: "M1",
+    required,
+    blocked,
+    can_start: !blocked && (!required || confirmed === 2),
+    weights: [
+      { athlete_id: CHALLENGE_WEIGHTS.challengerId, weight: CHALLENGE_WEIGHTS.challengerWeight },
+      { athlete_id: CHALLENGE_WEIGHTS.opponentId, weight: CHALLENGE_WEIGHTS.opponentWeight },
+    ],
+    checks: [
+      check("opp-1", "me-1", theirs, CHALLENGE_WEIGHTS.opponentWeight),
+      check("me-1", "opp-1", mine, CHALLENGE_WEIGHTS.challengerWeight),
+    ],
+  };
+}
+
+/** What the weight-check reads resolve to: the app's own parse of the raw payload. */
+function checksReply(spec: ChecksSpec = {}) {
+  return { ok: true, data: parseMatchWeightChecks(checksPayload(spec)) };
+}
+
+/** `calculate_elo_stakes` for the viewer (passed as its challenger), one division apart. */
+const STAKES = {
+  challenger_win: 14,
+  challenger_draw: -3,
+  challenger_loss: -18,
+  opponent_win: 18,
+  opponent_draw: -1,
+  opponent_loss: -14,
+  challenger_expected: 0.54,
+  opponent_expected: 0.46,
+  weight_division_gap: 1,
+  draw_score: 0.5,
+};
 
 /** The three shapes a flag-OFF match can arrive in (spec 14.7 P4). */
 const VARIANTS: Record<string, Record<string, unknown>> = {
@@ -232,24 +353,38 @@ const VARIANTS: Record<string, Record<string, unknown>> = {
   },
 };
 
-function row(status: string, extra: Record<string, unknown>, outcome: "win" | "loss" | null = null) {
-  const theirs = outcome === "win" ? "loss" : outcome === "loss" ? "win" : null;
+interface Fixture {
+  status: "pending" | "in_progress" | "completed";
+  outcome?: Outcome;
+  /**
+   * Challenge-backed, as every mobile Arena match is. A completed one also
+   * carries the stamped division gap on both participants.
+   */
+  challenge?: boolean;
+  /** The server's `started_at`. Default 12 minutes before NOW: past the countdown. */
+  startedAt?: string;
+}
+
+function row(fx: Fixture, extra: Record<string, unknown>) {
+  const outcome = fx.outcome ?? null;
+  const theirs = outcome === "win" ? "loss" : outcome === "loss" ? "win" : outcome;
+  const gap = fx.challenge && outcome ? 1 : 0;
   return {
     id: "M1",
-    challenge_id: null,
+    challenge_id: fx.challenge ? "C1" : null,
     session_id: null,
     match_type: "ranked",
     duration_seconds: 300,
-    status,
-    result: outcome ? "submission" : null,
-    started_at: status === "pending" ? null : "2026-09-25T12:00:00.000Z",
+    status: fx.status,
+    result: outcome === "draw" ? "draw" : outcome ? "submission" : null,
+    started_at: fx.status === "pending" ? null : (fx.startedAt ?? "2026-09-25T12:00:00.000Z"),
     completed_at: outcome ? "2026-09-25T12:06:00.000Z" : null,
     paused_at: null,
     total_paused_duration: 0,
     timekeeper_id: null,
     participants: [
-      participant("me-1", "Mina Park", outcome, 1512, 172.5),
-      participant("opp-1", "Demo Okafor", theirs, 1487, 171.4),
+      participant("me-1", "Mina Park", outcome, 1512, 172.5, gap),
+      participant("opp-1", "Demo Okafor", theirs, 1487, 171.4, gap),
     ],
     ...extra,
   };
@@ -272,52 +407,213 @@ async function tick(ms: number) {
 
 type Screen = ReturnType<typeof render>;
 
-async function mount(status: string, extra: Record<string, unknown>, outcome: "win" | "loss" | null = null) {
-  mockGetMatchDetails.mockResolvedValue(row(status, extra, outcome));
+async function mount(fx: Fixture, extra: Record<string, unknown>) {
+  mockGetMatchDetails.mockResolvedValue(row(fx, extra));
   const screen = render(
     <MatchFlowWizard exitHref="/(app)/(tabs)/arena" exitLabel="Back to Arena" matchId="M1" currentAthleteId="me-1" />,
   );
   await flush();
   await flush();
+  // A challenge-backed match settles in more hops: the rated weights, then
+  // the weight checks, then the stakes priced on them.
+  if (fx.challenge) {
+    await flush();
+    await flush();
+  }
   return screen;
 }
 
-/** How to reach each step, the same way the athlete (or the DB) gets there. */
-const STEPS: Record<string, (extra: Record<string, unknown>) => Promise<Screen>> = {
-  weight: (extra) => mount("pending", extra),
-  ready: async (extra) => {
-    const screen = await mount("pending", extra);
-    await act(async () => {
-      fireEvent.press(screen.getByTestId("weight-confirm"));
-    });
+async function press(screen: Screen, testID: string) {
+  await act(async () => {
+    fireEvent.press(screen.getByTestId(testID));
+  });
+  await flush();
+}
+
+/** "Confirm N lbs" on the weigh-in. */
+const weighIn = (screen: Screen) => press(screen, "weight-confirm");
+
+/** Weigh in, then Confirm the opponent's weigh-in (the check RPC replies `after`). */
+function weighInAndConfirm(after: ChecksSpec) {
+  return async (screen: Screen) => {
+    mockCheckOpponentWeight.mockResolvedValue(checksReply(after));
+    await weighIn(screen);
+    await press(screen, "weight-check-confirm");
     await flush();
-    return screen;
+  };
+}
+
+async function endMatch() {
+  act(() => handlerOf("onMatchEnded")());
+  await tick(OPPONENT_ENDED_INTERSTITIAL_MS);
+}
+
+async function toResult() {
+  await endMatch();
+  await tick(800);
+}
+
+function bothConfirmed() {
+  mockGetMatchConfirmations.mockResolvedValue(["me-1", "opp-1"]);
+}
+
+interface Case {
+  fixture: Fixture;
+  /** The step the screen is on. */
+  step: string;
+  /** Data-layer replies for this case, set before every capture. */
+  setup?: () => void;
+  /** From the mounted wizard to the screen, the way the athlete (or the DB) gets there. */
+  drive?: (screen: Screen) => Promise<void>;
+  /** What must be on screen, so a capture cannot pass on a half-settled tree. */
+  shows?: (screen: Screen) => void;
+}
+
+const RATED_PAIR = (s: Screen) => {
+  // The fight card (weigh-in) or the chip (ready, countdown) shows the
+  // challenge's weights, not the profile ones.
+  expect(s.queryAllByText(/170\.2/).length).toBeGreaterThan(0);
+  expect(s.queryAllByText(/172\.5/)).toHaveLength(0);
+};
+
+const CASES: Record<string, Case> = {
+  // Challenge-free (`challenge_id: null`): the original seven.
+  weight: { fixture: { status: "pending" }, step: "weight" },
+  ready: { fixture: { status: "pending" }, step: "ready", drive: weighIn },
+  live: { fixture: { status: "in_progress" }, step: "live" },
+  end: { fixture: { status: "in_progress" }, step: "end", drive: endMatch },
+  result: { fixture: { status: "in_progress" }, step: "result", drive: toResult },
+  confirm: { fixture: { status: "completed", outcome: "win" }, step: "confirm" },
+  summary: { fixture: { status: "completed", outcome: "win" }, step: "summary", setup: bothConfirmed },
+  // The 3-2-1 on profile weights (no challenge to rate on).
+  countdown: {
+    fixture: { status: "in_progress", startedAt: ONE_SECOND_AGO },
+    step: "live",
+    shows: (s) => {
+      s.getByTestId("match-countdown");
+      expect(s.getByTestId("countdown-numeral")).toHaveTextContent("2");
+    },
   },
-  live: (extra) => mount("in_progress", extra),
-  end: async (extra) => {
-    const screen = await mount("in_progress", extra);
-    act(() => handlerOf("onMatchEnded")());
-    await tick(OPPONENT_ENDED_INTERSTITIAL_MS);
-    return screen;
+
+  // Challenge-backed: what every mobile Arena match renders.
+  "challenge: weight, no stakes (V9)": {
+    fixture: { status: "pending", challenge: true },
+    step: "weight",
+    shows: (s) => {
+      RATED_PAIR(s);
+      expect(s.getByTestId("faceoff-my-weight")).toHaveTextContent("170.2 LBS");
+      expect(s.getByTestId("faceoff-opponent-weight")).toHaveTextContent("168 LBS");
+      expect(s.queryByTestId("weight-stakes")).toBeNull();
+      s.getByTestId("weight-confirm");
+    },
   },
-  result: async (extra) => {
-    const screen = await mount("in_progress", extra);
-    act(() => handlerOf("onMatchEnded")());
-    await tick(OPPONENT_ENDED_INTERSTITIAL_MS);
-    await tick(800);
-    return screen;
+  "challenge: weight, stakes": {
+    fixture: { status: "pending", challenge: true },
+    step: "weight",
+    setup: () => mockGetEloStakes.mockResolvedValue(STAKES),
+    shows: (s) => {
+      RATED_PAIR(s);
+      s.getByTestId("weight-stakes");
+      s.getByTestId("weight-gap-note");
+    },
   },
-  confirm: (extra) => mount("completed", extra, "win"),
-  summary: async (extra) => {
-    mockGetMatchConfirmations.mockResolvedValue(["me-1", "opp-1"]);
-    return mount("completed", extra, "win");
+  "challenge: weight, my check pending": {
+    fixture: { status: "pending", challenge: true },
+    step: "weight",
+    drive: weighIn,
+    shows: (s) => {
+      s.getByTestId("faceoff-weight-check-plate");
+      s.getByTestId("weight-check-confirm");
+      expect(s.queryByTestId("weight-confirm")).toBeNull();
+    },
+  },
+  "challenge: ready": {
+    fixture: { status: "pending", challenge: true },
+    step: "ready",
+    drive: weighInAndConfirm({ mine: "confirmed" }),
+    shows: (s) => {
+      RATED_PAIR(s);
+      expect(s.queryByTestId("ready-weight-hold")).toBeNull();
+      expect(s.getByTestId("ready-button").props.accessibilityState?.disabled).toBeFalsy();
+    },
+  },
+  "challenge: ready, waiting for their check": {
+    fixture: { status: "pending", challenge: true },
+    step: "ready",
+    setup: () => mockGetMatchWeightChecks.mockResolvedValue(checksReply({ required: true })),
+    drive: weighInAndConfirm({ required: true, mine: "confirmed" }),
+    shows: (s) => {
+      s.getByTestId("ready-weight-hold");
+      s.getByText("WAITING FOR WEIGHT CHECKS");
+    },
+  },
+  "challenge: ready, on hold (they flagged me)": {
+    fixture: { status: "pending", challenge: true },
+    step: "ready",
+    setup: () => mockGetMatchWeightChecks.mockResolvedValue(checksReply({ theirs: "flagged" })),
+    drive: weighInAndConfirm({ mine: "confirmed", theirs: "flagged" }),
+    shows: (s) => {
+      s.getByTestId("ready-weight-hold");
+      s.getByText("MATCH ON HOLD · WEIGHT CHECK");
+      s.getByTestId("weight-reweigh");
+    },
+  },
+  "challenge: countdown": {
+    fixture: { status: "in_progress", challenge: true, startedAt: ONE_SECOND_AGO },
+    step: "live",
+    shows: (s) => {
+      s.getByTestId("match-countdown");
+      expect(s.getByTestId("countdown-numeral")).toHaveTextContent("2");
+      RATED_PAIR(s);
+    },
+  },
+  "challenge: live": { fixture: { status: "in_progress", challenge: true }, step: "live" },
+  "challenge: end": { fixture: { status: "in_progress", challenge: true }, step: "end", drive: endMatch },
+  "challenge: result": { fixture: { status: "in_progress", challenge: true }, step: "result", drive: toResult },
+  "challenge: confirm, win": { fixture: { status: "completed", outcome: "win", challenge: true }, step: "confirm" },
+  "challenge: confirm, loss": { fixture: { status: "completed", outcome: "loss", challenge: true }, step: "confirm" },
+  "challenge: confirm, draw": { fixture: { status: "completed", outcome: "draw", challenge: true }, step: "confirm" },
+  "challenge: summary, win": {
+    fixture: { status: "completed", outcome: "win", challenge: true },
+    step: "summary",
+    setup: bothConfirmed,
+    shows: (s) => s.getByText("YOU WON"),
+  },
+  "challenge: summary, loss": {
+    fixture: { status: "completed", outcome: "loss", challenge: true },
+    step: "summary",
+    setup: bothConfirmed,
+    shows: (s) => s.getByText("YOU LOST"),
+  },
+  "challenge: summary, draw": {
+    fixture: { status: "completed", outcome: "draw", challenge: true },
+    step: "summary",
+    setup: bothConfirmed,
+    shows: (s) => s.getByText("DRAW"),
   },
 };
+
+// ---- serializing ----
+
+/**
+ * Accepted diff (b), PR3: the countdown caption became one prop string, so
+ * its Mono holds one text child where f88a9920's JSX held these three
+ * adjacent ones. Only this exact triple is joined; any other split text
+ * stays as it is.
+ */
+const SPLIT_COUNTDOWN_CAPTION = ["SYNCED TO SERVER CLOCK ", "·", " BOTH PHONES"];
+
+function isSplitCountdownCaption(node: unknown[]): boolean {
+  return node.length === SPLIT_COUNTDOWN_CAPTION.length && node.every((c, i) => c === SPLIT_COUNTDOWN_CAPTION[i]);
+}
 
 /** Sorted keys and no function identities, so only rendered output counts. */
 function normalize(node: unknown): unknown {
   if (typeof node === "function") return "[Function]";
-  if (Array.isArray(node)) return node.map(normalize);
+  if (Array.isArray(node)) {
+    if (isSplitCountdownCaption(node)) return [SPLIT_COUNTDOWN_CAPTION.join("")];
+    return node.map(normalize);
+  }
   if (node && typeof node === "object") {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(node).sort()) out[key] = normalize((node as Record<string, unknown>)[key]);
@@ -329,6 +625,7 @@ function normalize(node: unknown): unknown {
 function serialize(screen: Screen): string {
   return (
     JSON.stringify(normalize(screen.toJSON()), null, 1)
+      // Accepted diff (a), PR1: the dev-only marker's index ("of 8" to "of 7").
       .replace(/Step \d+ of \d+, /g, "Step N of T, ")
       // NativeWind's interop numbers its pressables with one global counter.
       .replace(/"nativeID": "\d+"/g, '"nativeID": "#"')
@@ -338,16 +635,25 @@ function serialize(screen: Screen): string {
 function resetModuleState() {
   mockSyncCalls.length = 0;
   mockGetMatchConfirmations.mockResolvedValue([]);
+  // Rating V9 has no stakes read: the face-off shows no stakes strip.
+  mockGetEloStakes.mockResolvedValue(null);
+  mockGetMatchChallengeWeights.mockResolvedValue(CHALLENGE_WEIGHTS);
+  mockGetMatchWeightChecks.mockResolvedValue(checksReply());
+  mockCheckOpponentWeight.mockResolvedValue(checksReply());
   __resetPlayedMomentsForTests();
   __resetFreshForTests();
   __resetHeaderEloForTests();
   __resetStripSuppressionsForTests();
 }
 
-async function capture(step: string, extra: Record<string, unknown>): Promise<string> {
+async function capture(name: string, extra: Record<string, unknown>): Promise<string> {
+  const c = CASES[name];
   resetModuleState();
-  const screen = await STEPS[step](extra);
-  screen.getByTestId(`match-step-${step}`);
+  c.setup?.();
+  const screen = await mount(c.fixture, extra);
+  if (c.drive) await c.drive(screen);
+  screen.getByTestId(`match-step-${c.step}`);
+  c.shows?.(screen);
   const out = serialize(screen);
   screen.unmount();
   return out;
@@ -367,14 +673,23 @@ afterEach(() => {
 });
 
 describe("flag-OFF golden output: identical whatever the timekeeper keys say", () => {
-  it.each(Object.keys(STEPS))("%s", async (step) => {
+  it.each(Object.keys(CASES))("%s", async (name) => {
     const [missing, falseOnly, presentFalse] = [
-      await capture(step, VARIANTS.missing),
-      await capture(step, VARIANTS.false),
-      await capture(step, VARIANTS["present-false"]),
+      await capture(name, VARIANTS.missing),
+      await capture(name, VARIANTS.false),
+      await capture(name, VARIANTS["present-false"]),
     ];
     expect(falseOnly).toBe(missing);
     expect(presentFalse).toBe(missing);
     expect(missing).toMatchSnapshot();
+  });
+
+  it("the challenge-backed cases read the challenge, the checks and the stakes", async () => {
+    // Guards the fixture itself: without these reads the challenge cases
+    // would silently pin the challenge-free screens again.
+    await capture("challenge: weight, stakes", VARIANTS.missing);
+    expect(mockGetMatchChallengeWeights).toHaveBeenCalledWith(expect.anything(), "C1");
+    expect(mockGetMatchWeightChecks).toHaveBeenCalledWith(expect.anything(), "M1");
+    expect(mockGetEloStakes).toHaveBeenCalledWith(expect.anything(), 1512, 1487, 170.2, 168);
   });
 });
