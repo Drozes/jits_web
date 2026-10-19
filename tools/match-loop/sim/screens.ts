@@ -9,6 +9,7 @@ import { Idb, summarise, type AXElement, type Query } from "./idb";
 import type { Simctl } from "./simctl";
 import { ExpectationTimeout, HarnessError } from "../lib/util";
 import { PROMPT_INPUT_GUARD_MS } from "../../../apps/mobile/lib/arena/constants";
+import type { MatchStep } from "../../../apps/mobile/lib/match-flow/step-router";
 
 /**
  * How long to wait after the prompt is detected before trying its buttons:
@@ -19,10 +20,20 @@ import { PROMPT_INPUT_GUARD_MS } from "../../../apps/mobile/lib/arena/constants"
  */
 export const PROMPT_TAP_DELAY_MS = PROMPT_INPUT_GUARD_MS + 250;
 
-export type WizardStep = "wait" | "weight" | "ready" | "live" | "end" | "result" | "confirm" | "summary";
+/** The app's wizard steps (`MatchStep`, imported so the two cannot drift). */
+export type WizardStep = MatchStep;
 
-const STEP_BY_LABEL: Record<string, WizardStep> = {
-  waiting: "wait",
+/**
+ * The step marker's accessibility label, "Step N of T, <Label>" (`StepMarker`
+ * in apps/mobile/components/match-flow/match-flow-wizard.tsx).
+ */
+export const STEP_MARKER_RE = /^Step \d+ of \d+, (\w+)$/;
+
+/**
+ * The marker's step name (lowercased) to the step. The names are the app's
+ * `STEP_LABELS`; `tests/label-contract.test.ts` pins the two together.
+ */
+export const STEP_BY_LABEL: Readonly<Record<string, WizardStep>> = {
   weights: "weight",
   ready: "ready",
   live: "live",
@@ -252,14 +263,14 @@ export class Screens {
   // --- wizard ---------------------------------------------------------------
 
   /**
-   * Current wizard step. The step marker is a Text; iOS does not surface a
-   * Text's testID through idb, so the marker's accessibility label
-   * ("Step N of 8, <Label>") is the primary signal and the testID a fallback.
+   * Current wizard step. idb does not reliably surface the step marker's
+   * testID, so the step name in its accessibility label ("Step N of T,
+   * <Label>") is the primary signal and the testID a fallback.
    */
   async currentStep(els?: AXElement[]): Promise<WizardStep | null> {
     const all = els ?? (await this.idb.describe());
     for (const e of all) {
-      const m = (e.AXLabel ?? "").match(/^Step \d+ of \d+, (\w+)$/);
+      const m = (e.AXLabel ?? "").match(STEP_MARKER_RE);
       if (m && STEP_BY_LABEL[m[1].toLowerCase()]) return STEP_BY_LABEL[m[1].toLowerCase()];
       if (e.AXUniqueId?.startsWith("match-step-")) return e.AXUniqueId.slice("match-step-".length) as WizardStep;
     }

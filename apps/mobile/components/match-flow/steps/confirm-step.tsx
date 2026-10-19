@@ -58,7 +58,7 @@ export function confirmVerdict(resultData: BroadcastResult | null, meId: string)
 }
 
 /**
- * Step 7, the opponent's side: confirm the recorded result with one tap or
+ * The confirm step, the opponent's side: confirm the recorded result with one tap or
  * dispute it. The recorder never lands here on a current backend: the server
  * confirms their side with the result (B2) and they go straight to the
  * verdict. A dispute is only possible for 24 h after the match (B3).

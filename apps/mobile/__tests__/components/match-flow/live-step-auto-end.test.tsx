@@ -218,7 +218,7 @@ describe("LiveStep auto-end at 00:00 (jits-2y8i)", () => {
       completeHold(getByTestId("live-end"));
     });
     expect(mockBroadcastMatchEnded).not.toHaveBeenCalled();
-    // Pause stays live at time up: it is how the timekeeper holds the end.
+    // Pause stays live at time up: it is how an athlete holds the end.
     expect(getByTestId("live-pause-toggle").props.accessibilityState).toEqual(
       expect.objectContaining({ disabled: false }),
     );

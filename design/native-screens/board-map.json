@@ -2347,7 +2347,6 @@
     "apps/mobile/components/highlight-viewer/viewer-improve-sheet.tsx",
     "apps/mobile/components/invite/PasteInviteButton.tsx",
     "apps/mobile/components/match-flow/steps/end-step.tsx",
-    "apps/mobile/components/match-flow/steps/wait-step.tsx",
     "apps/mobile/components/share-profile-sheet.tsx",
     "apps/mobile/components/ui/badge.tsx",
     "apps/mobile/components/ui/elo-system/data-row.tsx",

@@ -17,10 +17,11 @@ import { useMatchRecorder } from "./match-recorder-context";
  * fired by the time the match starts and the common path records on the
  * first attempt.
  *
- * Bounded on both ends on purpose. It does not mount on wait or weight
- * (those steps can sit open indefinitely and a live capture session costs
- * real battery), and it unmounts once the recorder is past `stopping`, so
- * nothing holds the camera open through result entry.
+ * Bounded on both ends on purpose. It does not mount on weight or before any
+ * match step (practice's lobby and wait): those can sit open indefinitely
+ * and a live capture session costs real battery. And it unmounts once the
+ * recorder is past `stopping`, so nothing holds the camera open through
+ * result entry.
  *
  * Note it does NOT provoke an earlier permission prompt: `CameraOverlay`
  * renders `CameraView` only once permission is already granted, and
@@ -32,7 +33,8 @@ export function MatchRecorderCamera({
   step,
   optedIn = true,
 }: {
-  step: MatchStep;
+  /** The wizard's step; null before any match step (practice's lobby and wait). */
+  step: MatchStep | null;
   /**
    * "Record from my phone" (the match face-off, decision 5). Default true
    * (practice). Off: no capture session at all on ready or live; the live

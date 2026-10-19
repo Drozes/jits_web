@@ -1,24 +1,27 @@
 /**
- * Pure mapping from a match's persisted DB status to the initial wizard step
- * the mobile UI should render. Mirrors the web's `computeInitialStep` but
- * collapses the timekeeper variants since the mobile app does not currently
- * surface timekeeper functionality (Phase 5 polish).
+ * The match wizard's steps, and the pure mapping from a match's persisted DB
+ * status to the step the wizard mounts on. Mirrors the web's
+ * `computeInitialStep` without its timekeeper variants: the mobile wizard has
+ * no timekeeper (web's session timekeeper never came to mobile).
  *
- * Steps (8 total), keyed by short slugs that match the spec's vocabulary:
- *   - `wait`    : transient hold while waiting for opponent (currently unused
- *                 by the orchestrator; kept for future timekeeper support).
- *   - `weight`  : both athletes confirm scale weight before going live.
- *   - `ready`   : ready-check; both athletes tap Ready, then `start_match`
- *                 fires and transitions everyone to `live`.
- *   - `live`    : timer running; pause/resume + end-match.
- *   - `end`     : transient — the moment after End Match before result entry.
- *                 Currently advances straight to `result` (see wizard).
- *   - `result`  : record submission/draw + winner + finish time.
- *   - `confirm` : both athletes confirm or one disputes the recorded result.
- *   - `summary` : final outcome card + ELO delta + nav back to lobby.
+ * Steps, in order. The order is also time order: the wizard and the
+ * reconciler never move to an earlier step (`use-wizard-sync.ts`,
+ * `reconcile.ts`).
+ *   - `weight`  : the face-off weigh-in. Each athlete confirms their own
+ *                 weight, and checks the opponent's where weight checks are on.
+ *   - `ready`   : the face-off ready check. Each athlete taps Ready; once both
+ *                 are ready each device calls `start_match` (the loser of that
+ *                 race reads the started match) and both move to `live`.
+ *   - `live`    : the countdown, then the clock: pause / resume, hold to end.
+ *   - `end`     : transient, the moment after the end; advances to `result`.
+ *   - `result`  : record a submission (winner, finish, time) or a draw.
+ *   - `confirm` : the other athlete confirms or disputes the recorded result.
+ *   - `summary` : the verdict and rating change, then the exit.
+ *
+ * The practice match draws its header from its own list (`PRACTICE_STEPS` in
+ * `lib/practice/constants.ts`), so a change here never moves that header.
  */
 export type MatchStep =
-  | "wait"
   | "weight"
   | "ready"
   | "live"
@@ -28,7 +31,6 @@ export type MatchStep =
   | "summary";
 
 export const MATCH_STEPS: readonly MatchStep[] = [
-  "wait",
   "weight",
   "ready",
   "live",
@@ -45,19 +47,8 @@ export interface MatchLike {
 /**
  * Returns the step the wizard should mount in based on persisted match
  * status. Pure / side-effect free so it can be reused in tests.
- *
- * Optional `localSubstate` overrides the inferred step when the local
- * client has progressed past what the DB reflects (e.g. timer ended,
- * waiting for the user to tap submit on result). It must be one of the
- * `MatchStep` values; an unknown value is ignored.
  */
-export function getCurrentStep(
-  match: MatchLike,
-  localSubstate?: MatchStep,
-): MatchStep {
-  if (localSubstate && MATCH_STEPS.includes(localSubstate)) {
-    return localSubstate;
-  }
+export function getCurrentStep(match: MatchLike): MatchStep {
   switch (match.status) {
     case "pending":
       return "weight";

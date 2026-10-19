@@ -34,7 +34,7 @@ interface ResultStepProps {
 }
 
 /**
- * Step 6: record the result, claim-first. The first athlete to start (tap a
+ * The result step: record the result, claim-first. The first athlete to start (tap a
  * winner or Draw) claims the form; the other phone shows a live "recording
  * the result" view and cannot open it, until a result lands (they move on
  * to confirm) or the claim goes quiet for 20 s (the form unlocks).

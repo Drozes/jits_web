@@ -236,7 +236,8 @@ already appends a `{"type":"run",...}` line per run):
   `tests/label-contract.test.ts` pins these against the app source (spec 9.3)
   without a simulator.
 - Text testIDs do not surface through idb; the wizard step is read from the
-  step marker's accessibility label ("Step N of 8, <Label>").
+  step name in the step marker's accessibility label ("Step N of T, <Label>",
+  pinned to the app's labels by `tests/label-contract.test.ts`).
 - Pressables surface as Button, Link, Slider or GenericElement depending on
   what else is mounted; selectors match by label/testID, not type.
 - A dev-build LogBox toast can cover the tab bar; the harness closes it.

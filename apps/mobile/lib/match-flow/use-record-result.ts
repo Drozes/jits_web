@@ -39,7 +39,7 @@ interface SubmitParams {
 /**
  * Wraps `recordMatchResult` with debounce, broadcast, error toasts, and
  * the broadcast listener for the opponent's submission. Pulled out of
- * the result step to keep the visual component below 100 lines.
+ * the result step so the step keeps only its form and its claim handling.
  *
  * The mutation runs through `mutationQueue` so a flaky-network record
  * isn't lost: when offline, the call is queued under a stable per-match

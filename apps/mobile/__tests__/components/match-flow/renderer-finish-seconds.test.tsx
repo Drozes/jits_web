@@ -35,7 +35,6 @@ jest.mock("@/components/match-flow/faceoff/faceoff-body", () => ({}));
 jest.mock("@/components/match-flow/steps/end-step", () => ({}));
 jest.mock("@/components/match-flow/steps/confirm-step", () => ({}));
 jest.mock("@/components/match-flow/verdict/verdict-step", () => ({}));
-jest.mock("@/components/match-flow/steps/wait-step", () => ({}));
 
 import { MatchStepRenderer } from "@/components/match-flow/match-step-renderer";
 

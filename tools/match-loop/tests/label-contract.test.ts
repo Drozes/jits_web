@@ -12,8 +12,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { HEADER_CHIP_ID, HEADER_LIVE_DOT_ID, LIVE_CHIP } from "../sim/screens";
+import { HEADER_CHIP_ID, HEADER_LIVE_DOT_ID, LIVE_CHIP, STEP_BY_LABEL, STEP_MARKER_RE } from "../sim/screens";
 import { matches, type AXElement } from "../sim/idb";
+import { MATCH_STEPS } from "../../../apps/mobile/lib/match-flow/step-router";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MOBILE = resolve(HERE, "../../../apps/mobile");
@@ -30,6 +31,7 @@ const LIVE_DOT = src("components/layout/header-live-dot.tsx");
 const POPOVER = src("components/layout/live-menu-popover.tsx");
 const MAT_BOARD = src("components/arena/mat-board.tsx");
 const SHEET = src("components/arena/challenge-prompt-sheet.tsx");
+const WIZARD = src("components/match-flow/match-flow-wizard.tsx");
 
 test("the harness's header testIDs are the ones the app exports", () => {
   assert.match(CHIP, new RegExp(`HEADER_CHIP_TEST_ID = "${HEADER_CHIP_ID}"`));
@@ -73,11 +75,41 @@ test("the Mat Board keeps the harness's Arena labels", () => {
 });
 
 test("the prompt sheet keeps Accept / Decline by label and exposes them to idb", () => {
-  assert.match(SHEET, /accessibilityLabel="Accept challenge"/);
-  assert.match(SHEET, /accessibilityLabel="Decline challenge"/);
-  assert.match(SHEET, /accessibilityLabel="Later"/);
-  // gorhom collapses the content into one "Bottom Sheet" leaf unless this is off.
-  assert.match(SHEET, /accessible=\{false\}/);
+  // Screens.isPromptVisible / tapPromptButton query { label, type: "Button" }.
+  assert.match(SHEET, /accessibilityRole="button"\s+accessibilityLabel="Accept challenge"/);
+  assert.match(SHEET, /accessibilityRole="button"\s+accessibilityLabel="Decline challenge"/);
+  assert.match(SHEET, /accessibilityRole="button"\s+accessibilityLabel="Later"/);
+  // The title is the second visibility signal (Screens.promptSheet).
+  assert.match(SHEET, /^\s*INCOMING CHALLENGE\s*$/m);
+  // A centered React Native Modal since jits-02vo.3, no longer a gorhom
+  // sheet (which collapsed its content into one "Bottom Sheet" leaf unless
+  // `accessible={false}`), and nothing in it makes the card one accessible
+  // leaf either, so the buttons stay separate elements to idb.
+  assert.match(SHEET, /import \{[^}]*\bModal\b[^}]*\} from "react-native"/);
+  assert.doesNotMatch(SHEET, /@gorhom\/bottom-sheet/);
+  assert.doesNotMatch(SHEET, /^\s*accessible(=\{(?!false\})[^}]*\})?\s*$/m);
+  // A card fading out after its challenge cleared leaves the tree, so its
+  // title never counts as a prompt still up.
+  assert.match(SHEET, /accessibilityElementsHidden=\{!visible\}/);
+});
+
+test("the harness reads every wizard step from the step marker's label", () => {
+  // StepMarker's label is "Step N of T, <Label>" (Screens.currentStep).
+  assert.match(
+    WIZARD,
+    /accessibilityLabel=\{exposed \? `Step \$\{idx \+ 1\} of \$\{MATCH_STEPS\.length\}, \$\{STEP_LABELS\[step\]\}` : undefined\}/,
+  );
+  const block = WIZARD.match(/const STEP_LABELS: Record<MatchStep, string> = \{([^}]*)\}/);
+  assert.ok(block, "STEP_LABELS not found in match-flow-wizard.tsx");
+  const labels = [...block[1].matchAll(/(\w+): "([^"]+)"/g)].map((m) => ({ step: m[1], label: m[2] }));
+  assert.deepEqual(labels.map((l) => l.step).sort(), [...MATCH_STEPS].sort(), "STEP_LABELS names every MatchStep");
+  labels.forEach(({ step, label }, i) => {
+    const marker = `Step ${i + 1} of ${labels.length}, ${label}`.match(STEP_MARKER_RE);
+    assert.ok(marker, `the marker label for ${step} ("${label}") does not parse`);
+    assert.equal(STEP_BY_LABEL[marker[1].toLowerCase()], step, `the harness misreads "${label}"`);
+  });
+  // Nothing for a step the app no longer has (such as the deleted wait step).
+  assert.deepEqual(Object.values(STEP_BY_LABEL).sort(), [...MATCH_STEPS].sort());
 });
 
 function el(over: Partial<AXElement>): AXElement {

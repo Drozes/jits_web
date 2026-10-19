@@ -6,7 +6,6 @@ import type { RecordedMeta } from "@/lib/match-flow/use-record-result";
 import { EndStep } from "./steps/end-step";
 import { ResultStep } from "./steps/result-step";
 import { ConfirmStep } from "./steps/confirm-step";
-import { WaitStep } from "./steps/wait-step";
 import { FaceoffBody } from "./faceoff/faceoff-body";
 import { LiveStage } from "./countdown/live-stage";
 import { VerdictStep } from "./verdict/verdict-step";
@@ -108,9 +107,6 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
   // the wizard (the compact line and the verdict's Film block say it).
   useSuppressUploadStrip(step === "live" ? { kind: "all" } : { kind: "match", matchId });
 
-  if (step === "wait") {
-    return <WaitStep message="Waiting for opponent..." allowSkip onSkip={() => setStep("weight")} />;
-  }
   if (step === "weight" || step === "ready") {
     return <FaceoffBody phase={step} me={me} opponent={opponent} durationSeconds={durationSeconds} />;
   }

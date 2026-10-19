@@ -39,8 +39,11 @@ export const APP_TIMING = {
   /** `FACEOFF_REPEAT_MS` (apps/mobile/lib/match-flow/use-faceoff.ts, the ready check):
    * a ready athlete repeats ready_signal until the opponent's arrives. */
   READY_REPEAT_MS: 3_000,
-  /** ConfirmStep's delay between "both confirmed" and the summary
-   * (apps/mobile/components/match-flow/steps/confirm-step.tsx). */
+  /** `ADVANCE_AFTER_CONFIRM_MS` (apps/mobile/components/match-flow/steps/confirm-step.tsx):
+   * how long the confirm step shows CONFIRMED before it moves on to the
+   * summary. Since jits-02vo.7 the app starts it on this athlete's own
+   * confirm; the bot still starts it once both have confirmed
+   * (`confirmDecision`, scenario drift owned by jits-c3vd). */
   CONFIRM_ADVANCE_MS: 1_500,
   /** `ACCEPTED_FALLBACK_MS` (apps/mobile/lib/arena/use-arena-challenge.ts): how
    * long a challenger lets its challenge sit at `accepted` before it starts

@@ -49,8 +49,8 @@ interface MatchFlowWizardProps {
   onStepChange?: (step: MatchStep | null) => void;
 }
 
-export const STEP_LABELS: Record<MatchStep, string> = {
-  wait: "Waiting",
+/** The step names in the step marker label the match-loop harness reads (`StepMarker`). */
+const STEP_LABELS: Record<MatchStep, string> = {
   weight: "Weights",
   ready: "Ready",
   live: "Live",
@@ -74,15 +74,15 @@ function computeOwnOutcome(
 }
 
 /**
- * Top-level orchestrator for the 8-step match wizard. Loads the match +
- * submission types, derives the initial step from match.status, and
- * renders one step at a time.
+ * Top-level orchestrator for the match wizard (steps in `step-router.ts`).
+ * Loads the match + submission types, derives the initial step from
+ * match.status, and renders one step at a time.
  *
  * Origin-agnostic: it takes `exitHref` / `exitLabel` rather than a session
  * id, so it mounts unchanged for a match with no session at all.
  *
- * ELO design system: page-tinted surface with a meta-strip progress
- * indicator. The live step keeps the same scroll container
+ * ELO design system: page-tinted surface with no visible step progress (the
+ * harness reads `StepMarker`). The live step keeps the same scroll container
  * but its internal layout is full-bleed within the padding.
  */
 export function MatchFlowWizard({
@@ -353,12 +353,13 @@ export function MatchFlowWizard({
 }
 
 /**
- * The wizard's step, for the match-loop harness. The visible "STEP N / 8"
+ * The wizard's step, for the match-loop harness. The visible "STEP N / T"
  * header is gone (the redesign has no step progress), but the harness reads
- * the step from this element: PRIMARILY by its accessibility label ("Step N
- * of 8, <Label>"), because idb does not reliably surface a testID
- * (`tools/match-loop/sim/screens.ts` currentStep), with `match-step-<step>`
- * as the fallback. So it cannot simply be hidden from the accessibility tree.
+ * the step from this element: PRIMARILY by the step name in its accessibility
+ * label ("Step N of T, <Label>"), because idb does not reliably surface a
+ * testID (`tools/match-loop/sim/screens.ts` currentStep), with
+ * `match-step-<step>` as the fallback. So it cannot simply be hidden from the
+ * accessibility tree.
  *
  * The harness drives a Metro dev build, so the marker is an accessibility
  * element only in `__DEV__`; release builds hide it (and its label) from
@@ -381,20 +382,23 @@ export function StepMarker({ step, exposed = __DEV__ }: { step: MatchStep; expos
 
 /**
  * Step progress indicator, now used by the practice match only (the real
- * match flow dropped the visible step header; see StepMarker). ELO meta-strip
- * with "STEP N / T" mono label, current-step name, and a row of
- * hairline bars that fill with the CTA color as the athlete advances.
+ * match flow dropped the visible step header; see StepMarker), which passes
+ * its own steps (`PRACTICE_STEPS`). ELO meta-strip with "STEP N / T" mono
+ * label, current-step name, and a row of hairline bars that fill with the
+ * CTA color as the athlete advances.
  */
 export function WizardStepHeader({
   step,
   currentIdx,
+  total,
   label,
 }: {
-  step: MatchStep;
+  /** The step's slug, for the `match-step-<step>` testID. */
+  step: string;
   currentIdx: number;
+  total: number;
   label: string;
 }) {
-  const total = MATCH_STEPS.length;
   return (
     <View className="gap-2">
       <View className="flex-row items-center justify-between">

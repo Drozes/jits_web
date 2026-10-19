@@ -45,10 +45,15 @@ test("APP_TIMING matches the app sources", () => {
     // repeats ready_signal (and its weigh-in / recording state) on this beat.
     appConst("apps/mobile/lib/match-flow/use-faceoff.ts", "FACEOFF_REPEAT_MS"),
   );
-  const confirm = src("apps/mobile/components/match-flow/steps/confirm-step.tsx");
-  const m = confirm.match(/setTimeout\(advance,\s*([\d_]+)\)/);
-  assert.ok(m, "ConfirmStep's both-confirmed advance delay not found");
-  assert.equal(APP_TIMING.CONFIRM_ADVANCE_MS, Number(m[1].replace(/_/g, "")));
+  // The confirm step's advance is a named delay since jits-02vo.7; pin both
+  // the value and that it is the delay the advance is scheduled on.
+  const confirmPath = "apps/mobile/components/match-flow/steps/confirm-step.tsx";
+  assert.match(
+    src(confirmPath),
+    /setTimeout\(advance,\s*ADVANCE_AFTER_CONFIRM_MS\)/,
+    "ConfirmStep no longer schedules its advance on ADVANCE_AFTER_CONFIRM_MS",
+  );
+  assert.equal(APP_TIMING.CONFIRM_ADVANCE_MS, appConst(confirmPath, "ADVANCE_AFTER_CONFIRM_MS"));
 });
 
 test("the confirm step does not treat a completed status as done (app source)", () => {

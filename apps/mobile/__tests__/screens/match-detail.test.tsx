@@ -1011,7 +1011,7 @@ describe("the Film status plate (jits-n2im.25) and the video pushes landing on i
     expect(utils.getByTestId("angle-switcher")).toBeTruthy();
   });
 
-  it("the timekeeper, refused by get_match_details, gets the plate alone (timekeeper_film_ready lands here)", async () => {
+  it("the timekeeper, who has no participant row (NOT_PARTICIPANT), gets the plate alone (timekeeper_film_ready lands here)", async () => {
     filmMock.setMockFilmStatus(
       derive({ phase: "ready", phase_reason: null, angles: [fx.angle("me", "ready"), fx.angle("opp", "ready"), fx.angle("tk", "ready")], reels: [{ athlete_id: fx.ME, state: "ready" }, { athlete_id: fx.OPP, state: "ready" }] }, fx.TK),
     );

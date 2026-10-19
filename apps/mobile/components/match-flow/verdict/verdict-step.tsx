@@ -77,7 +77,7 @@ interface VerdictStepProps {
 }
 
 /**
- * Step 8, the verdict. A win celebrates (confetti, the verdict slams in, the
+ * The summary step, the verdict. A win celebrates (confetti, the verdict slams in, the
  * rating rolls, the rank strip rises); a loss is calm. Every outcome gets
  * the same actions (P-Verdict, jits-02vo.8): Watch film, Back to Arena, and
  * Share match as one full-width tertiary row. Running it back is an

@@ -15,7 +15,6 @@ jest.mock("@/components/match-flow/match-recorder-context", () => ({
 jest.mock("@/components/match-flow/steps/end-step", () => ({ EndStep: () => null }));
 jest.mock("@/components/match-flow/steps/result-step", () => ({ ResultStep: () => null }));
 jest.mock("@/components/match-flow/steps/confirm-step", () => ({ ConfirmStep: () => null }));
-jest.mock("@/components/match-flow/steps/wait-step", () => ({ WaitStep: () => null }));
 jest.mock("@/components/match-flow/faceoff/faceoff-body", () => ({ FaceoffBody: () => null }));
 jest.mock("@/components/match-flow/countdown/live-stage", () => ({ LiveStage: () => null }));
 jest.mock("@/components/match-flow/verdict/verdict-step", () => ({ VerdictStep: () => null }));

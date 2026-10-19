@@ -24,8 +24,8 @@ interface UseLiveControlsParams {
 
 /**
  * Encapsulates the three live-match buttons (pause, resume, end) plus
- * busy-state debouncing and toast error surfaces. Splitting this out of
- * the live-step keeps the visual component below 100 lines.
+ * busy-state debouncing and toast error surfaces, so the live step keeps
+ * only its view, its clock and its effects.
  */
 export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: UseLiveControlsParams) {
   const [busy, setBusy] = React.useState<Action | null>(null);

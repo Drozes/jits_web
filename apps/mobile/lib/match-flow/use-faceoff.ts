@@ -179,7 +179,6 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   // forget: ready never waits on it.
   useRecordingIntent(p.meId, p.matchId, recording, p.active, myReady);
 
-
   const sync = useStepMatchSync({
     matchId: p.matchId,
     enabled: p.active,

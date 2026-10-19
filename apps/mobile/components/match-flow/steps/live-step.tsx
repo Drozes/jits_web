@@ -33,10 +33,12 @@ interface LiveStepProps {
    * (jits-od3). The viewfinder and the status chip live up there too.
    */
   recorder: UseVideoRecorderReturn;
-  /** Advance to the result step. Called after end_match completes or
-   * after we receive a `match_ended` broadcast from the opponent, with the
-   * match clock at that moment (pause-aware, clamped to 1..duration) so the
-   * result step can prefill the finish time. */
+  /** Advance to the result step. Called once: after this device's end (the
+   * hold or the auto-end) has sent `match_ended` (bounded; no `end_match`,
+   * see `useLiveControls`), or after the opponent-ended plate when the
+   * opponent's `match_ended` arrives. Passes the match clock at the end
+   * moment (pause-aware, clamped to 1..duration) so the result step can
+   * prefill the finish time. */
   onEnded: (finishSeconds: number) => void;
   /**
    * Record from this phone (the face-off opt-in, decision 5). Default true.
@@ -55,7 +57,7 @@ interface LiveStepProps {
 const TIME_WARNING_SECONDS = 10;
 
 /**
- * Step 4: live timer with pause / resume / hold-to-end controls. Auto-starts the
+ * The live step: live timer with pause / resume / hold-to-end controls. Auto-starts the
  * wizard's recorder on entry and stops it on end, and fires haptics on key
  * events (match start, time-warning, match end). The screen wake-lock is
  * held by the wizard across ready AND live, so it is not taken here.
@@ -215,7 +217,7 @@ export function LiveStep(props: LiveStepProps) {
   // timeout and the match sat LIVE at 00:00 forever (jits-2y8i). The effect
   // keys only on whether an auto-end is due, so it arms once and is cancelled
   // only by unmount or by the match stopping being due: a pause at 00:00
-  // holds it (the timekeeper stopped the clock on purpose) and resuming
+  // holds it (an athlete stopped the clock on purpose) and resuming
   // re-arms it; an in-flight pause/resume (`busy`) defers it rather than
   // letting `handleEnd` drop it. `endedRef` makes the end one-shot, whether
   // this device ended it or the opponent's `match_ended` arrived first.

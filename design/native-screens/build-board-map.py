@@ -337,7 +337,7 @@ ALLSTEPS = [MF + x for x in [
     "faceoff/faceoff-body.tsx", "countdown/live-stage.tsx", "countdown/countdown.tsx",
     "steps/live-step.tsx", "steps/result-step.tsx", "steps/result-waiting.tsx",
     "steps/result-form.tsx", "steps/confirm-step.tsx", "steps/dispute-form.tsx",
-    "verdict/verdict-step.tsx", "steps/end-step.tsx", "steps/wait-step.tsx",
+    "verdict/verdict-step.tsx", "steps/end-step.tsx",
     "match-recorder-surface.tsx", "camera-overlay.tsx",
 ]]
 

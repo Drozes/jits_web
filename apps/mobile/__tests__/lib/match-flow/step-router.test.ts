@@ -5,17 +5,11 @@
  * Source: apps/mobile/lib/match-flow/step-router.ts
  */
 
-import {
-  getCurrentStep,
-  MATCH_STEPS,
-  type MatchStep,
-  type MatchLike,
-} from "@/lib/match-flow/step-router";
+import { getCurrentStep, MATCH_STEPS } from "@/lib/match-flow/step-router";
 
 describe("MATCH_STEPS constant", () => {
-  it("has exactly 8 steps in the correct order", () => {
+  it("has exactly 7 steps in the correct order", () => {
     expect(MATCH_STEPS).toEqual([
-      "wait",
       "weight",
       "ready",
       "live",
@@ -24,7 +18,11 @@ describe("MATCH_STEPS constant", () => {
       "confirm",
       "summary",
     ]);
-    expect(MATCH_STEPS).toHaveLength(8);
+    expect(MATCH_STEPS).toHaveLength(7);
+  });
+
+  it("has no wait step (the dead session-era hold; practice keeps its own header steps)", () => {
+    expect(MATCH_STEPS as readonly string[]).not.toContain("wait");
   });
 
   it("is typed as readonly (as const)", () => {
@@ -36,7 +34,7 @@ describe("MATCH_STEPS constant", () => {
 });
 
 describe("getCurrentStep", () => {
-  describe("mapping from DB match status (no localSubstate)", () => {
+  describe("mapping from DB match status", () => {
     it('returns "weight" for a pending match', () => {
       expect(getCurrentStep({ status: "pending" })).toBe("weight");
     });
@@ -68,65 +66,6 @@ describe("getCurrentStep", () => {
 
     it('defaults to "weight" for an empty status string', () => {
       expect(getCurrentStep({ status: "" })).toBe("weight");
-    });
-  });
-
-  describe("localSubstate override", () => {
-    it("uses localSubstate when it is a valid MatchStep", () => {
-      const match: MatchLike = { status: "pending" };
-      // Even though the DB says "pending" (which maps to "weight"),
-      // localSubstate should override.
-      expect(getCurrentStep(match, "ready")).toBe("ready");
-      expect(getCurrentStep(match, "live")).toBe("live");
-      expect(getCurrentStep(match, "result")).toBe("result");
-      expect(getCurrentStep(match, "confirm")).toBe("confirm");
-      expect(getCurrentStep(match, "summary")).toBe("summary");
-    });
-
-    it("overrides in_progress status with localSubstate", () => {
-      const match: MatchLike = { status: "in_progress" };
-      expect(getCurrentStep(match, "end")).toBe("end");
-      expect(getCurrentStep(match, "result")).toBe("result");
-    });
-
-    it("overrides completed status with localSubstate", () => {
-      const match: MatchLike = { status: "completed" };
-      expect(getCurrentStep(match, "confirm")).toBe("confirm");
-    });
-
-    it("ignores localSubstate that is not a valid MatchStep", () => {
-      const match: MatchLike = { status: "pending" };
-      expect(getCurrentStep(match, "bogus" as MatchStep)).toBe("weight");
-    });
-
-    it("falls back to DB status when localSubstate is undefined", () => {
-      expect(getCurrentStep({ status: "in_progress" }, undefined)).toBe("live");
-    });
-  });
-
-  describe("step transition scenarios", () => {
-    it("progresses through the full happy-path sequence via localSubstate", () => {
-      const match: MatchLike = { status: "pending" };
-      const steps: MatchStep[] = [
-        "wait",
-        "weight",
-        "ready",
-        "live",
-        "end",
-        "result",
-        "confirm",
-        "summary",
-      ];
-      for (const step of steps) {
-        expect(getCurrentStep(match, step)).toBe(step);
-      }
-    });
-
-    it("allows jumping backwards in the step sequence via localSubstate", () => {
-      // The router does not enforce forward-only transitions; the wizard
-      // orchestrator is responsible for that. The router just maps.
-      const match: MatchLike = { status: "in_progress" };
-      expect(getCurrentStep(match, "weight")).toBe("weight");
     });
   });
 });

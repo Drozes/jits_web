@@ -62,7 +62,7 @@ describe("targetFor: what each status implies", () => {
 
 describe("planReconcile", () => {
   it("exits a cancelled match from any pre-live step (jits-bh2v)", () => {
-    for (const step of ["wait", "weight", "ready"] as const) {
+    for (const step of ["weight", "ready"] as const) {
       expect(plan(step, snap("cancelled"))).toEqual({ type: "exit", reason: "cancelled" });
     }
   });
@@ -178,7 +178,7 @@ describe("pollIntervalFor: poll only where the athlete waits on the other side",
     expect(pollIntervalFor("live")).toBeGreaterThan(pollIntervalFor("confirm")!);
   });
 
-  it.each<MatchStep | null>(["wait", "weight", "end", "summary", null])("%s never polls", (step) => {
+  it.each<MatchStep | null>(["weight", "end", "summary", null])("%s never polls", (step) => {
     expect(pollIntervalFor(step)).toBeNull();
   });
 });

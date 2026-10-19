@@ -634,9 +634,11 @@ export async function createInSessionMatch(
 }
 
 /**
- * Cancel a still-pending session match (ready-check abort). Marks the match
- * cancelled and releases BOTH session participants back to 'available'. Caller
- * must be one of the two competitors and the match must still be 'pending'.
+ * Cancel a still-pending match: the mobile face-off's Leave (an Arena match)
+ * and web's session ready-check abort. Marks the match cancelled; a session
+ * match also releases BOTH session participants back to 'available' (an
+ * Arena match has none). Caller must be one of the two competitors and the
+ * match must still be 'pending'. The session-era name stays: web shares it.
  */
 export async function cancelSessionMatch(
   supabase: Client,
