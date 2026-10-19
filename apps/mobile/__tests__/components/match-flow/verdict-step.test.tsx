@@ -102,8 +102,8 @@ function renderVerdict(overrides: Partial<Props> = {}) {
     exitLabel: ARENA_EXIT_LABEL,
     matchStatus: "completed",
     outcome: "win",
-    me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14, weight_division_gap: 0 },
-    opponent: { athlete_id: "opp", display_name: "Mina Park" },
+    me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1512, eloAfter: 1526, eloDelta: 14, weightDivisionGap: 0 },
+    opponent: { athleteId: "opp", displayName: "Mina Park" },
     submissionName: "Rear-naked choke",
     finishTimeSeconds: 377,
     upload: HIDDEN,
@@ -194,7 +194,7 @@ describe("verdict copy and the harness contract", () => {
   });
 
   it("a loss: YOU LOST, a red ▼ delta, no confetti", async () => {
-    const s = renderVerdict({ outcome: "loss", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1498, elo_after: 1489, elo_delta: -9 } });
+    const s = renderVerdict({ outcome: "loss", me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1498, eloAfter: 1489, eloDelta: -9 } });
     await flush();
     expect(s.getByTestId("summary-verdict")).toHaveTextContent("YOU LOST");
     expect(s.getByTestId("summary-elo-delta")).toHaveTextContent("▼ −9");
@@ -206,16 +206,16 @@ describe("verdict copy and the harness contract", () => {
   it("follows the app theme: the light scheme uses the light text tokens (AA on the light plates)", async () => {
     mockScheme = "light";
     try {
-      const loss = renderVerdict({ outcome: "loss", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1498, elo_after: 1489, elo_delta: -9 } });
+      const loss = renderVerdict({ outcome: "loss", me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1498, eloAfter: 1489, eloDelta: -9 } });
       await flush();
       expect(color(loss.getByTestId("summary-verdict"))).toBe("#0D0F14");
       expect(color(loss.getByTestId("summary-elo-delta"))).toBe("#AC2B34");
       loss.unmount();
-      const win = renderVerdict({ outcome: "win", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1498, elo_after: 1512, elo_delta: 14 } });
+      const win = renderVerdict({ outcome: "win", me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1498, eloAfter: 1512, eloDelta: 14 } });
       await flush();
       expect(color(win.getByTestId("summary-elo-delta"))).toBe("#116A33");
       win.unmount();
-      const draw = renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1500, elo_after: 1498, elo_delta: -2 } });
+      const draw = renderVerdict({ outcome: "draw", me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1500, eloAfter: 1498, eloDelta: -2 } });
       await flush();
       expect(color(draw.getByTestId("summary-verdict"))).toBe("#92400E");
     } finally {
@@ -224,7 +224,7 @@ describe("verdict copy and the harness contract", () => {
   });
 
   it("a draw: amber, never Signal Red", async () => {
-    const s = renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1500, elo_after: 1498, elo_delta: -2 } });
+    const s = renderVerdict({ outcome: "draw", me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1500, eloAfter: 1498, eloDelta: -2 } });
     await flush();
     expect(s.getByTestId("summary-verdict")).toHaveTextContent("DRAW");
     expect(color(s.getByTestId("summary-verdict"))).toBe("#F59E0B");
@@ -241,14 +241,14 @@ describe("verdict copy and the harness contract", () => {
   });
 
   it("a legacy row with no recorded rating shows no rating block and never casual", async () => {
-    const s = renderVerdict({ me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: null, elo_after: null, elo_delta: null, weight_division_gap: 0 } });
+    const s = renderVerdict({ me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: null, eloAfter: null, eloDelta: null, weightDivisionGap: 0 } });
     await flush();
     expect(s.queryByTestId("summary-elo-delta")).toBeNull();
     expect(s.queryByText(/casual/i)).toBeNull();
   });
 
   it("keeps the weight-gap note the harness looks for", async () => {
-    const s = renderVerdict({ me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14, weight_division_gap: 1 } });
+    const s = renderVerdict({ me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1512, eloAfter: 1526, eloDelta: 14, weightDivisionGap: 1 } });
     await flush();
     expect(s.getByText(/1 weight class apart/)).toBeTruthy();
   });
@@ -277,7 +277,7 @@ describe("actions", () => {
   });
 
   it("loss: the same actions as a win, calm, with no Rematch or run-it-back prompt", async () => {
-    const s = renderVerdict({ outcome: "loss", me: { athlete_id: "me", display_name: "Kai Reyes", elo_delta: -9, elo_before: 1498, elo_after: 1489 } });
+    const s = renderVerdict({ outcome: "loss", me: { athleteId: "me", displayName: "Kai Reyes", eloDelta: -9, eloBefore: 1498, eloAfter: 1489 } });
     await flush();
     expect(s.queryByTestId("summary-rematch")).toBeNull();
     expect(s.queryByText(/rematch/i)).toBeNull();
@@ -291,7 +291,7 @@ describe("actions", () => {
   });
 
   it("draw: the same three actions", async () => {
-    const s = renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1500, elo_after: 1498, elo_delta: -2 } });
+    const s = renderVerdict({ outcome: "draw", me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1500, eloAfter: 1498, eloDelta: -2 } });
     await flush();
     s.getByTestId("summary-watch-film");
     s.getByTestId("summary-exit");
@@ -315,7 +315,7 @@ describe("actions", () => {
 
   it("leaves the rating out of the share until the stamped rating is in", async () => {
     const spy = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" } as never);
-    const s = renderVerdict({ me: { athlete_id: "me", display_name: "Kai Reyes", current_elo: 1512, elo_after: null, elo_delta: null } });
+    const s = renderVerdict({ me: { athleteId: "me", displayName: "Kai Reyes", currentElo: 1512, eloAfter: null, eloDelta: null } });
     await flush();
     await act(async () => {
       fireEvent.press(s.getByTestId("summary-share"));
@@ -327,7 +327,7 @@ describe("actions", () => {
   it("while this phone's clip uploads, the CTA is an ENABLED Open match (deck rule 4)", async () => {
     const s = renderVerdict({
       outcome: "loss",
-      me: { athlete_id: "me", display_name: "Kai Reyes", elo_delta: -9, elo_before: 1498, elo_after: 1489 },
+      me: { athleteId: "me", displayName: "Kai Reyes", eloDelta: -9, eloBefore: 1498, eloAfter: 1489 },
       upload: { kind: "uploading", message: null, truncation: null, progress: 0.64 },
     });
     await flush();
@@ -530,8 +530,8 @@ describe("status bar over the opening still", () => {
     exitLabel: ARENA_EXIT_LABEL,
     matchStatus: "completed",
     outcome: "win",
-    me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14 },
-    opponent: { athlete_id: "opp", display_name: "Mina Park" },
+    me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1512, eloAfter: 1526, eloDelta: 14 },
+    opponent: { athleteId: "opp", displayName: "Mina Park" },
     submissionName: null,
     finishTimeSeconds: null,
     upload: HIDDEN,
@@ -639,8 +639,8 @@ describe("highlight note (spec 015 section 16.6.4)", () => {
         exitLabel={ARENA_EXIT_LABEL}
         matchStatus="disputed"
         outcome="win"
-        me={{ athlete_id: "me", display_name: "Kai Reyes", elo_before: 1512, elo_after: 1526, elo_delta: 14, weight_division_gap: 0 }}
-        opponent={{ athlete_id: "opp", display_name: "Mina Park" }}
+        me={{ athleteId: "me", displayName: "Kai Reyes", eloBefore: 1512, eloAfter: 1526, eloDelta: 14, weightDivisionGap: 0 }}
+        opponent={{ athleteId: "opp", displayName: "Mina Park" }}
         submissionName="Rear-naked choke"
         finishTimeSeconds={377}
         upload={HIDDEN}
@@ -802,7 +802,7 @@ describe("the header rating's verdict record", () => {
   });
 
   it("records a draw even before the stamped rating is in (the header's later delta is amber)", async () => {
-    renderVerdict({ outcome: "draw", me: { athlete_id: "me", display_name: "Kai Reyes", elo_before: null, elo_after: null, elo_delta: null } });
+    renderVerdict({ outcome: "draw", me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: null, eloAfter: null, eloDelta: null } });
     await flush();
     expect(lastVerdictOutcome("me")).toBe("draw");
     expect(wasRatingWatched("me", 1498)).toBe(false);

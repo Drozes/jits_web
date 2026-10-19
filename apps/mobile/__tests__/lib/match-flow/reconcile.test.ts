@@ -14,49 +14,104 @@ import {
   type MatchSnapshot,
 } from "@/lib/match-flow/reconcile";
 import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
+import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
+import type { MatchDetails } from "@jits/shared/api/queries";
 
 const ME = "me-1";
 const OPP = "opp-1";
+
+/** A two-athlete match; `first` is listed first (the challenger until BE-G). */
+function matchOf(first: string, second: string): MatchDetails {
+  const p = (id: string) => ({ athlete_id: id, display_name: id, current_elo: 1500, current_weight: 170, profile_photo_url: null, role: "competitor", outcome: null, elo_before: null, elo_after: null, elo_delta: 0, weight_division_gap: null });
+  return { participants: [p(first), p(second)] } as unknown as MatchDetails;
+}
+
+/** ME's roles in a match ME challenged, as the wizard derives them. */
+const ROLES = deriveMatchRoles(matchOf(ME, OPP), ME)!;
 
 function snap(status: string, confirmedAthleteIds: string[] | null = []): MatchSnapshot {
   return { status, confirmedAthleteIds };
 }
 
 function plan(current: MatchStep, s: MatchSnapshot, initial = false) {
-  return planReconcile({ current, snapshot: s, currentAthleteId: ME, opponentId: OPP, initial });
+  return planReconcile({ current, snapshot: s, roles: ROLES, initial });
 }
 
 describe("targetFor: what each status implies", () => {
   it("cancelled -> exit", () => {
-    expect(targetFor(snap("cancelled"), ME, OPP)).toBe("exit");
+    expect(targetFor(snap("cancelled"), ROLES)).toBe("exit");
   });
   it("voided -> exit (terminal, like cancelled)", () => {
-    expect(targetFor(snap("voided"), ME, OPP)).toBe("exit");
+    expect(targetFor(snap("voided"), ROLES)).toBe("exit");
   });
   it("pending -> no opinion (stay pre-live)", () => {
-    expect(targetFor(snap("pending"), ME, OPP)).toBeNull();
+    expect(targetFor(snap("pending"), ROLES)).toBeNull();
   });
   it("in_progress -> live", () => {
-    expect(targetFor(snap("in_progress"), ME, OPP)).toBe("live");
+    expect(targetFor(snap("in_progress"), ROLES)).toBe("live");
   });
   it("completed with nobody confirmed -> confirm (completed is set at RECORD time)", () => {
-    expect(targetFor(snap("completed", []), ME, OPP)).toBe("confirm");
+    expect(targetFor(snap("completed", []), ROLES)).toBe("confirm");
   });
   it("completed with only one side confirmed -> confirm", () => {
-    expect(targetFor(snap("completed", [ME]), ME, OPP)).toBe("confirm");
-    expect(targetFor(snap("completed", [OPP]), ME, OPP)).toBe("confirm");
+    expect(targetFor(snap("completed", [ME]), ROLES)).toBe("confirm");
+    expect(targetFor(snap("completed", [OPP]), ROLES)).toBe("confirm");
   });
   it("completed with both confirmed -> summary", () => {
-    expect(targetFor(snap("completed", [OPP, ME]), ME, OPP)).toBe("summary");
+    expect(targetFor(snap("completed", [OPP, ME]), ROLES)).toBe("summary");
   });
   it("completed with unknown confirmations -> confirm", () => {
-    expect(targetFor(snap("completed", null), ME, OPP)).toBe("confirm");
+    expect(targetFor(snap("completed", null), ROLES)).toBe("confirm");
   });
   it("disputed -> summary, whoever disputed", () => {
-    expect(targetFor(snap("disputed", []), ME, OPP)).toBe("summary");
+    expect(targetFor(snap("disputed", []), ROLES)).toBe("summary");
   });
   it("an unknown status -> no opinion", () => {
-    expect(targetFor(snap("weird"), ME, OPP)).toBeNull();
+    expect(targetFor(snap("weird"), ROLES)).toBeNull();
+  });
+});
+
+describe("targetFor with roles: one row per (status, confirmations, viewer), today's outputs", () => {
+  const STRANGER = "someone-else";
+  // [status, confirmations, the step today's flow goes to]
+  const ROWS: [string, string[] | null, MatchStep | "exit" | null][] = [
+    ["pending", [], null],
+    ["in_progress", [], "live"],
+    ["completed", [], "confirm"],
+    ["completed", null, "confirm"],
+    ["completed", [ME], "confirm"],
+    ["completed", [OPP], "confirm"],
+    ["completed", [STRANGER, ME], "confirm"],
+    ["completed", [ME, OPP], "summary"],
+    ["completed", [OPP, ME], "summary"],
+    ["disputed", [], "summary"],
+    ["cancelled", [], "exit"],
+    ["voided", [ME, OPP], "exit"],
+    ["weird", [], null],
+  ];
+  const VIEWERS = {
+    challenger: deriveMatchRoles(matchOf(ME, OPP), ME)!,
+    opponent: deriveMatchRoles(matchOf(OPP, ME), ME)!,
+  };
+
+  it("derives the viewer each row runs as", () => {
+    expect(VIEWERS.challenger.viewer).toBe("challenger");
+    expect(VIEWERS.opponent.viewer).toBe("opponent");
+  });
+
+  for (const [viewer, roles] of Object.entries(VIEWERS)) {
+    it.each(ROWS)(`${viewer}: %s with %j -> %s`, (status, confirmed, expected) => {
+      expect(targetFor(snap(status, confirmed), roles)).toBe(expected);
+    });
+  }
+
+  it("the initial summary -> confirm correction reads the viewer's own confirmation, as either athlete", () => {
+    for (const roles of Object.values(VIEWERS)) {
+      const initial = (ids: string[]) =>
+        planReconcile({ current: "summary", snapshot: snap("completed", ids), roles, initial: true });
+      expect(initial([OPP])).toEqual({ type: "goto", step: "confirm" });
+      expect(initial([ME])).toEqual({ type: "none" });
+    }
   });
 });
 

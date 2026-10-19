@@ -74,8 +74,8 @@ describe("ResultStep draw", () => {
       <ResultStep
         matchId="M1"
         durationSeconds={300}
-        me={{ id: "me-1", displayName: "Me", elo: null, weight: null }}
-        opponent={{ id: "opp-1", displayName: "Demo Red", elo: null, weight: null }}
+        me={{ athleteId: "me-1", displayName: "Me", currentElo: null, weightLbs: null }}
+        opponent={{ athleteId: "opp-1", displayName: "Demo Red", currentElo: null, weightLbs: null }}
         submissionTypes={[]}
         onRecorded={jest.fn()}
       />,

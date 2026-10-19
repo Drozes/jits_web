@@ -9,11 +9,9 @@ import { TRACKING, typeSize, typeStep } from "@/lib/typography";
 import { InitialsBlock, Mono, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 import { StatePressable } from "@/components/ui/state-pressable";
+import type { MatchAthleteView } from "@/lib/match-flow/match-roles";
 
-export interface FaceoffAthlete {
-  display_name: string;
-  current_elo: number | null;
-}
+export type FaceoffAthlete = Pick<MatchAthleteView, "displayName" | "currentElo">;
 
 interface FaceoffTopProps {
   phase: "weight" | "ready";
@@ -128,12 +126,12 @@ function FightCard({ me, opponent }: { me: FaceoffAthlete; opponent: FaceoffAthl
   return (
     <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
       <View style={{ flex: 1, gap: 10, minWidth: 0 }}>
-        <InitialsBlock name={me.display_name} size="fill" fontSize="display-64" display accent={p.cta} style={{ height: 176 }} />
+        <InitialsBlock name={me.displayName} size="fill" fontSize="display-64" display accent={p.cta} style={{ height: 176 }} />
         <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: p.text }]}>
-          {shortName(me.display_name)}
+          {shortName(me.displayName)}
         </Text>
         <Mono size="small" spacing="normal" color={p.text2}>
-          {me.current_elo != null ? `ELO ${me.current_elo}` : "UNRATED"}
+          {me.currentElo != null ? `ELO ${me.currentElo}` : "UNRATED"}
         </Mono>
         <MyWeight />
       </View>
@@ -143,12 +141,12 @@ function FightCard({ me, opponent }: { me: FaceoffAthlete; opponent: FaceoffAthl
         </Text>
       </View>
       <View style={{ flex: 1, gap: 10, alignItems: "flex-end", minWidth: 0 }}>
-        <InitialsBlock name={opponent.display_name} size="fill" fontSize="display-64" display style={{ height: 176 }} />
+        <InitialsBlock name={opponent.displayName} size="fill" fontSize="display-64" display style={{ height: 176 }} />
         <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: p.text }]}>
-          {shortName(opponent.display_name)}
+          {shortName(opponent.displayName)}
         </Text>
         <Mono size="small" spacing="normal" color={p.text2}>
-          {opponent.current_elo != null ? `ELO ${opponent.current_elo}` : "UNRATED"}
+          {opponent.currentElo != null ? `ELO ${opponent.currentElo}` : "UNRATED"}
         </Mono>
         <View style={{ height: 44, justifyContent: "center" }}>
           <Text testID="faceoff-opponent-weight" className="font-display" style={[typeSize("display-36"), { color: p.text }, TABULAR]}>
@@ -295,7 +293,7 @@ export function FaceoffChip({
     ? { bg: ON_MEDIA.chip, border: ON_MEDIA.chipBorder, ink: ON_MEDIA.ink, ink3: ON_MEDIA.ink3, vs: ON_MEDIA.inkRed, dot: ON_MEDIA.cta }
     : { bg: p.plate, border: p.strong, ink: p.text, ink3: p.text3, vs: p.red, dot: p.cta };
   const meta = (a: FaceoffAthlete, w: number | null) =>
-    [a.current_elo != null ? String(a.current_elo) : null, w != null ? `${Number(w.toFixed(1))} LBS` : null]
+    [a.currentElo != null ? String(a.currentElo) : null, w != null ? `${Number(w.toFixed(1))} LBS` : null]
       .filter(Boolean)
       .join(" · ");
   return (
@@ -307,7 +305,7 @@ export function FaceoffChip({
         <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
           <View style={{ width: 4, height: 4, backgroundColor: c.dot }} />
           <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: c.ink }]}>
-            {shortName(me.display_name)}
+            {shortName(me.displayName)}
           </Text>
         </View>
         <Text className="font-mono" style={[typeStep("caption"), { paddingLeft: 11, color: c.ink3 }, TABULAR]}>
@@ -321,7 +319,7 @@ export function FaceoffChip({
       </View>
       <View style={{ flex: 1, paddingRight: 12, justifyContent: "center", alignItems: "flex-end", gap: 5, minWidth: 0 }}>
         <Text numberOfLines={1} className="font-heading uppercase" style={[typeStep("subhead"), { letterSpacing: TRACKING.loose, color: c.ink }]}>
-          {shortName(opponent.display_name)}
+          {shortName(opponent.displayName)}
         </Text>
         <Text className="font-mono" style={[typeStep("caption"), { color: c.ink3 }, TABULAR]}>
           {meta(opponent, opponentWeight)}

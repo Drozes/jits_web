@@ -64,7 +64,7 @@ export function ResultWaiting({
             {`${shortName(me.displayName)} vs ${shortName(opponent.displayName)}`}
           </Text>
           <Mono size="caption" spacing="normal">
-            {[me.elo, opponent.elo].map((e) => (e != null ? String(e) : "--")).join(" · ")}
+            {[me.currentElo, opponent.currentElo].map((e) => (e != null ? String(e) : "--")).join(" · ")}
           </Mono>
         </View>
       </View>

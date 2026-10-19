@@ -22,7 +22,7 @@ export {
  * `completed` row alone maps to `confirm`, never `summary`: only a
  * `disputed` row or a confirmation from BOTH athletes finishes confirm.
  */
-export { pollIntervalFor, targetFor } from "../../../apps/mobile/lib/match-flow/reconcile";
+export { pollIntervalFor, targetFor, type ReconcileRoles } from "../../../apps/mobile/lib/match-flow/reconcile";
 export { MATCH_STEPS, type MatchStep } from "../../../apps/mobile/lib/match-flow/step-router";
 
 import { SESSION_MATCH_EVENTS } from "@jits/shared/hooks/session-match-channel";

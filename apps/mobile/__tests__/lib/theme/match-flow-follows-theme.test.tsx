@@ -159,8 +159,8 @@ describe("shared match-flow pieces render with the active theme", () => {
 
 describe("FaceoffChip", () => {
   const athletes = {
-    me: { display_name: "Kai Reyes", current_elo: 1512 },
-    opponent: { display_name: "Mina Park", current_elo: 1498 },
+    me: { displayName: "Kai Reyes", currentElo: 1512 },
+    opponent: { displayName: "Mina Park", currentElo: 1498 },
     myWeight: 170,
     opponentWeight: 165,
   };

@@ -36,13 +36,13 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
   const p = usePalette();
   // Priced on the challenge's rated weights, exactly as record_match_result
   // will rate it (a missing one means no gap), and only once they are read.
-  const stakes = useViewerStakes(f.weightsRated, me.current_elo, opponent.current_elo, f.myWeight, f.opponentWeight);
+  const stakes = useViewerStakes(f.weightsRated, me.currentElo, opponent.currentElo, f.myWeight, f.opponentWeight);
   const gap = stakes?.weight_division_gap ?? 0;
   const both = f.myWeight != null && f.opponentWeight != null;
   const diff = both ? Math.round(Math.abs(f.myWeight! - f.opponentWeight!) * 10) / 10 : null;
   const division = !stakes ? null : gap > 0 ? `${gap} ${gap > 1 ? "DIVISIONS" : "DIVISION"} APART` : "SAME DIVISION";
   const gapLine = [diff != null ? `${diff} LBS APART` : null, division].filter(Boolean).join(" · ");
-  const oppName = shortName(opponent.display_name).toUpperCase();
+  const oppName = shortName(opponent.displayName).toUpperCase();
   const cta = f.myWeight != null ? `Confirm ${Number(f.myWeight.toFixed(1))} lbs` : "Confirm weight";
   // Once my weight is in, the opponent's plate becomes my check of their
   // weigh-in (board P-Faceoff-Weight), when this match has checks.
@@ -80,7 +80,7 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
         )}
       </View>
       {checking ? (
-        <WeightCheckPanel opponentDisplayName={opponent.display_name} />
+        <WeightCheckPanel opponentDisplayName={opponent.displayName} />
       ) : (
         <FightButton
           testID="weight-confirm"
@@ -97,7 +97,7 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
 function ReadyCheck({ opponent, durationSeconds }: FaceoffBodyProps) {
   const f = useFaceoffContext();
   const p = usePalette();
-  const oppName = shortName(opponent.display_name).toUpperCase();
+  const oppName = shortName(opponent.displayName).toUpperCase();
   return (
     <View style={{ gap: 16 }}>
       {f.recording ? null : (
@@ -126,7 +126,7 @@ function ReadyCheck({ opponent, durationSeconds }: FaceoffBodyProps) {
         // The weight gate (jr_be-ahn.4): a flag or a recheck holds the match,
         // and so does a check still owed while the rollout flag is on.
         <View testID="ready-weight-hold" style={{ gap: 12 }}>
-          <WeightCheckPanel opponentDisplayName={opponent.display_name} />
+          <WeightCheckPanel opponentDisplayName={opponent.displayName} />
           <FightButton testID="ready-button" label="I'm ready" height={72} onPress={f.tapReady} disabled />
           <View style={{ alignItems: "center" }}>
             <Mono>{f.weightCheck.blocked ? "MATCH ON HOLD · WEIGHT CHECK" : "WAITING FOR WEIGHT CHECKS"}</Mono>

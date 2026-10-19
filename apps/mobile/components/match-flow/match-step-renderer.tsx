@@ -3,6 +3,7 @@ import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync"
 import type { SubmissionType } from "@jits/shared/types/submission-type";
 import type { MatchExtras } from "@/lib/match-flow/match-extras";
 import type { RecordedMeta } from "@/lib/match-flow/use-record-result";
+import { useMatchFlow } from "@/lib/match-flow/match-flow-context";
 import { EndStep } from "./steps/end-step";
 import { ResultStep } from "./steps/result-step";
 import { ConfirmStep } from "./steps/confirm-step";
@@ -15,19 +16,6 @@ import { useMatchRecorder } from "./match-recorder-context";
 import { MatchUploadLine } from "./match-upload-line";
 import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { View } from "react-native";
-
-export interface MatchParticipant {
-  athlete_id: string;
-  display_name: string;
-  current_elo: number | null;
-  current_weight: number | null;
-  outcome: string | null;
-  elo_before: number | null;
-  elo_after: number | null;
-  elo_delta: number | null;
-  /** BE-stamped IBJJF division gap used for the phantom-ELO adjustment. */
-  weight_division_gap: number | null;
-}
 
 interface MatchStepRendererProps {
   step: MatchStep;
@@ -42,8 +30,6 @@ interface MatchStepRendererProps {
   startedAt: string;
   pausedAt: string | null;
   totalPausedDuration: number;
-  me: MatchParticipant;
-  opponent: MatchParticipant;
   submissionTypes: SubmissionType[];
   resultData: BroadcastResult | null;
   ownOutcome: "win" | "loss" | "draw" | null;
@@ -68,7 +54,8 @@ interface MatchStepRendererProps {
 /**
  * One step at a time. The face-off header and the camera are rendered by the
  * wizard above this (they span steps); weight and ready render the face-off
- * body here, live renders the countdown then the frozen live screen.
+ * body here, live renders the countdown then the frozen live screen. The
+ * athletes come from the viewer's roles (`MatchFlowProvider`).
  */
 export function MatchStepRenderer(props: MatchStepRendererProps) {
   const {
@@ -81,8 +68,6 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     startedAt,
     pausedAt,
     totalPausedDuration,
-    me,
-    opponent,
     submissionTypes,
     resultData,
     ownOutcome,
@@ -106,6 +91,9 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
   // countdown and live screen, and for this match's own job everywhere in
   // the wizard (the compact line and the verdict's Film block say it).
   useSuppressUploadStrip(step === "live" ? { kind: "all" } : { kind: "match", matchId });
+  const { me, opponent } = useMatchFlow().roles;
+  // Every step here is an athlete's: the viewer is one of the two athletes.
+  if (!me || !opponent) return null;
 
   if (step === "weight" || step === "ready") {
     return <FaceoffBody phase={step} me={me} opponent={opponent} durationSeconds={durationSeconds} />;
@@ -122,8 +110,8 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         totalPausedDuration={totalPausedDuration}
         recorder={recorder}
         recording={recording}
-        myWeight={matchWeights?.mine ?? me.current_weight}
-        opponentWeight={matchWeights?.theirs ?? opponent.current_weight}
+        myWeight={matchWeights?.mine ?? me.weightLbs}
+        opponentWeight={matchWeights?.theirs ?? opponent.weightLbs}
         onEnded={(seconds) => {
           setFinishSeconds(seconds);
           setStep("end");
@@ -140,20 +128,14 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
     );
   }
   if (step === "result") {
-    const athlete = (p: MatchParticipant) => ({
-      id: p.athlete_id,
-      displayName: p.display_name,
-      elo: p.current_elo,
-      weight: p.current_weight,
-    });
     return (
       <View style={{ gap: 12 }}>
         <ResultStep
           matchId={matchId}
           durationSeconds={durationSeconds}
           initialFinishSeconds={initialFinishSeconds}
-          me={athlete(me)}
-          opponent={athlete(opponent)}
+          me={me}
+          opponent={opponent}
           submissionTypes={submissionTypes}
           onRecorded={(r: BroadcastResult, meta: RecordedMeta) => {
             setResultData(r);

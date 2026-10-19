@@ -20,14 +20,10 @@ import { FightButton, InitialsBlock, Mono, RatingBlock, shortName } from "../fig
 import { DisputeForm } from "./dispute-form";
 import { TapMarks } from "../verdict/rating-moment";
 import { markResultFresh } from "@/components/ui/elo-system/play-once";
+import type { MatchAthleteView } from "@/lib/match-flow/match-roles";
 
-export interface ConfirmAthlete {
-  athlete_id: string;
-  display_name: string;
-  elo_before?: number | null;
-  elo_after?: number | null;
-  elo_delta?: number | null;
-}
+export type ConfirmAthlete = Pick<MatchAthleteView, "athleteId" | "displayName"> &
+  Partial<Pick<MatchAthleteView, "eloBefore" | "eloAfter" | "eloDelta">>;
 
 interface ConfirmStepProps {
   matchId: string;
@@ -82,8 +78,8 @@ export function ConfirmStep(props: ConfirmStepProps) {
   const [showDispute, setShowDispute] = React.useState(false);
   const [windowClosed, setWindowClosed] = React.useState(() => isDisputeWindowClosed(disputeLocksAt));
   const { reconcileNow } = useMatchSyncContext();
-  const myConfirmed = myConfirmedLocal || confirmedAthleteIds.includes(me.athlete_id);
-  const opponentConfirmed = opponentConfirmedLocal || confirmedAthleteIds.includes(opponent.athlete_id);
+  const myConfirmed = myConfirmedLocal || confirmedAthleteIds.includes(me.athleteId);
+  const opponentConfirmed = opponentConfirmedLocal || confirmedAthleteIds.includes(opponent.athleteId);
 
   const advancedRef = React.useRef(false);
   const onCompletedRef = React.useRef(onCompleted);
@@ -97,11 +93,11 @@ export function ConfirmStep(props: ConfirmStepProps) {
   const sync = useStepMatchSync({
     matchId,
     onResultConfirmed: (athleteId) => {
-      if (athleteId === opponent.athlete_id) setOpponentConfirmed(true);
+      if (athleteId === opponent.athleteId) setOpponentConfirmed(true);
     },
     onMatchDisputed: (athleteId) => {
-      if (athleteId === me.athlete_id) return;
-      toast.info({ text1: "Result disputed", description: `${opponent.display_name} disputed the result. An admin will review it.` });
+      if (athleteId === me.athleteId) return;
+      toast.info({ text1: "Result disputed", description: `${opponent.displayName} disputed the result. An admin will review it.` });
       advance();
     },
   });
@@ -119,7 +115,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
   async function handleConfirm() {
     if (myConfirmed) return;
     setMyConfirmed(true);
-    const res = await mutationQueue.enqueue(`confirm-result:${matchId}:${me.athlete_id}`, () =>
+    const res = await mutationQueue.enqueue(`confirm-result:${matchId}:${me.athleteId}`, () =>
       confirmMatchResult(supabase, matchId),
     );
     if (!res.ok) {
@@ -138,11 +134,11 @@ export function ConfirmStep(props: ConfirmStepProps) {
     if (isQueuedResult(res.data)) {
       toast.success({ text1: "Saved locally", description: "Confirmation will sync when you're back online." });
     }
-    void sync.broadcastResultConfirmed(me.athlete_id);
+    void sync.broadcastResultConfirmed(me.athleteId);
   }
 
   async function handleDisputed() {
-    await settleWithin(sync.broadcastMatchDisputed(me.athlete_id), SEND_GRACE_MS);
+    await settleWithin(sync.broadcastMatchDisputed(me.athleteId), SEND_GRACE_MS);
     advance();
   }
 
@@ -161,11 +157,11 @@ export function ConfirmStep(props: ConfirmStepProps) {
   }
 
   const isDraw = resultData?.result === "draw";
-  const winner = resultData?.winnerId === me.athlete_id ? me : resultData?.winnerId === opponent.athlete_id ? opponent : null;
+  const winner = resultData?.winnerId === me.athleteId ? me : resultData?.winnerId === opponent.athleteId ? opponent : null;
   const how = [submissionName ? `by ${submissionName}` : null, finishTimeSeconds != null ? formatElapsed(finishTimeSeconds) : null]
     .filter(Boolean)
     .join(" · ");
-  const oppShort = shortName(opponent.display_name);
+  const oppShort = shortName(opponent.displayName);
   const lockNote = windowClosed ? "The dispute window has closed." : disputeLockNote(disputeLocksAt);
 
   return (
@@ -180,16 +176,16 @@ export function ConfirmStep(props: ConfirmStepProps) {
       <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate }}>
         <View style={{ paddingVertical: 20, paddingHorizontal: 16, gap: 12 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {winner ? <InitialsBlock name={winner.display_name} size={40} fontSize="callout" /> : null}
+            {winner ? <InitialsBlock name={winner.displayName} size={40} fontSize="callout" /> : null}
             <View style={{ flex: 1 }}>
               <Mono color={p.text3}>{isDraw ? "RESULT" : "WINNER"}</Mono>
             </View>
             <Text testID="confirm-verdict" className="font-mono-bold" style={[typeStep("caption"), { letterSpacing: TRACKING["caps-l"], color: p.text2 }, TABULAR]}>
-              {confirmVerdict(resultData, me.athlete_id)}
+              {confirmVerdict(resultData, me.athleteId)}
             </Text>
           </View>
           <Text className="font-display" style={[typeStep("display-60"), { lineHeight: 56, color: p.text }]}>
-            {isDraw ? "Draw" : winner ? `${shortName(winner.display_name)} won` : "Result in"}
+            {isDraw ? "Draw" : winner ? `${shortName(winner.displayName)} won` : "Result in"}
           </Text>
           {how ? (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -202,9 +198,9 @@ export function ConfirmStep(props: ConfirmStepProps) {
             </View>
           ) : null}
         </View>
-        {me.elo_after != null ? (
+        {me.eloAfter != null ? (
           <View style={{ borderTopWidth: 1, borderColor: p.hairline, padding: 12 }}>
-            <RatingBlock label="YOUR RATING" before={me.elo_before ?? null} after={me.elo_after} delta={me.elo_delta ?? null} />
+            <RatingBlock label="YOUR RATING" before={me.eloBefore ?? null} after={me.eloAfter} delta={me.eloDelta ?? null} />
           </View>
         ) : null}
       </View>
@@ -219,7 +215,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
         />
         <StatusRow
           testID={`confirm-panel-you-${myConfirmed ? "confirmed" : "your-call"}`}
-          name={`${shortName(me.display_name)} (you)`}
+          name={`${shortName(me.displayName)} (you)`}
           status={myConfirmed ? "CONFIRMED ✓" : "WAITING ON YOU"}
           done={myConfirmed}
         />

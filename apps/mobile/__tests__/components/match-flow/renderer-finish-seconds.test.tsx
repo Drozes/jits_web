@@ -37,18 +37,7 @@ jest.mock("@/components/match-flow/steps/confirm-step", () => ({}));
 jest.mock("@/components/match-flow/verdict/verdict-step", () => ({}));
 
 import { MatchStepRenderer } from "@/components/match-flow/match-step-renderer";
-
-const participant = (id: string) => ({
-  athlete_id: id,
-  display_name: id,
-  current_elo: null,
-  current_weight: null,
-  outcome: null,
-  elo_before: null,
-  elo_after: null,
-  elo_delta: null,
-  weight_division_gap: null,
-});
+import { matchFlowWrapper } from "../../support/match-flow-wrapper";
 
 function renderStep(
   step: "live" | "result",
@@ -69,8 +58,6 @@ function renderStep(
       startedAt={new Date(Date.now() - 10_000).toISOString()}
       pausedAt={null}
       totalPausedDuration={0}
-      me={participant("me")}
-      opponent={participant("opp")}
       submissionTypes={[]}
       resultData={null}
       ownOutcome={null}
@@ -84,6 +71,7 @@ function renderStep(
       refresh={refresh}
       {...extra}
     />,
+    { wrapper: matchFlowWrapper() },
   );
   return { ...s, setStep, setFinishSeconds, refresh };
 }

@@ -129,8 +129,8 @@ function renderLive(remainingSeconds: number, pausedForSeconds?: number, granted
   const element = () => (
     <LiveStep
       matchId="M1"
-      me={{ display_name: "Kai Reyes", current_elo: 1512, current_weight: 77 }}
-      opponent={{ display_name: "Mina Park", current_elo: 1498, current_weight: 76 }}
+      me={{ displayName: "Kai Reyes", currentElo: 1512, weightLbs: 77 }}
+      opponent={{ displayName: "Mina Park", currentElo: 1498, weightLbs: 76 }}
       durationSeconds={DURATION}
       startedAt={startedAt}
       pausedAt={pausedAt}

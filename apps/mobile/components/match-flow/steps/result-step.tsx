@@ -54,10 +54,10 @@ export function ResultStep(props: ResultStepProps) {
   const { loading, submit, broadcastResultClaimed } = useRecordResult({
     matchId,
     onRecorded,
-    currentAthleteId: me.id,
+    currentAthleteId: me.athleteId,
     onResultClaimed: (athleteId, at, supersedes) => remoteClaimRef.current?.(athleteId, at, supersedes),
   });
-  const claim = useResultClaim({ meId: me.id, broadcast: broadcastResultClaimed });
+  const claim = useResultClaim({ meId: me.athleteId, broadcast: broadcastResultClaimed });
   remoteClaimRef.current = claim.onRemoteClaim;
 
   const finishValid = isFinishTimeValid(finish.finishTimeStr, durationSeconds);
@@ -68,7 +68,7 @@ export function ResultStep(props: ResultStepProps) {
     (outcome === "submission" && winnerId !== "" && submissionCode !== "" && finishProvided && finishValid);
 
   if (claim.state === "theirs") {
-    const claimer = claim.claimerId === opponent.id ? opponent : me;
+    const claimer = claim.claimerId === opponent.athleteId ? opponent : me;
     return (
       <ResultWaiting
         claimer={claimer}
@@ -100,7 +100,7 @@ export function ResultStep(props: ResultStepProps) {
     void submit({ outcome, winnerId, submissionCode, finishTimeStr: finish.finishTimeStr });
   }
 
-  const winner = winnerId === me.id ? me : winnerId === opponent.id ? opponent : null;
+  const winner = winnerId === me.athleteId ? me : winnerId === opponent.athleteId ? opponent : null;
   const endedAt = initialFinishSeconds != null ? `ENDED AT ${formatElapsed(initialFinishSeconds)}` : null;
 
   return (

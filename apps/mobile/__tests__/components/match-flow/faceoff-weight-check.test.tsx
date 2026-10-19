@@ -57,8 +57,8 @@ import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin"
 import { toast as mockToast } from "@/components/ui/toast";
 import type { WeightChecksHandle, WeightChecksStatus } from "@/lib/match-flow/use-match-weight-checks";
 
-const ME = { display_name: "Marco Reyes", current_elo: 1487 };
-const OPP = { display_name: "Dayo Okafor", current_elo: 1512 };
+const ME = { displayName: "Marco Reyes", currentElo: 1487 };
+const OPP = { displayName: "Dayo Okafor", currentElo: 1512 };
 
 interface Spec {
   /** My check of the opponent. */

@@ -144,7 +144,7 @@ export function LiveStep(props: LiveStepProps) {
       void recorder.stop();
       fireEndHaptic();
       setOpponentEnded({
-        name: opponent.display_name,
+        name: opponent.displayName,
         finalFormatted: formattedRef.current,
         finalRemaining: remainingRef.current,
       });

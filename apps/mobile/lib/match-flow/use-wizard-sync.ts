@@ -4,12 +4,14 @@ import { exitMatchTo } from "./exit-to";
 import { toast } from "@/components/ui/toast";
 import type { MatchDetails } from "@jits/shared/api/queries";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
+import { deriveMatchRoles } from "./match-roles";
 import { planReconcile, resultFromOutcome } from "./reconcile";
 import { getCurrentStep, MATCH_STEPS, type MatchStep } from "./step-router";
 import { useMatchReconciler, type ReconcileSnapshot } from "./use-match-reconciler";
 
 interface UseWizardSyncParams {
   matchId: string;
+  /** The signed-in athlete; each snapshot's roles are derived for them. */
   currentAthleteId: string;
   exitHref: string;
   match: MatchDetails | null;
@@ -108,17 +110,17 @@ export function useWizardSync({
       // must be able to re-apply a read it deferred as possibly stale.
       for (const listener of snapshotListenersRef.current) listener(fresh);
       const current = stepRef.current;
-      const me = fresh.participants.find((p) => p.athlete_id === currentAthleteId);
-      const opponent = fresh.participants.find((p) => p.athlete_id !== currentAthleteId);
-      if (!current || !me || !opponent || exitingRef.current) return;
+      const roles = deriveMatchRoles(fresh, currentAthleteId);
+      const me = roles?.me;
+      const opponent = roles?.opponent;
+      if (!current || !roles || !me || !opponent || exitingRef.current) return;
 
       const initial = firstSnapshotRef.current && !interactedRef.current;
       firstSnapshotRef.current = false;
       const action = planReconcile({
         current,
         snapshot: { status: fresh.status, confirmedAthleteIds: ids },
-        currentAthleteId,
-        opponentId: opponent.athlete_id,
+        roles,
         initial,
       });
       if (action.type === "exit") {
@@ -137,7 +139,7 @@ export function useWizardSync({
       if (current === "live") stopRecorderRef.current?.();
       if (action.step === "live" && fresh.started_at) setStartedAt(fresh.started_at);
       if (action.step === "confirm" || action.step === "summary") {
-        const rebuilt = resultFromOutcome(me.outcome, currentAthleteId, opponent.athlete_id);
+        const rebuilt = resultFromOutcome(me.outcome, me.athleteId, opponent.athleteId);
         setResultData((prev) => prev ?? rebuilt);
       }
       // Summary reads the stamped ELO; take the same refresh path the

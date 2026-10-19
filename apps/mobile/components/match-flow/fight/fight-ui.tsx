@@ -31,13 +31,8 @@ export function initialsOf(name: string | null | undefined): string {
   return `${first}${last}`.toUpperCase();
 }
 
-/** "Mina Park" -> "M. Park"; a single word stays as is. */
-export function shortName(name: string | null | undefined): string {
-  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "Opponent";
-  if (words.length === 1) return words[0];
-  return `${words[0][0]}. ${words.slice(1).join(" ")}`;
-}
+/** "Mina Park" -> "M. Park". Lives in a pure module so `match-roles.ts` can use it too. */
+export { shortName } from "@/lib/match-flow/short-name";
 
 interface MonoProps {
   children: React.ReactNode;

@@ -67,6 +67,7 @@ import {
   targetFor,
   type BroadcastResult,
   type MatchStep,
+  type ReconcileRoles,
   type SessionMatchChannel,
 } from "./protocol";
 import { Bus } from "./bus";
@@ -148,6 +149,15 @@ export interface ConfirmOutcome {
 }
 
 /**
+ * The bot's roles in its (self-run) match, as the app's `deriveMatchRoles`
+ * gives them: this side and the two athletes whose confirmations finish it.
+ * That is all `targetFor` reads.
+ */
+function selfRunRoles(meId: string, opponentId: string): ReconcileRoles {
+  return { me: { athleteId: meId }, athletes: [{ athleteId: meId }, { athleteId: opponentId }] };
+}
+
+/**
  * What the ready step does with a DB snapshot (the wizard's reconciler):
  * a cancelled match exits, a started (or later) one goes live. Pending and
  * unknown statuses say nothing.
@@ -182,7 +192,7 @@ export interface ConfirmSignals {
 export function confirmDecision(s: ConfirmSignals): { outcome: ConfirmOutcome; delayMs: number } | null {
   if (s.opponentDisputed) return { outcome: { kind: "disputed", via: "broadcast" }, delayMs: 0 };
   const snap = s.snapshot;
-  if (snap && targetFor({ status: snap.status, confirmedAthleteIds: snap.confirmed }, s.meId, s.opponentId) === "summary") {
+  if (snap && targetFor({ status: snap.status, confirmedAthleteIds: snap.confirmed }, selfRunRoles(s.meId, s.opponentId)) === "summary") {
     return { outcome: { kind: snap.status === "disputed" ? "disputed" : "confirmed", via: "reconciler" }, delayMs: 0 };
   }
   const ids = snap?.confirmed ?? [];
@@ -335,7 +345,7 @@ export class MatchSide {
           status: match.status,
           startedAt: match.started_at ?? null,
           confirmed,
-          target: targetFor({ status: match.status, confirmedAthleteIds: confirmed }, this.meId, this.opponentId),
+          target: targetFor({ status: match.status, confirmedAthleteIds: confirmed }, selfRunRoles(this.meId, this.opponentId)),
           reason,
         };
         this.trace.add({ actor: this.actor, kind: "reconcile", name: reason, step: this.step ?? undefined, payload: snap });

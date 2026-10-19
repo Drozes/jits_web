@@ -79,8 +79,8 @@ function renderStep(overrides: Partial<StepProps> = {}) {
   return render(
     <ConfirmStep
       matchId="M1"
-      me={{ athlete_id: "me-1", display_name: "Mina Park", elo_before: 1498, elo_after: 1489, elo_delta: -9 }}
-      opponent={{ athlete_id: "opp-1", display_name: "Demo Red" }}
+      me={{ athleteId: "me-1", displayName: "Mina Park", eloBefore: 1498, eloAfter: 1489, eloDelta: -9 }}
+      opponent={{ athleteId: "opp-1", displayName: "Demo Red" }}
       resultData={{ result: "submission", winnerId: "me-1" }}
       confirmedAthleteIds={[]}
       submissionName={null}

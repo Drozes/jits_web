@@ -6,11 +6,12 @@ import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
 import { useWizardSync } from "@/lib/match-flow/use-wizard-sync";
 import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
-import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
 import { useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
-import { useMatchWeights } from "@/lib/match-flow/use-match-weights";
-import { useMatchWeightChecks } from "@/lib/match-flow/use-match-weight-checks";
+import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
+import { MatchFlowProvider } from "@/lib/match-flow/match-flow-context";
+import { computeOwnOutcome } from "@/lib/match-flow/compute-own-outcome";
+import { useWizardWeights } from "@/lib/match-flow/use-wizard-weights";
 import { WizardError, WizardLoading } from "./wizard-status";
 import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
@@ -60,19 +61,6 @@ const STEP_LABELS: Record<MatchStep, string> = {
   summary: "Summary",
 };
 
-function computeOwnOutcome(
-  rowOutcome: string | null,
-  resultData: BroadcastResult | null,
-  currentAthleteId: string,
-): "win" | "loss" | "draw" | null {
-  if (rowOutcome === "win" || rowOutcome === "loss" || rowOutcome === "draw") {
-    return rowOutcome;
-  }
-  if (!resultData) return null;
-  if (resultData.result === "draw") return "draw";
-  return resultData.winnerId === currentAthleteId ? "win" : "loss";
-}
-
 /**
  * Top-level orchestrator for the match wizard (steps in `step-router.ts`).
  * Loads the match + submission types, derives the initial step from
@@ -104,10 +92,12 @@ export function MatchFlowWizard({
   const recording = useEffectiveRecordingOptIn(currentAthleteId);
   const { match, submissionTypes, isLoading, error, refresh, applyMatch } =
     useMatchDetails(matchId);
-  const isParticipant =
-    !!match &&
-    match.participants.some((p) => p.athlete_id === currentAthleteId) &&
-    match.participants.some((p) => p.athlete_id !== currentAthleteId);
+  // Mode and role, derived once per match in hand (match-roles.ts). Null
+  // while loading, and for a viewer who is not one of its two athletes.
+  const roles = React.useMemo(
+    () => (match ? deriveMatchRoles(match, currentAthleteId) : null),
+    [match, currentAthleteId],
+  );
   // Step state + the DB reconciler that keeps it honest when a broadcast is
   // missed (jits-wfpo, -bh2v, -vh7m, -bmei, -mzfu). See use-wizard-sync.ts.
   const {
@@ -126,7 +116,7 @@ export function MatchFlowWizard({
     currentAthleteId,
     exitHref,
     match,
-    ready: isParticipant && !error,
+    ready: roles != null && !error,
     applyMatch,
     refresh,
   });
@@ -135,27 +125,15 @@ export function MatchFlowWizard({
     onStepChange?.(step);
   }, [step, onStepChange]);
 
-  // The weights this match is rated on (the challenge's), for the face-off
-  // and the countdown. Read here, above the early returns, for hook order.
-  const challengeWeights = useMatchWeights(
-    match?.challenge_id,
-    currentAthleteId,
-    match?.participants.find((p) => p.athlete_id === currentAthleteId)?.current_weight ?? null,
-    match?.participants.find((p) => p.athlete_id !== currentAthleteId)?.current_weight ?? null,
-  );
-  // The face-off weight checks (jr_be-ahn.4), challenge-backed matches only.
-  // Their weights are the challenge's too, read fresh, so a re-weigh on
-  // either phone shows here (and on the countdown) without a reload.
-  const weightChecks = useMatchWeightChecks(
+  // The weights this match is rated on, for the face-off and the countdown.
+  // Read here, above the early returns, for hook order.
+  const { weights, weightChecks } = useWizardWeights({
     matchId,
-    isParticipant && !error && !!match?.challenge_id && (step === "weight" || step === "ready"),
-  );
-  const opponentIdForWeights = match?.participants.find((p) => p.athlete_id !== currentAthleteId)?.athlete_id;
-  const checkedWeights = weightChecks.state?.weights;
-  const weights =
-    checkedWeights && opponentIdForWeights && currentAthleteId in checkedWeights && opponentIdForWeights in checkedWeights
-      ? { mine: checkedWeights[currentAthleteId] ?? null, theirs: checkedWeights[opponentIdForWeights] ?? null, rated: true }
-      : challengeWeights;
+    challengeId: match?.challenge_id,
+    viewerId: currentAthleteId,
+    roles,
+    checksEnabled: roles != null && !error && !!match?.challenge_id && (step === "weight" || step === "ready"),
+  });
 
   // Screen wake-lock for every step the recorder camera is up, not just
   // live. The ready check shows the preview and the phone is typically
@@ -244,15 +222,15 @@ export function MatchFlowWizard({
   }
   if ((isLoading && !revalidating) || !match || !step) return <WizardLoading />;
 
-  const me = match.participants.find((p) => p.athlete_id === currentAthleteId);
-  const opponent = match.participants.find((p) => p.athlete_id !== currentAthleteId);
-  if (!me || !opponent) {
+  const me = roles?.me;
+  const opponent = roles?.opponent;
+  if (!roles || !me || !opponent) {
     return (
       <WizardError exitHref={exitHref} exitLabel={exitLabel} title="Not a participant" />
     );
   }
 
-  const ownOutcome = computeOwnOutcome(me.outcome, resultData, currentAthleteId);
+  const ownOutcome = computeOwnOutcome(me, resultData);
   const extras = readMatchExtras(match);
   // Live is a full-screen broadcast layout over the camera, and the verdict
   // runs its hero edge to edge. The ScrollView and every slot stay in place
@@ -263,92 +241,92 @@ export function MatchFlowWizard({
   const faceoff = step === "weight" || step === "ready";
 
   return (
-    <WizardScrollContext.Provider value={wizardScroll.value}>
-      <ScrollView
-        ref={scrollRef}
-        onScroll={step === "summary" ? wizardScroll.onScroll : undefined}
-        scrollEventThrottle={32}
-        style={{ flex: 1, backgroundColor: live ? BROADCAST.black : palette.bg }}
-        scrollEnabled={!live}
-        contentContainerStyle={
-          fullBleed
-            ? { flexGrow: 1 }
-            : {
-                padding: 16,
-                paddingTop: insets.top + 8,
-                // Landscape ready check: clear the sensor housing and corners.
-                paddingLeft: Math.max(16, insets.left),
-                paddingRight: Math.max(16, insets.right),
-                paddingBottom: 32 + insets.bottom,
-                gap: 16,
-              }
-        }
-        keyboardShouldPersistTaps="handled"
-      >
-        <MatchRecorderProvider
-          matchId={matchId}
-          uploaderAthleteId={me.athlete_id}
-          matchDurationSeconds={match.duration_seconds}
+    <MatchFlowProvider match={match} roles={roles}>
+      <WizardScrollContext.Provider value={wizardScroll.value}>
+        <ScrollView
+          ref={scrollRef}
+          onScroll={step === "summary" ? wizardScroll.onScroll : undefined}
+          scrollEventThrottle={32}
+          style={{ flex: 1, backgroundColor: live ? BROADCAST.black : palette.bg }}
+          scrollEnabled={!live}
+          contentContainerStyle={
+            fullBleed
+              ? { flexGrow: 1 }
+              : {
+                  padding: 16,
+                  paddingTop: insets.top + 8,
+                  // Landscape ready check: clear the sensor housing and corners.
+                  paddingLeft: Math.max(16, insets.left),
+                  paddingRight: Math.max(16, insets.right),
+                  paddingBottom: 32 + insets.bottom,
+                  gap: 16,
+                }
+          }
+          keyboardShouldPersistTaps="handled"
         >
-          <MatchSyncProvider value={syncContext}>
-            <FaceoffProvider
-              active={faceoff}
-              phase={faceoff ? step : null}
-              matchId={matchId}
-              exitHref={exitHref}
-              meId={me.athlete_id}
-              opponentId={opponent.athlete_id}
-              myWeight={weights.mine}
-              opponentWeight={weights.theirs}
-              weightsRated={weights.rated}
-              weightChecks={weightChecks}
-              onWeighedIn={() => setStep("ready")}
-              onStarted={(s) => {
-                setStartedAt(s);
-                setStep("live");
-              }}
-              onCancelledRemotely={exitCancelled}
-            >
-              <RecorderStopBridge stopRef={stopRecorderRef} />
-              {/* Before the step renderer so the live lock lands before recording starts. */}
-              <MatchOrientationController mode={orientationModeFor(step)} />
-              <StepMarker step={step} />
-              {live ? null : <QueueStatusBanner />}
-              {faceoff ? (
-                <FaceoffTop phase={step} me={me} opponent={opponent} />
-              ) : null}
-              <MatchRecorderCamera step={step} optedIn={recording} />
-              <MatchStepRenderer
-                step={step}
-                exitHref={exitHref}
-                exitLabel={exitLabel}
+          <MatchRecorderProvider
+            matchId={matchId}
+            uploaderAthleteId={me.athleteId}
+            matchDurationSeconds={match.duration_seconds}
+          >
+            <MatchSyncProvider value={syncContext}>
+              <FaceoffProvider
+                active={faceoff}
+                phase={faceoff ? step : null}
                 matchId={matchId}
-                matchStatus={match.status}
-                durationSeconds={match.duration_seconds}
-                startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
-                pausedAt={match.paused_at}
-                totalPausedDuration={match.total_paused_duration}
-                me={me}
-                opponent={opponent}
-                submissionTypes={submissionTypes}
-                resultData={resultData}
-                ownOutcome={ownOutcome}
-                confirmedAthleteIds={confirmedAthleteIds}
-                extras={extras}
-                recording={recording}
-                matchWeights={weights}
-                setStep={setStep}
-                setResultData={setResultData}
-                advanceToResult={advanceToResult}
-                initialFinishSeconds={initialFinishSeconds}
-                setFinishSeconds={setFinishSeconds}
-                refresh={refresh}
-              />
-            </FaceoffProvider>
-          </MatchSyncProvider>
-        </MatchRecorderProvider>
-      </ScrollView>
-    </WizardScrollContext.Provider>
+                exitHref={exitHref}
+                meId={me.athleteId}
+                opponentId={opponent.athleteId}
+                myWeight={weights.mine}
+                opponentWeight={weights.theirs}
+                weightsRated={weights.rated}
+                weightChecks={weightChecks}
+                onWeighedIn={() => setStep("ready")}
+                onStarted={(s) => {
+                  setStartedAt(s);
+                  setStep("live");
+                }}
+                onCancelledRemotely={exitCancelled}
+              >
+                <RecorderStopBridge stopRef={stopRecorderRef} />
+                {/* Before the step renderer so the live lock lands before recording starts. */}
+                <MatchOrientationController mode={orientationModeFor(step)} />
+                <StepMarker step={step} />
+                {live ? null : <QueueStatusBanner />}
+                {faceoff ? (
+                  <FaceoffTop phase={step} me={me} opponent={opponent} />
+                ) : null}
+                <MatchRecorderCamera step={step} optedIn={recording} />
+                <MatchStepRenderer
+                  step={step}
+                  exitHref={exitHref}
+                  exitLabel={exitLabel}
+                  matchId={matchId}
+                  matchStatus={match.status}
+                  durationSeconds={match.duration_seconds}
+                  startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
+                  pausedAt={match.paused_at}
+                  totalPausedDuration={match.total_paused_duration}
+                  submissionTypes={submissionTypes}
+                  resultData={resultData}
+                  ownOutcome={ownOutcome}
+                  confirmedAthleteIds={confirmedAthleteIds}
+                  extras={extras}
+                  recording={recording}
+                  matchWeights={weights}
+                  setStep={setStep}
+                  setResultData={setResultData}
+                  advanceToResult={advanceToResult}
+                  initialFinishSeconds={initialFinishSeconds}
+                  setFinishSeconds={setFinishSeconds}
+                  refresh={refresh}
+                />
+              </FaceoffProvider>
+            </MatchSyncProvider>
+          </MatchRecorderProvider>
+        </ScrollView>
+      </WizardScrollContext.Provider>
+    </MatchFlowProvider>
   );
 }
 

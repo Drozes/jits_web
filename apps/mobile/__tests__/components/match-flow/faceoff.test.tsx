@@ -75,8 +75,8 @@ import { __resetRecordingOptInForTests, getRecordingOptIn } from "@/lib/match-fl
 import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 import { __resetRecordingIntentForTests } from "@/lib/match-flow/recording-intent";
 
-const ME = { display_name: "Kai Reyes", current_elo: 1512 };
-const OPP = { display_name: "Mina Park", current_elo: 1498 };
+const ME = { displayName: "Kai Reyes", currentElo: 1512 };
+const OPP = { displayName: "Mina Park", currentElo: 1498 };
 const STAKES = {
   challenger_win: 14,
   challenger_loss: -9,

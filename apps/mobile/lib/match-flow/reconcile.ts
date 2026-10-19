@@ -18,12 +18,26 @@
  *    match and applies ELO at record time; confirmations are separate rows.
  */
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
+import type { MatchAthleteView } from "./match-roles";
 import { MATCH_STEPS, type MatchStep } from "./step-router";
 
 export interface MatchSnapshot {
   status: string;
   /** Athlete ids with a positive `match_confirmations` row; null = unknown. */
   confirmedAthleteIds: string[] | null;
+}
+
+type AthleteRef = Pick<MatchAthleteView, "athleteId">;
+
+/**
+ * The part of `MatchRoles` reconciliation reads (`MatchRoles` satisfies
+ * it): the viewer's own athlete, and the two athletes whose confirmations
+ * finish the match (their order is not read). The match-loop bot builds it
+ * from the two athlete ids it holds.
+ */
+export interface ReconcileRoles {
+  me: AthleteRef | null;
+  athletes: readonly [AthleteRef, AthleteRef];
 }
 
 /** Why a terminal match leaves the wizard: the toast copy differs. */
@@ -37,8 +51,7 @@ export type ReconcileAction =
 interface PlanParams {
   current: MatchStep;
   snapshot: MatchSnapshot;
-  currentAthleteId: string;
-  opponentId: string;
+  roles: ReconcileRoles;
   /**
    * True only for the first snapshot after mount, before the athlete has
    * moved the wizard themselves. The mount-time step comes from status alone
@@ -72,11 +85,7 @@ export function pollIntervalFor(step: MatchStep | null): number | null {
  * null when the snapshot says nothing about the step (pending, unknown
  * statuses). `voided` is set only by an admin resolving a dispute (ELO
  * reverted, no winner), so there is nothing left for the wizard to show. */
-export function targetFor(
-  snapshot: MatchSnapshot,
-  currentAthleteId: string,
-  opponentId: string,
-): MatchStep | "exit" | null {
+export function targetFor(snapshot: MatchSnapshot, roles: ReconcileRoles): MatchStep | "exit" | null {
   switch (snapshot.status) {
     case "cancelled":
     case "voided":
@@ -85,7 +94,7 @@ export function targetFor(
       return "live";
     case "completed": {
       const ids = snapshot.confirmedAthleteIds;
-      if (ids && ids.includes(currentAthleteId) && ids.includes(opponentId)) return "summary";
+      if (ids && roles.athletes.every((a) => ids.includes(a.athleteId))) return "summary";
       return "confirm";
     }
     case "disputed":
@@ -98,11 +107,10 @@ export function targetFor(
 export function planReconcile({
   current,
   snapshot,
-  currentAthleteId,
-  opponentId,
+  roles,
   initial = false,
 }: PlanParams): ReconcileAction {
-  const target = targetFor(snapshot, currentAthleteId, opponentId);
+  const target = targetFor(snapshot, roles);
   if (target == null) return { type: "none" };
   if (target === "exit") {
     // A voided result leaves even the summary: the verdict and ELO it shows
@@ -117,7 +125,8 @@ export function planReconcile({
     current === "summary" &&
     target === "confirm" &&
     snapshot.confirmedAthleteIds != null &&
-    !snapshot.confirmedAthleteIds.includes(currentAthleteId)
+    roles.me != null &&
+    !snapshot.confirmedAthleteIds.includes(roles.me.athleteId)
   ) {
     return { type: "goto", step: "confirm" };
   }

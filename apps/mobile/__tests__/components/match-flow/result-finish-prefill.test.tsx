@@ -46,8 +46,8 @@ function renderResult(initialFinishSeconds?: number) {
       matchId="M1"
       durationSeconds={300}
       initialFinishSeconds={initialFinishSeconds}
-      me={{ id: "me-1", displayName: "Me", elo: 1500, weight: 170 }}
-      opponent={{ id: "opp-1", displayName: "Opp", elo: 1490, weight: 168 }}
+      me={{ athleteId: "me-1", displayName: "Me", currentElo: 1500, weightLbs: 170 }}
+      opponent={{ athleteId: "opp-1", displayName: "Opp", currentElo: 1490, weightLbs: 168 }}
       submissionTypes={TYPES}
       onRecorded={jest.fn()}
     />,

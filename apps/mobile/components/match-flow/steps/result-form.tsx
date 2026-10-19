@@ -11,13 +11,9 @@ import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { TRACKING, typeSize, typeStep } from "@/lib/typography";
 import { InitialsBlock, Mono, initialsOf, shortName } from "../fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
+import type { MatchAthleteView } from "@/lib/match-flow/match-roles";
 
-export interface ResultAthlete {
-  id: string;
-  displayName: string;
-  elo: number | null;
-  weight: number | null;
-}
+export type ResultAthlete = Pick<MatchAthleteView, "athleteId" | "displayName" | "currentElo" | "weightLbs">;
 
 /** The eight finishes offered as one-tap chips, most common first. Codes
  * missing from the catalogue are skipped; the search covers everything. */
@@ -49,7 +45,7 @@ export function commonSubmissions(types: SubmissionType[], count = 8): Submissio
 }
 
 const meta = (a: ResultAthlete) =>
-  [a.elo != null ? String(a.elo) : null, a.weight != null ? `${Number(a.weight.toFixed(1))} LBS` : null]
+  [a.currentElo != null ? String(a.currentElo) : null, a.weightLbs != null ? `${Number(a.weightLbs.toFixed(1))} LBS` : null]
     .filter(Boolean)
     .join(" · ");
 
@@ -68,11 +64,11 @@ export function WinnerTiles({
     <View style={{ flexDirection: "row", gap: 12 }}>
       {[me, opponent].map((a) => (
         <StatePressable
-          key={a.id}
-          testID={`result-winner-${a.id}`}
+          key={a.athleteId}
+          testID={`result-winner-${a.athleteId}`}
           accessibilityRole="button"
           accessibilityLabel={`${a.displayName} won`}
-          onPress={() => onPick(a.id)}
+          onPress={() => onPick(a.athleteId)}
           style={({ pressed }) => ({
             flex: 1,
             minHeight: 260,
@@ -97,7 +93,7 @@ export function WinnerTiles({
                 {meta(a)}
               </Mono>
             ) : null}
-            <Mono color={a.id === me.id ? p.text : p.text3}>{a.id === me.id ? "YOU" : "OPPONENT"}</Mono>
+            <Mono color={a.athleteId === me.athleteId ? p.text : p.text3}>{a.athleteId === me.athleteId ? "YOU" : "OPPONENT"}</Mono>
           </View>
         </StatePressable>
       ))}

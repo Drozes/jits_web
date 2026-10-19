@@ -35,21 +35,15 @@ import { useSuppressUploadStrip } from "@/lib/video/upload-strip-visibility";
 import { HERO_CAPTION } from "@/lib/video/video-status-copy";
 import { videoHref } from "@/lib/film-room/href";
 import { noteRatingWatched, noteVerdictOutcome } from "@/lib/rating/header-elo";
+import type { MatchAthleteView } from "@/lib/match-flow/match-roles";
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;
 /** ...this many times (10 minutes); the row listener and foreground cover the rest. */
 export const VERDICT_DISPUTE_POLL_LIMIT = 40;
 
-export interface VerdictAthlete {
-  athlete_id: string;
-  display_name: string;
-  elo_before?: number | null;
-  elo_after?: number | null;
-  elo_delta?: number | null;
-  current_elo?: number | null;
-  weight_division_gap?: number | null;
-}
+export type VerdictAthlete = Pick<MatchAthleteView, "athleteId" | "displayName"> &
+  Partial<Pick<MatchAthleteView, "eloBefore" | "eloAfter" | "eloDelta" | "currentElo" | "weightDivisionGap">>;
 
 interface VerdictStepProps {
   matchId: string;
@@ -102,7 +96,7 @@ export function VerdictStep(props: VerdictStepProps) {
   // to where the bottom scrim is solid; then it follows the app theme.
   const pastHero = useScrolledPast(HERO_HEIGHT - 75 - insets.top);
 
-  const opponentConfirmed = confirmedAthleteIds.includes(opponent.athlete_id);
+  const opponentConfirmed = confirmedAthleteIds.includes(opponent.athleteId);
   const disputed = matchStatus === "disputed" || disputedHere;
   const awaitingOpponent = !disputed && matchStatus === "completed" && !opponentConfirmed;
 
@@ -110,9 +104,9 @@ export function VerdictStep(props: VerdictStepProps) {
     matchId,
     enabled: !disputed,
     onMatchDisputed: (athleteId) => {
-      if (athleteId === me.athlete_id) return;
+      if (athleteId === me.athleteId) return;
       setDisputedHere(true);
-      toast.info({ text1: "Result disputed", description: `${opponent.display_name} disputed the result. An admin will review it.` });
+      toast.info({ text1: "Result disputed", description: `${opponent.displayName} disputed the result. An admin will review it.` });
       reconcileNow();
     },
   });
@@ -139,39 +133,39 @@ export function VerdictStep(props: VerdictStepProps) {
   const submission = resultType != null ? resultType === "submission" : submissionName != null;
   const loss = !disputed && outcome === "loss";
 
-  const videos = useVerdictVideos(matchId, me.athlete_id, uploadedVideoId);
+  const videos = useVerdictVideos(matchId, me.athleteId, uploadedVideoId);
   // The Film block (jits-n2im.25): the same plate and strings as match
   // detail. It replaces the upload card, the angle rows and the highlight
   // note; the wave 2 pieces stand in only while the status is unavailable.
-  const filmStatus = useFilmStatus(matchId, me.athlete_id, videos.playable);
+  const filmStatus = useFilmStatus(matchId, me.athleteId, videos.playable);
   const fsView = filmStatus.view;
   useSuppressUploadStrip({ kind: "match", matchId });
   const rank = useRankChange(matchId, win);
   const rankText = win ? rankStripText(rank, shortName) : null;
 
   // Every match is ranked (casual was retired).
-  const eloBefore = me.elo_before ?? null;
+  const eloBefore = me.eloBefore ?? null;
   // The stamped post-match rating only: before the refresh lands,
   // current_elo is still the PRE-match rating and would read as no change.
-  const eloAfter = me.elo_after ?? null;
-  const eloDelta = me.elo_delta ?? null;
-  const gap = me.weight_division_gap ?? 0;
+  const eloAfter = me.eloAfter ?? null;
+  const eloDelta = me.eloDelta ?? null;
+  const gap = me.weightDivisionGap ?? 0;
   // The athlete saw this rating land here: the header does not roll it again
   // when the auth row catches up after the exit (jits-1ez5.4).
   React.useEffect(() => {
-    if (eloAfter != null && !disputed) noteRatingWatched(me.athlete_id, eloAfter);
-  }, [me.athlete_id, eloAfter, disputed]);
+    if (eloAfter != null && !disputed) noteRatingWatched(me.athleteId, eloAfter);
+  }, [me.athleteId, eloAfter, disputed]);
   // Its outcome too, stamped rating or not: a draw's later header delta is amber.
   React.useEffect(() => {
-    if (outcome && !disputed) noteVerdictOutcome(me.athlete_id, matchId, outcome, eloBefore);
-  }, [me.athlete_id, matchId, outcome, disputed, eloBefore]);
+    if (outcome && !disputed) noteVerdictOutcome(me.athleteId, matchId, outcome, eloBefore);
+  }, [me.athleteId, matchId, outcome, disputed, eloBefore]);
 
   const verdict = disputed ? "DISPUTED" : win ? "YOU WON" : loss ? "YOU LOST" : outcome === "draw" ? "DRAW" : "MATCH RECORDED";
   const verdictColor = outcome === "draw" && !disputed ? p.amber : p.text;
   const how = [submissionName ? `by ${submissionName}` : null, finishTimeSeconds != null ? formatElapsed(finishTimeSeconds) : null]
     .filter(Boolean)
     .join(" \u00b7 ");
-  const oppShort = shortName(opponent.display_name);
+  const oppShort = shortName(opponent.displayName);
 
   const uploadBusy = upload.kind === "uploading" || upload.kind === "stopping";
   // A paused or failed UPLOAD (not a recorder failure, which has no class)
@@ -225,8 +219,8 @@ export function VerdictStep(props: VerdictStepProps) {
       <VerdictHero
         posterUrl={videos.posterUrl}
         posterKey={videos.posterKey}
-        left={outcome === "loss" ? opponent.display_name : me.display_name}
-        right={outcome === "loss" ? me.display_name : opponent.display_name}
+        left={outcome === "loss" ? opponent.displayName : me.displayName}
+        right={outcome === "loss" ? me.displayName : opponent.displayName}
         upload={upload}
         filmExpected={filmExpected}
         hasServerVideo={hasServerVideo}
@@ -302,7 +296,7 @@ export function VerdictStep(props: VerdictStepProps) {
             ) : null}
 
             {/* The other athlete's angle, live (jits-n2im.12). */}
-            <VerdictAngleRows videos={videos.others} opponentName={opponent.display_name} />
+            <VerdictAngleRows videos={videos.others} opponentName={opponent.displayName} />
 
             {/* A reel is on its way when THIS phone's clip landed or is still
                 uploading (spec 015 section 16.6.4; the pre-redesign summary's
