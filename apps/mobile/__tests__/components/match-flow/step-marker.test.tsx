@@ -16,8 +16,13 @@ describe("StepMarker", () => {
   it("dev: the harness label and testID", () => {
     const s = render(<StepMarker step="confirm" exposed />);
     const el = s.getByTestId("match-step-confirm");
-    expect(el.props.accessibilityLabel).toBe("Step 6 of 7, Confirm");
+    expect(el.props.accessibilityLabel).toBe("Step 7 of 8, Confirm");
     expect(el.props.accessible).toBe(true);
+  });
+
+  it("dev: the timekeeper-mode crew step reads as Crew (the harness's STEP_BY_LABEL)", () => {
+    const s = render(<StepMarker step="crew" exposed />);
+    expect(s.getByTestId("match-step-crew").props.accessibilityLabel).toBe("Step 1 of 8, Crew");
   });
 
   it("release: hidden from screen readers, testID kept", () => {

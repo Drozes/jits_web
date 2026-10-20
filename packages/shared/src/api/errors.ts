@@ -65,6 +65,37 @@ export type DomainErrorCode =
   | "PROXIMITY_FAILED"
   | "NOT_AUTHORIZED"
   | "BLOCKED"
+  // Timekeeper mode (jits_web specs/timekeeper-mode, jr_be 024). The two
+  // busy codes come from the match INSERT trigger (R2), so any match
+  // creation can raise them; the rest only from the timekeeper-mode RPCs,
+  // mapped by `api/timekeeper.ts`.
+  | "TIMEKEEPER_BUSY"
+  | "ATHLETE_IN_TIMEKEEPER_MATCH"
+  | "NOT_TIMEKEEPER_MODE"
+  | "NOT_TIMEKEEPER"
+  | "TIMEKEEPER_REQUIRED"
+  | "TIMEKEEPER_ALREADY_SEATED"
+  | "TIMEKEEPER_IS_COMPETITOR"
+  | "TIMEKEEPER_UNAVAILABLE"
+  | "TIMEKEEPER_NOT_RECORDING"
+  | "TIMEKEEPER_MUST_RECORD"
+  | "ATHLETES_NOT_READY"
+  | "REQUEST_ALREADY_OPEN"
+  | "REQUEST_CLOSED"
+  | "NOT_REQUESTED"
+  | "CONSENT_REQUIRED"
+  | "MATCH_CANCELLED"
+  | "MATCH_NOT_LIVE"
+  | "RESULT_OWED"
+  | "RESULT_CHANGED"
+  | "EDIT_WINDOW_CLOSED"
+  | "EDIT_CLOSED_DISPUTED"
+  | "EDIT_CLOSED_CONFIRMED"
+  | "EDIT_CLOSED_ADMIN"
+  | "WEIGHT_CHECK_NOT_REQUIRED"
+  | "NOT_AVAILABLE_IN_TIMEKEEPER_MODE"
+  | "USE_END_MATCH_CLOCK"
+  | "NO_OPEN_REVIEW"
   | "RLS_VIOLATION"
   | "RPC_MISSING"
   | "UNKNOWN";
@@ -252,6 +283,24 @@ const HINT_TO_CODE: Record<string, { code: DomainErrorCode; message: string }> =
     no_challenge: {
       code: "NO_CHALLENGE",
       message: "Weight checks apply to Arena matches only.",
+    },
+    // Timekeeper mode R2 (jr_be 024 3.4): the match INSERT trigger refuses a
+    // new match for a seated timekeeper, or for a competitor of an active
+    // timekeeper-mode match. It fires only while such a match exists, so it
+    // changes nothing for the two-athlete flow. DETAIL (`raw.details`) is the
+    // busy athlete's id, so the Arena chokepoint (`lib/arena/challenge-api.ts`,
+    // slice M6) shows the deck toast for the right side: TK-E2 when the
+    // viewer is the busy one, TK-E3 with the busy athlete's name otherwise.
+    // This table knows neither, so the message is the deck's subject-free
+    // busy wording, true whoever reads it (TK-P8, TK-P9; spec 14.9 X1),
+    // pinned to the app's `timekeeper-copy.ts` by `timekeeper-copy.test.ts`.
+    timekeeper_busy: {
+      code: "TIMEKEEPER_BUSY",
+      message: "Timekeeping another match",
+    },
+    athlete_in_timekeeper_match: {
+      code: "ATHLETE_IN_TIMEKEEPER_MATCH",
+      message: "Running their own match",
     },
     // Highlight reels (jr_be spec 015 section 9.5). The same table serves the
     // RPCs (P0001 HINT) and the highlight-regenerate edge function's

@@ -483,12 +483,50 @@ export interface MatchParticipant {
   weight_division_gap: number | null;
 }
 
+/**
+ * Why a timekeeper-mode match was cancelled (`matches.cancel_reason`, jr_be
+ * 024 2.1). Null on every two-athlete (flag-OFF) cancel.
+ */
+export type MatchCancelReason =
+  | "athlete_left"
+  | "no_timekeeper"
+  | "faceoff_timeout"
+  | "timekeeper_left"
+  | "timekeeper_offline"
+  | "pause_timeout"
+  | "admin_void";
+
+/** The caller's role in the match, as `get_match_details` reports it (BE-G). */
+export type MatchViewerRole = "challenger" | "opponent" | "timekeeper";
+
+/**
+ * Every value of `matches.status`, in both modes (timekeeper mode spec 6.1).
+ * `MatchDetails.status` stays a plain string (see there); code that needs the
+ * closed set types against this union instead. (`MatchStatus` in
+ * `constants.ts` is the shipped four-value `MATCH_STATUS` set, without the
+ * terminal `voided` and `cancelled`.)
+ */
+export type MatchRowStatus = "pending" | "in_progress" | "completed" | "disputed" | "voided" | "cancelled";
+
+/** `get_match_details`'s top-level `timekeeper`: whoever holds `matches.timekeeper_id`. */
+export interface MatchTimekeeper {
+  id: string;
+  display_name: string;
+  profile_photo_url: string | null;
+}
+
 export interface MatchDetails {
   id: string;
   challenge_id: string | null;
   session_id: string | null;
   match_type: string;
   duration_seconds: number;
+  /**
+   * One of the six `MatchRowStatus` values (both modes, spec 6.1). Kept a
+   * string, a deliberate deviation from ARCHITECTURE 2.6 ("typed as the union
+   * of the six statuses"): narrowing it would break existing web fixtures,
+   * and shared changes are additive only (M-R9). `MatchRowStatus` is the union.
+   */
   status: string;
   result: string | null;
   started_at: string | null;
@@ -497,6 +535,53 @@ export interface MatchDetails {
   total_paused_duration: number;
   timekeeper_id: string | null;
   participants: MatchParticipant[];
+  // Timekeeper mode (jr_be 024 5.1, BE-G), all additive. An older backend
+  // sends none of them: missing means false / null / 0, which is the
+  // two-athlete flow. Only `lib/match-flow/match-roles.ts` reads the mode
+  // (`requires_timekeeper`, clean-code rule M-R1).
+  /** Snapshot at match creation, immutable: true is timekeeper mode. */
+  requires_timekeeper?: boolean;
+  /** Snapshot of the `timekeeper_weight_check` sub-flag (A19). */
+  tk_weight_check_required?: boolean;
+  /** The challenge's challenger; null for a session match. */
+  challenger_id?: string | null;
+  /** The timekeeper ended the clock (status stays `in_progress` until the result). */
+  ended_at?: string | null;
+  /** The clock reading at that end, clamped to `duration_seconds`. */
+  final_elapsed_s?: number | null;
+  /** The pick deadline; null while a timekeeper is seated. */
+  timekeeper_deadline_at?: string | null;
+  cancel_reason?: MatchCancelReason | null;
+  /** Bumped by every result edit (A8): a confirm must carry the current value. */
+  result_edit_count?: number;
+  result_edited_at?: string | null;
+  /** An admin recorded a stalled result (A27, PM19): TK-R5b, never editable. */
+  result_recorded_by_admin?: boolean;
+  /** Top level of the read, flattened here. */
+  viewer_role?: MatchViewerRole | null;
+  /** Top level of the read, flattened here. */
+  timekeeper?: MatchTimekeeper | null;
+}
+
+/** The `get_match_details` payload, as the two reads below take it. */
+interface MatchDetailsPayload {
+  match: Omit<MatchDetails, "participants" | "viewer_role" | "timekeeper">;
+  participants: MatchParticipant[];
+  viewer_role?: MatchViewerRole | null;
+  timekeeper?: MatchTimekeeper | null;
+  confirmations?: unknown;
+}
+
+function matchDetailsFrom(result: MatchDetailsPayload): MatchDetails {
+  // The two top-level timekeeper-mode keys join the match only when the
+  // backend sends them (BE-G), so an older backend's payload maps exactly as
+  // before.
+  return {
+    ...result.match,
+    participants: result.participants,
+    ...("viewer_role" in result ? { viewer_role: result.viewer_role ?? null } : {}),
+    ...("timekeeper" in result ? { timekeeper: result.timekeeper ?? null } : {}),
+  };
 }
 
 /** Fetch match details with participants for live/results screens. */
@@ -510,15 +595,51 @@ export async function getMatchDetails(
 
   if (error || !data) return null;
 
-  const result = data as unknown as {
-    match: Omit<MatchDetails, "participants">;
-    participants: MatchParticipant[];
-  };
+  return matchDetailsFrom(data as unknown as MatchDetailsPayload);
+}
 
-  return {
-    ...result.match,
-    participants: result.participants,
-  };
+/** One `get_match_details` read: the match, and who has confirmed its result. */
+export interface MatchDetailsWithConfirmations {
+  /** Exactly what `getMatchDetails` returns for the same payload. */
+  match: MatchDetails;
+  /**
+   * The read's top-level `confirmations` (B4, jr_be 20260927000400: every
+   * positive confirmation, oldest first); null when the payload carries no
+   * such array (unknown, not "nobody").
+   */
+  confirmations: MatchConfirmation[] | null;
+}
+
+/**
+ * `getMatchDetails` plus who has positively confirmed the result, from the
+ * same `get_match_details` call. It exists for the seated timekeeper of a
+ * timekeeper-mode match (jits_web specs/timekeeper-mode 4.2 Confirm, 10):
+ * the `match_confirmations` RLS admits participants only and the timekeeper
+ * is never one (spec 4.4), so `getMatchConfirmations` reads [] for them with
+ * no error, while `get_match_details` (SECURITY DEFINER) admits
+ * `matches.timekeeper_id` and returns every confirmation. Null on any
+ * failure, like `getMatchDetails`.
+ */
+export async function getMatchDetailsWithConfirmations(
+  supabase: Client,
+  matchId: string,
+): Promise<MatchDetailsWithConfirmations | null> {
+  const { data, error } = await supabase.rpc("get_match_details", {
+    p_match_id: matchId,
+  });
+
+  if (error || !data) return null;
+
+  const payload = data as unknown as MatchDetailsPayload;
+  const confirmations = Array.isArray(payload.confirmations)
+    ? payload.confirmations.flatMap((c: unknown): MatchConfirmation[] => {
+        const row = c as { athlete_id?: unknown; confirmed_at?: unknown } | null;
+        if (!row || typeof row.athlete_id !== "string") return [];
+        const confirmedAt = typeof row.confirmed_at === "string" ? row.confirmed_at : "";
+        return [{ athlete_id: row.athlete_id, confirmed_at: confirmedAt }];
+      })
+    : null;
+  return { match: matchDetailsFrom(payload), confirmations };
 }
 
 /**
@@ -754,6 +875,15 @@ export interface MyActiveMatch {
  * so the `!inner` embed filtered to my athlete id is exactly "matches I am an
  * active participant in". The opponent's name comes from `get_match_details`,
  * which re-checks that the caller is a participant.
+ *
+ * Timekeeper mode (spec 9.1, review tech M9): a timekeeper-mode pending match
+ * legitimately outlives the 10-minute window (the pick deadline, then a
+ * face-off of up to 10 minutes, and a fresh deadline after a pre-start
+ * drop-out), so it stays open while its pick deadline runs or a timekeeper is
+ * seated. That is a SECOND read, made only when the shipped read finds
+ * nothing: the shipped read and its windows are unchanged, and a backend
+ * without the timekeeper columns answers the second read with an error that
+ * is read as "nothing more" (missing means two-athlete).
  */
 export async function getMyActiveMatch(
   supabase: Client,
@@ -780,7 +910,7 @@ export async function getMyActiveMatch(
     .limit(1);
 
   if (error) return { ok: false, error: mapPostgrestError(error) };
-  const row = data?.[0];
+  const row = data?.[0] ?? (await getMyTimekeeperModePendingMatch(supabase, athleteId, now, excluded));
   if (!row) return { ok: true, data: null };
 
   const details = await getMatchDetails(supabase, row.id);
@@ -793,6 +923,33 @@ export async function getMyActiveMatch(
       opponentName: opponent?.display_name ?? null,
     },
   };
+}
+
+/**
+ * My newest timekeeper-mode pending match whose pick deadline is still
+ * running or that has a seated timekeeper (spec 9.1), never one I backed out
+ * of; null when there is none, and on any error (a backend without the
+ * timekeeper columns: missing means the two-athlete flow).
+ */
+async function getMyTimekeeperModePendingMatch(
+  supabase: Client,
+  athleteId: string,
+  now: number,
+  excluded: readonly string[],
+): Promise<{ id: string; status: string } | null> {
+  let query = supabase
+    .from("matches")
+    .select("id, status, match_participants!inner(athlete_id, status)")
+    .eq("match_participants.athlete_id", athleteId)
+    .eq("match_participants.status", "active")
+    .is("session_id", null)
+    .eq("status", "pending")
+    .eq("requires_timekeeper", true)
+    .or(`timekeeper_deadline_at.gt.${new Date(now).toISOString()},timekeeper_id.not.is.null`);
+  if (excluded.length > 0) query = query.not("id", "in", `(${excluded.join(",")})`);
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(1);
+  if (error) return null;
+  return data?.[0] ?? null;
 }
 
 /** Get IDs of all athletes who have a pending challenge with this athlete (either direction) */

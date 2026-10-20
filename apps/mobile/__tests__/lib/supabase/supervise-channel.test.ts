@@ -258,4 +258,16 @@ describe("superviseChannel", () => {
     second.stop();
     expect(mockRemoveChannel).toHaveBeenCalledWith(channel.id);
   });
+
+  it("with resumeOnForeground false registers no AppState listener, and still rebuilds (the match screen's channels)", () => {
+    const stop = superviseChannel("test", build as never, jest.fn(), { keepRetrying: () => true, resumeOnForeground: false });
+    expect(appStateHandlers).toHaveLength(0);
+    for (const delay of [...CHANNEL_LOSS_RETRY_DELAYS_MS, 30_000, 30_000]) {
+      serverClose(latest());
+      jest.advanceTimersByTime(delay);
+    }
+    expect(mockBuilt).toHaveLength(7);
+    stop();
+    expect(mockRemoveChannel).toHaveBeenCalledWith(7);
+  });
 });

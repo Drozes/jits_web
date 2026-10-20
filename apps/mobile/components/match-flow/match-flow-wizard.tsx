@@ -7,7 +7,7 @@ import { useWizardSync } from "@/lib/match-flow/use-wizard-sync";
 import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
-import { useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
+import { useAiConsent, useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
 import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
 import { MatchFlowProvider } from "@/lib/match-flow/match-flow-context";
 import { computeOwnOutcome } from "@/lib/match-flow/compute-own-outcome";
@@ -52,6 +52,7 @@ interface MatchFlowWizardProps {
 
 /** The step names in the step marker label the match-loop harness reads (`StepMarker`). */
 const STEP_LABELS: Record<MatchStep, string> = {
+  crew: "Crew",
   weight: "Weights",
   ready: "Ready",
   live: "Live",
@@ -89,15 +90,24 @@ export function MatchFlowWizard({
   // The verdict turns its status bar back to the theme once its hero scrolls away.
   const wizardScroll = useWizardScrollSource();
   // "Record from my phone" only counts with AI processing consent (5.1.2(i)).
-  const recording = useEffectiveRecordingOptIn(currentAthleteId);
+  const recordingOptIn = useEffectiveRecordingOptIn(currentAthleteId);
+  const aiConsent = useAiConsent();
   const { match, submissionTypes, isLoading, error, refresh, applyMatch } =
     useMatchDetails(matchId);
   // Mode and role, derived once per match in hand (match-roles.ts). Null
-  // while loading, and for a viewer who is not one of its two athletes.
+  // while loading, and for a viewer who has no role in it (neither one of
+  // its two athletes nor a timekeeper-mode match's seated timekeeper).
   const roles = React.useMemo(
     () => (match ? deriveMatchRoles(match, currentAthleteId) : null),
     [match, currentAthleteId],
   );
+  // Whether this phone records the match: the camera warms on it and the
+  // live step arms the recorder. An athlete's own "Record from my phone", as
+  // always. The timekeeper always records (D12, `caps.recordingRequired`),
+  // whatever the device toggle says, but still only with AI processing
+  // consent (5.1.2(i)): without it the timekeeper's camera gate asks first.
+  const consented = aiConsent.athleteId === currentAthleteId && aiConsent.consentAt !== null;
+  const recording = recordingOptIn || (roles?.caps.recordingRequired === true && consented);
   // Step state + the DB reconciler that keeps it honest when a broadcast is
   // missed (jits-wfpo, -bh2v, -vh7m, -bmei, -mzfu). See use-wizard-sync.ts.
   const {
@@ -111,6 +121,7 @@ export function MatchFlowWizard({
     exitCancelled,
     stopRecorderRef,
     syncContext,
+    tkState,
   } = useWizardSync({
     matchId,
     currentAthleteId,
@@ -126,14 +137,32 @@ export function MatchFlowWizard({
   }, [step, onStepChange]);
 
   // The weights this match is rated on, for the face-off and the countdown.
-  // Read here, above the early returns, for hook order.
+  // Read here, above the early returns, for hook order. The athletes' reads
+  // only: the timekeeper can read neither the challenge row (RLS) nor the
+  // weight checks (participants only), and takes the rated weights and the
+  // checks from the timekeeper-mode state (PM26, `stepSeams`).
   const { weights, weightChecks } = useWizardWeights({
     matchId,
-    challengeId: match?.challenge_id,
+    challengeId: roles != null && roles.me == null ? null : match?.challenge_id,
     viewerId: currentAthleteId,
     roles,
-    checksEnabled: roles != null && !error && !!match?.challenge_id && (step === "weight" || step === "ready"),
+    checksEnabled: roles?.me != null && !error && !!match?.challenge_id && (step === "weight" || step === "ready"),
   });
+
+  // The step the camera follows. The timekeeper's one face-off screen is the
+  // `weight` step (spec 6.2), and it holds the camera the athletes' ready
+  // step holds (preview, wake-lock, orientation), so the camera is warm
+  // before their Start. While the match is pending or in progress: the match
+  // in hand may turn in_progress a render before the step turns live, and
+  // the capture session must stay up across that ready -> live handoff. Not
+  // for a cancelled (or finished) match, which also mounts on `weight` until
+  // its first snapshot exits it.
+  const timekeeperFaceoff =
+    step === "weight" &&
+    roles != null &&
+    roles.me == null &&
+    (match?.status === "pending" || match?.status === "in_progress");
+  const cameraStep: MatchStep | null = timekeeperFaceoff ? "ready" : step;
 
   // Screen wake-lock for every step the recorder camera is up, not just
   // live. The ready check shows the preview and the phone is typically
@@ -142,7 +171,7 @@ export function MatchFlowWizard({
   // per step: two holders of the one lock tag would release it for each
   // other on the ready -> live handoff. Held on live even when not
   // recording: the clock is on screen for the whole round.
-  useMatchKeepAwake(step === "ready" || step === "live");
+  useMatchKeepAwake(cameraStep === "ready" || cameraStep === "live");
 
   // Live shrinks the content to the viewport with scrolling off. Reset any
   // offset left from scrolling the ready step, or every full-screen layer
@@ -222,15 +251,17 @@ export function MatchFlowWizard({
   }
   if ((isLoading && !revalidating) || !match || !step) return <WizardLoading />;
 
-  const me = roles?.me;
-  const opponent = roles?.opponent;
-  if (!roles || !me || !opponent) {
+  if (!roles) {
     return (
       <WizardError exitHref={exitHref} exitLabel={exitLabel} title="Not a participant" />
     );
   }
+  // Null for the timekeeper of a timekeeper-mode match, who is in the match
+  // but is neither athlete: no athlete face-off, outcome or verdict.
+  const me = roles.me;
+  const opponent = roles.opponent;
 
-  const ownOutcome = computeOwnOutcome(me, resultData);
+  const ownOutcome = me ? computeOwnOutcome(me, resultData) : null;
   const extras = readMatchExtras(match);
   // Live is a full-screen broadcast layout over the camera, and the verdict
   // runs its hero edge to edge. The ScrollView and every slot stay in place
@@ -239,9 +270,12 @@ export function MatchFlowWizard({
   const live = step === "live";
   const fullBleed = live || step === "summary";
   const faceoff = step === "weight" || step === "ready";
+  // The athletes' face-off (its channel, ready handshake and auto-start);
+  // the timekeeper's face-off is its own screen.
+  const athleteFaceoff = faceoff && me != null && opponent != null;
 
   return (
-    <MatchFlowProvider match={match} roles={roles}>
+    <MatchFlowProvider match={match} roles={roles} tkState={tkState}>
       <WizardScrollContext.Provider value={wizardScroll.value}>
         <ScrollView
           ref={scrollRef}
@@ -266,17 +300,17 @@ export function MatchFlowWizard({
         >
           <MatchRecorderProvider
             matchId={matchId}
-            uploaderAthleteId={me.athleteId}
+            uploaderAthleteId={me?.athleteId ?? currentAthleteId}
             matchDurationSeconds={match.duration_seconds}
           >
             <MatchSyncProvider value={syncContext}>
               <FaceoffProvider
-                active={faceoff}
-                phase={faceoff ? step : null}
+                active={athleteFaceoff}
+                phase={athleteFaceoff && faceoff ? step : null}
                 matchId={matchId}
                 exitHref={exitHref}
-                meId={me.athleteId}
-                opponentId={opponent.athleteId}
+                meId={me?.athleteId ?? currentAthleteId}
+                opponentId={opponent?.athleteId ?? ""}
                 myWeight={weights.mine}
                 opponentWeight={weights.theirs}
                 weightsRated={weights.rated}
@@ -290,13 +324,13 @@ export function MatchFlowWizard({
               >
                 <RecorderStopBridge stopRef={stopRecorderRef} />
                 {/* Before the step renderer so the live lock lands before recording starts. */}
-                <MatchOrientationController mode={orientationModeFor(step)} />
+                <MatchOrientationController mode={orientationModeFor(cameraStep)} />
                 <StepMarker step={step} />
                 {live ? null : <QueueStatusBanner />}
-                {faceoff ? (
+                {faceoff && me && opponent ? (
                   <FaceoffTop phase={step} me={me} opponent={opponent} />
                 ) : null}
-                <MatchRecorderCamera step={step} optedIn={recording} />
+                <MatchRecorderCamera step={cameraStep} optedIn={recording} />
                 <MatchStepRenderer
                   step={step}
                   exitHref={exitHref}

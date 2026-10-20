@@ -425,3 +425,22 @@ describe("domainErrorFromHint", () => {
     expect(domainErrorFromHint("session_full").code).toBe("SESSION_FULL");
   });
 });
+
+describe("timekeeper mode R2: the match INSERT trigger's busy hints (jr_be 024 3.4)", () => {
+  it("maps timekeeper_busy to TIMEKEEPER_BUSY, keeping the busy athlete in raw.details", () => {
+    const err = Object.assign(pgError("P0001", "An athlete is timekeeping another match", "timekeeper_busy"), { details: "athlete-1" });
+    const mapped = mapPostgrestError(err);
+    expect(mapped.code).toBe("TIMEKEEPER_BUSY");
+    expect(mapped.raw?.details).toBe("athlete-1");
+  });
+
+  it("maps athlete_in_timekeeper_match to ATHLETE_IN_TIMEKEEPER_MATCH", () => {
+    const mapped = mapPostgrestError(pgError("P0001", "An athlete is in a timekeeper-mode match", "athlete_in_timekeeper_match"));
+    expect(mapped.code).toBe("ATHLETE_IN_TIMEKEEPER_MATCH");
+  });
+
+  it("the same codes come from domainErrorFromHint", () => {
+    expect(domainErrorFromHint("timekeeper_busy").code).toBe("TIMEKEEPER_BUSY");
+    expect(domainErrorFromHint("athlete_in_timekeeper_match").code).toBe("ATHLETE_IN_TIMEKEEPER_MATCH");
+  });
+});

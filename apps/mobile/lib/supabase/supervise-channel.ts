@@ -57,6 +57,13 @@ export interface SuperviseChannelOptions {
    * last step instead of waiting for the next foreground.
    */
   keepRetrying?: () => boolean;
+  /**
+   * Default true: a channel that gave up restarts on the next foreground.
+   * False registers no AppState listener, for a caller whose `keepRetrying`
+   * always says yes, so it never gives up (the match screen's channels,
+   * timekeeper mode M1: the screen is held awake on ready and live).
+   */
+  resumeOnForeground?: boolean;
 }
 
 /** The teardown returned by `superviseChannel`, plus a manual restart. */
@@ -137,15 +144,18 @@ export function superviseChannel(
     start();
   };
 
-  const appStateSub = AppState.addEventListener("change", (next) => {
-    if (next === "active") resume();
-  });
+  const appStateSub =
+    options.resumeOnForeground === false
+      ? null
+      : AppState.addEventListener("change", (next) => {
+          if (next === "active") resume();
+        });
 
   start();
 
   const stop = () => {
     stopped = true;
-    appStateSub.remove();
+    appStateSub?.remove();
     if (timer) clearTimeout(timer);
     if (current) void supabase.removeChannel(current);
     current = null;

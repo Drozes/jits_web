@@ -5,6 +5,11 @@
  * `!inner` embed, open statuses only, the resume window on created OR started)
  * and how it shapes the result, including the opponent name from
  * `get_match_details` and a quiet null name when that read fails.
+ *
+ * Timekeeper mode (spec 9.1, review tech M9; M1): only when that read finds
+ * nothing, a second read keeps a timekeeper-mode pending match open while its
+ * pick deadline runs or a timekeeper is seated. `calls` is the shipped read,
+ * unchanged; `tkCalls` is the second one.
  */
 import { describe, it, expect, vi } from "vitest";
 import { getMyActiveMatch } from "./queries";
@@ -16,26 +21,37 @@ const ME = "me-1";
 function mockClient(opts: {
   rows?: Array<{ id: string; status: string }>;
   error?: { message: string; code?: string } | null;
+  /** The timekeeper-mode pending read (the second `from("matches")`). */
+  tkRows?: Array<{ id: string; status: string }>;
+  tkError?: { message: string; code?: string } | null;
   details?: unknown;
   detailsError?: unknown;
 }) {
   const calls: Array<[string, ...unknown[]]> = [];
-  const chain: Record<string, (...args: unknown[]) => unknown> = {};
-  for (const m of ["select", "eq", "is", "in", "or", "not", "order"]) {
-    chain[m] = (...args: unknown[]) => {
-      calls.push([m, ...args]);
-      return chain;
+  const tkCalls: Array<[string, ...unknown[]]> = [];
+  let reads = 0;
+  const from = vi.fn(() => {
+    const first = reads++ === 0;
+    const log = first ? calls : tkCalls;
+    const rows = first ? opts.rows : opts.tkRows;
+    const error = first ? opts.error : opts.tkError;
+    const chain: Record<string, (...args: unknown[]) => unknown> = {};
+    for (const m of ["select", "eq", "is", "in", "or", "not", "order"]) {
+      chain[m] = (...args: unknown[]) => {
+        log.push([m, ...args]);
+        return chain;
+      };
+    }
+    chain.limit = (...args: unknown[]) => {
+      log.push(["limit", ...args]);
+      return Promise.resolve({ data: error ? null : (rows ?? []), error: error ?? null });
     };
-  }
-  chain.limit = (...args: unknown[]) => {
-    calls.push(["limit", ...args]);
-    return Promise.resolve({ data: opts.error ? null : (opts.rows ?? []), error: opts.error ?? null });
-  };
-  const from = vi.fn(() => chain);
+    return chain;
+  });
   const rpc = vi.fn(() =>
     Promise.resolve({ data: opts.details ?? null, error: opts.detailsError ?? null }),
   );
-  return { client: { from, rpc } as never, from, rpc, calls };
+  return { client: { from, rpc } as never, from, rpc, calls, tkCalls };
 }
 
 const details = {
@@ -146,5 +162,71 @@ describe("getMyActiveMatch", () => {
     const res = await getMyActiveMatch(client, ME, NOW);
     expect(res.ok).toBe(false);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("getMyActiveMatch: a timekeeper-mode pending match (spec 9.1, M1)", () => {
+  const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const nowIso = new Date(NOW).toISOString();
+
+  it("reads it only when the shipped read finds nothing, while its deadline runs or a timekeeper is seated", async () => {
+    const { client, from, tkCalls } = mockClient({ rows: [] });
+    await getMyActiveMatch(client, ME, NOW);
+    expect(from).toHaveBeenCalledTimes(2);
+    expect(from).toHaveBeenNthCalledWith(2, "matches");
+    expect(tkCalls).toEqual([
+      ["select", "id, status, match_participants!inner(athlete_id, status)"],
+      ["eq", "match_participants.athlete_id", ME],
+      ["eq", "match_participants.status", "active"],
+      ["is", "session_id", null],
+      ["eq", "status", "pending"],
+      ["eq", "requires_timekeeper", true],
+      ["or", `timekeeper_deadline_at.gt.${nowIso},timekeeper_id.not.is.null`],
+      ["order", "created_at", { ascending: false }],
+      ["limit", 1],
+    ]);
+  });
+
+  it("never runs when the shipped read found a match (the two-athlete path is one read, as before)", async () => {
+    const { client, from, tkCalls } = mockClient({ rows: [{ id: "m1", status: "pending" }], details });
+    await getMyActiveMatch(client, ME, NOW);
+    expect(from).toHaveBeenCalledTimes(1);
+    expect(tkCalls).toEqual([]);
+  });
+
+  it("returns that match, older than the 10-minute window, as pending with the opponent's name", async () => {
+    const { client, rpc } = mockClient({ rows: [], tkRows: [{ id: "m-tk", status: "pending" }], details });
+    expect(await getMyActiveMatch(client, ME, NOW)).toEqual({
+      ok: true,
+      data: { matchId: "m-tk", status: "pending", opponentName: "Demo Red" },
+    });
+    expect(rpc).toHaveBeenCalledWith("get_match_details", { p_match_id: "m-tk" });
+  });
+
+  it("leaves out matches the athlete backed out of", async () => {
+    const { client, tkCalls } = mockClient({ rows: [] });
+    await getMyActiveMatch(client, ME, NOW, [A, "not-a-uuid", B]);
+    expect(tkCalls).toContainEqual(["not", "id", "in", `(${A},${B})`]);
+  });
+
+  it("sends no exclusion when nothing (valid) was left", async () => {
+    const { client, tkCalls } = mockClient({ rows: [] });
+    await getMyActiveMatch(client, ME, NOW, ["not-a-uuid"]);
+    expect(tkCalls.some((c) => c[0] === "not")).toBe(false);
+  });
+
+  it("an older backend (no timekeeper columns) answers with an error: read as nothing more", async () => {
+    const { client, rpc } = mockClient({
+      rows: [],
+      tkError: { message: "column matches.requires_timekeeper does not exist", code: "42703" },
+    });
+    expect(await getMyActiveMatch(client, ME, NOW)).toEqual({ ok: true, data: null });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("returns null when there is no timekeeper-mode pending match either", async () => {
+    const { client } = mockClient({ rows: [], tkRows: [] });
+    expect(await getMyActiveMatch(client, ME, NOW)).toEqual({ ok: true, data: null });
   });
 });

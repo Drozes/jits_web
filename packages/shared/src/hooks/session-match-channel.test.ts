@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  actorPayload,
   createSessionMatchChannel,
   SESSION_MATCH_EVENTS,
   sessionMatchTopic,
@@ -214,5 +215,64 @@ describe("settleWithin", () => {
 
   it("accepts a non-promise (a fire-and-forget mock) and resolves immediately", async () => {
     await expect(settleWithin(undefined, 1000)).resolves.toBeUndefined();
+  });
+});
+
+describe("actor_id (timekeeper mode, spec 10, PM1)", () => {
+  function allHandlers(): Required<SessionMatchHandlers> {
+    return {
+      onTimerStarted: vi.fn(),
+      onTimerPaused: vi.fn(),
+      onTimerResumed: vi.fn(),
+      onMatchEnded: vi.fn(),
+      onReadySignal: vi.fn(),
+      onResultSubmitted: vi.fn(),
+      onResultConfirmed: vi.fn(),
+      onMatchCancelled: vi.fn(),
+      onMatchDisputed: vi.fn(),
+      onWeighedIn: vi.fn(),
+      onRecordingOptIn: vi.fn(),
+      onResultClaimed: vi.fn(),
+    };
+  }
+
+  it("hands the actor to the clock, end, cancel and result handlers when the payload carries one", () => {
+    const m = createMockSupabase();
+    const h = allHandlers();
+    createSessionMatchChannel(m.supabase as never, "m-1", h);
+    m.fire("timer_started", { started_at: "t0", actor_id: "tk" });
+    m.fire("timer_paused", { paused_at: "t1", actor_id: "tk" });
+    m.fire("timer_resumed", { total_paused_duration: 7, actor_id: "tk" });
+    m.fire("match_ended", { actor_id: "tk" });
+    m.fire("match_cancelled", { actor_id: "a" });
+    m.fire("result_submitted", { result: "submission", winnerId: "a", actor_id: "tk" });
+    expect(h.onTimerStarted).toHaveBeenCalledWith("t0", "tk");
+    expect(h.onTimerPaused).toHaveBeenCalledWith("t1", "tk");
+    expect(h.onTimerResumed).toHaveBeenCalledWith(7, "tk");
+    expect(h.onMatchEnded).toHaveBeenCalledWith("tk");
+    expect(h.onMatchCancelled).toHaveBeenCalledWith("a");
+    // The result handler gets the result without the actor key, and the actor apart.
+    expect(h.onResultSubmitted).toHaveBeenCalledWith({ result: "submission", winnerId: "a" }, "tk");
+  });
+
+  it("calls every handler with exactly its shipped arguments when there is no actor", () => {
+    const m = createMockSupabase();
+    const h = allHandlers();
+    createSessionMatchChannel(m.supabase as never, "m-1", h);
+    m.fire("timer_started", { started_at: "t0" });
+    m.fire("match_ended");
+    m.fire("match_cancelled", { actor_id: "" });
+    m.fire("result_submitted", { result: "draw" });
+    expect(vi.mocked(h.onTimerStarted).mock.calls).toEqual([["t0"]]);
+    expect(vi.mocked(h.onMatchEnded).mock.calls).toEqual([[]]);
+    expect(vi.mocked(h.onMatchCancelled).mock.calls).toEqual([[]]);
+    expect(vi.mocked(h.onResultSubmitted).mock.calls).toEqual([[{ result: "draw" }]]);
+  });
+
+  it("actorPayload adds the key only for an actor", () => {
+    expect(actorPayload("tk")).toEqual({ actor_id: "tk" });
+    expect(actorPayload(null)).toEqual({});
+    expect(actorPayload(undefined)).toEqual({});
+    expect(actorPayload("")).toEqual({});
   });
 });

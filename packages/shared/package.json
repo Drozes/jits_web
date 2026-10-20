@@ -27,6 +27,7 @@
     "./api/location": "./src/api/location.ts",
     "./api/invite-rpc": "./src/api/invite-rpc.ts",
     "./api/playback-settings": "./src/api/playback-settings.ts",
+    "./api/timekeeper": "./src/api/timekeeper.ts",
     "./constants": "./src/constants.ts",
     "./constants/highlights": "./src/constants/highlights.ts",
     "./constants/go-live": "./src/constants/go-live.ts",

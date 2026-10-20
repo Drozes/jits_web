@@ -43,6 +43,8 @@ export const STEP_MARKER_RE = /^Step \d+ of \d+, (\w+)$/;
  * `STEP_LABELS`; `tests/label-contract.test.ts` pins the two together.
  */
 export const STEP_BY_LABEL: Readonly<Record<string, WizardStep>> = {
+  // Timekeeper mode: the athletes pick a timekeeper (never shown in a two-athlete match).
+  crew: "crew",
   weights: "weight",
   ready: "ready",
   live: "live",
