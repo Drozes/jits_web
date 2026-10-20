@@ -1190,6 +1190,30 @@ export type Database = {
           },
         ]
       }
+      highlight_result_rerender_queue: {
+        Row: {
+          attempts: number
+          last_result: Json | null
+          last_run_at: string | null
+          match_id: string
+          requested_at: string
+        }
+        Insert: {
+          attempts?: number
+          last_result?: Json | null
+          last_run_at?: string | null
+          match_id: string
+          requested_at?: string
+        }
+        Update: {
+          attempts?: number
+          last_result?: Json | null
+          last_run_at?: string | null
+          match_id?: string
+          requested_at?: string
+        }
+        Relationships: []
+      }
       invite_attributions: {
         Row: {
           attributed_at: string
@@ -4372,6 +4396,7 @@ export type Database = {
           first_live_at: string | null
           id: string
           late_angle_renders: number
+          live_context_at: string | null
           live_duration_s: number | null
           live_poster_path: string | null
           live_ready_at: string | null
@@ -4389,6 +4414,7 @@ export type Database = {
           redispatched_at: string | null
           render_attempts: number
           render_total: number
+          result_rerenders: number
           scope: string
           segments: Json
           source_video_ids: string[] | null
@@ -4409,6 +4435,7 @@ export type Database = {
           first_live_at?: string | null
           id?: string
           late_angle_renders?: number
+          live_context_at?: string | null
           live_duration_s?: number | null
           live_poster_path?: string | null
           live_ready_at?: string | null
@@ -4426,6 +4453,7 @@ export type Database = {
           redispatched_at?: string | null
           render_attempts?: number
           render_total?: number
+          result_rerenders?: number
           scope?: string
           segments: Json
           source_video_ids?: string[] | null
@@ -4446,6 +4474,7 @@ export type Database = {
           first_live_at?: string | null
           id?: string
           late_angle_renders?: number
+          live_context_at?: string | null
           live_duration_s?: number | null
           live_poster_path?: string | null
           live_ready_at?: string | null
@@ -4463,6 +4492,7 @@ export type Database = {
           redispatched_at?: string | null
           render_attempts?: number
           render_total?: number
+          result_rerenders?: number
           scope?: string
           segments?: Json
           source_video_ids?: string[] | null
@@ -4688,6 +4718,17 @@ export type Database = {
         }
         Returns: Json
       }
+      _arm_match_highlight_result_rerender: {
+        Args: {
+          p_athlete_id: string
+          p_audio_bed?: string
+          p_match_id: string
+          p_primary_id: string
+          p_segments: Json
+          p_source_ids: string[]
+        }
+        Returns: Json
+      }
       _arm_rebuild_render: {
         Args: { p_prep: Json; p_primary_id: string; p_rebuild_id: string }
         Returns: string
@@ -4858,6 +4899,7 @@ export type Database = {
           first_live_at: string | null
           id: string
           late_angle_renders: number
+          live_context_at: string | null
           live_duration_s: number | null
           live_poster_path: string | null
           live_ready_at: string | null
@@ -4875,6 +4917,7 @@ export type Database = {
           redispatched_at: string | null
           render_attempts: number
           render_total: number
+          result_rerenders: number
           scope: string
           segments: Json
           source_video_ids: string[] | null
@@ -4896,6 +4939,10 @@ export type Database = {
         Returns: string
       }
       _highlight_render_max: { Args: never; Returns: number }
+      _highlight_result_stale: {
+        Args: { p_h: Database["public"]["Tables"]["video_highlights"]["Row"] }
+        Returns: boolean
+      }
       _highlight_segments_v1_to_v2: {
         Args: {
           p_allowed: string[]
@@ -5025,6 +5072,7 @@ export type Database = {
         Returns: string
       }
       _match_clarity_moments: { Args: { p_match_id: string }; Returns: Json }
+      _match_countdown_seconds: { Args: never; Returns: number }
       _match_current_primary: { Args: { p_match_id: string }; Returns: string }
       _match_footage_angle_counts: {
         Args: {
@@ -5321,6 +5369,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      _result_edit_rerender_match: {
+        Args: { p_match_id: string }
+        Returns: Json
+      }
       _scrub_highlight_message: {
         Args: { p_max?: number; p_text: string }
         Returns: string
@@ -5366,14 +5418,48 @@ export type Database = {
         }
         Returns: Json
       }
+      _tk_busy_as: {
+        Args: {
+          p_athlete: string
+          p_count_requests: boolean
+          p_match_id: string
+        }
+        Returns: string
+      }
       _tk_cancel: {
         Args: { p_left_reason?: string; p_match_id: string; p_reason: string }
+        Returns: undefined
+      }
+      _tk_cancel_before_start: { Args: { p_match_id: string }; Returns: Json }
+      _tk_check_opponent_weight: {
+        Args: { p_match_id: string; p_verdict: string; p_weight_seen?: number }
+        Returns: Json
+      }
+      _tk_code_path_refusal: { Args: { p_match_id: string }; Returns: Json }
+      _tk_confirm_match_result: {
+        Args: { p_expected_edit_count?: number; p_match_id: string }
+        Returns: Json
+      }
+      _tk_due_step: { Args: { p_match_id: string }; Returns: string }
+      _tk_edit_guard: {
+        Args: {
+          p_caller: string
+          p_expected_edit_count: number
+          p_finish_time_seconds: number
+          p_match_id: string
+        }
         Returns: undefined
       }
       _tk_flag: {
         Args: { p_kind: string; p_match_id: string }
         Returns: boolean
       }
+      _tk_invitee_refusal: {
+        Args: { p_athlete: string; p_match_id: string }
+        Returns: string
+      }
+      _tk_lapse_request: { Args: { p_request_id: string }; Returns: boolean }
+      _tk_leave_as_timekeeper: { Args: { p_match_id: string }; Returns: Json }
       _tk_match_athletes: { Args: { p_match_id: string }; Returns: string[] }
       _tk_notify: {
         Args: {
@@ -5385,16 +5471,48 @@ export type Database = {
         Returns: number
       }
       _tk_offline_since: { Args: { p_match_id: string }; Returns: string }
+      _tk_pause_match: { Args: { p_match_id: string }; Returns: Json }
+      _tk_record_match_result: {
+        Args: {
+          p_finish_time_seconds?: number
+          p_match_id: string
+          p_result: string
+          p_submission_type_code?: string
+          p_winner_id?: string
+        }
+        Returns: Json
+      }
+      _tk_resume_match: { Args: { p_match_id: string }; Returns: Json }
+      _tk_reweigh_for_match: {
+        Args: { p_match_id: string; p_weight: number }
+        Returns: Json
+      }
       _tk_seat_timekeeper: {
         Args: { p_athlete_id: string; p_match_id: string }
         Returns: undefined
       }
+      _tk_set_match_recording_intent: {
+        Args: { p_intends: boolean; p_match_id: string }
+        Returns: Json
+      }
       _tk_start_blockers: { Args: { p_match_id: string }; Returns: string[] }
+      _tk_start_match: { Args: { p_match_id: string }; Returns: Json }
+      _tk_tick_match: { Args: { p_match_id: string }; Returns: string }
       _tk_unseat_before_start: {
         Args: { p_match_id: string; p_reason?: string }
         Returns: undefined
       }
+      _tk_weight_check_payload: { Args: { p_match_id: string }; Returns: Json }
       _tk_window: { Args: { p_name: string }; Returns: string }
+      _tk_write_opponent_check: {
+        Args: {
+          p_checker_id: string
+          p_match_id: string
+          p_verdict: string
+          p_weight_seen: number
+        }
+        Returns: undefined
+      }
       _tk_write_result: {
         Args: {
           p_actor: string
@@ -5555,6 +5673,7 @@ export type Database = {
           total_disputes_30d: number
         }[]
       }
+      admin_list_timekeeper_reviews: { Args: never; Returns: Json }
       admin_remove_gym_manager: {
         Args: { p_athlete_id: string; p_gym_id: string }
         Returns: undefined
@@ -5563,6 +5682,18 @@ export type Database = {
       admin_resolve_content_report: {
         Args: { p_note?: string; p_report_id: string; p_status: string }
         Returns: undefined
+      }
+      admin_resolve_timekeeper_review: {
+        Args: {
+          p_action: string
+          p_finish_time_seconds?: number
+          p_match_id: string
+          p_note?: string
+          p_result?: string
+          p_submission_type_code?: string
+          p_winner_id?: string
+        }
+        Returns: Json
       }
       admin_search_athletes: {
         Args: { p_query: string }
@@ -5647,6 +5778,19 @@ export type Database = {
         Returns: Json
       }
       cancel_session_match: { Args: { p_match_id: string }; Returns: Json }
+      cancel_timekeeper_request: {
+        Args: { p_request_id: string }
+        Returns: Json
+      }
+      check_athlete_weight_as_timekeeper: {
+        Args: {
+          p_match_id: string
+          p_subject_id: string
+          p_verdict: string
+          p_weight_seen?: number
+        }
+        Returns: Json
+      }
       check_opponent_weight: {
         Args: { p_match_id: string; p_verdict: string; p_weight_seen?: number }
         Returns: Json
@@ -5748,7 +5892,10 @@ export type Database = {
       }
       cleanup_orphaned_chunk_objects: { Args: never; Returns: number }
       clear_active_avatar: { Args: never; Returns: Json }
-      confirm_match_result: { Args: { p_match_id: string }; Returns: Json }
+      confirm_match_result: {
+        Args: { p_expected_edit_count?: number; p_match_id: string }
+        Returns: Json
+      }
       create_direct_conversation: {
         Args: { p_other_athlete_id: string }
         Returns: Json
@@ -5785,12 +5932,27 @@ export type Database = {
         Args: { p_match_id: string; p_reason?: string }
         Returns: Json
       }
+      edit_match_result: {
+        Args: {
+          p_expected_edit_count?: number
+          p_finish_time_seconds?: number
+          p_match_id: string
+          p_result: string
+          p_submission_type_code?: string
+          p_winner_id?: string
+        }
+        Returns: Json
+      }
       elect_match_primary_video: {
         Args: { p_match_id: string }
         Returns: string
       }
       enable_multi_angle_highlights: { Args: never; Returns: Json }
       end_match: { Args: { p_match_id: string }; Returns: Json }
+      end_match_clock: {
+        Args: { p_final_elapsed_s: number; p_match_id: string }
+        Returns: Json
+      }
       enqueue_highlight_plan: {
         Args: { p_match_video_id: string }
         Returns: string
@@ -5987,6 +6149,7 @@ export type Database = {
         Args: { p_before?: string; p_before_id?: string; p_limit?: number }
         Returns: Json
       }
+      get_my_timekeeping_match: { Args: never; Returns: Json }
       get_or_create_personal_invite: { Args: never; Returns: Json }
       get_playback_settings: { Args: never; Returns: Json }
       get_playback_url_target: {
@@ -6019,10 +6182,12 @@ export type Database = {
           submission_type_display_name: string
         }[]
       }
+      get_timekeeper_candidates: { Args: { p_match_id: string }; Returns: Json }
       get_timekeeper_match_state: {
         Args: { p_match_id: string }
         Returns: Json
       }
+      get_timekeeper_request: { Args: { p_request_id: string }; Returns: Json }
       get_unread_counts: {
         Args: never
         Returns: {
@@ -6110,6 +6275,10 @@ export type Database = {
       mark_highlight_seen: {
         Args: { p_highlight_id: string; p_version: number }
         Returns: undefined
+      }
+      mark_match_ready: {
+        Args: { p_confirm_opponent_weight?: boolean; p_match_id: string }
+        Returns: Json
       }
       mark_practice_match: {
         Args: { p_event: string }
@@ -6310,6 +6479,10 @@ export type Database = {
         Returns: undefined
       }
       request_match_sync: { Args: { p_match_id: string }; Returns: Json }
+      request_match_timekeeper: {
+        Args: { p_invitee_id: string; p_match_id: string }
+        Returns: Json
+      }
       request_pending_video_slices: { Args: never; Returns: number }
       request_playback_backfill: {
         Args: { p_dry_run?: boolean; p_limit?: number; p_profile?: string }
@@ -6324,6 +6497,11 @@ export type Database = {
         }
         Returns: Json
       }
+      respond_timekeeper_request: {
+        Args: { p_accept: boolean; p_request_id: string }
+        Returns: Json
+      }
+      result_edit_rerender_tick: { Args: never; Returns: Json }
       resume_match: { Args: { p_match_id: string }; Returns: Json }
       retry_failed_chunks: { Args: never; Returns: number }
       retry_highlight_render: {
@@ -6492,7 +6670,9 @@ export type Database = {
         Args: { p_limit?: number; p_now?: string }
         Returns: number
       }
+      timekeeper_mode_tick: { Args: never; Returns: Json }
       toggle_scoutable: { Args: { p_scoutable: boolean }; Returns: boolean }
+      touch_match_timekeeper: { Args: { p_match_id: string }; Returns: Json }
       touch_match_video_upload: {
         Args: {
           p_bytes_confirmed: number
