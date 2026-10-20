@@ -2,12 +2,18 @@
  * Mode and role, derived ONCE per match snapshot (timekeeper mode,
  * ARCHITECTURE 2.1). Every hook, step and control reads `MatchRoles`, never
  * `requires_timekeeper` or the participant array (clean-code rules M-R1 and
- * M-R2): this module is the only place that pairs "me" with "the other one".
+ * M-R2): this module is the only place that pairs "me" with "the other one",
+ * and the only place that reads the mode.
  *
- * Only the self-run mode (today's two-athlete flow) is derived here yet. The
- * timekeeper values of `MatchMode`, `ViewerRole`, `timekeeper` and the
- * capabilities are typed so the timekeeper slice (M1) adds its rows without
- * changing this shape; nothing reaches them before it does.
+ * Two first-class modes, decided by the backend at match creation:
+ *  - self_run (`requires_timekeeper` missing or false): today's two-athlete
+ *    flow, for every two-athlete match and every older backend;
+ *  - timekeeper (`requires_timekeeper` true): a seated timekeeper runs the
+ *    match; the athletes and the timekeeper each get their capability row.
+ * The interfaces are the shape ARCHITECTURE 2.1 records as built (jits-o47s.25:
+ * no `stillUrl`, `weightDivisionGap` added). The capture capabilities
+ * (`recordingOrientation`, `captureLens`) join from M9's
+ * `capture-policy.ts` (ARCHITECTURE 2.8), never from here.
  *
  * Pure: the match-loop harness imports `reconcile.ts`, which imports this
  * file's types, and runs outside React Native. Import only types and other
@@ -28,7 +34,11 @@ export interface MatchAthleteView {
   /** "Mina Park" -> "M. Park". */
   shortName: string;
   currentElo: number | null;
-  /** The profile weight (`current_weight`, lbs); the rated weights come from `useWizardWeights`. */
+  /**
+   * The profile weight (`current_weight`, lbs). An athlete's rated weights
+   * come from `useWizardWeights`; the timekeeper's step pair carries the
+   * rated weights here instead (`stepSeams`, PM26).
+   */
   weightLbs: number | null;
   photoUrl: string | null;
   /** The stamped outcome; null until a result is recorded. */
@@ -77,6 +87,7 @@ export interface MatchRoles {
   opponent: MatchAthleteView | null;
   /** Challenger first. */
   athletes: readonly [MatchAthleteView, MatchAthleteView];
+  /** The seated timekeeper (timekeeper mode only); null while nobody is seated. */
   timekeeper: { id: string; name: string; shortName: string } | null;
   caps: MatchCaps;
 }
@@ -100,6 +111,46 @@ const SELF_RUN_CAPS: MatchCaps = {
   submissionLayout: "chips",
 };
 
+/** Timekeeper mode, either athlete: the timekeeper starts, runs the clock and records. */
+const TIMEKEEPER_MODE_ATHLETE_CAPS: MatchCaps = {
+  autoStart: false,
+  canStart: false,
+  canPauseEnd: false,
+  endVia: null,
+  resultEntry: "wait",
+  recorderAutoConfirmed: false,
+  canConfirm: true,
+  canEditResult: false,
+  leave: "cancel_for_all",
+  recordingRequired: false,
+  readyPolicy: "server_merged",
+  weightVerdicts: "opponent",
+  showsRatingOnConfirm: false,
+  submissionLayout: "chips",
+};
+
+/** Timekeeper mode, the seated timekeeper. */
+const TIMEKEEPER_CAPS: MatchCaps = {
+  autoStart: false,
+  canStart: true,
+  canPauseEnd: true,
+  endVia: "end_match_clock",
+  resultEntry: "sole",
+  recorderAutoConfirmed: false,
+  canConfirm: false,
+  // A8, A24: still subject to the server's 30-minute window.
+  canEditResult: true,
+  leave: "timekeeper_seat",
+  recordingRequired: true,
+  readyPolicy: "server_merged",
+  // A19: the per-athlete verdicts only when the match snapshot asks for them.
+  weightVerdicts: "both_athletes",
+  showsRatingOnConfirm: false,
+  submissionLayout: "list",
+};
+
+const TIMEKEEPER_NO_WEIGHT_CHECK_CAPS: MatchCaps = { ...TIMEKEEPER_CAPS, weightVerdicts: "none" };
+
 function asOutcome(outcome: string | null | undefined): AthleteOutcome | null {
   return outcome === "win" || outcome === "loss" || outcome === "draw" ? outcome : null;
 }
@@ -121,27 +172,74 @@ function toMatchAthleteView(p: MatchParticipant, isChallenger: boolean): MatchAt
   };
 }
 
+/** The one read of the mode (M-R1): missing means the two-athlete flow. */
+function modeOf(match: MatchDetails): MatchMode {
+  return match.requires_timekeeper === true ? "timekeeper" : "self_run";
+}
+
 /**
- * The viewer's roles in this match, or null for a viewer who is not one of
- * its two athletes (the wizard's "Not a participant").
+ * Which of the two athletes challenged: `challenger_id` when the backend
+ * names one of them (BE-G), else the first participant stands in (an older
+ * backend; nothing in the two-athlete flow depends on it, jits-o47s.24).
  */
-export function deriveMatchRoles(match: MatchDetails, viewerId: string): MatchRoles | null {
-  const mine = match.participants.find((p) => p.athlete_id === viewerId);
-  const theirs = match.participants.find((p) => p.athlete_id !== viewerId);
-  if (!mine || !theirs) return null;
-  // `get_match_details` names the challenger once BE-G ships (`challenger_id`,
-  // read from M1 on). Until then the first participant stands in: nothing in
-  // the self-run flow depends on which athlete challenged.
-  const challengerId = match.participants[0].athlete_id;
+function challengerIdOf(match: MatchDetails, a: MatchParticipant, b: MatchParticipant): string {
+  const named = match.challenger_id;
+  if (named && (named === a.athlete_id || named === b.athlete_id)) return named;
+  return match.participants[0].athlete_id;
+}
+
+function seatedTimekeeper(match: MatchDetails): MatchRoles["timekeeper"] {
+  if (!match.timekeeper_id) return null;
+  const name = match.timekeeper?.id === match.timekeeper_id ? match.timekeeper.display_name : "";
+  return { id: match.timekeeper_id, name, shortName: name ? shortName(name) : "" };
+}
+
+function athleteRoles(match: MatchDetails, mode: MatchMode, mine: MatchParticipant, theirs: MatchParticipant): MatchRoles {
+  const challengerId = challengerIdOf(match, mine, theirs);
   const me = toMatchAthleteView(mine, mine.athlete_id === challengerId);
   const opponent = toMatchAthleteView(theirs, theirs.athlete_id === challengerId);
   return {
-    mode: "self_run",
+    mode,
     viewer: me.isChallenger ? "challenger" : "opponent",
     me,
     opponent,
     athletes: me.isChallenger ? [me, opponent] : [opponent, me],
-    timekeeper: null,
-    caps: SELF_RUN_CAPS,
+    timekeeper: mode === "timekeeper" ? seatedTimekeeper(match) : null,
+    caps: mode === "timekeeper" ? TIMEKEEPER_MODE_ATHLETE_CAPS : SELF_RUN_CAPS,
   };
+}
+
+function timekeeperRoles(match: MatchDetails): MatchRoles | null {
+  const [a, b] = match.participants;
+  if (!a || !b) return null;
+  const challengerId = challengerIdOf(match, a, b);
+  const first = toMatchAthleteView(a, a.athlete_id === challengerId);
+  const second = toMatchAthleteView(b, b.athlete_id === challengerId);
+  return {
+    mode: "timekeeper",
+    viewer: "timekeeper",
+    me: null,
+    opponent: null,
+    athletes: second.isChallenger ? [second, first] : [first, second],
+    timekeeper: seatedTimekeeper(match),
+    caps: match.tk_weight_check_required === true ? TIMEKEEPER_CAPS : TIMEKEEPER_NO_WEIGHT_CHECK_CAPS,
+  };
+}
+
+/**
+ * The viewer's roles in this match, or null for a viewer who is neither one
+ * of its two athletes nor its seated timekeeper (the wizard's "Not a
+ * participant"). A two-athlete match's record-only timekeeper (the code
+ * join) stays null, as before: only a timekeeper-mode match has a
+ * timekeeper role, and the mode is never read from `timekeeper_id` (B-R5).
+ */
+export function deriveMatchRoles(match: MatchDetails, viewerId: string): MatchRoles | null {
+  const mode = modeOf(match);
+  const mine = match.participants.find((p) => p.athlete_id === viewerId);
+  if (mine) {
+    const theirs = match.participants.find((p) => p.athlete_id !== viewerId);
+    return theirs ? athleteRoles(match, mode, mine, theirs) : null;
+  }
+  if (mode === "timekeeper" && match.timekeeper_id === viewerId) return timekeeperRoles(match);
+  return null;
 }

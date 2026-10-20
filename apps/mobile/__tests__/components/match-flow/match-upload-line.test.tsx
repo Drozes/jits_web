@@ -18,6 +18,10 @@ jest.mock("@/components/match-flow/steps/confirm-step", () => ({ ConfirmStep: ()
 jest.mock("@/components/match-flow/faceoff/faceoff-body", () => ({ FaceoffBody: () => null }));
 jest.mock("@/components/match-flow/countdown/live-stage", () => ({ LiveStage: () => null }));
 jest.mock("@/components/match-flow/verdict/verdict-step", () => ({ VerdictStep: () => null }));
+// The timekeeper-mode steps the renderer also places (never reached here), mocked like the rest.
+jest.mock("@/components/match-flow/crew/crew-step", () => ({ CrewStep: () => null }));
+jest.mock("@/components/match-flow/faceoff/faceoff-timekeeper", () => ({ FaceoffTimekeeper: () => null }));
+jest.mock("@/components/match-flow/steps/timekeeper-done", () => ({ TimekeeperDone: () => null }));
 
 import * as React from "react";
 import { StyleSheet } from "react-native";

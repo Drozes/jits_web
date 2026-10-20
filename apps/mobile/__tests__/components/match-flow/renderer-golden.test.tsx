@@ -2,16 +2,17 @@
  * Flag-OFF golden test (timekeeper mode, TEST-PLAN 3.1 item 3, spec 14.7 P4).
  *
  * The real wizard, the real step renderer and the real steps render every
- * screen of a two-athlete (self-run) match three times: with the match
+ * screen of a two-athlete (self-run) match four times: with the match
  * payload as an older backend sends it (no `requires_timekeeper`), with
- * `requires_timekeeper: false`, and with every timekeeper-mode key present at
+ * `requires_timekeeper: false`, with every timekeeper-mode key present at
  * its flag-OFF value (the backend after BE-G, for a flag-OFF match, with
- * `challenger_id` naming the OTHER athlete). All three trees must be
+ * `challenger_id` naming the OTHER athlete), and with the participant order
+ * reversed (an older backend's payload, so the first participant, now the
+ * other athlete, stands in for the challenger). All four trees must be
  * identical, and equal to the committed snapshot. The third variant proves
- * the extra keys change nothing; it does not prove that athlete order cannot
- * leak: `deriveMatchRoles` does not read `challenger_id` yet (the first
- * participant stands in until M1), and no variant reverses the participant
- * order.
+ * the extra keys change nothing, and since `deriveMatchRoles` reads
+ * `challenger_id` (M1, jits-o47s.24) it also flips who challenged; the
+ * fourth proves the participant order cannot leak into any screen.
  *
  * Two match shapes are pinned. The challenge-free one (`challenge_id: null`)
  * is the original seven steps. The challenge-backed one is what production
@@ -350,7 +351,11 @@ const STAKES = ratingStakes({
   weight_division_gap: 1,
 });
 
-/** The three shapes a flag-OFF match can arrive in (spec 14.7 P4). */
+/**
+ * The shapes a flag-OFF match can arrive in (spec 14.7 P4), plus the
+ * participant order reversed (jits-o47s.24; `reverseParticipants` is read by
+ * `row`, never sent).
+ */
 const VARIANTS: Record<string, Record<string, unknown>> = {
   missing: {},
   false: { requires_timekeeper: false },
@@ -368,6 +373,7 @@ const VARIANTS: Record<string, Record<string, unknown>> = {
     viewer_role: "opponent",
     timekeeper: null,
   },
+  reversed: { reverseParticipants: true },
 };
 
 interface Fixture {
@@ -382,10 +388,15 @@ interface Fixture {
   startedAt?: string;
 }
 
-function row(fx: Fixture, extra: Record<string, unknown>) {
+function row(fx: Fixture, variant: Record<string, unknown>) {
+  const { reverseParticipants, ...extra } = variant;
   const outcome = fx.outcome ?? null;
   const theirs = outcome === "win" ? "loss" : outcome === "loss" ? "win" : outcome;
   const gap = fx.challenge && outcome ? 1 : 0;
+  const participants = [
+    participant("me-1", "Mina Park", outcome, 1512, 172.5, gap),
+    participant("opp-1", "Demo Okafor", theirs, 1487, 171.4, gap),
+  ];
   return {
     id: "M1",
     challenge_id: fx.challenge ? "C1" : null,
@@ -399,10 +410,7 @@ function row(fx: Fixture, extra: Record<string, unknown>) {
     paused_at: null,
     total_paused_duration: 0,
     timekeeper_id: null,
-    participants: [
-      participant("me-1", "Mina Park", outcome, 1512, 172.5, gap),
-      participant("opp-1", "Demo Okafor", theirs, 1487, 171.4, gap),
-    ],
+    participants: reverseParticipants ? participants.reverse() : participants,
     ...extra,
   };
 }
@@ -691,13 +699,15 @@ afterEach(() => {
 
 describe("flag-OFF golden output: identical whatever the timekeeper keys say", () => {
   it.each(Object.keys(CASES))("%s", async (name) => {
-    const [missing, falseOnly, presentFalse] = [
+    const [missing, falseOnly, presentFalse, reversed] = [
       await capture(name, VARIANTS.missing),
       await capture(name, VARIANTS.false),
       await capture(name, VARIANTS["present-false"]),
+      await capture(name, VARIANTS.reversed),
     ];
     expect(falseOnly).toBe(missing);
     expect(presentFalse).toBe(missing);
+    expect(reversed).toBe(missing);
     expect(missing).toMatchSnapshot();
   });
 

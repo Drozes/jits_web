@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  actorPayload,
   createSessionMatchChannel,
   SESSION_MATCH_EVENTS as E,
   type BroadcastResult,
@@ -82,15 +83,30 @@ export function useSessionMatchSync(params: UseSessionMatchSyncParams) {
     }
   }, []);
 
+  // `actorId` (timekeeper mode, spec 10): omitted, the payload is exactly
+  // the one these always sent (`actorPayload` adds nothing).
   return {
-    broadcastTimerStarted: useCallback((startedAt: string) => send(E.TIMER_STARTED, { started_at: startedAt }), [send]),
-    broadcastTimerPaused: useCallback((pausedAt: string) => send(E.TIMER_PAUSED, { paused_at: pausedAt }), [send]),
-    broadcastTimerResumed: useCallback((d: number) => send(E.TIMER_RESUMED, { total_paused_duration: d }), [send]),
-    broadcastMatchEnded: useCallback(() => send(E.MATCH_ENDED, {}), [send]),
+    broadcastTimerStarted: useCallback(
+      (startedAt: string, actorId?: string | null) => send(E.TIMER_STARTED, { started_at: startedAt, ...actorPayload(actorId) }),
+      [send],
+    ),
+    broadcastTimerPaused: useCallback(
+      (pausedAt: string, actorId?: string | null) => send(E.TIMER_PAUSED, { paused_at: pausedAt, ...actorPayload(actorId) }),
+      [send],
+    ),
+    broadcastTimerResumed: useCallback(
+      (d: number, actorId?: string | null) => send(E.TIMER_RESUMED, { total_paused_duration: d, ...actorPayload(actorId) }),
+      [send],
+    ),
+    broadcastMatchEnded: useCallback((actorId?: string | null) => send(E.MATCH_ENDED, actorPayload(actorId)), [send]),
     broadcastReady: useCallback((athleteId: string) => send(E.READY_SIGNAL, { athlete_id: athleteId }), [send]),
-    broadcastResultSubmitted: useCallback((r: BroadcastResult) => send(E.RESULT_SUBMITTED, r as unknown as Record<string, unknown>), [send]),
+    broadcastResultSubmitted: useCallback(
+      (r: BroadcastResult, actorId?: string | null) =>
+        send(E.RESULT_SUBMITTED, actorId ? { ...r, ...actorPayload(actorId) } : (r as unknown as Record<string, unknown>)),
+      [send],
+    ),
     broadcastResultConfirmed: useCallback((athleteId: string) => send(E.RESULT_CONFIRMED, { athlete_id: athleteId }), [send]),
-    broadcastMatchCancelled: useCallback(() => send(E.MATCH_CANCELLED, {}), [send]),
+    broadcastMatchCancelled: useCallback((actorId?: string | null) => send(E.MATCH_CANCELLED, actorPayload(actorId)), [send]),
     broadcastMatchDisputed: useCallback((athleteId: string) => send(E.MATCH_DISPUTED, { athlete_id: athleteId }), [send]),
     broadcastWeighedIn: useCallback(
       (athleteId: string, weight: number | null) => send(E.WEIGHED_IN, { athlete_id: athleteId, weight }),

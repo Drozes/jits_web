@@ -10,6 +10,11 @@
  * The route is deliberately generic rather than `/arena/match/[matchId]`: a
  * sessionless match is a match, and the only Arena-specific thing about it is
  * where its exits point.
+ *
+ * `/match/<id>` resolves here (`match/[matchId]/index`): the folder also holds
+ * `match/[matchId]/timekeep`, the asked person's sheet in timekeeper mode
+ * (spec 8, `timekeep_href`). The URL, every `exitMatchTo` target and the
+ * push `match_href` are unchanged by the folder.
  */
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
@@ -37,12 +42,15 @@ const GUARDED_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>([
 ]);
 
 /**
- * The face-off: no swipe back either (leaving there without cancelling left
- * the match pending with nobody in it, jits-bh2v). Not a preventRemove
- * guard, so the face-off's own exits (Leave, a remote cancel) still
- * navigate; its Leave control and Android back both confirm and cancel.
+ * The face-off, and timekeeper mode's pick before it (`crew`): no swipe back
+ * either (leaving there without cancelling left the match pending with
+ * nobody in it, jits-bh2v). Not a preventRemove guard, so their own exits
+ * (Leave, a remote cancel) still navigate; an athlete's Leave control and
+ * Android back both confirm and cancel (the face-off's `FaceoffTop`, the
+ * crew step's `useCrewLeave`, spec 4.3). The timekeeper's face-off Leave is
+ * a drop-out, not a cancel (TK-K14, slices M3 and M4).
  */
-const NO_SWIPE_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>(["weight", "ready"]);
+const NO_SWIPE_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>(["crew", "weight", "ready"]);
 
 export default function ArenaMatchScreen() {
   const tokens = useThemedTokens();
