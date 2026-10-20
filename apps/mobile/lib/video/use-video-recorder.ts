@@ -19,6 +19,7 @@ import {
   useMatchUpload,
 } from "./match-upload-store";
 import { discardLocalClip } from "./recording-file";
+import type { MatchVideoCaptureLens, MatchVideoCaptureQuality } from "@jits/shared/api/match-video-upload";
 
 /**
  * State machine for the recorder. Mirrors the web hook's `uploadStatus`
@@ -74,6 +75,17 @@ export type RecordingState =
  *                 (a call, backgrounding, a stop whose bookkeeping was lost)
  */
 export type RecordingTruncation = "limit" | "interrupted";
+
+/**
+ * What the viewfinder records with: the capture quality and the lens
+ * (timekeeper mode spec 13.4). `MatchRecorderCamera` keeps it current; the
+ * recorder takes it as the clip starts and the reservation stamps it on the
+ * `match_videos` row.
+ */
+export interface RecordingCapture {
+  quality: MatchVideoCaptureQuality;
+  lens: MatchVideoCaptureLens;
+}
 
 /** When the recorder started (epoch ms) and how long the clip ran. */
 interface RecordTiming {
@@ -167,6 +179,12 @@ export interface UseVideoRecorderOptions {
    * finished clip is exposed as `localUri` instead.
    */
   upload?: boolean;
+  /**
+   * What the viewfinder records with, kept current by `MatchRecorderCamera`
+   * (`MatchRecorderProvider` owns the ref). Read once per clip, as it starts,
+   * and sent with the reservation. Absent or empty: the row keeps NULL.
+   */
+  captureRef?: { readonly current: RecordingCapture | null };
 }
 
 /**
@@ -247,6 +265,11 @@ export function useVideoRecorder(
   // unexpected settle be classified as "hit the OS cap" vs "interrupted"
   // instead of passing silently as a normal completion.
   const recordStartedAtRef = React.useRef<number | null>(null);
+  // What the viewfinder recorded the clip with, taken as the attempt starts
+  // (spec 13.4): the capture never changes mid-clip, and the reservation
+  // stamps it on the row.
+  const captureSource = options?.captureRef ?? null;
+  const recordCaptureRef = React.useRef<RecordingCapture | null>(null);
   // The OS cap for THIS match, derived from its configured duration rather
   // than hardcoded, so it cannot drift back into a tie with the match clock.
   const maxDurationSeconds = computeMaxRecordingSeconds(matchDurationSeconds);
@@ -373,6 +396,9 @@ export function useVideoRecorder(
       // angles up by start time until audio sync exists.
       recordStartedAt: timing?.startedAt ?? null,
       recordDurationMs: timing?.durationMs ?? null,
+      ...(recordCaptureRef.current
+        ? { captureQuality: recordCaptureRef.current.quality, captureLens: recordCaptureRef.current.lens }
+        : {}),
     });
     if (outcome.ok) transition("uploaded");
     // A PARKED upload is not a recorder failure. The job is on disk and the
@@ -462,6 +488,7 @@ export function useVideoRecorder(
         // backend's default duration_seconds, so it fired before the match
         // ended on every full-length match (jits-2zpe).
         recordStartedAtRef.current = Date.now();
+        recordCaptureRef.current = captureSource?.current ?? null;
         const promise = cam.recordAsync({ maxDuration: maxDurationSeconds });
         recordPromiseRef.current = promise;
         // A stop requested while start() was still spinning up must not be
@@ -584,6 +611,7 @@ export function useVideoRecorder(
     maxDurationSeconds,
     markTruncated,
     uploadEnabled,
+    captureSource,
   ]);
 
   // Mutating a ref during render is not safe: React can discard or

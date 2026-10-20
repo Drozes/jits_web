@@ -22,6 +22,7 @@ import {
   FACEOFF_LEAVE,
   HOLD_TO_END_MS,
   PROMPT_BUTTONS,
+  READY_CAPTURE_HINT,
   STEP_BY_CONTROL,
   STEP_TEST_ID_PREFIX,
   TAB_LABELS,
@@ -396,6 +397,20 @@ test("the face-off weigh-in and weight check keep the harness's testIDs", () => 
   assert.match(TOP, new RegExp(`testID="${FACEOFF_LEAVE.id}"\\s+accessibilityRole="button"[\\s\\S]{0,200}accessibilityLabel="${String(FACEOFF_LEAVE.label)}"`));
   // Confirm answers with the "confirm" verdict.
   assert.match(WEIGHT_CHECK_UI, /onPress=\{\(\) => void w\.check\("confirm"\)\}/);
+});
+
+test("the ready step's capture hint keeps the harness's testID and the copy deck's words (T14)", () => {
+  const SURFACE = src("components/match-flow/match-recorder-surface.tsx");
+  const COPY = src("lib/video/capture-copy.ts");
+  assert.match(SURFACE, new RegExp(`READY_HINT_TEST_ID = "${READY_CAPTURE_HINT.id}"`));
+  assert.match(SURFACE, /testID=\{READY_HINT_TEST_ID\}/);
+  assert.ok(COPY.includes(`"TK-REC2": "${READY_CAPTURE_HINT.athlete}"`));
+  assert.ok(COPY.includes(`"TK-REC1": "${READY_CAPTURE_HINT.timekeeperWideLens}"`));
+  assert.ok(COPY.includes(`"TK-REC1b": "${READY_CAPTURE_HINT.timekeeperStepBack}"`));
+  // The sideways hint is retired in both modes and in practice (A21, A23).
+  for (const rel of ["components/match-flow/match-recorder-surface.tsx", "lib/video/capture-copy.ts", "app/(app)/practice.tsx"]) {
+    assert.ok(!src(rel).includes(READY_CAPTURE_HINT.retired), rel);
+  }
 });
 
 test("the verdict shows a delta only for a non-zero change", () => {

@@ -41,6 +41,7 @@ import {
 } from "@/lib/practice/constants";
 import { useArenaMatchScreen } from "@/lib/arena/arena-store";
 import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
+import { PRACTICE_CAPTURE } from "@/lib/match-flow/capture-policy";
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { ARENA_HREF } from "@/lib/arena/constants";
 import { discardLocalClip } from "@/lib/video/recording-file";
@@ -177,7 +178,7 @@ export default function PracticeScreen() {
           >
             <PracticeClipCustodian />
             {/* Before the phase view so the live lock lands before recording starts. */}
-            <MatchOrientationController mode={orientationModeFor(phase)} />
+            <MatchOrientationController mode={orientationModeFor(phase)} recordingOrientation={PRACTICE_CAPTURE.recordingOrientation} />
             {live ? null : (
               <MetaTag accessibilityLabel="Practice match" testID="practice-tag">
                 Practice
@@ -193,7 +194,7 @@ export default function PracticeScreen() {
             ) : null}
             {tip && !live ? <PracticeTip text={tip} /> : null}
             {/* The camera only acts on ready and live; the lobby and the wait are not match steps. */}
-            <MatchRecorderCamera step={step === "wait" ? null : step} />
+            <MatchRecorderCamera step={step === "wait" ? null : step} capture={PRACTICE_CAPTURE} />
             <PracticePhaseView
               state={state}
               dispatch={dispatch}

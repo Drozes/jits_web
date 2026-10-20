@@ -1,7 +1,14 @@
 import * as React from "react";
-import { useVideoRecorder, type UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
+import {
+  useVideoRecorder,
+  type RecordingCapture,
+  type UseVideoRecorderReturn,
+} from "@/lib/video/use-video-recorder";
 
 const MatchRecorderContext = React.createContext<UseVideoRecorderReturn | null>(null);
+const MatchRecordingCaptureContext = React.createContext<React.MutableRefObject<RecordingCapture | null> | null>(
+  null,
+);
 
 interface MatchRecorderProviderProps {
   matchId: string;
@@ -49,15 +56,28 @@ export function MatchRecorderProvider({
   upload,
   children,
 }: MatchRecorderProviderProps) {
-  const recorder = useVideoRecorder(
-    matchId,
-    uploaderAthleteId,
-    matchDurationSeconds,
-    upload === false ? { upload: false } : undefined,
-  );
+  // What the viewfinder records with (quality and lens, timekeeper mode spec
+  // 13.4): `MatchRecorderCamera` keeps it current, the recorder takes it as a
+  // clip starts.
+  const captureRef = React.useRef<RecordingCapture | null>(null);
+  const recorder = useVideoRecorder(matchId, uploaderAthleteId, matchDurationSeconds, {
+    upload: upload !== false,
+    captureRef,
+  });
   return (
-    <MatchRecorderContext.Provider value={recorder}>{children}</MatchRecorderContext.Provider>
+    <MatchRecorderContext.Provider value={recorder}>
+      <MatchRecordingCaptureContext.Provider value={captureRef}>{children}</MatchRecordingCaptureContext.Provider>
+    </MatchRecorderContext.Provider>
   );
+}
+
+/** Where `MatchRecorderCamera` reports what its viewfinder records with. */
+export function useMatchRecordingCapture(): React.MutableRefObject<RecordingCapture | null> {
+  const captureRef = React.useContext(MatchRecordingCaptureContext);
+  if (!captureRef) {
+    throw new Error("useMatchRecordingCapture must be used inside a MatchRecorderProvider");
+  }
+  return captureRef;
 }
 
 /**

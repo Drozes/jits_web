@@ -8,6 +8,7 @@
 import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { completeHold } from "../support/complete-hold";
+import type { CapturePolicy } from "@/lib/match-flow/capture-policy";
 
 // ---- mocks ----
 
@@ -131,7 +132,22 @@ jest.mock("@/lib/orientation", () => ({
   lockPortrait: jest.fn(async () => {
     mockCallLog.push("lockPortrait");
   }),
+  lockLandscape: jest.fn(async () => {
+    mockCallLog.push("lockLandscape");
+  }),
 }));
+
+// Practice records portrait (A21, A23). A test can force a landscape capture
+// policy (the spec 13.6 seam) to prove the shared controller still locks it.
+const mockPracticeCapture: { current: CapturePolicy | null } = { current: null };
+jest.mock("@/lib/match-flow/capture-policy", () => {
+  const actual = jest.requireActual("@/lib/match-flow/capture-policy");
+  // A getter read at render time (the factory runs before this file's consts).
+  return Object.defineProperty({ ...actual }, "PRACTICE_CAPTURE", {
+    enumerable: true,
+    get: () => mockPracticeCapture.current ?? actual.PRACTICE_CAPTURE,
+  });
+});
 
 // A camera that records until stopped, then settles with a local file.
 const mockPermission = { granted: true };
@@ -678,19 +694,26 @@ describe("PracticeScreen", () => {
   });
 
   describe("orientation parity with the real match", () => {
-    it("portrait until ready, rotates on ready with the hint, locks at live before recording", async () => {
+    afterEach(() => {
+      mockPracticeCapture.current = null;
+    });
+
+    it("portrait through ready and live with the portrait hint and the 9:16 preview, never a rotation (A23)", async () => {
       const s = render(<PracticeScreen />);
       await flush();
       expect(mockCallLog).toEqual(["lockPortrait"]);
       toWeight(s);
       fireEvent.press(s.getByTestId("weight-confirm"));
-      expect(mockCallLog).toEqual(["lockPortrait", "allowRotation"]);
-      s.getByText("Turn your phone sideways for a wide shot. It locks when the match starts.");
+      expect(mockCallLog).toEqual(["lockPortrait"]);
+      expect(s.getByTestId("ready-capture-hint").props.children).toBe(
+        "Hold your phone upright and keep both of you in frame.",
+      );
+      expect(s.queryByText("Turn your phone sideways for a wide shot. It locks when the match starts.")).toBeNull();
+      expect(s.getByTestId("camera-frame").props.style).toEqual({ aspectRatio: 9 / 16 });
       fireEvent.press(s.getByTestId("ready-button"));
       advance(BOT_READY_MS);
       await flush();
-      expect(mockCallLog.indexOf("lockToCurrent")).toBeGreaterThan(-1);
-      expect(mockCallLog.indexOf("lockToCurrent")).toBeLessThan(mockCallLog.indexOf("recordAsync"));
+      expect(mockCallLog).toEqual(["lockPortrait", "recordAsync"]);
     });
 
     it("no hint under the permission card", async () => {
@@ -699,7 +722,24 @@ describe("PracticeScreen", () => {
       await flush();
       toWeight(s);
       fireEvent.press(s.getByTestId("weight-confirm"));
-      expect(s.queryByTestId("ready-rotate-hint")).toBeNull();
+      expect(s.queryByTestId("ready-capture-hint")).toBeNull();
+    });
+
+    it("a landscape capture policy (the spec 13.6 seam): landscape on ready, locks at live before recording", async () => {
+      mockPracticeCapture.current = { recordingOrientation: "landscape_locked", captureLens: "default" };
+      const s = render(<PracticeScreen />);
+      await flush();
+      expect(mockCallLog).toEqual(["lockPortrait"]);
+      toWeight(s);
+      fireEvent.press(s.getByTestId("weight-confirm"));
+      expect(mockCallLog).toEqual(["lockPortrait", "lockLandscape"]);
+      // No portrait instruction under a landscape capture (no deck string for one yet).
+      expect(s.queryByTestId("ready-capture-hint")).toBeNull();
+      fireEvent.press(s.getByTestId("ready-button"));
+      advance(BOT_READY_MS);
+      await flush();
+      expect(mockCallLog.indexOf("lockToCurrent")).toBeGreaterThan(-1);
+      expect(mockCallLog.indexOf("lockToCurrent")).toBeLessThan(mockCallLog.indexOf("recordAsync"));
     });
 
     it("EXIT from live leaves and restores portrait", async () => {
@@ -714,7 +754,8 @@ describe("PracticeScreen", () => {
       expect(mockCallLog).toContain("lockPortrait");
     });
 
-    it("portrait again once the practice clip has stopped", async () => {
+    it("portrait again once the practice clip has stopped (a landscape capture policy)", async () => {
+      mockPracticeCapture.current = { recordingOrientation: "landscape_locked", captureLens: "default" };
       const s = render(<PracticeScreen />);
       await flush();
       await toResult(s);

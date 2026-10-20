@@ -1,7 +1,9 @@
 /**
- * MatchOrientationController: ready rotates, live locks to the current
- * orientation, the lock holds while the recorder is stopping, everything
- * else and unmount is portrait, and it only calls when the target changes.
+ * MatchOrientationController. Under "free" (the flow before A21): ready
+ * rotates, live locks to the current orientation, the lock holds while the
+ * recorder is stopping, everything else and unmount is portrait, and it only
+ * calls when the target changes. Then each recording orientation, and the
+ * capture policy's choice for every role and for practice (A21, A23).
  */
 import * as React from "react";
 import { render } from "@testing-library/react-native";
@@ -25,6 +27,7 @@ import {
   type OrientationMode,
   type RecordingOrientation,
 } from "@/components/match-flow/match-orientation-controller";
+import { capturePolicyFor, PRACTICE_CAPTURE } from "@/lib/match-flow/capture-policy";
 
 const calls = () => ({
   rotate: (allowRotation as jest.Mock).mock.calls.length,
@@ -34,12 +37,12 @@ const calls = () => ({
 
 function renderWith(mode: OrientationMode, state = "idle") {
   mockRecorder.state = state;
-  const utils = render(<MatchOrientationController mode={mode} />);
+  const utils = render(<MatchOrientationController mode={mode} recordingOrientation="free" />);
   return {
     ...utils,
     update: (m: OrientationMode, st = mockRecorder.state) => {
       mockRecorder.state = st;
-      utils.rerender(<MatchOrientationController mode={m} />);
+      utils.rerender(<MatchOrientationController mode={m} recordingOrientation="free" />);
     },
   };
 }
@@ -94,7 +97,7 @@ it("restores portrait on unmount from ready and from live", () => {
 });
 
 // The recording-orientation input (timekeeper mode ARCHITECTURE 2.8, PR3):
-// "free" is the default above; the capture policy may lock either way.
+// "free" is the flow above; the capture policy may lock either way.
 describe("recordingOrientation", () => {
   const all = () => ({ ...calls(), landscape: (lockLandscape as jest.Mock).mock.calls.length });
 
@@ -110,7 +113,7 @@ describe("recordingOrientation", () => {
     };
   }
 
-  it("free is the default: the same calls as no input", () => {
+  it("free: the same calls as the flow above", () => {
     const s = renderPolicy("free");
     s.update("ready");
     s.update("live", "recording");
@@ -147,5 +150,35 @@ describe("recordingOrientation", () => {
     expect(all()).toEqual({ rotate: 0, live: 1, portrait: 1, landscape: 1 });
     s.update("other", "idle");
     expect(all()).toEqual({ rotate: 0, live: 1, portrait: 2, landscape: 1 });
+  });
+});
+
+// The capture policy (A21, A23): every role in both modes, and practice,
+// records portrait. Driven through the real table, so a row that stops being
+// portrait fails here.
+describe("the capture policy's orientation", () => {
+  const all = () => ({ ...calls(), landscape: (lockLandscape as jest.Mock).mock.calls.length });
+  const ROLES: { name: string; orientation: RecordingOrientation }[] = [
+    ...(["self_run", "timekeeper"] as const).flatMap((mode) =>
+      (mode === "self_run" ? (["challenger", "opponent"] as const) : (["challenger", "opponent", "timekeeper"] as const)).map(
+        (viewer) => ({ name: `${mode} ${viewer}`, orientation: capturePolicyFor({ mode, viewer }).recordingOrientation }),
+      ),
+    ),
+    { name: "practice", orientation: PRACTICE_CAPTURE.recordingOrientation },
+  ];
+
+  it.each(ROLES)("$name: portrait through ready, live and stopping; never a rotation", ({ orientation }) => {
+    mockRecorder.state = "idle";
+    const utils = render(<MatchOrientationController mode="other" recordingOrientation={orientation} />);
+    const step = (m: OrientationMode, st: string) => {
+      mockRecorder.state = st;
+      utils.rerender(<MatchOrientationController mode={m} recordingOrientation={orientation} />);
+    };
+    step("ready", "idle");
+    step("live", "recording");
+    step("other", "stopping");
+    step("other", "idle");
+    utils.unmount();
+    expect(all()).toEqual({ rotate: 0, live: 0, portrait: 2, landscape: 0 });
   });
 });

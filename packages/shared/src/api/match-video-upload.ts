@@ -23,6 +23,14 @@ type Client = SupabaseClient<Database>;
 
 export type MatchVideoUploadTransport = "tus" | "background";
 
+/**
+ * What a recording was captured with (`match_videos.capture_quality` /
+ * `capture_lens`, jr_be `20261021100900`; timekeeper mode spec 13.4). The
+ * server nulls any other value; NULL means unknown (older rows, web).
+ */
+export type MatchVideoCaptureQuality = "720p" | "1080p";
+export type MatchVideoCaptureLens = "ultrawide" | "default";
+
 /** The columns every lifecycle step reads back. */
 const ROW_SELECT = "id, status, storage_path, failure_code";
 
@@ -76,6 +84,54 @@ export interface ReserveMatchVideoParams {
   recordDurationMs?: number | null;
   transport?: MatchVideoUploadTransport;
   requestedTier?: "standard" | "premium";
+  /** The clip's capture quality. Sent on the INSERT and on a takeover (both a new recording). */
+  captureQuality?: MatchVideoCaptureQuality | null;
+  /** The lens the clip was recorded on, likewise. */
+  captureLens?: MatchVideoCaptureLens | null;
+}
+
+type CaptureColumns = Pick<
+  Database["public"]["Tables"]["match_videos"]["Insert"],
+  "capture_quality" | "capture_lens"
+>;
+
+/** The capture columns this reservation writes: only the ones it was given. */
+function captureColumns(params: ReserveMatchVideoParams): CaptureColumns {
+  const columns: CaptureColumns = {};
+  if (params.captureQuality) columns.capture_quality = params.captureQuality;
+  if (params.captureLens) columns.capture_lens = params.captureLens;
+  return columns;
+}
+
+/**
+ * A database without the capture columns (jr_be `20261021100900` not yet
+ * applied) refuses any write that names them: PostgREST answers PGRST204 from
+ * its schema cache before any SQL runs, so nothing was written. The
+ * reservation then repeats the write once without them (decision recorded on
+ * jits-o47s.14): losing the capture metadata beats losing the match video.
+ * The release order still puts that migration on prod first.
+ */
+function isMissingCaptureColumn(error: { code?: string; message?: string } | null): boolean {
+  const missing = error?.code === "PGRST204" && /capture_(quality|lens)/.test(error.message ?? "");
+  if (missing) warnMissingCaptureColumns(error?.message ?? "");
+  return missing;
+}
+
+let warnedMissingCaptureColumns = false;
+
+/**
+ * Says so once per process when the fallback fires: a build that reaches a
+ * database without `20261021100900` writes NULL capture columns on every
+ * reservation, which would otherwise hide a broken release order and quietly
+ * void the spec 13.4 data the 1080p decision depends on. (On mobile the Sentry
+ * SDK keeps console warnings as breadcrumbs.)
+ */
+function warnMissingCaptureColumns(message: string): void {
+  if (warnedMissingCaptureColumns) return;
+  warnedMissingCaptureColumns = true;
+  console.warn(
+    `[match-video] ${message}: jr_be 20261021100900 is not applied, so match video reservations are written without capture_quality and capture_lens`,
+  );
 }
 
 function toReserved(
@@ -117,6 +173,9 @@ function unexpected(err: unknown): DomainError {
  *     PATCH to 'uploading' (free: no slice ever ran on it), guarded on the
  *     key just read so a concurrent change is not overwritten;
  *   - anything else (it has bytes): left alone, `outcome: "deferred"`.
+ *
+ * The capture quality and lens ride on the INSERT and on the takeover, the
+ * two writes that point the row at a new recording (spec 13.4).
  */
 export async function reserveMatchVideoUpload(
   supabase: Client,
@@ -138,8 +197,16 @@ export async function reserveMatchVideoUpload(
     if (params.recordDurationMs != null && params.recordDurationMs > 0) {
       insert.record_duration_ms = Math.round(params.recordDurationMs);
     }
+    const capture = captureColumns(params);
 
-    const created = await supabase.from("match_videos").insert(insert).select(ROW_SELECT).single();
+    const insertRow = (withCapture: boolean) =>
+      supabase
+        .from("match_videos")
+        .insert(withCapture ? { ...insert, ...capture } : insert)
+        .select(ROW_SELECT)
+        .single();
+    let created = await insertRow(true);
+    if (isMissingCaptureColumn(created.error)) created = await insertRow(false);
     if (!created.error && created.data) return { ok: true, data: toReserved(created.data as LifecycleRow, false) };
     if (created.error?.code !== "23505") {
       return { ok: false, error: mapPostgrestError(created.error!, "match_video_create") };
@@ -173,17 +240,24 @@ export async function reserveMatchVideoUpload(
       upload_bytes_total: params.fileSizeBytes,
       upload_transport: transport,
     };
-    let takeover = supabase.from("match_videos").update(update).eq("id", existing.id);
-    takeover = existing.storage_path == null ? takeover.is("storage_path", null) : takeover.eq("storage_path", existing.storage_path);
-    // R2-M1: guard on the STATUS read too. The landing trigger flips
-    // 'uploading' -> 'ready' without changing the key, so a key-only guard
-    // would still re-path a row whose bytes landed between the read and this
-    // PATCH. With the status (and the abandon code) in the WHERE, which
-    // Postgres re-checks under the row lock, such a row matches nothing and
-    // the retry below re-reads it and defers.
-    takeover = takeover.eq("status", existing.status);
-    if (existing.status === "failed") takeover = takeover.eq("failure_code", "upload_abandoned");
-    const taken = await takeover.select(ROW_SELECT).maybeSingle();
+    const takeoverRow = (withCapture: boolean) => {
+      let takeover = supabase
+        .from("match_videos")
+        .update(withCapture ? { ...update, ...capture } : update)
+        .eq("id", existing.id);
+      takeover = existing.storage_path == null ? takeover.is("storage_path", null) : takeover.eq("storage_path", existing.storage_path);
+      // R2-M1: guard on the STATUS read too. The landing trigger flips
+      // 'uploading' -> 'ready' without changing the key, so a key-only guard
+      // would still re-path a row whose bytes landed between the read and this
+      // PATCH. With the status (and the abandon code) in the WHERE, which
+      // Postgres re-checks under the row lock, such a row matches nothing and
+      // the retry below re-reads it and defers.
+      takeover = takeover.eq("status", existing.status);
+      if (existing.status === "failed") takeover = takeover.eq("failure_code", "upload_abandoned");
+      return takeover.select(ROW_SELECT).maybeSingle();
+    };
+    let taken = await takeoverRow(true);
+    if (isMissingCaptureColumn(taken.error)) taken = await takeoverRow(false);
     if (taken.error) return { ok: false, error: mapPostgrestError(taken.error, "match_video_create") };
     if (!taken.data) {
       // The row changed between the read and the PATCH: report a transient

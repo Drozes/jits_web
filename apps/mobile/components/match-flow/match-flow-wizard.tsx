@@ -9,6 +9,7 @@ import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
 import { useAiConsent, useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
 import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
+import { capturePolicyFor } from "@/lib/match-flow/capture-policy";
 import { MatchFlowProvider } from "@/lib/match-flow/match-flow-context";
 import { computeOwnOutcome } from "@/lib/match-flow/compute-own-outcome";
 import { useWizardWeights } from "@/lib/match-flow/use-wizard-weights";
@@ -260,6 +261,8 @@ export function MatchFlowWizard({
   // but is neither athlete: no athlete face-off, outcome or verdict.
   const me = roles.me;
   const opponent = roles.opponent;
+  // How this viewer records: the orientation, the preview and the lens (A21).
+  const capture = capturePolicyFor(roles);
 
   const ownOutcome = me ? computeOwnOutcome(me, resultData) : null;
   const extras = readMatchExtras(match);
@@ -324,13 +327,16 @@ export function MatchFlowWizard({
               >
                 <RecorderStopBridge stopRef={stopRecorderRef} />
                 {/* Before the step renderer so the live lock lands before recording starts. */}
-                <MatchOrientationController mode={orientationModeFor(cameraStep)} />
+                <MatchOrientationController
+                  mode={orientationModeFor(cameraStep)}
+                  recordingOrientation={capture.recordingOrientation}
+                />
                 <StepMarker step={step} />
                 {live ? null : <QueueStatusBanner />}
                 {faceoff && me && opponent ? (
                   <FaceoffTop phase={step} me={me} opponent={opponent} />
                 ) : null}
-                <MatchRecorderCamera step={cameraStep} optedIn={recording} />
+                <MatchRecorderCamera step={cameraStep} optedIn={recording} capture={capture} />
                 <MatchStepRenderer
                   step={step}
                   exitHref={exitHref}

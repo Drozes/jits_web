@@ -1,19 +1,10 @@
 import * as React from "react";
 import { allowRotation, lockLandscape, lockPortrait, lockToCurrent } from "@/lib/orientation";
+import type { RecordingOrientation } from "@/lib/match-flow/capture-policy";
 import { useMatchRecorder } from "./match-recorder-context";
 
 export type OrientationMode = "ready" | "live" | "other";
-
-/**
- * How the match is recorded (timekeeper mode ARCHITECTURE 2.8, the input
- * the capture policy sets):
- *  - "free" (the default, today): the ready check follows the phone and
- *    going live locks whichever side the interface is in;
- *  - "portrait_locked": portrait on every step;
- *  - "landscape_locked": the ready check turns to landscape (either side)
- *    and going live locks the side it is in.
- */
-export type RecordingOrientation = "free" | "portrait_locked" | "landscape_locked";
+export type { RecordingOrientation };
 
 type Target = "rotate" | "landscape" | "live" | "portrait";
 
@@ -24,13 +15,20 @@ function targetFor(mode: OrientationMode, recorderState: string, orientation: Re
 }
 
 /**
- * Orientation policy for the match wizard and practice. By default the
- * ready check follows the phone so the athlete can frame a wide shot; going
- * live locks whatever orientation the interface is in (the clip records in
- * it), and the lock holds while the recorder is still `stopping` so the
- * camera view never rotates under a finalizing clip. Everything else, and
- * unmount, is portrait. `recordingOrientation` changes the ready and live
- * locks (see `RecordingOrientation`).
+ * Orientation policy for the match wizard and practice, driven by the
+ * capture policy's `recordingOrientation` (`lib/match-flow/capture-policy.ts`;
+ * timekeeper mode spec 13.2, ARCHITECTURE 2.8):
+ *  - "portrait_locked" (every role and practice, A21, A23): portrait on the
+ *    ready check, on live, while the recorder is stopping, and everywhere
+ *    else; the interface never rotates;
+ *  - "landscape_locked" (the spec 13.6 review seam): the ready check turns
+ *    to landscape (either side), going live locks the side the interface is
+ *    in (the clip records in it), and the lock holds while the recorder is
+ *    still `stopping` so the camera view never rotates under a finalizing
+ *    clip;
+ *  - "free" (the flow before A21): the ready check follows the phone, then
+ *    the same live lock.
+ * Everything else, and unmount, is portrait.
  *
  * Render it inside `MatchRecorderProvider` BEFORE the step renderer: sibling
  * effects run in tree order, so the live lock is requested before the live
@@ -38,10 +36,10 @@ function targetFor(mode: OrientationMode, recorderState: string, orientation: Re
  */
 export function MatchOrientationController({
   mode,
-  recordingOrientation = "free",
+  recordingOrientation,
 }: {
   mode: OrientationMode;
-  recordingOrientation?: RecordingOrientation;
+  recordingOrientation: RecordingOrientation;
 }) {
   const { state } = useMatchRecorder();
   const target = targetFor(mode, state, recordingOrientation);

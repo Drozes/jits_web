@@ -262,6 +262,34 @@ export const PROMPT_BUTTONS = {
 } as const satisfies Record<string, Query>;
 export const FACEOFF_LEAVE: Query = { id: "faceoff-leave", label: "Cancel match" };
 
+/**
+ * The ready step's framing hint (the capture policy, timekeeper mode spec 13,
+ * A21 to A23; scenario T14): by testID, with the copy deck's words for each
+ * role. The retired sideways hint must never show, in either mode or in
+ * practice.
+ *
+ * Preconditions (`apps/mobile/components/match-flow/match-recorder-surface.tsx`):
+ * the hint exists only on the READY step (never on weight or live), only with
+ * camera permission granted, and only for a viewer who records ("Record from
+ * my phone" on, which goes through the AI consent sheet). The timekeeper's
+ * hint also waits for the lens lookup (the camera's onCameraReady, or 1.5 s).
+ * Core runs revoke the camera and record from no phone, so none of them can
+ * see it: a scenario checking it grants camera and microphone first (simctl
+ * privacy grant relaunches the app), turns recording on, then waits on the
+ * ready step. In portrait the hint sits beside the 9:16 card, under the
+ * `ready-notes-beside` column.
+ */
+export const READY_CAPTURE_HINT = {
+  id: "ready-capture-hint",
+  /** TK-REC2: both athletes, both modes, and practice. */
+  athlete: "Hold your phone upright and keep both of you in frame.",
+  /** TK-REC1: the timekeeper on an iPhone's ultrawide. */
+  timekeeperWideLens: "Hold your phone upright. The wide lens keeps the whole mat in frame.",
+  /** TK-REC1b: the timekeeper without one (Android, older iPhones). */
+  timekeeperStepBack: "Hold your phone upright. Step back so the whole mat fits.",
+  retired: "Turn your phone sideways for a wide shot. It locks when the match starts.",
+} as const;
+
 /** testIDs from apps/mobile/components/layout/header-status-chip.tsx / header-live-dot.tsx. */
 export const HEADER_CHIP_ID = "header-status-chip";
 export const HEADER_LIVE_DOT_ID = "header-live-dot";
