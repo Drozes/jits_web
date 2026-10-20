@@ -138,6 +138,19 @@ describe("YourNumbersBody", () => {
     expect(color(delta)).not.toBe(P.loss);
   });
 
+  it("an underdog's draw that GAINS is gain green; an even draw shows no delta (Rating V9)", () => {
+    mockDashboard.data = {
+      summary: { ...SUMMARY, recent_matches: [{ ...SUMMARY.recent_matches[0], outcome: "draw", elo_delta: 4 }] },
+    };
+    const up = render(<YourNumbersBody athlete={ATHLETE} />).getByTestId("your-numbers-last-delta");
+    expect(up).toHaveTextContent("▲ +4");
+    expect(color(up)).toBe(P.win);
+    mockDashboard.data = {
+      summary: { ...SUMMARY, recent_matches: [{ ...SUMMARY.recent_matches[0], outcome: "draw", elo_delta: 0 }] },
+    };
+    expect(render(<YourNumbersBody athlete={ATHLETE} />).queryByTestId("your-numbers-last-delta")).toBeNull();
+  });
+
   it("a loss's last-match delta is red (negative), a win's green", () => {
     mockDashboard.data = { summary: { ...SUMMARY, recent_matches: [{ ...SUMMARY.recent_matches[0], outcome: "loss", elo_delta: -11 }] } };
     expect(color(render(<YourNumbersBody athlete={ATHLETE} />).getByTestId("your-numbers-last-delta"))).toBe(P.loss);

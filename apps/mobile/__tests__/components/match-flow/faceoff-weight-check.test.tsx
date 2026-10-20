@@ -19,7 +19,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
 jest.mock("@/components/ui/toast", () => ({ toast: { success: jest.fn(), error: jest.fn(), info: jest.fn() } }));
 jest.mock("expo-router", () => ({ useRouter: () => ({ dismissTo: jest.fn(), push: jest.fn(), back: jest.fn() }) }));
 jest.mock("@jits/shared/api/queries", () => ({
-  getEloStakes: jest.fn(() => Promise.resolve(null)),
+  getRatingStakes: jest.fn(() => Promise.resolve(null)),
   getMatchDetails: jest.fn(() => Promise.resolve(null)),
 }));
 const mockStart = jest.fn();
@@ -57,8 +57,8 @@ import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin"
 import { toast as mockToast } from "@/components/ui/toast";
 import type { WeightChecksHandle, WeightChecksStatus } from "@/lib/match-flow/use-match-weight-checks";
 
-const ME = { displayName: "Marco Reyes", currentElo: 1487 };
-const OPP = { displayName: "Dayo Okafor", currentElo: 1512 };
+const ME = { athleteId: "me-1", displayName: "Marco Reyes", currentElo: 1487 };
+const OPP = { athleteId: "opp-1", displayName: "Dayo Okafor", currentElo: 1512 };
 
 interface Spec {
   /** My check of the opponent. */

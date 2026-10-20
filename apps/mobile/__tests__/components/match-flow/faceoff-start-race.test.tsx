@@ -19,7 +19,7 @@ jest.mock("expo-router", () => ({ useRouter: () => ({ dismissTo: jest.fn(), push
 
 const mockGetMatchDetails = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
-  getEloStakes: jest.fn(async () => null),
+  getRatingStakes: jest.fn(async () => null),
   getMatchDetails: (...a: unknown[]) => mockGetMatchDetails(...a),
 }));
 const mockStart = jest.fn();
@@ -60,8 +60,8 @@ import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin"
 import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 import { __resetRecordingIntentForTests } from "@/lib/match-flow/recording-intent";
 
-const ME = { displayName: "Kai Reyes", currentElo: 1512 };
-const OPP = { displayName: "Mina Park", currentElo: 1498 };
+const ME = { athleteId: "me-1", displayName: "Kai Reyes", currentElo: 1512 };
+const OPP = { athleteId: "opp-1", displayName: "Mina Park", currentElo: 1498 };
 const LOST = { ok: false, error: { code: "UNKNOWN", message: "Match is not pending" } };
 
 function renderReady(onStarted = jest.fn()) {

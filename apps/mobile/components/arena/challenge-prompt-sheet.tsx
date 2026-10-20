@@ -60,9 +60,9 @@ import {
   spokenCountdown,
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
-import { useViewerStakes, viewerStakesKey } from "@/lib/match-flow/use-viewer-stakes";
+import { useViewerStakes, viewerStakesKey, weightsStakesKey } from "@/lib/match-flow/use-viewer-stakes";
 import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
-import type { EloStakes } from "@jits/shared/types/composites";
+import type { RatingStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { TABULAR, TYPE_SCALE, typeStep } from "@/lib/typography";
@@ -180,8 +180,9 @@ interface ChallengePromptSheetProps {
    */
   moreCount?: number;
   /**
-   * The viewer's own rating and weight, for the stakes strip. Omitted (or a
-   * missing rating): no strip. Arena challenges are ranked-only.
+   * The viewer's own rating and weight, for the stakes strip (the server
+   * reads both athletes' state and the weights itself; these key the read).
+   * Omitted (or a missing rating): no strip. Arena challenges are ranked-only.
    */
   viewer?: { elo: number | null; weight: number | null };
 }
@@ -189,7 +190,7 @@ interface ChallengePromptSheetProps {
 /** What the card shows: frozen while the modal fades out after a null. */
 interface Shown {
   challenge: IncomingChallenge;
-  stakes: EloStakes | null;
+  stakes: RatingStakes | null;
   moreCount: number;
   viewerElo: number | null;
 }
@@ -214,37 +215,39 @@ export function ChallengePromptSheet({
 
   // Later passes challenge=null, which resets the stakes read below. Keep the
   // last stakes read so reopening from the chip shows the strip at once
-  // instead of the fallback line followed by the strip. The cache is keyed on
-  // the four inputs the stakes were computed from, never on the challenge id:
-  // useViewerStakes only returns stakes for its current inputs, and reuse
-  // here requires the viewer's and the challenger's rating and weight to
-  // match exactly, so one challenger's stakes can never show for another.
-  const stakesKey = viewerStakesKey(
-    viewer?.elo,
-    challenge?.challengerElo,
-    viewer?.weight,
-    challenge?.challengerWeight,
-  );
+  // instead of the fallback line followed by the strip. The cache is keyed
+  // EXACTLY as useViewerStakes keys its read (the challenger, no match yet,
+  // both ratings, and both weights as its extra key), never on the challenge
+  // id: useViewerStakes only returns stakes for its current inputs, and reuse
+  // here requires the same challenger, both ratings and both weights
+  // unchanged, so one challenger's stakes can never show for another, nor
+  // for a new challenge from them at another weight (the server prices an
+  // open challenge on its weights), even when it replaces the old one in
+  // place with no null render between.
+  const weightsKey = weightsStakesKey(viewer?.weight, challenge?.challengerWeight);
+  const stakesKey = viewerStakesKey(challenge?.challengerId, null, viewer?.elo, challenge?.challengerElo, weightsKey);
   // Held in state and written from an effect, never from render: a render
   // React throws away (concurrent rendering, StrictMode) must not leave its
   // value behind. The live read is used directly while it exists, so the
   // cache is only consulted after it has been committed.
   const [cached, setCached] = React.useState<{
     key: string;
-    stakes: EloStakes;
+    stakes: RatingStakes;
   } | null>(null);
   const cacheHit = cached !== null && cached.key === stakesKey;
-  // One calculate_elo_stakes read per set of inputs, viewer as "challenger"
+  // One get_rating_stakes read per set of inputs, from the viewer's side
   // (see useViewerStakes). Fails quietly: no strip. Skipped while a committed
-  // read for the same inputs is cached: stakes are a pure function of those
-  // four inputs, so a Later then reopen (or the same challenger again) does
-  // not hit the network for numbers that cannot have changed.
+  // read for the same inputs is cached: a Later then reopen (or the same
+  // challenger again) does not hit the network again. Nothing in the key has
+  // changed in between, so only the RD aging of a few minutes could move a
+  // number, by a point at most.
   const liveStakes = useViewerStakes(
     !!challenge && viewer?.elo != null && !cacheHit,
+    challenge?.challengerId,
+    null,
     viewer?.elo,
     challenge?.challengerElo,
-    viewer?.weight,
-    challenge?.challengerWeight,
+    weightsKey,
   );
   const hasChallenge = challenge !== null;
   React.useEffect(() => {
@@ -465,9 +468,9 @@ export function ChallengePromptSheet({
                     <Mono color={p.text3} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{`YOUR STAKES${shown.viewerElo != null ? ` · ${shown.viewerElo}` : ""}`}</Mono>
                     <StakesStrip
                       testID="challenge-prompt-stakes"
-                      win={shown.stakes.challenger_win}
-                      draw={shown.stakes.challenger_draw}
-                      loss={shown.stakes.challenger_loss}
+                      win={shown.stakes.win}
+                      draw={shown.stakes.draw}
+                      loss={shown.stakes.loss}
                       height={64}
                       background={p.bg}
                       maxFontSizeMultiplier={MAX_FONT_SCALE}

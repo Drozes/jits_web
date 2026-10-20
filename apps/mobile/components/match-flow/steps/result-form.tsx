@@ -293,7 +293,7 @@ export function DrawPlate({ onChange }: { onChange: () => void }) {
         <ChangeButton onPress={onChange} testID="result-change-draw" />
       </View>
       <Text className="font-body" style={[typeStep("body"), { color: p.text2 }]}>
-        Draws cost both athletes rating.
+        In a draw the favourite gives up a few points to the underdog.
       </Text>
     </View>
   );

@@ -19,10 +19,10 @@
  * reads the challenge's rated weights (useMatchWeights) and, on the
  * face-off, the weight checks (useMatchWeightChecks), so its cases pin the
  * rated weights on the fight card, the chip and the countdown, the gap line,
- * the stakes strip (null on Rating V9, and one case with stakes), the weight
- * check plate and panel, and the ready step's weight hold. The countdown
- * (started_at one second before NOW) and the confirm and verdict screens for
- * a win, a loss and a draw are pinned too.
+ * the stakes strip (a null get_rating_stakes response, and one case with
+ * stakes), the weight check plate and panel, and the ready step's weight
+ * hold. The countdown (started_at one second before NOW) and the confirm and
+ * verdict screens for a win, a loss and a draw are pinned too.
  *
  * The snapshot is the baseline (PLAN.md section 5, "Golden baseline", R3-6).
  * Every entry was captured by running this file, unchanged, in a clean
@@ -30,6 +30,16 @@
  * Only the slices that change flag-OFF output by owner decision may
  * re-capture it (M5 for A25, M6 for A11 and O1, M9 for A21; ARCHITECTURE
  * M-R5), each reviewed as exactly that change.
+ *
+ * One owner-approved re-capture so far: the Rating V9 client merge (PR #81,
+ * jits-76le.1, merged into this branch before Wave 2) changed exactly two
+ * copy lines, nothing else: the face-off weight-gap note ("The heavier
+ * athlete is favoured, so they win fewer points.", entry "challenge: weight,
+ * stakes") and the verdict weight-class line ("1 weight class apart. The
+ * heavier athlete was favoured, so they win fewer points.", entries
+ * "challenge: summary, win / loss / draw"). Its stakes now come from
+ * `get_rating_stakes` (opponent id and match id) with the same numbers, so
+ * the strip itself is unchanged.
  *
  * Only the data layer, the realtime hook, the recorder and the native
  * modules are stubbed (the same set `wizard-reconcile.test.tsx` uses, plus
@@ -159,12 +169,12 @@ jest.mock("@/components/match-flow/match-recorder-surface", () => ({
 
 const mockGetMatchDetails = jest.fn();
 const mockGetMatchConfirmations = jest.fn();
-const mockGetEloStakes = jest.fn();
+const mockGetRatingStakes = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: (...a: unknown[]) => mockGetMatchDetails(...a),
   getMatchConfirmations: (...a: unknown[]) => mockGetMatchConfirmations(...a),
   getSubmissionTypes: async () => [],
-  getEloStakes: (...a: unknown[]) => mockGetEloStakes(...a),
+  getRatingStakes: (...a: unknown[]) => mockGetRatingStakes(...a),
   getMatchDetailView: async () => ({ ok: true, data: { videos: [] } }),
 }));
 jest.mock("@jits/shared/api/match-rank-change", () => ({
@@ -229,6 +239,7 @@ import { __resetFreshForTests, __resetPlayedMomentsForTests } from "@/components
 import { __resetHeaderEloForTests } from "@/lib/rating/header-elo";
 import { __resetStripSuppressionsForTests } from "@/lib/video/upload-strip-visibility";
 import { parseMatchWeightChecks } from "@jits/shared/api/match-weight-checks";
+import { ratingStakes } from "../../support/rating-stakes";
 
 // ---- fixtures ----
 
@@ -239,7 +250,11 @@ const ONE_SECOND_AGO = "2026-09-25T12:11:59.000Z";
 
 type Outcome = "win" | "loss" | "draw";
 
-/** A draw costs both athletes rating (Pressure Score); the higher rated loses more. */
+/**
+ * Draw deltas, kept from the pre-V9 baseline (both negative). The viewer's is
+ * negative (the favourite gives up points), which Rating V9's sign-based draw
+ * colour still renders amber, so the draw entries are unchanged.
+ */
 const DRAW_DELTA: Record<string, number> = { "me-1": -6, "opp-1": -2 };
 
 function participant(id: string, name: string, outcome: Outcome | null, elo: number, weight: number, gap: number) {
@@ -322,19 +337,18 @@ function checksReply(spec: ChecksSpec = {}) {
   return { ok: true, data: parseMatchWeightChecks(checksPayload(spec)) };
 }
 
-/** `calculate_elo_stakes` for the viewer (passed as its challenger), one division apart. */
-const STAKES = {
-  challenger_win: 14,
-  challenger_draw: -3,
-  challenger_loss: -18,
+/** `get_rating_stakes` from the viewer's side, one division apart. */
+const STAKES = ratingStakes({
+  win: 14,
+  draw: -3,
+  loss: -18,
   opponent_win: 18,
-  opponent_draw: -1,
+  opponent_draw: 3,
   opponent_loss: -14,
-  challenger_expected: 0.54,
-  opponent_expected: 0.46,
+  win_probability: 0.54,
+  expected: 0.54,
   weight_division_gap: 1,
-  draw_score: 0.5,
-};
+});
 
 /** The three shapes a flag-OFF match can arrive in (spec 14.7 P4). */
 const VARIANTS: Record<string, Record<string, unknown>> = {
@@ -513,7 +527,7 @@ const CASES: Record<string, Case> = {
   "challenge: weight, stakes": {
     fixture: { status: "pending", challenge: true },
     step: "weight",
-    setup: () => mockGetEloStakes.mockResolvedValue(STAKES),
+    setup: () => mockGetRatingStakes.mockResolvedValue(STAKES),
     shows: (s) => {
       RATED_PAIR(s);
       s.getByTestId("weight-stakes");
@@ -638,8 +652,8 @@ function serialize(screen: Screen): string {
 function resetModuleState() {
   mockSyncCalls.length = 0;
   mockGetMatchConfirmations.mockResolvedValue([]);
-  // Rating V9 has no stakes read: the face-off shows no stakes strip.
-  mockGetEloStakes.mockResolvedValue(null);
+  // A null get_rating_stakes response: the face-off shows no stakes strip.
+  mockGetRatingStakes.mockResolvedValue(null);
   mockGetMatchChallengeWeights.mockResolvedValue(CHALLENGE_WEIGHTS);
   mockGetMatchWeightChecks.mockResolvedValue(checksReply());
   mockCheckOpponentWeight.mockResolvedValue(checksReply());
@@ -693,6 +707,7 @@ describe("flag-OFF golden output: identical whatever the timekeeper keys say", (
     await capture("challenge: weight, stakes", VARIANTS.missing);
     expect(mockGetMatchChallengeWeights).toHaveBeenCalledWith(expect.anything(), "C1");
     expect(mockGetMatchWeightChecks).toHaveBeenCalledWith(expect.anything(), "M1");
-    expect(mockGetEloStakes).toHaveBeenCalledWith(expect.anything(), 1512, 1487, 170.2, 168);
+    // Rating V9: against the opponent's id, priced on this match's challenge weights.
+    expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "opp-1", "M1");
   });
 });

@@ -146,6 +146,23 @@ describe("shared match-flow pieces render with the active theme", () => {
     expect(color(s.getByText("Record it myself"))).toBe(t.textPrimary);
   });
 
+  it.each([
+    ["light", lightTokens],
+    ["dark", darkTokens],
+  ] as const)("%s: the draw cell is coloured by its sign (Rating V9: an underdog's draw gains)", (scheme, t) => {
+    mockScheme = scheme;
+    const s = render(
+      <View>
+        <StakesStrip testID="up" win={31} draw={4} loss={-6} />
+        <StakesStrip testID="down" win={3} draw={-2} loss={-17} />
+        <StakesStrip testID="even" win={10} draw={0} loss={-10} />
+      </View>,
+    );
+    expect(color(s.getByTestId("up-draw"))).toBe(t.statePositive);
+    expect(color(s.getByTestId("down-draw"))).toBe(t.attention);
+    expect(color(s.getByTestId("even-draw"))).toBe(t.textPrimary);
+  });
+
   it("chrome over camera or film keeps the fixed on-media colors in the light theme", () => {
     mockScheme = "light";
     const s = render(

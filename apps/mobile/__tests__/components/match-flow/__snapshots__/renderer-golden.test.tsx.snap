@@ -8342,7 +8342,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
         },
         {
          "children": [
-          "1 weight class apart. Heavier athlete’s ELO was adjusted."
+          "1 weight class apart. The heavier athlete was favoured, so they win fewer points."
          ],
          "props": {
           "className": "font-mono-medium",
@@ -9282,7 +9282,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
         },
         {
          "children": [
-          "1 weight class apart. Heavier athlete’s ELO was adjusted."
+          "1 weight class apart. The heavier athlete was favoured, so they win fewer points."
          ],
          "props": {
           "className": "font-mono-medium",
@@ -10222,7 +10222,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
         },
         {
          "children": [
-          "1 weight class apart. Heavier athlete’s ELO was adjusted."
+          "1 weight class apart. The heavier athlete was favoured, so they win fewer points."
          ],
          "props": {
           "className": "font-mono-medium",
@@ -13382,9 +13382,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
       },
       {
        "children": [
-        "The heavier athlete",
-        "’",
-        "s rating is adjusted for the weight gap."
+        "The heavier athlete is favoured, so they win fewer points."
        ],
        "props": {
         "className": "font-body",

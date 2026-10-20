@@ -96,7 +96,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
   if (!me || !opponent) return null;
 
   if (step === "weight" || step === "ready") {
-    return <FaceoffBody phase={step} me={me} opponent={opponent} durationSeconds={durationSeconds} />;
+    return <FaceoffBody phase={step} me={me} opponent={opponent} matchId={matchId} durationSeconds={durationSeconds} />;
   }
   if (step === "live") {
     return (

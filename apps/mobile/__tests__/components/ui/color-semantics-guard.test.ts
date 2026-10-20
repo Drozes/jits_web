@@ -173,7 +173,7 @@ const GREEN_ALLOWED: Allow = {
   "components/layout/your-numbers-sheet.tsx": { lines: 1, reason: "a positive rating delta (last match, this month)" },
   "components/match-card.tsx": { lines: 1, reason: "a positive rating delta" },
   "components/match-detail/match-verdict.tsx": { lines: 1, reason: "a positive rating delta" },
-  "components/match-flow/fight/fight-ui.tsx": { lines: 1, reason: "a positive rating delta (the done StatusPlate is ink)" },
+  "components/match-flow/fight/fight-ui.tsx": { lines: 2, reason: "a positive rating delta, and a positive draw delta (Rating V9: an underdog's draw gains) (the done StatusPlate is ink)" },
   "components/match-flow/steps/confirm-step-panels.tsx": { lines: 1, reason: "YOU WON (a win; the confirmed panel is ink)" },
   "components/match-flow/verdict/verdict-step.tsx": { lines: 2, reason: "the rank strip, shown only on a win (a rank gain)" },
   "components/profile/elo-progression.tsx": { lines: 1, reason: "a positive rating delta" },

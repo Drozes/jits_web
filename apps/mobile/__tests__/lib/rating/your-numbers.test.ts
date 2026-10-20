@@ -140,8 +140,10 @@ describe("sparkRange and the peak legend", () => {
 });
 
 describe("deltaTone", () => {
-  it("is amber for a draw whatever the sign, else by the sign", () => {
+  it("is by the sign; a negative draw is amber (not a loss), an underdog's positive draw is a gain, an even draw flat", () => {
     expect(deltaTone(-2, "draw")).toBe("draw");
+    expect(deltaTone(4, "draw")).toBe("win");
+    expect(deltaTone(0, "draw")).toBe("flat");
     expect(deltaTone(-11, "loss")).toBe("loss");
     expect(deltaTone(-11)).toBe("loss");
     expect(deltaTone(14, "win")).toBe("win");

@@ -122,7 +122,7 @@ jest.mock("@jits/shared/api/queries", () => ({
   getMatchDetails: (...a: unknown[]) => mockGetMatchDetails(...a),
   getMatchConfirmations: async () => [],
   getSubmissionTypes: async () => [],
-  getEloStakes: async () => null,
+  getRatingStakes: async () => null,
   getMatchResultLockSeconds: async () => 86_400,
   getMatchDetailView: async () => ({ ok: true, data: { videos: [] } }),
 }));

@@ -94,7 +94,8 @@ describe("ResultStep draw", () => {
     const screen = renderResult();
     fireEvent.press(screen.getByText("Draw"));
     screen.getByText("Match ends in a draw");
-    screen.getByText("Draws cost both athletes rating.");
+    screen.getByText("In a draw the favourite gives up a few points to the underdog.");
+    expect(screen.queryByText(/draws? cost/i)).toBeNull();
     // The draw plate's handshake is amber (pressure), never Signal Red.
     const icon = screen.getAllByTestId("icon-Handshake").at(-1)!;
     expect(icon.props.color).toBe("#F59E0B");

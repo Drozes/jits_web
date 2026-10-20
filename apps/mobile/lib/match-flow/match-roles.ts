@@ -36,7 +36,7 @@ export interface MatchAthleteView {
   eloBefore: number | null;
   eloAfter: number | null;
   eloDelta: number | null;
-  /** BE-stamped IBJJF division gap used for the phantom-ELO adjustment. */
+  /** BE-stamped IBJJF division gap: informational since Rating V9 (no number depends on it). */
   weightDivisionGap: number | null;
   isChallenger: boolean;
 }
