@@ -61,10 +61,10 @@ export function confirmVerdict(resultData: BroadcastResult | null, meId: string)
 }
 
 /**
- * The confirm step, the opponent's side: confirm the recorded result with one tap or
- * dispute it. The recorder never lands here on a current backend: the server
- * confirms their side with the result (B2) and they go straight to the
- * verdict. A dispute is only possible for 24 h after the match (B3).
+ * The confirm step, the opponent's side: confirm the recorded result with
+ * one tap or dispute it. The recorder never lands here on a current backend:
+ * the server confirms their side with the result (B2) and they go straight
+ * to the verdict. A dispute is only possible for 24 h after the match (B3).
  *
  * Leaving counts as confirming (jits-02vo.7): the backend confirms an
  * undisputed result once its lock window passes (jr_be-ahn.5), so there is

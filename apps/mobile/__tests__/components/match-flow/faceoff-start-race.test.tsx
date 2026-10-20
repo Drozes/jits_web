@@ -147,7 +147,7 @@ describe("losing the start race", () => {
     expect(onStarted).not.toHaveBeenCalled();
   });
 
-  it("hides Leave while the start is in flight; both athletes stay ready, so the face-off tries again", async () => {
+  it("hides Leave while the start is in flight; after a failed start both stay ready and it retries at once (pins current behaviour, bug jits-l7g3)", async () => {
     let fail!: (v: unknown) => void;
     mockStart.mockReturnValueOnce(new Promise((r) => (fail = r))).mockReturnValue(new Promise(() => {}));
     mockGetMatchDetails.mockResolvedValue({ id: "M1", status: "pending", started_at: null });
@@ -159,7 +159,10 @@ describe("losing the start race", () => {
       fail(LOST);
     });
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
-    // Nothing cleared ready, so the start policy races start_match again.
+    // Nothing cleared ready, so the start policy races start_match again at
+    // once, with no backoff and a new toast each time. This pins today's
+    // behaviour so a refactor cannot change it by accident; it is the bug
+    // jits-l7g3 tracks, and the fix for that bead updates this test on purpose.
     await waitFor(() => expect(mockStart).toHaveBeenCalledTimes(2));
   });
 });

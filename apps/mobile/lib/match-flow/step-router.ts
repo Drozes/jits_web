@@ -4,9 +4,11 @@
  * `computeInitialStep` without its timekeeper variants: the mobile wizard has
  * no timekeeper (web's session timekeeper never came to mobile).
  *
- * Steps, in order. The order is also time order: the wizard and the
- * reconciler never move to an earlier step (`use-wizard-sync.ts`,
- * `reconcile.ts`).
+ * Steps, in order. The order is also time order: the wizard's own setter
+ * never moves to an earlier step (`use-wizard-sync.ts`), and the reconciler
+ * moves back only once, for its initial correction: on the first snapshot it
+ * moves an athlete who has not confirmed from `summary` back to `confirm`
+ * (jits-bmei, `planReconcile` in `reconcile.ts`).
  *   - `weight`  : the face-off weigh-in. Each athlete confirms their own
  *                 weight, and checks the opponent's where weight checks are on.
  *   - `ready`   : the face-off ready check. Each athlete taps Ready; once both

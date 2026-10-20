@@ -5,10 +5,13 @@
  * screen of a two-athlete (self-run) match three times: with the match
  * payload as an older backend sends it (no `requires_timekeeper`), with
  * `requires_timekeeper: false`, and with every timekeeper-mode key present at
- * its flag-OFF value (the backend after BE-G, for a flag-OFF match; the
- * challenger is the OTHER athlete there, so athlete order cannot leak into
- * the output either). All three trees must be identical, and equal to the
- * committed snapshot.
+ * its flag-OFF value (the backend after BE-G, for a flag-OFF match, with
+ * `challenger_id` naming the OTHER athlete). All three trees must be
+ * identical, and equal to the committed snapshot. The third variant proves
+ * the extra keys change nothing; it does not prove that athlete order cannot
+ * leak: `deriveMatchRoles` does not read `challenger_id` yet (the first
+ * participant stands in until M1), and no variant reverses the participant
+ * order.
  *
  * Two match shapes are pinned. The challenge-free one (`challenge_id: null`)
  * is the original seven steps. The challenge-backed one is what production

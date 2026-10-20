@@ -67,10 +67,11 @@ export interface LiveStepProps {
 const TIME_WARNING_SECONDS = 10;
 
 /**
- * The live step: live timer with pause / resume / hold-to-end controls. Auto-starts the
- * wizard's recorder on entry and stops it on end, and fires haptics on key
- * events (match start, time-warning, match end). The screen wake-lock is
- * held by the wizard across ready AND live, so it is not taken here.
+ * The live step: live timer with pause / resume / hold-to-end controls.
+ * Auto-starts the wizard's recorder on entry and stops it on end, and fires
+ * haptics on key events (match start, time-warning, match end). The screen
+ * wake-lock is held by the wizard across ready AND live, so it is not taken
+ * here.
  *
  * The viewfinder and the upload status chip are rendered by the wizard,
  * not here: the camera has to be warm BEFORE this step mounts, and the

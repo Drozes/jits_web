@@ -71,12 +71,13 @@ interface VerdictStepProps {
 }
 
 /**
- * The summary step, the verdict. A win celebrates (confetti, the verdict slams in, the
- * rating rolls, the rank strip rises); a loss is calm. Every outcome gets
- * the same actions (P-Verdict, jits-02vo.8): Watch film, Back to Arena, and
- * Share match as one full-width tertiary row. Running it back is an
- * ordinary Arena challenge, never a shortcut here. The opening still (or the
- * athletes, until it exists) as the hero; this phone's upload as a card.
+ * The summary step, the verdict. A win celebrates (confetti, the verdict
+ * slams in, the rating rolls, the rank strip rises); a loss is calm. Every
+ * outcome gets the same actions (P-Verdict, jits-02vo.8): Watch film, Back
+ * to Arena, and Share match as one full-width tertiary row. Running it back
+ * is an ordinary Arena challenge, never a shortcut here. The opening still
+ * (or the athletes, until it exists) as the hero; this phone's upload as a
+ * card.
  *
  * A recorder reaches this before the opponent has confirmed (auto-confirm,
  * B2), and the opponent may still dispute. So the verdict listens for
