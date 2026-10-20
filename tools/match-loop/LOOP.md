@@ -117,6 +117,58 @@ relaunch. It logs the previous user's `looking_for_ranked` after sign-out
 
 ## 4. Run
 
+### The flag-OFF guard (gate runs)
+
+Core is the flag-OFF guard for the timekeeper mode build: it proves the
+two-athlete Arena match still works with every timekeeper flag off. A gate
+run is core with NO `--rerun-failures`:
+
+```
+npm run match-loop -- --tier core
+```
+
+Without reruns there is no `flake` status: a scenario that would only pass
+on a second attempt is `fail`, and a gate counts it as red. Never add
+`--rerun-failures` to a gate run, and never call a gate green on a run that
+needed one. The strict press oracles (`ui:weight-check-one-press`,
+`ui:end-one-hold`, `ui:back-to-arena-one-tap`, see "Known harness facts")
+exist for the same reason: a press the app dropped must fail the guard, not
+be retried away. The extended tier's gate run is the same, also with no
+`--rerun-failures`:
+
+```
+npm run match-loop -- --tier extended
+```
+
+An excused second Back to Arena tap passes `ui:back-to-arena-one-tap` but is
+not a silent pass: review every one before calling a gate green. After each
+gate run, this must print 0, and anything else is a review item (open the
+run's trace, `logbox_retap` note, and say in the gate notes why the LogBox
+excuse holds):
+
+```
+grep -c '"logBoxRetap": true' tools/match-loop/.runs/<iso>/result.json
+```
+
+Baseline flag states (local `public.feature_flags`, read 2026-10-20 on the
+jr_be-tk-build stack with Rating V9 and TK Wave 1 backend):
+`timekeeper_role=false` (the mode under guard is OFF),
+`timekeeper_weight_check=true`, `opponent_weight_check_required=false`,
+`match_location_required=false`, `match_proximity_required=false`,
+`live_location_drift_check=false`, `invites_enabled=true`,
+`video_upload_enabled=true`, `highlight_clips_enabled=true`,
+`highlight_share_enabled=true`, `multi_angle_highlights_enabled=false`,
+`multi_angle_sync_enabled=false`, `match_capture_1080p=false`,
+`ai_labels_public=false`, `video_position_taxonomy=false`. A baseline is
+only comparable with a run on the same flag states; re-read them before a
+gate with
+`psql "host=127.0.0.1 port=54322 dbname=postgres user=postgres" -Atc "select key || '=' || enabled from feature_flags order by key"`.
+
+### Loop iterations (triage)
+
+Inside the unattended loop, reruns are a triage tool only (they tell a
+`flake` from a reproducible failure), never a gate:
+
 ```
 npm run match-loop -- --tier core --rerun-failures 2
 ```
@@ -137,6 +189,11 @@ Exit code: 0 when every scenario is `pass`, `flake` or `known`; 1 when any is
 Core is expected fully green (7 of 7: C1 to C6B) on the local stack, with
 Rating V9 applied and face-off weight checks on; it is the flag-OFF guard for
 the timekeeper mode build. Any core failure is a regression to triage.
+Extended is expected fully green too (every implemented scenario, E1 to E20;
+E13 is not implemented). A failure that is a real app bug stays red until
+the app is fixed (never waived in the harness); none is open on 2026-10-20
+(E17's `ui:no-app-error-athlete` went green with the jits-i5ih fix, see
+"Known harness facts").
 
 Target: the core tier takes about 3.5 minutes; the extended tier about
 13 to 16 minutes (E18 to E20 add roughly 1.5 to 2 minutes each: the toast
@@ -226,12 +283,22 @@ already appends a `{"type":"run",...}` line per run):
 ## Known harness facts
 
 - The incoming-challenge prompt is a centered React Native `Modal` (a gorhom
-  sheet before jits-02vo.3). Since
-  jits-ef2a its Accept/Decline buttons are in the accessibility tree by label,
-  and the harness taps them only by label (the old offset-from-handle fallback
-  is gone). The prompt ignores taps for `PROMPT_INPUT_GUARD_MS` (600ms) after
-  it appears and disables its buttons for that window, so the harness waits
-  out the guard plus a margin and then for the button to be enabled.
+  sheet before jits-02vo.3). Since jits-ef2a its Accept/Decline buttons are in
+  the accessibility tree, and the harness taps them by testID plus label
+  (`PROMPT_BUTTONS`: `#challenge-prompt-accept` "Accept challenge",
+  `#challenge-prompt-decline` "Decline challenge"), never by element type and
+  never by an offset (the old offset-from-handle fallback is gone). The prompt
+  ignores taps for `PROMPT_INPUT_GUARD_MS` (600ms) after it appears and
+  disables its buttons for that window, so the harness waits out the guard
+  plus a margin and then for the button to be enabled.
+- The modal hides everything under it from idb, the tab root's header chip
+  and the Arena's control bar included. Going live with a pending incoming
+  challenge (E14) raises the recovered prompt at once
+  (`use-pending-challenge-recovery.ts`), so E14 taps Go live
+  (`Screens.tapGoLive`) and waits for the PROMPT, not for `Go offline`
+  (`ensureLive` would time out behind the modal); it then checks the DB says
+  Blue is live, declines, and checks the challenge is `declined` and Blue is
+  still live.
 - Live state is read from the header status chip (`#header-status-chip`,
   AXValue `live` / `offline`) on the four tab roots, or the non-interactive
   `#header-live-dot` on pushed screens. Every chip label starts with
@@ -288,13 +355,49 @@ already appends a `{"type":"run",...}` line per run):
   counts the clock from GO too.
 - End is "Hold to end match": a tap never ends. `Screens.endMatch` presses
   `#live-end` for `HOLD_TO_END_MS` (1.2 s, pinned to the app) plus a margin
-  and checks the press took.
+  and checks the press took. Two holds that both fail to end the live step
+  are the app's failure (ExpectationTimeout, status `fail`), not a harness
+  error.
+- Strict presses. Three controls are pressed again when the first press did
+  not take, and every one counts its presses so the retry can never hide a
+  dropped press: `ui:weight-check-one-press` (the face-off check plate's
+  Confirm, `blueConfirmsWeights`), `ui:end-one-hold` (`blueEnds`) and
+  `ui:back-to-arena-one-tap` (`exitToArena`). Each expects exactly one; a
+  second press fails the oracle (and so the scenario). Back to Arena is
+  tapped a second time ONLY when a dev-build LogBox could physically have
+  taken the first tap: a toast was closed just before it (that close tap
+  can open the LogBox inspector), a toast's frame held the tap's point in
+  the screen read just before the tap, or the LogBox inspector is open
+  after it. The oracle then accepts the second tap and records
+  `logBoxRetap: true` with `logBoxExcuse` (`closed-before`,
+  `toast-over-tap` or `inspector-open`), plus a `logbox_retap` trace note
+  and a REVIEW note on the oracle; a gate reviews every one (section 4,
+  "The flag-OFF guard"). A toast elsewhere on screen excuses nothing: the
+  exit was scrolled 150pt clear of the toast band before the tap, so the
+  verdict ignoring the tap is a `fail` at once. `dismissLogBox` minimises
+  an open inspector (its Minimize button, found with its "Log n of m"
+  title) before closing the toast.
+- The live pause toggle (`#live-pause-toggle`) is ONE accessible element
+  whose label names the action it offers: "Pause match clock" while running,
+  "Resume match clock" while paused (since 35d87d0f). The drawn PAUSE /
+  RESUME text is inside it and never reported on its own; `pauseLabel` maps
+  the label to `PAUSE` / `RESUME` (`PAUSE_TOGGLE`, pinned to the app by
+  `tests/label-contract.test.ts`) and returns any other label as itself, so
+  a relabel shows up as the oracle's actual value.
+- DB oracles beyond the rating checks: `db:weight-checks-confirmed` (after
+  Blue's weigh-in, Blue's own `match_weight_checks` row, checker Blue and
+  subject the opponent, is `confirmed`), `db:participant-delta-consistent`
+  (`checkRatingApplied`: every participant row has `elo_before`,
+  `elo_after` and `elo_delta` written and `elo_delta = elo_after -
+  elo_before`; the verdict shows `elo_delta`) and `db:draw-symmetric`
+  (`checkDrawDb`: a draw between equals moves both athletes by the same,
+  written delta; Rating V9 moves neither).
 - `fillField` clears a field before typing (the finish time is prefilled
   from the match clock) and compares case-insensitively (iOS capitalises a
   text field's first letter).
 - A dev-build LogBox toast can also cover the verdict's Back to Arena;
-  `exitSummary` closes it, scrolls the exit clear of that band and re-taps
-  if the verdict is still up.
+  `exitSummary` closes it and scrolls the exit clear of that band before
+  the tap, and re-taps only as described under "Strict presses".
 - C4: the app declines with the RPC first and broadcasts `declined` after
   it, so the challenger's status UPDATE and the broadcast race. C4 asserts
   the outcome and that the broadcast was delivered
@@ -361,9 +464,68 @@ already appends a `{"type":"run",...}` line per run):
   challenge), so "left the lobby" cannot pass vacuously when Blue was never
   in it. `checkOfflineInMatch` throws a HarnessError if the pre-match oracle
   was not recorded.
-- History rows near the bottom of a tab sit under the tab bar: a tap on
-  their centre lands on a tab. `sim/match-detail.ts` scrolls every target
-  into the band between the header and the tab bar before tapping.
+- History rows near the bottom of a tab sit under the tab bar, and a scroll
+  with momentum can leave a row under the header bar: a tap on either lands
+  on the bar, not the row (E17, 2026-10-20: a Stats row centred at y=117,
+  under the pushed header whose bar ends at 118, opened nothing).
+  `sim/match-detail.ts` scrolls every target into `hittableBand` before
+  tapping: below the header bar (its controls' centre plus half the 56pt
+  bar, plus a 12pt margin; 130 on the iPhone 17 Pro) and above the tab bar
+  (minus 12pt).
+- Match detail has no fixed header: its back control (FilmBackButton,
+  "Go back", `#match-back`) sits in the hero, inside the ScrollView, and
+  scrolls away with the content. A detail scrolled down stays scrolled while
+  a screen above it is open, so after that screen pops, idb reports the
+  detail's "Go back" with its real, off-screen frame (E17, 2026-10-20: the
+  Stats detail under the athlete page, scrolled to its opponent row, at
+  y=-169), and a tap there does nothing. Every pop goes through
+  `Screens.goBack` (`sim/screens.ts`): it taps only a back control a tap
+  can reach (`backTappable`: on screen, its centre at y >= 62, below the
+  status bar and the Dynamic Island), scrolls an unreachable one back down by its own frame first
+  (`backRevealMove`, slow), and throws ExpectationTimeout when it cannot.
+  `Screens.backToTabRoot` (used by `sim/match-detail.ts` and
+  `normaliseApp`) also throws when a back control is still there after its
+  pops, so a stranded screen fails where it happens instead of as a missing
+  tab button later. `normaliseApp` relaunches the app (trace notes
+  `stuck_pushed_screen_relaunch`, `normalise_last_resort_relaunch`) when it
+  cannot bring back the tab bar, so one stranded scenario does not fail the
+  next ones in setup (E18 to E20 did on 2026-10-20).
+- The Matches tab is labelled Film since 2026-10-09 (its route is still
+  `matches`): the tab bar's button is "Film" (`TAB_LABELS`, pinned to the
+  tabs layout). The Film tab root is proven by BrandHeader's
+  accessibility-only heading, which idb reports as a Heading labelled "Film",
+  usually without its `tab-header-title-film` testID (it is a Text), so
+  `TAB_PROOF` accepts either; the tab bar's Film button is never a Heading.
+  The label is matched case-sensitively (`/^Film$/`): match detail's
+  FilmAngles header is a Heading too and reads "FILM" with one usable
+  angle, and string labels match case-insensitively.
+  E17 opens the match from the Film tab's card `#film-card-<matchId>` and
+  plays Demo Red's recording from there (`ui:player-loaded`,
+  `ui:no-error-panel`); its oracle keeps the route's name
+  (`ui:detail-from-matches`).
+- E17 checks after each entry point that the app is not on its error screen
+  (`ui:no-app-error-<home|stats|athlete|film>`, read from the error
+  boundary's "SOMETHING WENT WRONG" or the dev red box). When it is, that
+  oracle fails (with the error message as its actual value), and the app is
+  relaunched and Blue put back live on the Arena, so the later entry points
+  and the player still report on their own. The two live-state oracles
+  (`db:blue-still-live-after-history`, `ui:live-pill-after-history`) are
+  then SKIPPED, not evaluated: once the harness has relaunched the app and
+  gone live itself, live state no longer reflects history browsing.
+  The athlete entry is the only one that stacks two match detail screens
+  for the same match (Stats detail, opponent profile, head-to-head row, the
+  same match again). The second one crashed until jits-i5ih (2026-10-20)
+  with "cannot add `postgres_changes` callbacks for
+  realtime:video_progress:<videoId> after `subscribe()`": `useVideoProgress`
+  (packages/shared/src/hooks/use-video-progress.ts) named its channel
+  `video_progress:<videoId>` with no per-subscription suffix, realtime-js
+  returned the first screen's already joined channel for the same topic,
+  and `.on()` on it threw. It fired while the recording was still in the
+  pipeline (E17's seeded rows stay `ready` with no analysis, `useMatchFilm`
+  `watching`). jits-i5ih gave the hook a per-subscription topic, and E17
+  keeps `ui:no-app-error-athlete` as the regression guard (verified: with
+  the old hook E17 fails on it and on `logs:metro-clean`, fingerprint
+  `a7f90f794337`, run 2026-10-20T04-59-20-221Z, a deliberate red run).
 - E18 to E20 exercise the Arena concurrency rules in
   `apps/mobile/lib/arena/use-arena-challenge.ts`. E18 (crossing) has two
   legitimate branches, picked by which challenge id is lower (random per

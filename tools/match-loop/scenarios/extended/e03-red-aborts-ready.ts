@@ -12,7 +12,7 @@ const scenario: Scenario = {
     const h = await blueChallengesRed(ctx, red);
     const side = await ctx.matchSide(red, h.matchId);
     await blueOnWeight(ctx);
-    await blueConfirmsWeights(ctx);
+    await blueConfirmsWeights(ctx, h.matchId);
     await ctx.step("Red reaches the ready step", () => side.confirmWeights());
     await ctx.step("Red cancels", () => side.cancelReady());
     await ctx.step("Blue is returned to the Arena", () =>

@@ -16,6 +16,7 @@ import {
   HEADER_CHIP_ID,
   HEADER_LIVE_DOT_ID,
   LIVE_CHIP,
+  PAUSE_TOGGLE,
   STEP_BY_LABEL,
   STEP_MARKER_RE,
   FACEOFF_LEAVE,
@@ -23,13 +24,23 @@ import {
   PROMPT_BUTTONS,
   STEP_BY_CONTROL,
   STEP_TEST_ID_PREFIX,
+  TAB_LABELS,
   WEIGHT_CHECK,
+  BACK_MIN_CENTRE_Y,
+  GO_BACK,
+  Screens,
+  backRevealMove,
+  backTappable,
+  pauseToggleState,
   stepFromControls,
   stepFromTestId,
 } from "../sim/screens";
-import { participantDelta, verdictChipDelta } from "../scenarios/flows";
+import { APP_ERROR_TITLE, TAB_PROOF, appErrorIn, bandMove, hittableBand } from "../sim/match-detail";
+import { drawSymmetric, participantDelta, participantDeltaConsistent, verdictChipDelta } from "../scenarios/flows";
 import { parseDelta } from "../oracle/ui";
-import { matches, type AXElement } from "../sim/idb";
+import { matches, type AXElement, type Idb, type Query } from "../sim/idb";
+import type { Simctl } from "../sim/simctl";
+import { ExpectationTimeout } from "../lib/util";
 import { MATCH_STEPS } from "../../../apps/mobile/lib/match-flow/step-router";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -93,8 +104,9 @@ test("the Mat Board keeps the harness's Arena labels", () => {
   assert.match(MAT_BOARD, /accessibilityLabel=\{`Go live to answer \$\{name\}`\}/);
 });
 
-test("the prompt sheet keeps Accept / Decline by label and exposes them to idb", () => {
-  // Screens.isPromptVisible / tapPromptButton query { label, type: "Button" }.
+test("the prompt sheet keeps Accept / Decline by testID and label and exposes them to idb", () => {
+  // Screens.isPromptVisible / tapPromptButton query PROMPT_BUTTONS (testID
+  // plus label, never an element type).
   assert.match(SHEET, /accessibilityRole="button"\s+accessibilityLabel="Accept challenge"/);
   assert.match(SHEET, /accessibilityRole="button"\s+accessibilityLabel="Decline challenge"/);
   assert.match(SHEET, /accessibilityRole="button"\s+accessibilityLabel="Later"/);
@@ -161,6 +173,206 @@ test("the step-only controls the harness falls back on are where it expects them
   assert.equal(stepFromControls([el({ AXUniqueId: "weight-confirm" })]), null);
 });
 
+test("the live pause toggle's labels are the ones the harness reads", () => {
+  // E4 reads the action the toggle offers from its accessibility label.
+  const BTN = src("components/match-flow/live/pause-button.tsx");
+  assert.match(BTN, new RegExp(`testID="${PAUSE_TOGGLE.id}"`));
+  assert.ok(
+    BTN.includes(`accessibilityLabel={paused ? "${PAUSE_TOGGLE.resume}" : "${PAUSE_TOGGLE.pause}"}`),
+    "PauseButton's accessibilityLabel changed: update PAUSE_TOGGLE",
+  );
+  assert.equal(pauseToggleState(PAUSE_TOGGLE.pause), "PAUSE");
+  assert.equal(pauseToggleState(PAUSE_TOGGLE.resume), "RESUME");
+  // A relabel reads as itself (evidence), never as either state.
+  assert.equal(pauseToggleState("Pause"), "Pause");
+  assert.equal(pauseToggleState(null), null);
+});
+
+test("the tab bar's labels are the harness's TAB_LABELS, in order", () => {
+  const LAYOUT = src("app/(app)/(tabs)/_layout.tsx");
+  const titles = [...LAYOUT.matchAll(/^\s*title: "([^"]+)",$/gm)].map((m) => m[1]);
+  assert.deepEqual(titles, [...TAB_LABELS]);
+  // The Matches tab is labelled Film (route still `matches`).
+  assert.match(LAYOUT, /name="matches"\s+options=\{\{\s+title: "Film",/);
+});
+
+test("the Film tab root is proven by BrandHeader's heading, never by the tab bar's button", () => {
+  const HEADER = src("components/layout/brand-header.tsx");
+  assert.match(HEADER, /testID=\{`tab-header-title-\$\{title\.toLowerCase\(\)\}`\}\s+accessibilityRole="header"/);
+  const heading = el({ AXLabel: "Film", type: "Heading", frame: { x: 0, y: 58, width: 1, height: 1 } });
+  const tabButton = el({ AXLabel: "Film", type: "Button", frame: { x: 161, y: 782, width: 80, height: 57 } });
+  assert.ok(TAB_PROOF.Film.some((q) => matches(heading, q)), "the heading must prove the Film tab");
+  assert.ok(!TAB_PROOF.Film.some((q) => matches(tabButton, q)), "the tab bar's Film button must not prove the tab");
+  // Match detail's FilmAngles header is a Heading too, reading "FILM" with one
+  // usable angle: it must not pass for the Film tab root.
+  const ANGLES = src("components/match-detail/film-angles.tsx");
+  assert.match(ANGLES, /accessibilityRole="header"[^>]*>\s*\{count > 1 \? `FILM · \$\{count\} ANGLES` : "FILM"\}/);
+  const anglesHeading = el({ AXLabel: "FILM", type: "Heading", frame: { x: 16, y: 520, width: 40, height: 14 } });
+  assert.ok(!TAB_PROOF.Film.some((q) => matches(anglesHeading, q)), "match detail's FILM header must not prove the Film tab");
+});
+
+test("taps stay inside the band between the header bar and the tab bar", () => {
+  const H = 874;
+  // A pushed screen (AppHeader: Go back + live dot), as on Stats.
+  const pushed = [
+    el({ AXLabel: "Go back", type: "Button", frame: { x: 16, y: 74, width: 28, height: 28 } }),
+    el({ AXLabel: "You are live in the Arena", AXUniqueId: "header-live-dot", type: "GenericElement", frame: { x: 372, y: 76, width: 14, height: 28 } }),
+  ];
+  const band = hittableBand(pushed, H);
+  assert.equal(band.top, 130, "the 56pt bar ends at 118, plus the margin");
+  assert.equal(band.bottom, H - 12);
+  // E17, 2026-10-20: a Stats row centred at y=117 sat under the header.
+  assert.ok(!(117 > band.top), "a row under the header must not count as hittable");
+  // A tab root (BrandHeader controls, tab bar at 782).
+  const tabRoot = [
+    el({ AXLabel: "Your rating 1001", AXUniqueId: "header-elo", type: "GenericElement", frame: { x: 100, y: 68, width: 51, height: 44 } }),
+    ...TAB_LABELS.map((l, i) => el({ AXLabel: l, type: "Button", frame: { x: i * 80, y: 782, width: 80, height: 57 } })),
+    el({ AXLabel: "Film", type: "Heading", frame: { x: 0, y: 58, width: 1, height: 1 } }),
+  ];
+  assert.deepEqual(hittableBand(tabRoot, H), { top: 130, bottom: 770 });
+  // Nothing reported for the header: the iPhone 17 Pro's bar bottom.
+  assert.equal(hittableBand([], H).top, 130);
+});
+
+test("a scroll move aims at the band's middle, capped and slow", () => {
+  const band = { top: 130, bottom: 770 };
+  // Below the band (E17's first Stats row at 830): the finger moves up.
+  const down = bandMove(830, band, 874);
+  assert.ok(down.fromY > down.toY);
+  assert.equal(down.fromY - down.toY, 830 - 450);
+  // Above the band (flung under the header): the finger moves down.
+  const up = bandMove(117, band, 874);
+  assert.ok(up.toY > up.fromY);
+  assert.equal(up.toY - up.fromY, 450 - 117);
+  // Far away: one move is at most 80% of the band, and slow.
+  const far = bandMove(5_000, band, 874);
+  assert.equal(far.fromY - far.toY, 512);
+  assert.ok(far.durationS >= 512 / 300 - 1e-9);
+  assert.ok(bandMove(460, band, 874).durationS >= 0.3);
+});
+
+test("every pushed screen's back control is labelled Go back, and the match hero's scrolls with the detail", () => {
+  assert.equal(GO_BACK.label, "Go back");
+  assert.match(src("components/layout/app-header.tsx"), /accessibilityRole="button"\s+accessibilityLabel="Go back"/);
+  assert.match(src("components/film-room/film-back-button.tsx"), /accessibilityRole="button"\s+accessibilityLabel=\{label\}/);
+  assert.match(src("components/match-detail/match-hero.tsx"), /<FilmBackButton label="Go back" [^>]*testID="match-back" \/>/);
+  // The hero is inside the detail's ScrollView, so its back control scrolls away (what Screens.goBack handles).
+  assert.match(src("app/(app)/match-detail/[matchId].tsx"), /<ScrollView[^]*?<MatchHero/);
+});
+
+test("only a back control a tap can reach counts; an off-screen one is scrolled back into reach, slowly", () => {
+  const H = 874;
+  const W = 402;
+  const back = (x: number, cy: number) => el({ AXLabel: "Go back", AXUniqueId: "match-back", frame: { x, y: cy - 22, width: 44, height: 44 } });
+  // E17, 2026-10-20: the Stats detail's hero back control, scrolled away.
+  assert.equal(backTappable(back(4, -169.3), W, H), false);
+  // At rest: the match hero's (centre 90) and AppHeader's (centre 88).
+  assert.equal(backTappable(back(4, 90), W, H), true);
+  assert.equal(backTappable(el({ AXLabel: "Go back", frame: { x: 16, y: 74, width: 28, height: 28 } }), W, H), true);
+  // Under the status bar, off to the side, below the screen, or zero-sized: out of reach.
+  assert.equal(backTappable(back(4, BACK_MIN_CENTRE_Y - 1), W, H), false);
+  assert.equal(backTappable(back(-60, 90), W, H), false);
+  assert.equal(backTappable(back(4, H + 40), W, H), false);
+  assert.equal(backTappable(el({ AXLabel: "Go back", frame: { x: 4, y: 68, width: 0, height: 0 } }), W, H), false);
+  // The move brings the control's centre into reach, finger down, slowly.
+  const m = backRevealMove(-169.3, H);
+  assert.ok(m.toY > m.fromY, "the finger moves down to bring the content down");
+  assert.ok(backTappable(back(4, -169.3 + (m.toY - m.fromY)), W, H), "one move lands it in reach");
+  assert.ok(m.durationS >= (m.toY - m.fromY) / 300 - 1e-9);
+  // Far above: one move is capped at 60% of the screen and stays on it.
+  const far = backRevealMove(-5_000, H);
+  assert.ok(Math.abs(far.toY - far.fromY - H * 0.6) < 1e-9);
+  assert.ok(far.fromY >= 0 && far.toY <= H);
+});
+
+/**
+ * A fake Idb with one "Go back" whose frame a swipe moves by the finger's
+ * travel, down to where its scroll view stops at the top (centre 90), or
+ * not at all (`stuck`). A tap on it pops the screen unless `ignoresTap`.
+ */
+function backIdb(startCentreY: number | null, opts: { stuck?: boolean; ignoresTap?: boolean } = {}) {
+  let cy = startCentreY;
+  const taps: number[] = [];
+  const swipes: number[] = [];
+  const read = () => (cy === null ? [] : [el({ AXLabel: "Go back", AXUniqueId: "match-back", frame: { x: 4, y: cy - 22, width: 44, height: 44 } })]);
+  const idb = {
+    screenH: 874,
+    screenW: 402,
+    async describe() {
+      return read();
+    },
+    async settled(q: Query) {
+      return read().find((e) => matches(e, q));
+    },
+    async swipe(_x1: number, y1: number, _x2: number, y2: number) {
+      swipes.push(y2 - y1);
+      if (cy !== null && !opts.stuck) cy = Math.min(90, cy + (y2 - y1));
+    },
+    async tap(e: AXElement) {
+      taps.push(e.frame.y + e.frame.height / 2);
+      if (!opts.ignoresTap) cy = null;
+    },
+  };
+  return { ui: new Screens(idb as unknown as Idb, {} as Simctl, 0), taps, swipes };
+}
+
+test("goBack scrolls a scrolled-away back control into reach before its one tap", async () => {
+  const { ui, taps, swipes } = backIdb(-169.3);
+  assert.equal(await ui.goBack(), true);
+  assert.equal(swipes.length, 1);
+  assert.ok(swipes[0] > 0, "content scrolled down");
+  assert.deepEqual(taps, [90], "one tap, on the control at rest, never at its off-screen frame");
+});
+
+test("goBack taps a reachable back control at once, and reports a tab root as nothing to pop", async () => {
+  const pushed = backIdb(88);
+  assert.equal(await pushed.ui.goBack(), true);
+  assert.deepEqual(pushed.swipes, []);
+  assert.deepEqual(pushed.taps, [88]);
+  const root = backIdb(null);
+  assert.equal(await root.ui.goBack(), false);
+  assert.deepEqual(root.taps, []);
+});
+
+test("a back control that never comes into reach fails, without a tap off screen", async () => {
+  const { ui, taps, swipes } = backIdb(-169.3, { stuck: true });
+  await assert.rejects(ui.goBack(), (e: unknown) => {
+    assert.ok(e instanceof ExpectationTimeout, String(e));
+    assert.match(e.message, /"Go back" within reach/);
+    return true;
+  });
+  assert.deepEqual(taps, []);
+  assert.equal(swipes.length, 4);
+});
+
+test("backToTabRoot fails naming the screen when a pop does not leave it", async () => {
+  const { ui, taps } = backIdb(88, { ignoresTap: true });
+  await assert.rejects(ui.backToTabRoot(1), (e: unknown) => {
+    assert.ok(e instanceof ExpectationTimeout, String(e));
+    assert.match(e.message, /a tab root within 1 pops/);
+    return true;
+  });
+  assert.deepEqual(taps, [88]);
+  // A pop that leaves it is a clean return.
+  const ok = backIdb(88);
+  await ok.ui.backToTabRoot(2);
+  assert.deepEqual(ok.taps, [88]);
+});
+
+test("the app's error screen is read from the error boundary or the dev red box", () => {
+  const BOUNDARY = src("components/error-boundary.tsx");
+  assert.ok(BOUNDARY.includes(APP_ERROR_TITLE), "the error boundary's title changed");
+  const text = (AXLabel: string) => el({ AXLabel, type: "StaticText" });
+  const msg = "cannot add `postgres_changes` callbacks for realtime:video_progress:x after `subscribe()`.";
+  assert.equal(
+    appErrorIn([text(APP_ERROR_TITLE), text("The app hit an unexpected error. Try again, or sign out."), text(msg)]),
+    msg,
+  );
+  assert.equal(appErrorIn([text(APP_ERROR_TITLE)]), APP_ERROR_TITLE);
+  assert.equal(appErrorIn([text("Render Error"), text(msg)]), msg);
+  assert.equal(appErrorIn([text("Match detail"), text("Watch your recording")]), null);
+});
+
 test("End is a hold, for the time the harness holds it", () => {
   // Screens.endMatch long-presses #live-end; a tap never ends the match.
   const m = src("lib/match-flow/live-view-state.ts").match(/export const HOLD_TO_END_MS = ([\d_]+);/);
@@ -212,6 +424,24 @@ test("the verdict's rating card speaks the delta, and the harness reads it", () 
   // The rendered chip still parses when idb exposes it.
   assert.equal(parseDelta("▲ +14"), 14);
   assert.equal(parseDelta("▼ \u22129"), -9);
+});
+
+test("a rated participant row is consistent only with all three values written and agreeing", () => {
+  assert.equal(participantDeltaConsistent({ elo_before: 1000, elo_after: 1012, elo_delta: 12 }), true);
+  assert.equal(participantDeltaConsistent({ elo_before: 1000, elo_after: 1000, elo_delta: 0 }), true);
+  assert.equal(participantDeltaConsistent({ elo_before: 1000, elo_after: 1012, elo_delta: 11 }), false);
+  // A missing delta fails (participantDelta's fallback would hide it).
+  assert.equal(participantDeltaConsistent({ elo_before: 1000, elo_after: 1012, elo_delta: null }), false);
+  assert.equal(participantDeltaConsistent({ elo_before: null, elo_after: 1012, elo_delta: 12 }), false);
+});
+
+test("a draw between equals is symmetric: two written, equal deltas", () => {
+  const row = (elo_delta: number | null) => ({ elo_before: 1000, elo_after: 1000 + (elo_delta ?? 0), elo_delta });
+  assert.equal(drawSymmetric([row(0), row(0)]), true);
+  assert.equal(drawSymmetric([row(-4), row(-4)]), true);
+  assert.equal(drawSymmetric([row(-4), row(4)]), false);
+  assert.equal(drawSymmetric([row(null), row(null)]), false);
+  assert.equal(drawSymmetric([row(0)]), false);
 });
 
 test("a participant row's delta is elo_delta, else after minus before", () => {

@@ -14,7 +14,7 @@ const scenario: Scenario = {
     const side = await ctx.matchSide(red, h.matchId);
     side.enter("weight"); // Red is reading the scale (the weight step mounts a channel since jits-bh2v)
     await blueOnWeight(ctx);
-    await blueConfirmsWeights(ctx);
+    await blueConfirmsWeights(ctx, h.matchId);
     await ctx.step("Blue cancels the match", () => ctx.ui.cancelMatch());
     await ctx.step("spy sees match_cancelled", () => side.spy.waitFor("match_cancelled", (e) => e.event === "match_cancelled", 10_000, 0));
     await pace(1_500);

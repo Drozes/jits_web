@@ -126,7 +126,8 @@ export class Idb {
   }
 
   async tap(el: AXElement): Promise<void> {
-    await this.tapXY(el.frame.x + el.frame.width / 2, el.frame.y + el.frame.height / 2);
+    const p = tapPoint(el);
+    await this.tapXY(p.x, p.y);
   }
 
   /** Press and hold an element's frame centre for `seconds` (idb `ui tap --duration`). */
@@ -264,12 +265,23 @@ export class Idb {
   /**
    * Close the dev-build LogBox toast ("Open debugger to view warnings"): it
    * sits over the tab bar and swallows taps meant for the tabs. Tapping its
-   * right edge hits the close glyph. Returns true when one was closed.
+   * right edge hits the close glyph. A tap that misses the glyph opens the
+   * full-screen LogBox inspector instead, which swallows every tap after it,
+   * so an open inspector is minimised first (back to the toast), then the
+   * toast is closed. Returns true when either was closed.
    */
   async dismissLogBox(els?: AXElement[]): Promise<boolean> {
-    const all = els ?? (await this.describe());
-    const toast = all.find((e) => /open debugger to view/i.test(e.AXLabel ?? ""));
-    if (!toast) return false;
+    let all = els ?? (await this.describe());
+    let closed = false;
+    const minimize = logBoxInspectorMinimize(all);
+    if (minimize) {
+      await this.tap(minimize);
+      closed = true;
+      await new Promise((r) => setTimeout(r, 400));
+      all = await this.describe();
+    }
+    const toast = all.find(isLogBox);
+    if (!toast) return closed;
     await this.tapXY(toast.frame.x + toast.frame.width - 24, toast.frame.y + toast.frame.height / 2);
     return true;
   }
@@ -320,6 +332,40 @@ export class Idb {
     }
     return tapped;
   }
+}
+
+/** A dev-build LogBox toast ("Open debugger to view warnings"). */
+export function isLogBox(e: AXElement): boolean {
+  return /open debugger to view/i.test(e.AXLabel ?? "");
+}
+
+/** Where `Idb.tap` presses an element: its frame's centre. */
+export function tapPoint(e: AXElement): { x: number; y: number } {
+  return { x: e.frame.x + e.frame.width / 2, y: e.frame.y + e.frame.height / 2 };
+}
+
+/** True when the point is inside the element's frame (edges included). */
+export function frameContains(e: AXElement, p: { x: number; y: number }): boolean {
+  const f = e.frame;
+  return p.x >= f.x && p.x <= f.x + f.width && p.y >= f.y && p.y <= f.y + f.height;
+}
+
+/** The LogBox toast lying over a point, i.e. the toast that would take a tap there. */
+export function logBoxOver(els: AXElement[], p: { x: number; y: number }): AXElement | undefined {
+  return els.find((e) => isLogBox(e) && frameContains(e, p));
+}
+
+/**
+ * The open LogBox inspector's Minimize button, or undefined when the
+ * inspector is not open. The inspector (react-native
+ * Libraries/LogBox/UI/LogBoxInspectorHeader.js and
+ * LogBoxInspectorFooter.js) has a "Log <n> of <total>" title and Dismiss /
+ * Minimize footer buttons and no testIDs; both the title and Minimize must be
+ * on screen, so no app screen can pass for it (the app has neither label).
+ */
+export function logBoxInspectorMinimize(els: AXElement[]): AXElement | undefined {
+  if (!els.some((e) => /^Log \d+ of \d+$/.test(e.AXLabel ?? ""))) return undefined;
+  return els.find((e) => e.AXLabel === "Minimize" && e.type !== "StaticText") ?? els.find((e) => e.AXLabel === "Minimize");
 }
 
 /** Compact dump of a screen for evidence: type, label, id. */

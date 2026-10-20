@@ -5,7 +5,16 @@
  * accessibility label, labels are matched case-insensitively (text-transform
  * uppercases rendered text) and filtered to Buttons where it matters.
  */
-import { Idb, matches, summarise, type AXElement, type Query } from "./idb";
+import {
+  Idb,
+  logBoxInspectorMinimize,
+  logBoxOver,
+  matches,
+  summarise,
+  tapPoint,
+  type AXElement,
+  type Query,
+} from "./idb";
 import type { Simctl } from "./simctl";
 import { ExpectationTimeout, HarnessError } from "../lib/util";
 import { PROMPT_INPUT_GUARD_MS } from "../../../apps/mobile/lib/arena/constants";
@@ -106,6 +115,127 @@ const WEIGHT_CHECK_RETAP_MS = 3_000;
 export interface WeighIn {
   /** The weight-check plate asked for Blue's check and the harness confirmed. */
   weightCheck: boolean;
+  /**
+   * How many times the harness pressed the plate's Confirm. One is the only
+   * clean answer: a second press means the app dropped the first (the
+   * button stayed up and enabled for WEIGHT_CHECK_RETAP_MS), which the
+   * caller records as a failed oracle rather than hiding it.
+   */
+  confirmPresses: number;
+}
+
+/** How Blue's End went: one hold is the only clean answer. */
+export interface EndPress {
+  holds: number;
+}
+
+/**
+ * Why a second Back to Arena tap was allowed: a LogBox toast was closed just
+ * before the first tap (that close tap can open the inspector), a toast lay
+ * over the first tap's point when it was made, or the LogBox inspector was
+ * open after it.
+ */
+export type LogBoxExcuse = "closed-before" | "toast-over-tap" | "inspector-open";
+
+/** How Blue's Back to Arena went. */
+export interface ExitPress {
+  taps: number;
+  /**
+   * The harness tapped a second time because a dev-build LogBox could have
+   * taken the first tap (`logBoxExcuse` says how). The only reason for a
+   * second tap; a gate run reviews every true (LOOP.md, the flag-OFF guard).
+   */
+  logBoxRetap: boolean;
+  logBoxExcuse?: LogBoxExcuse;
+}
+
+/**
+ * The live step's pause toggle (`PauseButton`,
+ * components/match-flow/live/pause-button.tsx). Its accessibility label
+ * names the next action ("Pause match clock" while running, "Resume match
+ * clock" while paused) since 35d87d0f; the drawn PAUSE / RESUME text is
+ * inside that one accessible element, so idb never reports it on its own.
+ */
+export const PAUSE_TOGGLE = {
+  id: "live-pause-toggle",
+  pause: "Pause match clock",
+  resume: "Resume match clock",
+} as const;
+
+/**
+ * "PAUSE" or "RESUME" for the toggle's accessibility label, the raw label
+ * for anything else (so a relabel shows up in the oracle's actual value
+ * instead of as a bare timeout), null when the toggle is not on screen.
+ */
+export function pauseToggleState(label: string | null | undefined): string | null {
+  if (label == null) return null;
+  if (label === PAUSE_TOGGLE.pause) return "PAUSE";
+  if (label === PAUSE_TOGGLE.resume) return "RESUME";
+  return label;
+}
+
+/**
+ * The tab bar's labels, in order (`title` of each `Tabs.Screen` in
+ * apps/mobile/app/(app)/(tabs)/_layout.tsx). The Matches tab is labelled
+ * Film since 2026-10-09; its route is still `matches`.
+ */
+export const TAB_LABELS = ["Home", "Arena", "Film", "Rankings", "Profile"] as const;
+export type TabLabel = (typeof TAB_LABELS)[number];
+
+/**
+ * Every pushed screen's back control: AppHeader's chevron
+ * (components/layout/app-header.tsx) and FilmBackButton
+ * (components/film-room/film-back-button.tsx: the match detail hero, the
+ * player's close, the timekeeper film page). A tab root has none.
+ */
+export const GO_BACK: Query = { label: "Go back", type: "Button" };
+
+/**
+ * A control centred above this line sits under the status bar and the
+ * Dynamic Island (the top safe area is 62pt on the iPhone 17 Pro), where a
+ * tap does not reach it. At rest every back control is centred lower:
+ * AppHeader's at about y=88, the match hero's at 90, the player's at 92.
+ */
+export const BACK_MIN_CENTRE_Y = 62;
+/** The home indicator strip at the bottom of the screen. */
+const HOME_INDICATOR = 34;
+/**
+ * Where a reveal move aims a back control's centre: a little below where
+ * any back control rests, so a move that scrolls content down always
+ * reaches the top of its scroll view, which stops it there (no overshoot).
+ */
+const BACK_REVEAL_TARGET_Y = 110;
+/** Reveal moves before an unreachable back control is a failure. */
+const BACK_REVEAL_MOVES = 4;
+/** Slow enough that the fling after release stays short (as `bandMove` in sim/match-detail.ts). */
+const REVEAL_PT_PER_S = 300;
+
+/**
+ * Whether a tap at the element's centre reaches it (pure, for tests): on
+ * screen, below the status bar, above the home indicator. idb lists
+ * scrolled-away content with its real frame, so a FilmBackButton in a
+ * scrolled match detail hero is reported at a negative y (E17, 2026-10-20:
+ * y=-169), and a tap there lands nowhere.
+ */
+export function backTappable(el: AXElement, screenW: number, screenH: number): boolean {
+  const cx = el.frame.x + el.frame.width / 2;
+  const cy = el.frame.y + el.frame.height / 2;
+  return el.frame.width > 0 && el.frame.height > 0 && cx > 0 && cx < screenW && cy >= BACK_MIN_CENTRE_Y && cy < screenH - HOME_INDICATOR;
+}
+
+/**
+ * The vertical swipe that scrolls a back control centred at `cy` back
+ * towards BACK_REVEAL_TARGET_Y (pure, for tests): the content moves by the
+ * control's own distance from there (finger down for a control above the
+ * screen), at most 60% of the screen per move, centred on the screen's
+ * middle, at REVEAL_PT_PER_S (0.3 s at least).
+ */
+export function backRevealMove(cy: number, screenH: number): { fromY: number; toY: number; durationS: number } {
+  const span = screenH * 0.6;
+  // > 0: the content must move down (finger moves down).
+  const d = Math.max(-span, Math.min(span, BACK_REVEAL_TARGET_Y - cy));
+  const mid = screenH / 2;
+  return { fromY: mid - d / 2, toY: mid + d / 2, durationS: Math.max(0.3, Math.abs(d) / REVEAL_PT_PER_S) };
 }
 
 const VERDICT_RE = /^(YOU WON|YOU LOST|DRAW|DISPUTED|MATCH COMPLETE)$/i;
@@ -150,9 +280,70 @@ export class Screens {
 
   // --- global ---------------------------------------------------------------
 
-  async tab(name: "Home" | "Arena" | "Matches" | "Rankings" | "Profile"): Promise<void> {
+  async tab(name: TabLabel): Promise<void> {
     await this.idb.dismissLogBox();
     await this.idb.tapQ({ label: name, type: "Button" }, 15_000);
+  }
+
+  /**
+   * Pop the top pushed screen with its "Go back" control; false when the
+   * screen has none (a tab root). Only a back control a tap can reach is
+   * tapped (`backTappable`). FilmBackButton sits in the match detail hero
+   * and scrolls away with the content, so after a deeper screen pops, the
+   * detail under it can still be scrolled down with its back control above
+   * the screen (E17, 2026-10-20: the Stats detail, scrolled to its opponent
+   * row, reported "Go back" at y=-169; six taps there did nothing and the
+   * run was stranded on it). Such a control is scrolled back into reach by
+   * its own reported frame (`backRevealMove`), then tapped. Throws
+   * ExpectationTimeout when it cannot be brought into reach.
+   */
+  async goBack(): Promise<boolean> {
+    const t0 = Date.now();
+    let seen: AXElement[] = [];
+    for (let move = 0; move <= BACK_REVEAL_MOVES; move++) {
+      // Let a pop transition or scroll momentum finish before measuring.
+      if (!(await this.idb.settled(GO_BACK))) return false;
+      seen = (await this.idb.describe()).filter((e) => matches(e, GO_BACK));
+      if (seen.length === 0) return false;
+      const reachable = seen.find((e) => backTappable(e, this.idb.screenW, this.idb.screenH));
+      if (reachable) {
+        await this.idb.tap(reachable);
+        return true;
+      }
+      // Only a vertical scroll can bring it back: one off to the side cannot be revealed.
+      const b = seen.find((e) => {
+        const cx = e.frame.x + e.frame.width / 2;
+        return e.frame.width > 0 && cx > 0 && cx < this.idb.screenW;
+      });
+      if (!b || move === BACK_REVEAL_MOVES) break;
+      const m = backRevealMove(b.frame.y + b.frame.height / 2, this.idb.screenH);
+      const x = this.idb.screenW / 2;
+      await this.idb.swipe(x, m.fromY, x, m.toY, m.durationS);
+    }
+    throw new ExpectationTimeout(
+      `"Go back" within reach (on screen, centre at y >= ${BACK_MIN_CENTRE_Y})`,
+      Date.now() - t0,
+      seen.map((e) => ({ id: e.AXUniqueId, frame: e.frame })),
+    );
+  }
+
+  /**
+   * Pop pushed screens until a tab root shows (no "Go back" left), at most
+   * `max` pops. Throws ExpectationTimeout when one cannot be popped
+   * (`goBack`) or a back control is still there after `max` pops, so a
+   * stranded screen fails here, naming itself, instead of in whatever the
+   * caller does next.
+   */
+  async backToTabRoot(max = 6): Promise<void> {
+    const t0 = Date.now();
+    for (let i = 0; i < max; i++) {
+      if (!(await this.goBack())) return;
+      await new Promise((r) => setTimeout(r, 900));
+    }
+    const els = await this.idb.describe();
+    if (els.some((e) => matches(e, GO_BACK))) {
+      throw new ExpectationTimeout(`a tab root within ${max} pops of "Go back"`, Date.now() - t0, summarise(els));
+    }
   }
 
   /**
@@ -212,11 +403,20 @@ export class Screens {
    */
   async ensureLive(): Promise<void> {
     const els = await this.idb.describe();
-    if (await this.idb.find({ label: "Go live", type: "Button" }, els)) {
-      await this.idb.tapQ({ label: "Go live", type: "Button", enabled: true }, 15_000);
-    }
+    if (await this.idb.find({ label: "Go live", type: "Button" }, els)) await this.tapGoLive();
     await this.idb.waitFor(LIVE_CHIP, 15_000);
     await this.idb.waitFor({ label: "Go offline", type: "Button" }, 15_000);
+  }
+
+  /**
+   * Tap the Arena's Go live and return without waiting for the result. For
+   * when going live raises something over the Arena: a recovered incoming
+   * challenge is a centered modal (jits-02vo.3) that hides the whole tab
+   * root from idb, chip and control bar included, so the caller waits for
+   * what it expects instead of for `Go offline`.
+   */
+  async tapGoLive(): Promise<void> {
+    await this.idb.tapQ({ label: "Go live", type: "Button", enabled: true }, 15_000);
   }
 
   async ensureOffline(): Promise<void> {
@@ -390,32 +590,35 @@ export class Screens {
    * match) the opponent's plate then turns into Blue's check of their
    * weigh-in (#faceoff-weight-check-plate) with Confirm and "Doesn't look
    * right", and the app stays on the weight step until Blue's OWN check is
-   * confirmed (`useFaceoff`; jits-c3vd). Answer Confirm, re-tapping only if
-   * the tap was dropped (the button stays up and enabled). Without checks
-   * (the pre-check flow) the app moves on by itself. Resolves once the
-   * wizard has left the weight step; the caller waits for the step it wants.
+   * confirmed (`useFaceoff`; jits-c3vd). Answer Confirm, pressing again only
+   * if the press was dropped (the button stays up and enabled for
+   * WEIGHT_CHECK_RETAP_MS), and count the presses: the caller records
+   * anything but one as a failed oracle, so a dropped press cannot hide
+   * behind the retry. Without checks (the pre-check flow) the app moves on
+   * by itself. Resolves once the wizard has left the weight step; the
+   * caller waits for the step it wants.
    */
   async confirmWeights(timeoutMs = 25_000): Promise<WeighIn> {
     await this.idb.tapQ({ id: "weight-confirm" }, 10_000);
     const start = Date.now();
-    let weightCheck = false;
+    let confirmPresses = 0;
     let lastTap = 0;
     for (;;) {
       const els = await this.idb.describe();
       const step = await this.currentStep(els);
-      if (step && step !== "weight") return { weightCheck };
+      if (step && step !== "weight") return { weightCheck: confirmPresses > 0, confirmPresses };
       const plate = els.find((e) => e.AXUniqueId === WEIGHT_CHECK.plate);
       const confirm = els.find((e) => matches(e, { id: WEIGHT_CHECK.confirm, enabled: true }));
       if (plate && confirm && Date.now() - lastTap > WEIGHT_CHECK_RETAP_MS) {
         const target = this.idb.onScreen(confirm) ? confirm : await this.idb.scrollTo({ id: WEIGHT_CHECK.confirm });
         await this.idb.tap(target);
-        weightCheck = true;
+        confirmPresses++;
         lastTap = Date.now();
       }
       if (Date.now() - start > timeoutMs) {
         throw new ExpectationTimeout("the weigh-in (and Blue's weight check) to leave the weight step", timeoutMs, {
           currentStep: step,
-          weightCheckAnswered: weightCheck,
+          weightCheckConfirmPresses: confirmPresses,
           screen: summarise(els),
         });
       }
@@ -448,12 +651,16 @@ export class Screens {
   }
 
   async pauseToggle(): Promise<void> {
-    await this.idb.tapQ({ id: "live-pause-toggle" });
+    await this.idb.tapQ({ id: PAUSE_TOGGLE.id });
   }
 
-  /** "PAUSE" or "RESUME" as the live toggle currently reads. */
+  /**
+   * "PAUSE" (running) or "RESUME" (paused): the action the live toggle
+   * offers, read from its accessibility label (`pauseToggleState`).
+   */
   async pauseLabel(): Promise<string | null> {
-    return (await this.idb.find({ id: "live-pause-toggle" }))?.AXLabel?.toUpperCase() ?? null;
+    const el = await this.idb.find({ id: PAUSE_TOGGLE.id });
+    return el ? pauseToggleState(el.AXLabel ?? "") : null;
   }
 
   /** Fill the submission form without tapping Record (for E10). */
@@ -481,20 +688,30 @@ export class Screens {
    * (`HoldToEndButton`): a tap never ends, the press must last
    * `HOLD_TO_END_MS`, so hold it with a margin, then confirm the press took
    * (the button leaves the screen with the live step, or reads ENDING).
+   * A hold that did not take is held once more and counted: the caller
+   * records anything but one hold as a failed oracle. When neither hold
+   * ended the match, that is the app not ending it (ExpectationTimeout, a
+   * `fail`), not a harness fault. `settleMs`: how long each hold has to
+   * show it took (unit tests shorten it).
    */
-  async endMatch(): Promise<void> {
-    for (let attempt = 0; attempt < 2; attempt++) {
+  async endMatch(settleMs = 3_000): Promise<EndPress> {
+    let els: AXElement[] = [];
+    for (let holds = 1; holds <= 2; holds++) {
       const el = await this.idb.waitFor({ id: "live-end", enabled: true }, 10_000);
       await this.idb.longPress(el, (HOLD_TO_END_MS + HOLD_MARGIN_MS) / 1000);
       const start = Date.now();
-      while (Date.now() - start < 3_000) {
-        const els = await this.idb.describe();
+      while (Date.now() - start < settleMs) {
+        els = await this.idb.describe();
         const btn = els.find((e) => e.AXUniqueId === "live-end");
-        if (!btn || btn.enabled === false || (await this.currentStep(els)) !== "live") return;
+        if (!btn || btn.enabled === false || (await this.currentStep(els)) !== "live") return { holds };
         await new Promise((r) => setTimeout(r, 250));
       }
     }
-    throw new HarnessError("holding #live-end did not end the match");
+    throw new ExpectationTimeout(
+      `the live step to end after two ${HOLD_TO_END_MS + HOLD_MARGIN_MS}ms holds on #live-end`,
+      2 * (HOLD_TO_END_MS + HOLD_MARGIN_MS + settleMs),
+      summarise(els),
+    );
   }
 
   /**
@@ -603,21 +820,53 @@ export class Screens {
    * Tap the verdict's exit ("Back to Arena"). It sits at the bottom of the
    * verdict, where a dev build's LogBox banner ("Open debugger to view
    * warnings") can lie over it and swallow the tap: close the banner, scroll
-   * the exit clear of that band, tap, and tap once more if the verdict is
-   * still up.
+   * the exit clear of that band, tap. Tap a second time ONLY when a LogBox
+   * could physically have taken the first tap: a toast was closed just
+   * before it (that close tap can open the inspector), a toast lay over the
+   * tap's point in the screen read just before the tap, or the LogBox
+   * inspector is open after it. A toast elsewhere on screen excuses
+   * nothing: the exit was scrolled LOGBOX_CLEAR_INSET clear of the toast
+   * band, so a verdict that ignores the tap is the app's failure
+   * (ExpectationTimeout), never retried away. Returns the tap count (and
+   * the excuse, when there was a second tap) for the caller's strict oracle.
    */
-  async exitSummary(): Promise<void> {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      await this.idb.dismissLogBox();
+  async exitSummary(): Promise<ExitPress> {
+    const goneMs = 5_000;
+    let excuse: LogBoxExcuse | undefined;
+    for (let taps = 1; taps <= 2; taps++) {
+      const closedBefore = await this.idb.dismissLogBox();
       const el = await this.idb.scrollTo({ id: "summary-exit" }, 8, "up", LOGBOX_CLEAR_INSET);
+      const point = tapPoint(el);
+      const atTap = await this.idb.describe();
       await this.idb.tap(el);
       try {
-        await this.idb.waitGone({ id: "summary-exit" }, 5_000);
-        return;
-      } catch {
-        /* tap again */
+        await this.idb.waitGone({ id: "summary-exit" }, goneMs);
+        return excuse ? { taps, logBoxRetap: true, logBoxExcuse: excuse } : { taps, logBoxRetap: false };
+      } catch (e) {
+        if (!(e instanceof ExpectationTimeout)) throw e;
+        const els = await this.idb.describe();
+        const why: LogBoxExcuse | undefined = closedBefore
+          ? "closed-before"
+          : logBoxOver(atTap, point)
+            ? "toast-over-tap"
+            : logBoxInspectorMinimize(els)
+              ? "inspector-open"
+              : undefined;
+        if (taps === 2 || !why) {
+          throw new ExpectationTimeout(
+            `the verdict to close after ${taps === 1 ? "one tap" : "two taps"} on Back to Arena (#summary-exit)${
+              why
+                ? ""
+                : "; no LogBox could have taken the tap (none closed just before it, none over its point, no inspector open), so no second tap"
+            }`,
+            taps * goneMs,
+            { taps, logBoxRetap: excuse !== undefined, logBoxExcuse: excuse, point, screen: summarise(els) },
+          );
+        }
+        excuse = why;
       }
     }
+    throw new HarnessError("exitSummary: unreachable");
   }
 
   // --- auth -----------------------------------------------------------------

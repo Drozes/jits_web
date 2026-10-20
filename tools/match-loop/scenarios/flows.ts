@@ -12,6 +12,8 @@ import { resetFixtures, type ResetOptions } from "../fixtures/reset";
 import { proveAppOnLocalStack } from "../bot/app-on-local";
 import { APP_TIMING } from "../bot/protocol";
 import { ExpectationTimeout, HarnessError, pollUntil } from "../lib/util";
+import { matches, summarise } from "../sim/idb";
+import { GO_BACK } from "../sim/screens";
 import type { ScenarioCtx } from "./context";
 
 export const T = {
@@ -50,7 +52,9 @@ export async function prepare(ctx: ScenarioCtx, opts: PrepareOptions = {}): Prom
 
 /**
  * Leave whatever the last scenario left on screen: a wizard, a stale prompt,
- * a waiting plate, an alert. Relaunch as a last resort.
+ * a waiting plate, an alert, pushed screens. Relaunch as a last resort,
+ * including when no case could bring back the tab bar (E18 to E20 on
+ * 2026-10-20 each failed in setup on the match detail E17 had stranded).
  */
 export async function normaliseApp(ctx: ScenarioCtx): Promise<void> {
   const { idb, ui, simctl } = ctx;
@@ -102,15 +106,36 @@ export async function normaliseApp(ctx: ScenarioCtx): Promise<void> {
       }
       continue;
     }
-    if (els.some((e) => e.AXLabel === "Go back" && e.type === "Button") && !els.some((e) => e.AXLabel === "Arena" && e.type === "Button")) {
-      await idb.tap(els.find((e) => e.AXLabel === "Go back")!);
+    if (els.some((e) => matches(e, GO_BACK)) && !els.some((e) => e.AXLabel === "Arena" && e.type === "Button")) {
+      // Pushed screens (match detail, Stats, an athlete page, the player):
+      // pop them all. A back control the match detail hero scrolled away is
+      // scrolled back into reach first; one that cannot be is relaunched.
+      try {
+        await ui.backToTabRoot();
+      } catch (e) {
+        if (!(e instanceof ExpectationTimeout)) throw e;
+        await relaunch(ctx, "stuck_pushed_screen_relaunch", { what: e.what, lastSeen: e.lastSeen });
+      }
       continue;
     }
     if (els.some((e) => e.type === "Button" && e.AXLabel === "Arena")) return;
     await simctl.launch();
     await idb.waitFor({ label: "Home", type: "Button" }, 30_000).catch(() => undefined);
   }
+  const last = await idb.describe();
+  if (!last.some((e) => e.type === "Button" && e.AXLabel === "Arena")) {
+    // The last resort: a screen none of the cases above could leave.
+    await relaunch(ctx, "normalise_last_resort_relaunch", summarise(last));
+  }
   await idb.waitFor({ label: "Arena", type: "Button" }, 10_000);
+}
+
+/** Terminate and relaunch the app, noting why in the trace (setup only, never to pass an oracle). */
+async function relaunch(ctx: ScenarioCtx, why: string, evidence: unknown): Promise<void> {
+  ctx.trace.note("harness", why, evidence);
+  await ctx.simctl.terminate();
+  await ctx.simctl.launch();
+  await ctx.idb.waitFor({ label: "Home", type: "Button" }, 30_000);
 }
 
 /** The rating every fixture athlete starts a scenario at (`resetFixtures`). */
@@ -161,6 +186,27 @@ export function participantDelta(p: Pick<ParticipantDb, "elo_before" | "elo_afte
   if (!p) return null;
   if (p.elo_delta != null) return p.elo_delta;
   return p.elo_before != null && p.elo_after != null ? p.elo_after - p.elo_before : null;
+}
+
+/**
+ * A rated participant row is consistent: all three of `elo_before`,
+ * `elo_after` and `elo_delta` are written, and the delta is after minus
+ * before. Deliberately NOT `participantDelta`, whose fallback would make a
+ * missing `elo_delta` pass.
+ */
+export function participantDeltaConsistent(p: Pick<ParticipantDb, "elo_before" | "elo_after" | "elo_delta">): boolean {
+  return p.elo_before != null && p.elo_after != null && p.elo_delta != null && p.elo_delta === p.elo_after - p.elo_before;
+}
+
+/**
+ * A draw between equals (same rating, same weight: every fixture draw) moves
+ * both athletes by the same amount, whatever the engine: the Elo Pressure
+ * Score cost both the same, Rating V9 moves neither. Two rated rows with one
+ * equal, written delta.
+ */
+export function drawSymmetric(parts: Pick<ParticipantDb, "elo_before" | "elo_after" | "elo_delta">[]): boolean {
+  const d = parts.map((p) => p.elo_delta);
+  return d.length === 2 && d[0] != null && d[0] === d[1];
 }
 
 /**
@@ -320,7 +366,7 @@ export async function checkStillOneMatch(ctx: ScenarioCtx, challengeIds: string[
  */
 export async function blueCancelsFromReady(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
   side.enter("weight");
-  await blueConfirmsWeights(ctx);
+  await blueConfirmsWeights(ctx, side.matchId);
   await ctx.step("Blue cancels the match", () => ctx.ui.cancelMatch());
   await ctx.expect("protocol:blue-in-the-same-match", true, async () => {
     await side.spy.waitFor("Blue's match_cancelled on the bot's match topic", (e) => e.event === "match_cancelled", 10_000, 0);
@@ -414,21 +460,51 @@ export async function blueOnWeight(ctx: ScenarioCtx): Promise<void> {
  * own check of Red's weigh-in on the face-off check plate (jr_be-ahn.4,
  * "Confirm"), which the app waits for before it moves to ready (jits-c3vd).
  * Every Arena match is challenge-backed, so the plate must be there.
+ *
+ * Strict: one press of the plate's Confirm (a second means the app dropped
+ * the first), and the database must hold Blue's check of the opponent as
+ * `confirmed` (`match_weight_checks`, checker Blue, subject the opponent).
  */
-export async function blueConfirmsWeights(ctx: ScenarioCtx): Promise<void> {
+export async function blueConfirmsWeights(ctx: ScenarioCtx, matchId: string): Promise<void> {
   const weighIn = await ctx.step("Blue confirms weights", async () => {
     const r = await ctx.ui.confirmWeights(T.step);
     await ctx.ui.waitStep("ready", T.step);
     return r;
   });
-  ctx.eq("ui:weight-check-plate-answered", true, weighIn.weightCheck, "Blue confirmed Red's weigh-in on the face-off check plate");
+  ctx.eq("ui:weight-check-plate-answered", true, weighIn.weightCheck, "Blue confirmed the opponent's weigh-in on the face-off check plate");
+  ctx.eq("ui:weight-check-one-press", 1, weighIn.confirmPresses, "presses of #weight-check-confirm; a second press means the first was dropped");
+  await checkBlueWeightCheckConfirmed(ctx, matchId);
+}
+
+/**
+ * `db:weight-checks-confirmed`: Blue's own weight check on this match (Blue
+ * the checker, the other participant the subject) is `confirmed`, the row
+ * the app's Confirm writes (`check_opponent_weight`) and the one it waits
+ * for before ready.
+ */
+export async function checkBlueWeightCheckConfirmed(ctx: ScenarioCtx, matchId: string): Promise<void> {
+  const opponents = (await db.participants(matchId))
+    .map((p) => p.athlete_id)
+    .filter((id) => id !== ctx.ids.blue)
+    .sort();
+  const expected = opponents.map((subject_id) => ({ subject_id, status: "confirmed" }));
+  const read = () => db.weightChecksBy(matchId, ctx.ids.blue).then((rows) => rows.map((r) => ({ subject_id: r.subject_id, status: r.status })));
+  const actual = await pollUntil(
+    "Blue's weight check to read confirmed",
+    async () => {
+      const rows = await read();
+      return JSON.stringify(rows) === JSON.stringify(expected) ? rows : undefined;
+    },
+    { timeoutMs: 5_000, intervalMs: 300 },
+  ).catch(read);
+  ctx.eq("db:weight-checks-confirmed", expected, actual, "match_weight_checks rows with checker = Blue");
 }
 
 /** Both confirm weights and ready up; returns the bot's view of the start. */
 export async function readyToLive(ctx: ScenarioCtx, side: MatchSide): Promise<ReadyOutcome> {
   const botRun = side.confirmWeights().then(() => side.readyAndStart(T.handshake));
   botRun.catch(() => undefined); // awaited below; never an unhandled rejection
-  await blueConfirmsWeights(ctx);
+  await blueConfirmsWeights(ctx, side.matchId);
   await ctx.step("Blue taps Ready", () => ctx.ui.tapReady());
   const [outcome] = await Promise.all([
     ctx.step("bot completes the ready handshake", () => botRun),
@@ -444,9 +520,13 @@ export async function readyToLive(ctx: ScenarioCtx, side: MatchSide): Promise<Re
   return outcome;
 }
 
-/** Blue taps End; the bot must receive match_ended in its live step. */
+/**
+ * Blue holds End; the bot must receive match_ended in its live step. Strict:
+ * one hold (`ui:end-one-hold`), a second means the app ignored the first.
+ */
 export async function blueEnds(ctx: ScenarioCtx, side: MatchSide): Promise<void> {
-  await ctx.step("Blue ends the match", () => ctx.ui.endMatch());
+  const end = await ctx.step("Blue ends the match", () => ctx.ui.endMatch());
+  ctx.eq("ui:end-one-hold", 1, end.holds, "holds of #live-end; a second hold means the first did not end the match");
   await Promise.all([
     ctx.step("bot receives match_ended", () => side.waitForEnd(T.broadcast)),
     ctx.step("Blue reaches the result step", () => ctx.ui.waitStep("result", T.step)),
@@ -591,11 +671,28 @@ export async function checkSummary(ctx: ScenarioCtx, verdict: string, delta: Sum
   ctx.eq("ui:summary-exit-visible", true, s.hasExit);
 }
 
+/**
+ * Back to Arena from the verdict. Strict: one tap (`ui:back-to-arena-one-tap`);
+ * `exitSummary` taps a second time only when a dev-build LogBox could have
+ * taken the first, and the oracle accepts that second tap only then. An
+ * excused second tap still passes, but it is noted for review (trace note
+ * `logbox_retap`, the oracle's note): a gate run reviews every
+ * `logBoxRetap: true` (LOOP.md, the flag-OFF guard).
+ */
 export async function exitToArena(ctx: ScenarioCtx): Promise<void> {
-  await ctx.step("Blue taps Back to Arena", async () => {
-    await ctx.ui.exitSummary();
+  const exit = await ctx.step("Blue taps Back to Arena", async () => {
+    const r = await ctx.ui.exitSummary();
     await ctx.idb.waitAny([{ label: "Go live", type: "Button" }, { label: "Go offline", type: "Button" }], T.step);
+    return r;
   });
+  if (exit.logBoxRetap) ctx.trace.note("harness", "logbox_retap", exit);
+  ctx.oracle(
+    "ui:back-to-arena-one-tap",
+    exit.taps === 1 || (exit.taps === 2 && exit.logBoxRetap),
+    { taps: 1, secondTapOnlyAfterLogBox: true },
+    exit,
+    exit.logBoxRetap ? `REVIEW: second tap excused by a LogBox (${exit.logBoxExcuse}); check this run before calling a gate green` : undefined,
+  );
 }
 
 // --- DB oracles ---------------------------------------------------------------------
@@ -613,14 +710,23 @@ export interface DecisiveExpectation {
 }
 
 /**
- * The rating change landed everywhere the app reads it: one `elo_history`
+ * The rating change landed everywhere the app reads it: each participant
+ * row is internally consistent (`elo_delta` written and equal to `elo_after`
+ * minus `elo_before`; the verdict shows `elo_delta`, so a row where they
+ * disagree would show a delta the rating never moved by), one `elo_history`
  * row per athlete that agrees with its participant row, and `current_elo`
  * equal to `elo_after`. Engine independent (Elo or Rating V9).
  */
 export async function checkRatingApplied(ctx: ScenarioCtx, matchId: string, parts: ParticipantDb[]): Promise<void> {
+  const byAthlete = <T extends { athlete_id: string }>(rows: T[]) => [...rows].sort((a, b) => a.athlete_id.localeCompare(b.athlete_id));
+  ctx.eq(
+    "db:participant-delta-consistent",
+    byAthlete(parts).map((p) => ({ athlete_id: p.athlete_id, consistent: true })),
+    byAthlete(parts).map((p) => ({ athlete_id: p.athlete_id, consistent: participantDeltaConsistent(p) })),
+    JSON.stringify(byAthlete(parts).map((p) => [p.elo_before, p.elo_after, p.elo_delta])),
+  );
   const hist = await db.eloHistory(matchId);
   ctx.eq("db:elo-history-rows", 2, hist.length);
-  const byAthlete = <T extends { athlete_id: string }>(rows: T[]) => [...rows].sort((a, b) => a.athlete_id.localeCompare(b.athlete_id));
   ctx.eq(
     "db:elo-history-matches-participants",
     byAthlete(parts).map((p) => ({ athlete_id: p.athlete_id, before: p.elo_before, after: p.elo_after, delta: participantDelta(p) })),
@@ -696,7 +802,8 @@ export async function checkDecisiveDb(ctx: ScenarioCtx, x: DecisiveExpectation):
  * applied); the size and sign of the change are the engine's business
  * (the Elo Pressure Score always cost both, Rating V9 scores a draw between
  * equals as no change), so they are compared only with the stakes preview,
- * when there is one.
+ * when there is one. What every engine owes a draw between equals is
+ * symmetry: both athletes move by the same amount (`db:draw-symmetric`).
  */
 export async function checkDrawDb(ctx: ScenarioCtx, h: Handshake, stakeDelta: number | null): Promise<void> {
   const m = await db.match(h.matchId);
@@ -709,6 +816,12 @@ export async function checkDrawDb(ctx: ScenarioCtx, h: Handshake, stakeDelta: nu
       { outcome: "draw", elo_before: FIXTURE_ELO },
     ],
     parts.map((p) => ({ outcome: p.outcome, elo_before: p.elo_before })),
+  );
+  ctx.oracle(
+    "db:draw-symmetric",
+    drawSymmetric(parts),
+    "both athletes' elo_delta written and equal (a draw between equals)",
+    parts.map((p) => ({ athlete_id: p.athlete_id, elo_delta: p.elo_delta })),
   );
   stakeOracle(ctx, "stakes:draw-deltas-match-preview", [stakeDelta, stakeDelta], parts.map(participantDelta), stakeDelta !== null);
   await checkRatingApplied(ctx, h.matchId, parts);

@@ -16,7 +16,7 @@ const scenario: Scenario = {
     await checkOfflineInMatch(ctx, red);
     const botReady = side.confirmWeights().then(() => side.readyAndStart(T.handshake));
     botReady.catch(() => undefined); // awaited below; never an unhandled rejection
-    await blueConfirmsWeights(ctx);
+    await blueConfirmsWeights(ctx, h.matchId);
     // Cancel only once Red is on the ready step and has readied (the case where
     // Red is still on the weight step is E3B: the weight step's channel).
     await ctx.step("Red is ready (Blue's opponent panel)", async () => {

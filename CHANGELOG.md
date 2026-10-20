@@ -14,6 +14,20 @@ JS-only (OTA-eligible), no backend change. Production is exposed too (the same c
 - `packages/shared/src/hooks/use-video-progress.test.ts`: three channel-ownership cases run the real `RealtimeClient` against an in-process fake Realtime server (protocol vsn 1.0.0): two mounts on one video each own a joined channel and unmounting one leaves the other subscribed and refreshing; a mount switching onto a video another mount watches, and back, never touches that mount's channel; a single mount moving v1, v2, v1 removes each previous channel. The first two fail on the previous code with the E17 error; the third is a cleanup guard. Topics are compared without their suffix and checked to be distinct, so any per-subscription suffix (a counter or a random mount id) passes.
 - `packages/shared/src/api/row-watch-channels.test.ts` (new): for `subscribeToChallengeStatus` and `subscribeToInvite`, a second watcher of the same row subscribes on its own topic, and stopping one watcher removes only its own channel (real `RealtimeClient` over a socket that never connects). All four fail on the previous code with the same "cannot add `postgres_changes` callbacks" error.
 
+### Match-loop harness: extended green on the V9 stack (jits-c3vd)
+
+Harness only (`tools/match-loop/`), no app or backend change. The flag-OFF guard for the timekeeper build is now the core and extended tiers run with no reruns (run `2026-10-20T10-53-59-063Z`, extended 20/20; core 7/7 twice).
+
+**Added**
+- Strict press oracles that expect exactly one press, so a dropped tap that a retry used to hide now fails: `ui:weight-check-one-press` (face-off weight check Confirm, `blueConfirmsWeights`), `ui:end-one-hold` (`blueEnds`) and `ui:back-to-arena-one-tap` (`exitToArena`).
+- DB oracles: `db:weight-checks-confirmed` (Blue's face-off weight check of the opponent is `confirmed`, new `db.weightChecksBy` in `oracle/db.ts`), `db:participant-delta-consistent` (every participant row has `elo_before`, `elo_after` and `elo_delta` written, and `elo_delta = elo_after - elo_before`) and `db:draw-symmetric` (a draw between equals moves both athletes by the same written delta; Rating V9 moves neither).
+
+**Fixed**
+- E4: the pause toggle is read through one poller that keeps the last label as evidence.
+- E14: Blue taps Go live without waiting for `Go offline` (the recovered challenge prompt is a modal that hides the Arena from idb), then asserts Blue is live in the DB, the declined challenge settles as `declined`, and Blue is still live after answering.
+- E17: the Film tab relabel (`openFromFilm`), backing out of a scrolled match detail under the athlete page, a per-entry `ui:no-app-error-<entry>` oracle with a relaunch so later entry points still report (the athlete entry exposed the app crash fixed in jits-i5ih), and live-state oracles skipped rather than passed after a relaunch.
+- `LOOP.md` documents the strict presses, the new oracles and the drift fixes.
+
 ### Match flow (timekeeper prework): Wave 1 refactor, flag OFF unchanged (jits-o47s.11, .12, .13)
 
 Refactor only, on `feat/timekeeper-mode` (timekeeper mode spec, PLAN Wave 1: PR1 to PR3). With the timekeeper flag off, today's two-athlete match flow and practice behave and look exactly as before; nothing reads a timekeeper value yet. The only label that changed is the dev-only step marker ("Step 2 of 8, Weights" is now "Step 1 of 7, Weights"), which release builds hide. No backend or shared API change.

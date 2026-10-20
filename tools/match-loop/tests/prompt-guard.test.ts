@@ -4,12 +4,16 @@
  * guard (AC-S3). The app drops (does not queue) a tap inside the guard, so the
  * harness must wait for the button to report itself enabled, and fail naming
  * the guard when it never does, rather than stalling on a lost tap.
+ *
+ * Also the strict presses (end of file): the weight check's Confirm, End and
+ * Back to Arena report how many presses they took, so a dropped one is a
+ * failed oracle instead of a silent retry.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PROMPT_INPUT_GUARD_MS } from "../../../apps/mobile/lib/arena/constants";
-import { PROMPT_TAP_DELAY_MS, Screens } from "../sim/screens";
-import type { Idb, Query } from "../sim/idb";
+import { PROMPT_TAP_DELAY_MS, Screens, WEIGHT_CHECK } from "../sim/screens";
+import type { AXElement, Idb, Query } from "../sim/idb";
 import type { Simctl } from "../sim/simctl";
 import { ExpectationTimeout } from "../lib/util";
 
@@ -68,4 +72,190 @@ test("a non-timeout failure is passed through unchanged", async () => {
   const boom = new Error("idb crashed");
   const { idb } = fakeIdb([boom]);
   await assert.rejects(new Screens(idb, simctl, NO_DELAY).declinePrompt(), (e: unknown) => e === boom);
+});
+
+// --- strict presses: confirmWeights, endMatch, exitSummary ------------------------
+//
+// The flag-OFF guard must be able to fail: a press the app dropped is
+// counted (and recorded by the flows as a failed oracle), never retried
+// away in silence.
+
+type El = AXElement;
+const el = (over: Partial<El>): El => ({
+  AXLabel: null,
+  AXUniqueId: null,
+  AXValue: null,
+  type: "Button",
+  frame: { x: 0, y: 300, width: 100, height: 44 },
+  ...over,
+});
+const marker = (label: string) => el({ AXLabel: label, type: "GenericElement" });
+
+/** A fake Idb that serves screens in order (the last one repeats) and records taps. */
+function scriptedIdb(screens: El[][], opts: { logBoxClosed?: boolean[]; goneAfterTap?: number[] } = {}) {
+  const taps: string[] = [];
+  let i = 0;
+  let tapCount = 0;
+  const closed = [...(opts.logBoxClosed ?? [])];
+  const idb = {
+    screenH: 874,
+    screenW: 402,
+    async describe() {
+      const s = screens[Math.min(i, screens.length - 1)];
+      i++;
+      return s;
+    },
+    async tapQ(q: Query) {
+      taps.push(`tapQ:${q.id ?? String(q.label)}`);
+      return el({ AXUniqueId: q.id ?? null });
+    },
+    async tap(e: El) {
+      tapCount++;
+      taps.push(`tap:${e.AXUniqueId ?? e.AXLabel}`);
+    },
+    async longPress(e: El) {
+      taps.push(`hold:${e.AXUniqueId}`);
+    },
+    async waitFor(q: Query) {
+      return el({ AXUniqueId: q.id ?? null, enabled: true });
+    },
+    async scrollTo(q: Query) {
+      return el({ AXUniqueId: q.id ?? null });
+    },
+    onScreen() {
+      return true;
+    },
+    async dismissLogBox() {
+      return closed.shift() ?? false;
+    },
+    async waitGone(q: Query, ms: number) {
+      if ((opts.goneAfterTap ?? []).includes(tapCount)) return;
+      throw new ExpectationTimeout(`UI element #${q.id} to disappear`, ms, []);
+    },
+  };
+  return { idb: idb as unknown as Idb, taps };
+}
+
+const WEIGHT = marker("Step 1 of 7, Weights");
+const READY = marker("Step 2 of 7, Ready");
+const plate = el({ AXUniqueId: WEIGHT_CHECK.plate, type: "GenericElement" });
+const confirm = el({ AXUniqueId: WEIGHT_CHECK.confirm, enabled: true });
+
+test("confirmWeights counts one press of the check plate's Confirm", async () => {
+  const { idb, taps } = scriptedIdb([[WEIGHT, plate, confirm], [READY]]);
+  const r = await new Screens(idb, simctl, NO_DELAY).confirmWeights(5_000);
+  assert.deepEqual(r, { weightCheck: true, confirmPresses: 1 });
+  assert.deepEqual(taps, ["tapQ:weight-confirm", `tap:${WEIGHT_CHECK.confirm}`]);
+});
+
+test("confirmWeights counts a second press when the app dropped the first", async () => {
+  // The plate stays up and enabled past the retap window, then the app moves on.
+  const stuck = Array.from({ length: 12 }, () => [WEIGHT, plate, confirm]);
+  const { idb } = scriptedIdb([...stuck, [READY]]);
+  const r = await new Screens(idb, simctl, NO_DELAY).confirmWeights(10_000);
+  assert.equal(r.confirmPresses, 2);
+});
+
+test("confirmWeights without a check plate reports no press", async () => {
+  const { idb } = scriptedIdb([[WEIGHT], [READY]]);
+  assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).confirmWeights(5_000), { weightCheck: false, confirmPresses: 0 });
+});
+
+const LIVE_END = el({ AXUniqueId: "live-end", AXLabel: "Hold to end match", enabled: true });
+
+test("endMatch counts one hold when the live step ends", async () => {
+  const { idb, taps } = scriptedIdb([[marker("Step 4 of 7, Ended")]]);
+  assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).endMatch(300), { holds: 1 });
+  assert.deepEqual(taps, ["hold:live-end"]);
+});
+
+test("endMatch failing both holds is the app not ending (ExpectationTimeout), not a harness error", async () => {
+  const { idb, taps } = scriptedIdb([[LIVE_END]]);
+  await assert.rejects(new Screens(idb, simctl, NO_DELAY).endMatch(300), (e: unknown) => {
+    assert.ok(e instanceof ExpectationTimeout, String(e));
+    assert.match(e.message, /two .*holds on #live-end/);
+    return true;
+  });
+  assert.deepEqual(taps, ["hold:live-end", "hold:live-end"]);
+});
+
+test("exitSummary takes one tap when the verdict closes", async () => {
+  const { idb, taps } = scriptedIdb([[]], { goneAfterTap: [1] });
+  assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).exitSummary(), { taps: 1, logBoxRetap: false });
+  assert.deepEqual(taps, ["tap:summary-exit"]);
+});
+
+test("exitSummary never taps Back to Arena twice without a LogBox", async () => {
+  const { idb, taps } = scriptedIdb([[]], { goneAfterTap: [2] });
+  await assert.rejects(new Screens(idb, simctl, NO_DELAY).exitSummary(), (e: unknown) => {
+    assert.ok(e instanceof ExpectationTimeout, String(e));
+    assert.match(e.message, /one tap on Back to Arena .*no LogBox/);
+    return true;
+  });
+  assert.deepEqual(taps, ["tap:summary-exit"]);
+});
+
+// The fake's scrollTo returns the exit at the default frame, so the tap lands
+// at its centre (50, 322). Screen reads per attempt: one just before the tap,
+// one after a tap the verdict ignored.
+const LOGBOX_LABEL = "! Open debugger to view warnings.";
+/** A toast lying over the exit's tap point. */
+const toastOverExit = el({ AXLabel: LOGBOX_LABEL, type: "GenericElement", frame: { x: 0, y: 300, width: 402, height: 48 } });
+/** A toast in its usual band at the bottom, well away from the scrolled-up exit. */
+const toastAtBottom = el({ AXLabel: LOGBOX_LABEL, type: "GenericElement", frame: { x: 8, y: 780, width: 386, height: 48 } });
+/** The LogBox inspector (react-native LogBoxInspectorHeader / Footer). */
+const inspector = [el({ AXLabel: "Log 1 of 2", type: "StaticText" }), el({ AXLabel: "Dismiss" }), el({ AXLabel: "Minimize" })];
+
+test("exitSummary taps again when a toast lay over the exit's tap point at tap time, and says so", async () => {
+  const { idb, taps } = scriptedIdb([[toastOverExit], [toastOverExit], []], { goneAfterTap: [2] });
+  assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).exitSummary(), {
+    taps: 2,
+    logBoxRetap: true,
+    logBoxExcuse: "toast-over-tap",
+  });
+  assert.deepEqual(taps, ["tap:summary-exit", "tap:summary-exit"]);
+});
+
+test("exitSummary taps again when a toast was closed just before the first tap", async () => {
+  const { idb } = scriptedIdb([[]], { goneAfterTap: [2], logBoxClosed: [true] });
+  assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).exitSummary(), {
+    taps: 2,
+    logBoxRetap: true,
+    logBoxExcuse: "closed-before",
+  });
+});
+
+test("exitSummary taps again when the LogBox inspector is open after the first tap", async () => {
+  const { idb } = scriptedIdb([[], inspector, []], { goneAfterTap: [2] });
+  assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).exitSummary(), {
+    taps: 2,
+    logBoxRetap: true,
+    logBoxExcuse: "inspector-open",
+  });
+});
+
+test("exitSummary: a toast on screen but away from the exit excuses nothing (a dropped tap fails)", async () => {
+  const { idb, taps } = scriptedIdb([[toastAtBottom]], { goneAfterTap: [2] });
+  await assert.rejects(new Screens(idb, simctl, NO_DELAY).exitSummary(), (e: unknown) => {
+    assert.ok(e instanceof ExpectationTimeout, String(e));
+    assert.match(e.message, /one tap on Back to Arena .*no LogBox could have taken the tap/);
+    return true;
+  });
+  assert.deepEqual(taps, ["tap:summary-exit"]);
+});
+
+test("exitSummary: a toast that reaches the tap point only after the tap excuses nothing", async () => {
+  const { idb, taps } = scriptedIdb([[], [toastOverExit]], { goneAfterTap: [2] });
+  await assert.rejects(new Screens(idb, simctl, NO_DELAY).exitSummary(), ExpectationTimeout);
+  assert.deepEqual(taps, ["tap:summary-exit"]);
+});
+
+test("exitSummary: a second ignored tap still fails, even after an excused first", async () => {
+  const { idb, taps } = scriptedIdb([[toastOverExit]], { goneAfterTap: [] });
+  await assert.rejects(new Screens(idb, simctl, NO_DELAY).exitSummary(), (e: unknown) => {
+    assert.ok(e instanceof ExpectationTimeout, String(e));
+    assert.match(e.message, /two taps on Back to Arena/);
+    return true;
+  });
+  assert.deepEqual(taps, ["tap:summary-exit", "tap:summary-exit"]);
 });

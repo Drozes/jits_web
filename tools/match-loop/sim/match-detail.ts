@@ -11,33 +11,114 @@
  *   - `match-video-watch-<videoId>`: each Watch button, label
  *     "Watch your recording" / "Watch <Name>'s recording";
  *   - history rows labelled "Open match vs <name>" (Pressables), and the
- *     Matches tab's posters `film-card-<matchId>` (the tab replaced the
- *     Film Room and Profile's Recent Matches and Film Room preview, spec
- *     specs/matches-tab/spec.md); its header title
- *     `tab-header-title-film` proves the tab root is showing (the result
- *     chips are hidden on a zero-match account).
+ *     Film tab's cards `film-card-<matchId>` (the Matches tab, labelled
+ *     Film since 2026-10-09, route still `matches`; it replaced the Film
+ *     Room and Profile's Recent Matches and Film Room preview, spec
+ *     specs/matches-tab/spec.md); its accessibility-only header title
+ *     (a Heading "Film", testID `tab-header-title-film`) proves the tab
+ *     root is showing (the result chips are hidden on a zero-match account).
  * Selectors take the testID OR the label, never a container testID.
  */
 import type { AXElement, Idb, Query } from "./idb";
 import { matches, summarise } from "./idb";
-import type { Screens } from "./screens";
+import { TAB_LABELS, type Screens } from "./screens";
 import { ExpectationTimeout, pollUntil } from "../lib/util";
 
 export const DETAIL_MARKER_ID = "match-detail-screen";
 export const PLAYER_STATE_ID = "video-player-state";
 const DETAIL_LABEL_RE = /^Match detail vs (.+)$/i;
 const PLAYER_LABEL_RE = /^Video state: (\w+)$/i;
-const TAB_LABELS = ["Home", "Arena", "Matches", "Rankings", "Profile"];
-type ProvenTab = "Home" | "Matches" | "Profile";
-/** An element only that tab's root renders. */
-const TAB_PROOF: Record<ProvenTab, Query> = {
-  Home: { label: "Me", type: "Button" },
+export type ProvenTab = "Home" | "Film" | "Profile";
+/** Elements only that tab's root renders (any one is proof). */
+export const TAB_PROOF: Record<ProvenTab, Query[]> = {
+  Home: [{ label: "Me", type: "Button" }],
   // BrandHeader's accessibility-only tab heading (never drawn since
-  // jits-1ez5, still in the accessibility tree): present in every Matches state (zero, low data,
-  // loading, error), unlike the result chips, which a zero-match account hides.
-  Matches: { id: "tab-header-title-film" },
-  Profile: { label: /^(share profile|view detailed stats)$/i, type: "Button" },
+  // jits-1ez5, still in the accessibility tree): present in every Film state
+  // (zero, low data, loading, error), unlike the result chips, which a
+  // zero-match account hides. idb reports it as a Heading labelled "Film"
+  // and, being a Text, usually without its testID, so the label counts too
+  // (the tab bar's own "Film" is a Button, never a Heading). Case-sensitive:
+  // match detail's FilmAngles header is also a Heading, reading "FILM" with
+  // one usable angle (components/match-detail/film-angles.tsx), and string
+  // labels match case-insensitively.
+  Film: [{ id: "tab-header-title-film" }, { label: /^Film$/, type: "Heading" }],
+  Profile: [{ label: /^(share profile|view detailed stats)$/i, type: "Button" }],
 };
+
+/**
+ * The header bar (BrandHeader on a tab root, AppHeader on a pushed screen)
+ * is 56pt tall under the top safe area, with its controls centred in it, so
+ * its bottom edge is a control's centre plus half the bar. A row whose
+ * centre sits under the bar is NOT hittable: a tap there lands on the
+ * header (E17, 2026-10-20: a Stats row scrolled to y=117 under the pushed
+ * header, whose bar ends at 118 on the iPhone 17 Pro, and the tap opened
+ * nothing).
+ */
+const HEADER_HALF_BAR = 28;
+/** Safe area (62pt) plus the bar (56pt) on the iPhone 17 Pro: used when no header control is reported. */
+const HEADER_FALLBACK_BOTTOM = 118;
+/** Keep a tap target's centre at least this far inside the band. */
+const BAND_MARGIN = 12;
+/** The header's controls, on tab roots and pushed screens. */
+const HEADER_CONTROLS: Query[] = [
+  { id: "header-elo" },
+  { id: "header-status-chip" },
+  { id: "header-live-dot" },
+  { label: "Go back", type: "Button" },
+  { label: "Notifications", type: "Button" },
+];
+
+/** Bottom edge of the header bar, from its controls (pure, for tests). */
+export function headerBottom(els: AXElement[], screenH: number): number {
+  const controls = els.filter(
+    (e) => HEADER_CONTROLS.some((q) => matches(e, q)) && e.frame.width > 0 && e.frame.y + e.frame.height / 2 < screenH * 0.25,
+  );
+  if (controls.length === 0) return HEADER_FALLBACK_BOTTOM;
+  return Math.max(...controls.map((c) => c.frame.y + c.frame.height / 2 + HEADER_HALF_BAR));
+}
+
+/**
+ * Top of the tab bar, or the screen bottom on a pushed screen (pure, for
+ * tests). A row whose centre sits under the tab bar is NOT hittable: a tap
+ * there lands on a tab (E17's first live run tapped "Rankings" instead of a
+ * Profile row).
+ */
+export function tabBarTop(els: AXElement[], screenH: number): number {
+  const tabs = els.filter(
+    (e) => (TAB_LABELS as readonly string[]).includes(e.AXLabel ?? "") && e.type !== "StaticText" && e.type !== "Heading" && e.frame.y > screenH * 0.75,
+  );
+  return tabs.length > 0 ? Math.min(...tabs.map((t) => t.frame.y)) : screenH;
+}
+
+/**
+ * The band a tap target's centre must sit in: below the header bar and
+ * above the tab bar, each with BAND_MARGIN to spare (pure, for tests).
+ */
+export function hittableBand(els: AXElement[], screenH: number): { top: number; bottom: number } {
+  return { top: headerBottom(els, screenH) + BAND_MARGIN, bottom: tabBarTop(els, screenH) - BAND_MARGIN };
+}
+
+/** Swipe speed for `bandMove`: slow enough that the fling after release stays short. */
+const MOVE_PT_PER_S = 300;
+
+/**
+ * The vertical swipe that moves an element centred at `cy` towards the
+ * band's middle (pure, for tests): at most 80% of the band per move,
+ * centred on the screen's middle (clear of the header, chips rows and the
+ * tab bar), at MOVE_PT_PER_S (0.3 s at least).
+ */
+export function bandMove(
+  cy: number,
+  band: { top: number; bottom: number },
+  screenH: number,
+): { fromY: number; toY: number; durationS: number } {
+  const target = (band.top + band.bottom) / 2;
+  const span = (band.bottom - band.top) * 0.8;
+  // > 0: the content must move up (finger moves up).
+  const d = Math.max(-span, Math.min(span, cy - target));
+  const mid = screenH / 2;
+  return { fromY: mid + d / 2, toY: mid - d / 2, durationS: Math.max(0.3, Math.abs(d) / MOVE_PT_PER_S) };
+}
 
 /**
  * Player failure panels: the testIDs sit on container Views (not visible to
@@ -100,48 +181,47 @@ export class MatchDetailPages {
   }
 
   /**
-   * Top of the tab bar, or the screen bottom on a pushed screen. A row whose
-   * centre sits under the tab bar is NOT hittable: a tap there lands on a
-   * tab (E17's first live run tapped "Rankings" instead of a Profile row).
+   * Scroll the current screen until `q`'s centre is inside `hittableBand`
+   * (below the header bar, above the tab bar) and return the settled
+   * element, so every tap through here lands inside the band.
+   *
+   * idb lists off-screen scroll content with its real frame, so the element
+   * says which way and how far to scroll: each move is aimed at the band's
+   * middle (`bandMove`) and made slowly, so the fling after it stays small,
+   * then re-measured. A blind fixed-direction swipe loop overshoots: on
+   * 2026-10-20 a fast swipe flung E17's Stats row above the screen, and
+   * further "up" swipes could never bring it back. Only an element not in
+   * the tree yet (outside a virtualised list's window) is scrolled blind
+   * until it appears.
    */
-  private hittableBottom(els: AXElement[]): number {
-    const tabs = els.filter(
-      (e) =>
-        TAB_LABELS.includes(e.AXLabel ?? "") &&
-        e.type !== "StaticText" &&
-        e.frame.y > this.idb.screenH * 0.75,
-    );
-    return tabs.length > 0 ? Math.min(...tabs.map((t) => t.frame.y)) : this.idb.screenH;
-  }
-
-  /**
-   * Scroll the current screen until `q` is on screen AND hittable (clear of
-   * the header and the tab bar): content up first, then back down. Returns the
-   * settled element.
-   */
-  async scrollToAny(q: Query): Promise<AXElement> {
-    let el: AXElement;
-    try {
-      el = await this.idb.scrollTo(q, 6, "up", 130);
-    } catch (e) {
-      if (!(e instanceof ExpectationTimeout)) throw e;
-      el = await this.idb.scrollTo(q, 10, "down", 130);
-    }
+  async scrollToAny(q: Query, maxMoves = 8): Promise<AXElement> {
     const x = this.idb.screenW / 2;
-    for (let i = 0; i < 4; i++) {
+    let seen: { centreY: number; band: { top: number; bottom: number } } | null = null;
+    let blind = false;
+    for (let move = 0; move <= maxMoves; move++) {
+      const el = await this.idb.settled(q);
+      if (!el) {
+        if (blind) break;
+        blind = true;
+        try {
+          await this.idb.scrollTo(q, 6, "up", 130);
+        } catch (e) {
+          if (!(e instanceof ExpectationTimeout)) throw e;
+          await this.idb.scrollTo(q, 10, "down", 130);
+        }
+        continue;
+      }
       const els = await this.idb.describe();
       const cur = els.find((e) => matches(e, q)) ?? el;
       const cy = cur.frame.y + cur.frame.height / 2;
-      const bottom = this.hittableBottom(els) - 12;
-      if (cy > 100 && cy < bottom) return cur;
-      // Nudge it into the hittable band: small swipe towards the centre.
-      const dy = cy >= bottom ? -Math.min(220, cy - bottom + 80) : Math.min(220, 180 - cy);
-      const from = this.idb.screenH * 0.5;
-      await this.idb.swipe(x, from, x, from + dy, 0.3);
-      await new Promise((r) => setTimeout(r, 400));
-      el = (await this.idb.settled(q)) ?? cur;
+      const band = hittableBand(els, this.idb.screenH);
+      seen = { centreY: cy, band };
+      if (cy > band.top && cy < band.bottom) return cur;
+      if (move === maxMoves) break;
+      const m = bandMove(cy, band, this.idb.screenH);
+      await this.idb.swipe(x, m.fromY, x, m.toY, m.durationS);
     }
-    throw new ExpectationTimeout(`UI element ${JSON.stringify(q.label ?? q.id)} in the hittable band`, 4, null);
+    throw new ExpectationTimeout(`UI element ${JSON.stringify(q.label ?? q.id)} in the hittable band`, maxMoves, seen);
   }
 
   /** Swipe the current scroll view back to its top. */
@@ -182,20 +262,13 @@ export class MatchDetailPages {
     return { opponent, watch };
   }
 
-  /** Pop pushed screens (header "Go back") until a tab root is showing. */
+  /**
+   * Pop pushed screens until a tab root is showing (`Screens.backToTabRoot`:
+   * a back control the detail hero scrolled away is scrolled back into
+   * reach first, and a screen it cannot leave throws).
+   */
   async backToTabRoot(max = 6): Promise<void> {
-    for (let i = 0; i < max; i++) {
-      const els = await this.idb.describe();
-      const back = els.find((e) => e.AXLabel === "Go back" && e.type !== "StaticText");
-      if (!back) return;
-      await this.idb.tap(back);
-      await new Promise((r) => setTimeout(r, 900));
-    }
-  }
-
-  async back(): Promise<void> {
-    await this.idb.tapQ({ label: "Go back", type: "Button" }, 10_000);
-    await new Promise((r) => setTimeout(r, 900));
+    await this.ui.backToTabRoot(max);
   }
 
   // --- entry points ------------------------------------------------------------
@@ -217,12 +290,12 @@ export class MatchDetailPages {
    * element only that tab renders (retry the tap once).
    */
   async openTab(tab: ProvenTab): Promise<void> {
-    const proof: Query = TAB_PROOF[tab];
+    const proof = TAB_PROOF[tab];
     for (let attempt = 0; attempt < 2; attempt++) {
       await this.backToTabRoot();
       await this.ui.tab(tab);
       try {
-        await this.idb.waitFor(proof, 8_000);
+        await this.idb.waitAny(proof, 8_000);
         return;
       } catch (e) {
         if (!(e instanceof ExpectationTimeout) || attempt === 1) throw e;
@@ -271,9 +344,9 @@ export class MatchDetailPages {
     await this.tapFirstRow(opponent, 20_000);
   }
 
-  /** Matches tab -> pull-to-refresh -> the poster for `matchId`. */
-  async openFromMatches(matchId: string): Promise<void> {
-    await this.refreshTab("Matches");
+  /** Film tab (route `matches`) -> pull-to-refresh -> the card for `matchId`. */
+  async openFromFilm(matchId: string): Promise<void> {
+    await this.refreshTab("Film");
     await this.idb.tap(await this.scrollToAny({ id: `film-card-${matchId}` }));
   }
 
@@ -330,4 +403,32 @@ export class MatchDetailPages {
         els.some((e) => (e.AXLabel ?? "").toLowerCase() === p.title.toLowerCase()),
     ).map((p) => p.id);
   }
+
+  /** The app's error screen, if it is up (`appErrorIn`). */
+  async appError(): Promise<string | null> {
+    return appErrorIn(await this.idb.describe());
+  }
+}
+
+/** The app error boundary's title (components/error-boundary.tsx). */
+export const APP_ERROR_TITLE = "SOMETHING WENT WRONG";
+const APP_ERROR_PROSE = /^The app hit an unexpected error/;
+
+/**
+ * The app's error screen, if it is up (pure, for tests): the error
+ * boundary's message (a dev build prints `error.message` under its prose),
+ * else its title; or a dev build's LogBox "Render Error" overlay's message.
+ * Null when neither is on screen.
+ */
+export function appErrorIn(els: AXElement[]): string | null {
+  const title = els.findIndex((e) => e.type === "StaticText" && e.AXLabel === APP_ERROR_TITLE);
+  if (title >= 0) {
+    const msg = els
+      .slice(title + 1, title + 4)
+      .find((e) => e.type === "StaticText" && !!e.AXLabel && !APP_ERROR_PROSE.test(e.AXLabel));
+    return msg?.AXLabel ?? APP_ERROR_TITLE;
+  }
+  const redBox = els.findIndex((e) => e.type === "StaticText" && e.AXLabel === "Render Error");
+  if (redBox >= 0) return els.slice(redBox + 1).find((e) => e.type === "StaticText" && !!e.AXLabel)?.AXLabel ?? "Render Error";
+  return null;
 }
