@@ -527,6 +527,21 @@ describe("reserve-before-bytes wrappers (jits-n2im.11)", () => {
     expect(mockReserve.mock.calls[0][1]).toMatchObject({ transport: "tus", storagePath: "M/A/1.mp4" });
   });
 
+  it("reserve passes the clip's capture quality and lens through (timekeeper mode spec 13.4)", async () => {
+    mockReserve.mockResolvedValueOnce({ ok: true, data: { id: "V", status: "uploading", storagePath: "M/A/1.mp4" } });
+    await reserveMatchVideoRow({
+      matchId: "M",
+      uploaderAthleteId: "A",
+      storagePath: "M/A/1.mp4",
+      fileSizeBytes: 9,
+      recordStartedAt: null,
+      recordDurationMs: null,
+      captureQuality: "1080p",
+      captureLens: "ultrawide",
+    });
+    expect(mockReserve.mock.calls[0][1]).toMatchObject({ captureQuality: "1080p", captureLens: "ultrawide" });
+  });
+
   it("reserve throws a MatchVideoDbError carrying the gate (final copy), code and HINT", async () => {
     mockReserve.mockResolvedValueOnce(pgError("P0001", "upload_rate_limited", "Upload limit reached: at most 10"));
     const err = (await reserveMatchVideoRow({

@@ -324,3 +324,20 @@ describe("reserve-before-bytes fields (jits-n2im.11)", () => {
     expect(await loadUploadJob("M1")).toMatchObject({ protocol: 1, videoId: null, recordDurationMs: null });
   });
 });
+
+describe("capture fields (timekeeper mode spec 13.4)", () => {
+  it("round-trips the clip's capture quality and lens", async () => {
+    await saveUploadJob(job({ protocol: 2, captureQuality: "1080p", captureLens: "ultrawide" }));
+    expect(await loadUploadJob("M1")).toMatchObject({ captureQuality: "1080p", captureLens: "ultrawide" });
+  });
+
+  it("an older record without them reads as unknown, and the clip is kept", async () => {
+    await saveUploadJob(job({ protocol: 2 }));
+    expect(await loadUploadJob("M1")).toMatchObject({ phase: "bytes", captureQuality: null, captureLens: null });
+  });
+
+  it("an unknown value reads as unknown instead of dropping the clip", async () => {
+    await saveUploadJob(job({ protocol: 2, captureQuality: "4k" as never, captureLens: 3 as never }));
+    expect(await loadUploadJob("M1")).toMatchObject({ phase: "bytes", captureQuality: null, captureLens: null });
+  });
+});
