@@ -431,14 +431,23 @@ export async function isInvitesEnabled(supabase: Client): Promise<boolean> {
   return (await readInvitesEnabled(supabase)) === true;
 }
 
-/** Live updates of one invite row (the inviter's waiting screen). */
+/**
+ * Per-call topic suffix for `subscribeToInvite` (jits-i5ih): realtime-js
+ * reuses a registered channel for the same topic, and adding
+ * postgres_changes to a joining or joined channel throws, so two watchers of
+ * one invite must never share a topic. Private to this client, free.
+ */
+let inviteSeq = 0;
+
+/** Live updates of one invite row (the inviter's waiting screen). Every call owns its own channel. */
 export function subscribeToInvite(
   supabase: Client,
   inviteId: string,
   onUpdate: (row: { status: string; claimed_by: string | null; challenge_id: string | null }) => void,
 ): () => void {
+  inviteSeq += 1;
   const channel = supabase
-    .channel(`invite:${inviteId}`)
+    .channel(`invite:${inviteId}:${inviteSeq}`)
     .on(
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "invites", filter: `id=eq.${inviteId}` },

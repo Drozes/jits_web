@@ -205,17 +205,31 @@ export function startInviteBooking(
 }
 
 /**
+ * Per-call topic suffix for `subscribeToChallengeStatus` (jits-i5ih).
+ * realtime-js `RealtimeClient.channel(topic)` hands back the channel already
+ * registered under a topic, and `.on("postgres_changes", ...)` on a joining
+ * or joined channel throws. The invite screen and the Arena's bookings can
+ * watch the same booking; without a suffix they would share one topic, and
+ * the second watcher would throw (or the first one's cleanup would remove
+ * the second's channel). A postgres_changes topic is private to this client,
+ * so the suffix costs nothing.
+ */
+let challengeStatusSeq = 0;
+
+/**
  * Live status changes of one challenge row (the other athlete started the
  * booking: `accepted` -> `started`, or cancelled it). Participants can read
  * their challenges, so the existing realtime on `challenges` carries it.
+ * Every call owns its own channel (see `challengeStatusSeq`).
  */
 export function subscribeToChallengeStatus(
   supabase: Client,
   challengeId: string,
   onStatus: (status: string) => void,
 ): () => void {
+  challengeStatusSeq += 1;
   const channel = supabase
-    .channel(`challenge-status:${challengeId}`)
+    .channel(`challenge-status:${challengeId}:${challengeStatusSeq}`)
     .on(
       "postgres_changes",
       { event: "UPDATE", schema: "public", table: "challenges", filter: `id=eq.${challengeId}` },

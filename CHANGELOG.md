@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Shared: match detail no longer crashes with the same video open twice (jits-i5ih)
+
+JS-only (OTA-eligible), no backend change. Production is exposed too (the same code is on `main`); the owner wants it shipped as its own hotfix OTA as well.
+
+**Fixed**
+- `packages/shared/src/hooks/use-video-progress.ts`: the realtime topic is now unique per subscription (`video_progress:<videoId>:<seq>`, a module counter like `use-match-video-status.ts`). realtime-js 2.105.4 `RealtimeClient.channel(topic)` hands back the channel already registered under a topic, so a second mount on the same video (mobile match detail pushed twice: the match, then an athlete, then the same match again) added `postgres_changes` callbacks to a subscribed channel and threw "cannot add `postgres_changes` callbacks for realtime:video_progress:<id> after `subscribe()`" into the root error boundary (found by match-loop extended E17). Each cleanup now removes only its own channel, so unmounting one screen no longer silences the other's progress updates. Web's analysis viewer uses the same hook and gets the same fix.
+- `packages/shared/src/api/location.ts` (`subscribeToChallengeStatus`, `challenge-status:<id>:<seq>`) and `packages/shared/src/api/invites.ts` (`subscribeToInvite`, `invite:<id>:<seq>`): the same per-call topic suffix. Not crashing today, but the mobile invite screen (`lib/invites/use-challenge-invite.ts`) and the Arena's bookings (`lib/invites/use-bookings.ts`) can watch the same booking, and they only never overlapped because the bookings subscribe while the Arena tab is focused and native-stack unmounts a popped screen as the tab refocuses. Every other `postgres_changes` or presence channel in `packages/shared`, `apps/mobile` and `apps/web` was audited and either already has a per-mount suffix or has one owner at a time (audit on jits-i5ih).
+
+**Tests**
+- `packages/shared/src/hooks/use-video-progress.test.ts`: three channel-ownership cases run the real `RealtimeClient` against an in-process fake Realtime server (protocol vsn 1.0.0): two mounts on one video each own a joined channel and unmounting one leaves the other subscribed and refreshing; a mount switching onto a video another mount watches, and back, never touches that mount's channel; a single mount moving v1, v2, v1 removes each previous channel. The first two fail on the previous code with the E17 error; the third is a cleanup guard. Topics are compared without their suffix and checked to be distinct, so any per-subscription suffix (a counter or a random mount id) passes.
+- `packages/shared/src/api/row-watch-channels.test.ts` (new): for `subscribeToChallengeStatus` and `subscribeToInvite`, a second watcher of the same row subscribes on its own topic, and stopping one watcher removes only its own channel (real `RealtimeClient` over a socket that never connects). All four fail on the previous code with the same "cannot add `postgres_changes` callbacks" error.
+
 ### Match flow (timekeeper prework): Wave 1 refactor, flag OFF unchanged (jits-o47s.11, .12, .13)
 
 Refactor only, on `feat/timekeeper-mode` (timekeeper mode spec, PLAN Wave 1: PR1 to PR3). With the timekeeper flag off, today's two-athlete match flow and practice behave and look exactly as before; nothing reads a timekeeper value yet. The only label that changed is the dev-only step marker ("Step 2 of 8, Weights" is now "Step 1 of 7, Weights"), which release builds hide. No backend or shared API change.
