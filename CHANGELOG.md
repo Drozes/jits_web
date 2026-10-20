@@ -4,7 +4,7 @@
 
 ### Shared: match detail no longer crashes with the same video open twice (jits-i5ih)
 
-JS-only (OTA-eligible), no backend change. Production is exposed too (the same code is on `main`); the owner wants it shipped as its own hotfix OTA as well.
+JS-only (OTA-eligible), no backend change. Production is exposed too (the same code is on `main`); it ships with the timekeeper release (owner, 2026-10-20).
 
 **Fixed**
 - `packages/shared/src/hooks/use-video-progress.ts`: the realtime topic is now unique per subscription (`video_progress:<videoId>:<seq>`, a module counter like `use-match-video-status.ts`). realtime-js 2.105.4 `RealtimeClient.channel(topic)` hands back the channel already registered under a topic, so a second mount on the same video (mobile match detail pushed twice: the match, then an athlete, then the same match again) added `postgres_changes` callbacks to a subscribed channel and threw "cannot add `postgres_changes` callbacks for realtime:video_progress:<id> after `subscribe()`" into the root error boundary (found by match-loop extended E17). Each cleanup now removes only its own channel, so unmounting one screen no longer silences the other's progress updates. Web's analysis viewer uses the same hook and gets the same fix.
