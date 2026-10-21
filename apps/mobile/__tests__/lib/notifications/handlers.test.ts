@@ -53,7 +53,8 @@ jest.mock("expo-router", () => ({
   useSegments: () => [],
 }));
 
-import { renderHook } from "@testing-library/react-native";
+import * as React from "react";
+import { render, renderHook } from "@testing-library/react-native";
 import {
   markNotificationRouterReady,
   notificationTarget,
@@ -63,6 +64,11 @@ import {
   teardownNotificationHandlers,
 } from "@/lib/notifications/handlers";
 import { __resetArenaStoreForTests, useArenaMatchScreen } from "@/lib/arena/arena-store";
+import {
+  __resetTimekeepSheetStoreForTests,
+  useTimekeepSheetScreen,
+  useTimekeepTapHold,
+} from "@/lib/match-flow/timekeep-sheet-store";
 import { resolveSystemPath } from "@/lib/deep-links/system-path";
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { ARENA_HREF } from "@/lib/arena/constants";
@@ -588,5 +594,296 @@ describe("match video pushes land on the Film status plate (jits-n2im.13)", () =
     leave();
     const after = await handler({ request: { content: { data: push("film_ready") } } });
     expect(after.shouldShowBanner).toBe(true);
+  });
+});
+
+describe("timekeeper-mode pushes (timekeeper mode M2, spec 8)", () => {
+  const M = "0c1d2e3f-4a5b-4c6d-8e7f-001122334455";
+  const OTHER = "0c1d2e3f-4a5b-4c6d-8e7f-667788990011";
+  const TIMEKEEP = `/match/${M}/timekeep`;
+  const ADMIN = "/settings/admin/timekeeper-reviews";
+  /** A push as the jr_be push function builds it: type, kind, match_id and one href key. */
+  const tk = (kind: string, link: Record<string, string>, matchId = M) => ({ type: "timekeeper", kind, match_id: matchId, ...link });
+  /** Mount a screen of one match (the match route passes its id). */
+  const enterMatchOf = (matchId: string) => renderHook(() => useArenaMatchScreen(matchId)).unmount;
+  const handler = () =>
+    mockSetHandler.mock.calls[mockSetHandler.mock.calls.length - 1][0].handleNotification as (
+      n: unknown,
+    ) => Promise<Record<string, boolean>>;
+  const note = (data: unknown) => ({ request: { content: { data } } });
+
+  beforeEach(async () => {
+    markNotificationRouterReady();
+    await flush();
+  });
+
+  it("the asked person's timekeep_href opens the timekeep sheet", () => {
+    tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }));
+    expect(mockPush).toHaveBeenCalledWith(TIMEKEEP);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("an admin's admin_href opens Admin > Timekeeper reviews", () => {
+    tap(tk("admin_result_review", { admin_href: ADMIN }));
+    expect(mockPush).toHaveBeenCalledWith(ADMIN);
+  });
+
+  it("ignores timekeeper hrefs that do not match their exact shape", () => {
+    expect(notificationTarget({ timekeep_href: "/match/x/timekeep" })).toBeNull();
+    expect(notificationTarget({ timekeep_href: `${TIMEKEEP}/../../settings` })).toBeNull();
+    expect(notificationTarget({ timekeep_href: `https://evil.example${TIMEKEEP}` })).toBeNull();
+    expect(notificationTarget({ admin_href: "/settings/admin/flags" })).toBeNull();
+    expect(notificationTarget(tk("timekeeper_accepted", { match_href: `/match/${M}` }))).toBe(`/match/${M}`);
+  });
+
+  it("a timekeep tap during a match is not dropped: the sheet opens at once (its request lapses in 2 minutes)", () => {
+    const leave = enterMatchOf(OTHER);
+    tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }));
+    expect(mockPush).toHaveBeenCalledWith(TIMEKEEP);
+    expect(dropsDuringMatch(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }))).toBe(false);
+    expect(holdsDuringMatch(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }))).toBe(false);
+    leave();
+  });
+
+  it("a timekeep tap during the practice run (no match id) waits for its exit, then opens the sheet once", async () => {
+    // Nothing refuses an Accept during practice (it writes nothing), so the
+    // match would open over the practice screen and its camera.
+    const leave = enterMatch();
+    tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }), "tk-practice-ask");
+    expect(mockPush).not.toHaveBeenCalled();
+    leave();
+    await tick();
+    expect(mockPush).toHaveBeenCalledWith(TIMEKEEP);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }), "tk-practice-ask");
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("a real match screen mounted with practice is not practice only: the timekeep tap opens at once", () => {
+    const leavePractice = enterMatch();
+    const leave = enterMatchOf(OTHER);
+    tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }));
+    expect(mockPush).toHaveBeenCalledWith(TIMEKEEP);
+    leave();
+    leavePractice();
+  });
+
+  it("an admin review tap during a match is held, never dropped, and opens after the exit", async () => {
+    const leave = enterMatchOf(OTHER);
+    tap(tk("admin_result_review", { admin_href: ADMIN }), "adm-1");
+    expect(mockPush).not.toHaveBeenCalled();
+    leave();
+    await tick();
+    expect(mockPush).toHaveBeenCalledWith(ADMIN);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("a cold start from the timekeep push opens the sheet once the router is ready", async () => {
+    resetNotificationRoutingForTests();
+    mockGetLast.mockResolvedValue(response(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }), "cold-tk"));
+    markNotificationRouterReady();
+    await flush();
+    expect(mockPush).toHaveBeenCalledWith(TIMEKEEP);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("no foreground banner for a timekeeper push about the match on screen; it stays in the list", async () => {
+    const push = tk("timekeeper_result_recorded", { match_href: `/match/${M}` });
+    expect((await handler()(note(push))).shouldShowBanner).toBe(true);
+    const leave = enterMatchOf(M);
+    const during = await handler()(note(push));
+    expect(during).toMatchObject({ shouldShowBanner: false, shouldShowList: true });
+    // About another match: spec 8 quiets only the match on screen, so its
+    // banner shows (only its tap waits for the exit), and it is listed.
+    const other = tk("match_timed_out", { match_href: `/match/${OTHER}` }, OTHER);
+    expect(await handler()(note(other))).toMatchObject({ shouldShowBanner: true, shouldShowList: true });
+    expect(holdsDuringMatch(other)).toBe(true);
+    // Not a timekeeper-mode push (flag OFF invites): the banner as before.
+    expect((await handler()(note({ type: "invite", match_id: M, match_href: `/match/${M}` }))).shouldShowBanner).toBe(true);
+    expect((await handler()(note({ type: "invite", match_id: OTHER, match_href: `/match/${OTHER}` }))).shouldShowBanner).toBe(true);
+    // The asked person's request for another match is urgent (2 minutes): its banner shows.
+    const ask = tk("timekeeper_requested", { timekeep_href: `/match/${OTHER}/timekeep` }, OTHER);
+    expect((await handler()(note(ask))).shouldShowBanner).toBe(true);
+    leave();
+    expect((await handler()(note(push))).shouldShowBanner).toBe(true);
+    expect((await handler()(note(other))).shouldShowBanner).toBe(true);
+  });
+
+  it("a timekeeper push about another match during practice (no match id) keeps its banner (spec 8)", async () => {
+    const leave = enterMatch();
+    const other = tk("timekeeper_result_edited", { match_href: `/match/${OTHER}` }, OTHER);
+    expect(await handler()(note(other))).toMatchObject({ shouldShowBanner: true, shouldShowList: true });
+    leave();
+  });
+
+  it("the asked person's TK-N1 while that match's timekeep sheet is up: no banner, and its tap stacks no second sheet", async () => {
+    __resetTimekeepSheetStoreForTests();
+    const push = tk("timekeeper_requested", { timekeep_href: TIMEKEEP });
+    const sheet = renderHook(() => useTimekeepSheetScreen(M, "q1"));
+    expect((await handler()(note(push))).shouldShowBanner).toBe(false);
+    tap(push);
+    expect(mockPush).not.toHaveBeenCalled();
+    // Another match's request still shows and opens.
+    const other = tk("timekeeper_requested", { timekeep_href: `/match/${OTHER}/timekeep` }, OTHER);
+    expect((await handler()(note(other))).shouldShowBanner).toBe(true);
+    tap(other);
+    expect(mockPush).toHaveBeenCalledWith(`/match/${OTHER}/timekeep`);
+    sheet.unmount();
+    expect((await handler()(note(push))).shouldShowBanner).toBe(true);
+  });
+
+  it("an old TK-N1 for the match the asked person now timekeeps (its screen is up): no banner, and its tap stays on the match", async () => {
+    __resetTimekeepSheetStoreForTests();
+    const push = tk("timekeeper_requested", { timekeep_href: TIMEKEEP });
+    const leave = enterMatchOf(M);
+    expect((await handler()(note(push))).shouldShowBanner).toBe(false);
+    tap(push, "tk-seated");
+    expect(mockPush).not.toHaveBeenCalled();
+    leave();
+    // Off that match, the same push opens its sheet (which then reads the request and says it is closed).
+    expect((await handler()(note(push))).shouldShowBanner).toBe(true);
+    tap(push, "tk-after");
+    expect(mockPush).toHaveBeenCalledWith(TIMEKEEP);
+  });
+
+  describe("modal precedence (spec 9.1): the challenge prompt or a blocked start's sheet is up", () => {
+    const holdWhile = (held: boolean) =>
+      renderHook(({ h }: { h: boolean }) => useTimekeepTapHold(h), { initialProps: { h: held } });
+
+    beforeEach(() => __resetTimekeepSheetStoreForTests());
+
+    it("a TK-N1 tap waits and opens the sheet once the prompt closes", async () => {
+      const hold = holdWhile(true);
+      tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }), "tk-held");
+      expect(mockPush).not.toHaveBeenCalled();
+      // Only the asked person's tap waits: an athlete's timekeeper push opens as before.
+      tap(tk("timekeeper_accepted", { match_href: `/match/${OTHER}` }, OTHER));
+      expect(mockPush).toHaveBeenCalledWith(`/match/${OTHER}`);
+      mockPush.mockClear();
+      hold.rerender({ h: false });
+      await tick();
+      expect(mockPush).toHaveBeenCalledWith(TIMEKEEP);
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      // Routed once: a repeat of the same tap does nothing.
+      tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }), "tk-held");
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      hold.unmount();
+    });
+
+    it("the prompt closed because the athlete entered a match: the held tap is dropped, also after the exit", async () => {
+      const hold = holdWhile(true);
+      tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }), "tk-drop");
+      const leave = enterMatchOf(OTHER);
+      hold.rerender({ h: false });
+      await tick();
+      expect(mockPush).not.toHaveBeenCalled();
+      leave();
+      await tick();
+      expect(mockPush).not.toHaveBeenCalled();
+      hold.unmount();
+    });
+
+    it("the prompt closes and the match mounts in the same commit (Accept): the release waits a tick, so the tap is still dropped", async () => {
+      // One commit, as when Accept takes the athlete into the match: the
+      // prompt's release effect runs before the match screen's mount effect.
+      const Prompt = ({ up }: { up: boolean }) => {
+        useTimekeepTapHold(up);
+        return null;
+      };
+      const Match = () => {
+        useArenaMatchScreen(OTHER);
+        return null;
+      };
+      const shell = (entered: boolean) =>
+        React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(Prompt, { up: !entered }),
+          entered ? React.createElement(Match) : null,
+        );
+      const s = render(shell(false));
+      tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }), "tk-same-commit");
+      expect(mockPush).not.toHaveBeenCalled();
+      s.rerender(shell(true));
+      await tick();
+      expect(mockPush).not.toHaveBeenCalled();
+      s.unmount();
+      await tick();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("sign-out drops a held tap", async () => {
+      const hold = holdWhile(true);
+      tap(tk("timekeeper_requested", { timekeep_href: TIMEKEEP }), "tk-out");
+      resetNotificationRouterReady();
+      hold.rerender({ h: false });
+      await tick();
+      expect(mockPush).not.toHaveBeenCalled();
+      hold.unmount();
+    });
+  });
+
+  it("a timekeeper push tapped while its match is on screen does not stack a second screen of it", async () => {
+    const leave = enterMatchOf(M);
+    tap(tk("timekeeper_result_edited", { match_href: `/match/${M}` }), "tk-same");
+    expect(mockPush).not.toHaveBeenCalled();
+    leave();
+    await tick();
+    // Claimed, not held: nothing opens after the exit either.
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["timekeeper_result_edited"],
+    ["timekeeper_result_recorded"],
+    ["admin_result_recorded"],
+    ["match_no_contest"],
+    ["match_timed_out"],
+    ["timekeeper_expired"],
+    ["match_cancelled_athlete_left"],
+    ["admin_match_voided"],
+  ])("%s: a tap about another match waits for the live match's exit, then opens once", async (kind) => {
+    const push = tk(kind, { match_href: `/match/${OTHER}` }, OTHER);
+    const leave = enterMatchOf(M);
+    expect(holdsDuringMatch(push)).toBe(true);
+    tap(push, `tk-held-${kind}`);
+    // Never pushed over match M: its wizard's exitMatchTo would pop M too.
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    leave();
+    await tick();
+    expect(mockPush).toHaveBeenCalledWith(`/match/${OTHER}`);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    tap(push, `tk-held-${kind}`);
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  it("a timekeeper push about another match tapped during practice waits for its exit", async () => {
+    const leave = enterMatch();
+    tap(tk("timekeeper_result_edited", { match_href: `/match/${OTHER}` }, OTHER), "tk-practice");
+    expect(mockPush).not.toHaveBeenCalled();
+    leave();
+    await tick();
+    expect(mockPush).toHaveBeenCalledWith(`/match/${OTHER}`);
+  });
+
+  it("a held tap whose match the athlete opened meanwhile does not open it a second time", async () => {
+    const leaveM = enterMatchOf(M);
+    tap(tk("timekeeper_result_edited", { match_href: `/match/${OTHER}` }, OTHER), "tk-entered");
+    // OTHER's screen mounts over M before M ends.
+    const leaveOther = enterMatchOf(OTHER);
+    leaveM();
+    leaveOther();
+    await tick();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("flag OFF: an invite match_href about another match still opens during a match (not held)", () => {
+    const leave = enterMatchOf(M);
+    const invite = { type: "invite", match_id: OTHER, match_href: `/match/${OTHER}` };
+    expect(holdsDuringMatch(invite)).toBe(false);
+    tap(invite);
+    expect(mockPush).toHaveBeenCalledWith(`/match/${OTHER}`);
+    leave();
   });
 });

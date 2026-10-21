@@ -435,6 +435,99 @@ export function getTimekeeperRequest(supabase: Client, requestId: string): Promi
   return call(() => supabase.rpc("get_timekeeper_request", { p_request_id: requestId }), parseTimekeeperRequest);
 }
 
+/** The newest request of a match that this viewer may read (M2). */
+export interface LatestTimekeeperRequest {
+  requestId: string;
+  /** As stored: a pending request past `expiresAt` still reads `pending` here. */
+  status: TimekeeperRequestStatus;
+  inviteeId: string;
+  inviteeName: string;
+  expiresAt: string;
+}
+
+/**
+ * The newest `match_timekeeper_requests` row of a match that the caller can
+ * read (RLS, jr_be 024 2.3): for either athlete, every request of their
+ * match; for an asked person, only the requests sent to them. Two readers
+ * need it and neither has a request id: the asked person's sheet opened from
+ * the TK-N1 push, whose `timekeep_href` carries only the match id (jr_be 024
+ * section 8), and the athletes' picker after a pre-start drop-out, where the
+ * newest request is the accepted one and names the timekeeper who left
+ * (TK-D1; `get_timekeeper_match_state` reports only a declined or lapsed
+ * latest request). Null when there is none.
+ */
+export async function getLatestTimekeeperRequest(
+  supabase: Client,
+  matchId: string,
+): Promise<TkResult<LatestTimekeeperRequest | null>> {
+  const { data, error } = await supabase
+    .from("match_timekeeper_requests")
+    .select("id, status, invitee_id, expires_at, invitee:athletes!match_timekeeper_requests_invitee_id_fkey(display_name)")
+    .eq("match_id", matchId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return { ok: false, error: mapTimekeeperError(error) };
+  if (data == null) return { ok: true, data: null };
+  const row = data as unknown as Row;
+  const requestId = str(row.id);
+  const inviteeId = str(row.invitee_id);
+  const status = oneOf(row.status, ["pending", "accepted", "declined", "expired", "cancelled"] as const);
+  if (!requestId || !inviteeId || !status) return { ok: false, error: { ...UNEXPECTED } };
+  // An aliased to-one join: an object, or null when the athlete is not readable.
+  const invitee = isRow(row.invitee) ? row.invitee : null;
+  return {
+    ok: true,
+    data: {
+      requestId,
+      status,
+      inviteeId,
+      inviteeName: str(invitee?.display_name) ?? "",
+      expiresAt: str(row.expires_at) ?? "",
+    },
+  };
+}
+
+/** The newest pending request sent to an athlete (M2, the asked person's listener). */
+export interface IncomingTimekeeperRequest {
+  requestId: string;
+  matchId: string;
+  /** As stored: a pending request past `expiresAt` still reads `pending` here, so the caller checks it. */
+  expiresAt: string;
+}
+
+/**
+ * The newest `pending` `match_timekeeper_requests` row sent to `athleteId`
+ * (RLS admits the invitee, jr_be 024 2.3; served by the partial index on
+ * `invitee_id` where pending). The asked person's app-wide listener reads it
+ * on every channel (re)subscribe and on the return to the foreground, so a
+ * request whose realtime INSERT was missed (app suspended, channel down)
+ * still opens its sheet. Null when there is none.
+ */
+export async function getIncomingTimekeeperRequest(
+  supabase: Client,
+  athleteId: string,
+): Promise<TkResult<IncomingTimekeeperRequest | null>> {
+  const { data, error } = await supabase
+    .from("match_timekeeper_requests")
+    .select("id, match_id, expires_at")
+    .eq("invitee_id", athleteId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return { ok: false, error: mapTimekeeperError(error) };
+  if (data == null) return { ok: true, data: null };
+  const row = data as unknown as Row;
+  const requestId = str(row.id);
+  const matchId = str(row.match_id);
+  const expiresAt = str(row.expires_at);
+  if (!requestId || !matchId || !expiresAt) return { ok: false, error: { ...UNEXPECTED } };
+  return { ok: true, data: { requestId, matchId, expiresAt } };
+}
+
 /**
  * The seated timekeeper leaves (R21): before the start the athletes go back
  * to the picker (`pending`); while the clock runs it is a no contest

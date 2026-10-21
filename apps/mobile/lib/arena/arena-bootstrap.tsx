@@ -1,6 +1,8 @@
 /**
  * The single, app-wide owner of the Arena: live state, `lobby:online`
- * presence, the incoming-challenge listener and its prompt.
+ * presence, the incoming-challenge listener and its prompt, and (timekeeper
+ * mode) the listener for timekeeper requests sent to the athlete, with the
+ * precedence between their two modals (spec 9.1).
  *
  * Mounted once in `app/(app)/_layout.tsx`, beside the Stack, so it lives for
  * as long as the signed-in app does and NOT for as long as a screen does. That
@@ -40,7 +42,7 @@ import {
 } from "./arena-store";
 import { useArenaChallenge } from "./use-arena-challenge";
 import { useArenaLive } from "./use-arena-live";
-import { cancelLocationSheet, useLegacyGoLiveReadingRefresh } from "./go-live-location";
+import { cancelLocationSheet, useGoLiveLocationSheet, useLegacyGoLiveReadingRefresh } from "./go-live-location";
 import {
   GO_LIVE_FAILED_MESSAGE,
   showLocationOffGoLiveCta,
@@ -49,7 +51,7 @@ import {
 import { goLiveFromTap, restoreFirstFrame, restoreLiveSilently } from "./location-ladder";
 import { useMatchProximityRequired } from "./location-flags";
 import { DriftPromptSheet } from "@/components/arena/drift-prompt-sheet";
-import { useLiveDriftCheck } from "./use-live-drift-check";
+import { useDriftPrompt, useLiveDriftCheck } from "./use-live-drift-check";
 import {
   markMatchLocationRequired,
   readMatchLocationRequired,
@@ -90,6 +92,9 @@ import {
 import { useLobbyIds, useLobbyKnown, useLobbyPresence } from "./use-lobby-presence";
 import { usePendingChallengeRecovery } from "./use-pending-challenge-recovery";
 import { useActiveMatchOwner } from "../match-flow/active-match-store";
+import { useIncomingTimekeeperRequests } from "../match-flow/use-incoming-timekeeper-requests";
+import { useIsTimekeepSheetOpen, useTimekeepTapHold } from "../match-flow/timekeep-sheet-store";
+import { useScreenFocused } from "../navigation/use-screen-focused";
 
 const ARENA_KEEP_AWAKE_TAG = "arena-live";
 
@@ -363,6 +368,30 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   const { incoming, outgoing, incomingCount, incomingTucked, isBusy, capReached } =
     challenge;
   useArenaLiveKeepAwake(isLive && !inMatch);
+  // Timekeeper mode, the asked person (spec 9.1): never two modals. While the
+  // timekeep sheet is open the challenge prompt is held (gated below, as a
+  // match screen gates it, but kept, never dropped); while the prompt, a
+  // blocked start's sheet, the Go Live location sheet, the drift prompt or a
+  // match screen is up, a new timekeeper request waits and its sheet opens
+  // once that closes; a TK-N1 tap waits for the prompt or the blocked
+  // start's sheet the same way (a tap during a match still opens the sheet:
+  // its request lapses in 2 minutes).
+  const timekeepSheetOpen = useIsTimekeepSheetOpen();
+  const promptUp = !!incoming && !inMatch && !incomingTucked && !challenge.startBlocked && !timekeepSheetOpen;
+  const locationSheetUp = useGoLiveLocationSheet() !== null;
+  const driftPromptUp = useDriftPrompt() !== null;
+  // The `(app)` route itself is on top of the root Stack (this owner is
+  // mounted beside the `(app)` Stack, so it reads that route's focus). Under
+  // a root route (the legal documents, an invite link, invite setup), a push
+  // of the sheet would put a second `(app)` with a second Arena owner on the
+  // root Stack, so a new request waits until the athlete is back.
+  const appOnTop = useScreenFocused();
+  useIncomingTimekeeperRequests({
+    athleteId: athlete.id,
+    held: inMatch || promptUp || !!challenge.startBlocked || locationSheetUp || driftPromptUp || !appOnTop,
+    live: isLive,
+  });
+  useTimekeepTapHold(promptUp || !!challenge.startBlocked);
   const athleteId = athlete.id;
   // No reading is refreshed while live (instant go-live 4.2: the 60 s
   // refresh is gone; the server no longer expires a session for missing
@@ -543,12 +572,13 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
       <GoLiveLocationSheet />
       {/* "Still on the same mat?" (drift check, flag off by default). */}
       <DriftPromptSheet
-        blocked={inMatch || (!!incoming && !incomingTucked) || !!challenge.startBlocked}
+        blocked={inMatch || timekeepSheetOpen || (!!incoming && !incomingTucked) || !!challenge.startBlocked}
       />
       <ChallengePromptSheet
         // Never two modals: a blocked start's sheet holds the screen until
         // it is answered; a challenge arriving meanwhile waits in the chip.
-        challenge={inMatch || incomingTucked || challenge.startBlocked ? null : incoming}
+        // The timekeep sheet holds it as well, until it closes (spec 9.1).
+        challenge={inMatch || timekeepSheetOpen || incomingTucked || challenge.startBlocked ? null : incoming}
         busy={isBusy}
         onAccept={() => void challenge.accept()}
         onDecline={() => void challenge.decline()}

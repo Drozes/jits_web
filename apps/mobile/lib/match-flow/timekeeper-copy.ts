@@ -266,6 +266,10 @@ export type TimekeeperCopyId = keyof typeof TIMEKEEPER_COPY;
 export const SHIPPED_COPY = {
   /** A2: the face-off's Leave (`faceoff/faceoff-top.tsx`), also the crew step's: it cancels the match for both athletes. */
   leave: { text: "Leave", a11y: "Cancel match" },
+  /** A2: the face-off's VS (`faceoff/faceoff-top.tsx`), also between the two athletes on the asked person's sheet (board P-TK-B4). */
+  vs: "VS",
+  /** A2-ELO: the Friends row's rating (`app/(app)/friends.tsx`), also on every picker row (board P-TK-B2); the face-off keeps its own `ELO {n}`. */
+  elo: (elo: number) => `${elo} ELO`,
   /** A2, B5 and B6: the weight verdicts (`faceoff/faceoff-weight-check.tsx`). */
   confirm: "Confirm",
   flag: "Doesn't look right",
