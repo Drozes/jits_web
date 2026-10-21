@@ -136,7 +136,8 @@ describe("caps labels are tracked in the WP5a areas (R3 TY-3)", () => {
    */
   const DATA_LINE = /\bfont-mono(-medium|-bold)?\b.*\btext-caption\b.*\buppercase\b/;
   const DATA_LINES: Record<string, number> = {
-    "components/arena/mat-board.tsx": 7,
+    // 6: the closest-match stakes line went with the stakes (timekeeper mode A11, O1).
+    "components/arena/mat-board.tsx": 6,
     "components/invite/booked-strip.tsx": 1,
   };
   /** A caps tracking step (CAPS_TRACKING in lib/typography.ts), not just any tracking. */

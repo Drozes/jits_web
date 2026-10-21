@@ -8342,7 +8342,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
         },
         {
          "children": [
-          "1 weight class apart. The heavier athlete was favoured, so they win fewer points."
+          "1 weight class apart. The heavier athlete was favoured."
          ],
          "props": {
           "className": "font-mono-medium",
@@ -9282,7 +9282,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
         },
         {
          "children": [
-          "1 weight class apart. The heavier athlete was favoured, so they win fewer points."
+          "1 weight class apart. The heavier athlete was favoured."
          ],
          "props": {
           "className": "font-mono-medium",
@@ -10222,7 +10222,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
         },
         {
          "children": [
-          "1 weight class apart. The heavier athlete was favoured, so they win fewer points."
+          "1 weight class apart. The heavier athlete was favoured."
          ],
          "props": {
           "className": "font-mono-medium",
@@ -11152,7 +11152,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
        "children": [
         {
          "children": [
-          "2.2 LBS APART"
+          "2.2 LBS APART · SAME DIVISION"
          ],
          "props": {
           "className": "font-mono-medium",
@@ -12231,7 +12231,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
        "children": [
         {
          "children": [
-          "2.2 LBS APART"
+          "2.2 LBS APART · SAME DIVISION"
          ],
          "props": {
           "className": "font-mono-medium",
@@ -13070,7 +13070,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
            "children": [
             {
              "children": [
-              "168 LBS"
+              "160 LBS"
              ],
              "props": {
               "className": "font-display",
@@ -13134,7 +13134,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
        "children": [
         {
          "children": [
-          "2.2 LBS APART · 1 DIVISION APART"
+          "10.2 LBS APART · 1 DIVISION APART"
          ],
          "props": {
           "className": "font-mono-medium",
@@ -13171,218 +13171,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
       },
       {
        "children": [
-        {
-         "children": [
-          {
-           "children": [
-            "WIN"
-           ],
-           "props": {
-            "className": "font-mono-medium",
-            "style": [
-             {
-              "fontSize": 10,
-              "lineHeight": 13
-             },
-             {
-              "color": "#8D929D",
-              "letterSpacing": 2.52
-             },
-             {
-              "fontVariant": [
-               "tabular-nums"
-              ]
-             }
-            ]
-           },
-           "type": "Text"
-          },
-          {
-           "children": [
-            "▲ +14"
-           ],
-           "props": {
-            "className": "font-mono-bold",
-            "style": [
-             {
-              "fontSize": 16,
-              "lineHeight": 21
-             },
-             {
-              "color": "#22C55E"
-             },
-             {
-              "fontVariant": [
-               "tabular-nums"
-              ]
-             }
-            ],
-            "testID": "weight-stakes-win"
-           },
-           "type": "Text"
-          }
-         ],
-         "props": {
-          "accessibilityLabel": "WIN +14",
-          "accessible": true,
-          "style": {
-           "alignItems": "center",
-           "borderColor": "rgba(107, 114, 128, 0.45)",
-           "borderLeftWidth": 0,
-           "flex": 1,
-           "gap": 5,
-           "justifyContent": "center"
-          }
-         },
-         "type": "View"
-        },
-        {
-         "children": [
-          {
-           "children": [
-            "DRAW"
-           ],
-           "props": {
-            "className": "font-mono-medium",
-            "style": [
-             {
-              "fontSize": 10,
-              "lineHeight": 13
-             },
-             {
-              "color": "#8D929D",
-              "letterSpacing": 2.52
-             },
-             {
-              "fontVariant": [
-               "tabular-nums"
-              ]
-             }
-            ]
-           },
-           "type": "Text"
-          },
-          {
-           "children": [
-            "▼ −3"
-           ],
-           "props": {
-            "className": "font-mono-bold",
-            "style": [
-             {
-              "fontSize": 16,
-              "lineHeight": 21
-             },
-             {
-              "color": "#F59E0B"
-             },
-             {
-              "fontVariant": [
-               "tabular-nums"
-              ]
-             }
-            ],
-            "testID": "weight-stakes-draw"
-           },
-           "type": "Text"
-          }
-         ],
-         "props": {
-          "accessibilityLabel": "DRAW -3",
-          "accessible": true,
-          "style": {
-           "alignItems": "center",
-           "borderColor": "rgba(107, 114, 128, 0.45)",
-           "borderLeftWidth": 1,
-           "flex": 1,
-           "gap": 5,
-           "justifyContent": "center"
-          }
-         },
-         "type": "View"
-        },
-        {
-         "children": [
-          {
-           "children": [
-            "LOSS"
-           ],
-           "props": {
-            "className": "font-mono-medium",
-            "style": [
-             {
-              "fontSize": 10,
-              "lineHeight": 13
-             },
-             {
-              "color": "#8D929D",
-              "letterSpacing": 2.52
-             },
-             {
-              "fontVariant": [
-               "tabular-nums"
-              ]
-             }
-            ]
-           },
-           "type": "Text"
-          },
-          {
-           "children": [
-            "▼ −18"
-           ],
-           "props": {
-            "className": "font-mono-bold",
-            "style": [
-             {
-              "fontSize": 16,
-              "lineHeight": 21
-             },
-             {
-              "color": "#EC6A74"
-             },
-             {
-              "fontVariant": [
-               "tabular-nums"
-              ]
-             }
-            ],
-            "testID": "weight-stakes-loss"
-           },
-           "type": "Text"
-          }
-         ],
-         "props": {
-          "accessibilityLabel": "LOSS -18",
-          "accessible": true,
-          "style": {
-           "alignItems": "center",
-           "borderColor": "rgba(107, 114, 128, 0.45)",
-           "borderLeftWidth": 1,
-           "flex": 1,
-           "gap": 5,
-           "justifyContent": "center"
-          }
-         },
-         "type": "View"
-        }
-       ],
-       "props": {
-        "style": {
-         "backgroundColor": "#1E222B",
-         "borderColor": "rgba(107, 114, 128, 0.45)",
-         "borderRadius": 3,
-         "borderWidth": 1,
-         "flexDirection": "row",
-         "height": 56
-        },
-        "testID": "weight-stakes"
-       },
-       "type": "View"
-      },
-      {
-       "children": [
-        "The heavier athlete is favoured, so they win fewer points."
+        "Weight gap: the heavier athlete is favoured."
        ],
        "props": {
         "className": "font-body",

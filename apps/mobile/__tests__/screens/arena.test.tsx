@@ -167,9 +167,23 @@ jest.mock("@/lib/match-flow/active-match-store", () => ({
   useMatchToConfirm: () => mockConfirm,
 }));
 
-// The real useViewerStakes runs; only the RPC wrapper is mocked, so the
-// Closest Match card is tested as it consumes get_rating_stakes.
+// Mocked only to prove the Arena never reads rating stakes any more
+// (timekeeper mode A11, O1).
 const mockGetRatingStakes = jest.fn((..._a: unknown[]): Promise<unknown> => Promise.resolve(null));
+
+// Timekeeper mode (A20, TK-AR2): the timekeeping slot and the Arena copy's
+// flag, off and empty unless a test says otherwise.
+// eslint-disable-next-line no-var
+var mockTimekeeping: { matchId: string; status: string } | null = null;
+// eslint-disable-next-line no-var
+var mockTimekeeperFlag = { enabled: false, known: false };
+jest.mock("@/lib/match-flow/timekeeping-match-store", () => ({
+  ...jest.requireActual("@/lib/match-flow/timekeeping-match-store"),
+  useMyTimekeepingMatch: () => mockTimekeeping,
+}));
+jest.mock("@/lib/match-flow/use-timekeeper-enabled", () => ({
+  useTimekeeperEnabled: () => mockTimekeeperFlag,
+}));
 
 jest.mock("@/lib/supabase/client", () => ({ supabase: {} }));
 // Invites + friends (jr_be spec 016): controllable stand-ins for the realtime
@@ -386,6 +400,8 @@ beforeEach(() => {
     capReached: false,
   };
   mockConfirm = null;
+  mockTimekeeping = null;
+  mockTimekeeperFlag = { enabled: false, known: false };
   mockGetRatingStakes.mockReset();
   mockGetRatingStakes.mockImplementation(() => Promise.resolve(null));
   mockGetPending.mockResolvedValue({ ok: true, data: { incoming: [], outgoing: [] } });
@@ -732,6 +748,40 @@ describe("Arena screen", () => {
       expect(mockToggle).not.toHaveBeenCalled();
     });
 
+    it.each(["pending", "in_progress"])(
+      "a seated timekeeper (%s match) cannot go live: the LIVE segment and every go-live are locked (A20)",
+      (status) => {
+        mockTimekeeping = { matchId: "tk-1", status };
+        const r = render(<ArenaScreen />);
+        const goLive = r.getByLabelText("Go live");
+        expect(isDisabled(goLive)).toBe(true);
+        fireEvent.press(goLive);
+        expect(mockGuardedGoLive).not.toHaveBeenCalled();
+        // The Closest Match GO LIVE TO ROLL and a row's go-live are the live switch too.
+        expect(isDisabled(r.getByTestId("arena-closest-cta"))).toBe(true);
+      },
+    );
+
+    it.each(["pending", "in_progress"])(
+      "a seated timekeeper (%s match) who is live can still go offline: never a stuck live (A20)",
+      (status) => {
+        mockIsLive = true;
+        mockTimekeeping = { matchId: "tk-1", status };
+        const r = render(<ArenaScreen />);
+        const goOffline = r.getByLabelText("Go offline");
+        expect(isDisabled(goOffline)).toBe(false);
+        fireEvent.press(goOffline);
+        expect(mockGuardedGoOffline).toHaveBeenCalledTimes(1);
+        expect(mockGuardedGoLive).not.toHaveBeenCalled();
+      },
+    );
+
+    it("a completed timekeeping match in its edit window does not lock going live (PM20)", () => {
+      mockTimekeeping = { matchId: "tk-1", status: "completed" };
+      const r = render(<ArenaScreen />);
+      expect(isDisabled(r.getByLabelText("Go live"))).toBe(false);
+    });
+
     it("offers Go offline while live", () => {
       mockIsLive = true;
       const { getByLabelText, queryByLabelText } = render(<ArenaScreen />);
@@ -946,7 +996,7 @@ describe("Arena screen", () => {
       mockLobbyIds = new Set(["far", "near", "mid"]);
     }
 
-    it("suggests the smallest |ΔELO| with its stakes and one red CHALLENGE", async () => {
+    it("suggests the smallest |ΔELO| with one red CHALLENGE, and no stakes in either mode (A11, O1)", async () => {
       mockIsLive = true;
       mat();
       mockGetRatingStakes.mockImplementation(() => Promise.resolve(ratingStakes({ win: 15, draw: 0, loss: -15 })));
@@ -954,9 +1004,12 @@ describe("Arena screen", () => {
       const cta = r.getByTestId("arena-closest-cta");
       expect(cta.props.accessibilityLabel).toBe("Challenge Near");
       expect(cta.props.className).toMatch(/bg-cta/);
-      await waitFor(() => expect(r.getByTestId("arena-closest-stakes").props.children).toBe("Win +15 · Loss −15"));
-      // Rating V9: read against the suggested athlete's id, no match yet.
-      expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "near", null);
+      await act(async () => undefined);
+      // No get_rating_stakes read and no Win / Loss line; current ratings stay.
+      expect(mockGetRatingStakes).not.toHaveBeenCalled();
+      expect(r.queryByTestId("arena-closest-stakes")).toBeNull();
+      expect(r.queryByText(/Win .* Loss/)).toBeNull();
+      expect(within(r.getByTestId("arena-closest")).getByText(/^1190 · −10 vs you/)).toBeTruthy();
       expect(redCount(r)).toBe(1);
 
       fireEvent.press(cta);
@@ -964,35 +1017,16 @@ describe("Arena screen", () => {
       expect(mockImpact).toHaveBeenCalledWith("light");
     });
 
-    it("reads the closest match's stakes again when its weight changes", async () => {
+    it("a weight change on the closest match reads nothing", async () => {
       mockIsLive = true;
       mat();
-      mockGetRatingStakes.mockImplementation(() => Promise.resolve(ratingStakes({ win: 15, loss: -15 })));
       const r = render(<ArenaScreen />);
-      await waitFor(() => expect(r.getByTestId("arena-closest-stakes")).toBeTruthy());
-      const calls = mockGetRatingStakes.mock.calls.length;
-      mockGetRatingStakes.mockImplementation(() => new Promise(() => undefined));
       mockRoster.competitors = mockRoster.competitors.map((c) => ((c as { id: string }).id === "near" ? { ...(c as object), weight: 205 } : c));
       r.rerender(<ArenaScreen />);
-      expect(r.queryByTestId("arena-closest-stakes")).toBeNull();
-      await waitFor(() => expect(mockGetRatingStakes.mock.calls.length).toBe(calls + 1));
-      expect(mockGetRatingStakes).toHaveBeenLastCalledWith(expect.anything(), "near", null);
-    });
-
-    it("hides the stakes line when get_rating_stakes returns null or fails, with no error", async () => {
-      mockIsLive = true;
-      mat();
-      const r = render(<ArenaScreen />);
-      await waitFor(() => expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "near", null));
       await act(async () => undefined);
+      expect(mockGetRatingStakes).not.toHaveBeenCalled();
       expect(r.queryByTestId("arena-closest-stakes")).toBeNull();
-      r.unmount();
-      mockGetRatingStakes.mockImplementation(() => Promise.reject(new Error("offline")));
-      const failed = render(<ArenaScreen />);
-      await waitFor(() => expect(mockGetRatingStakes).toHaveBeenCalledTimes(2));
-      await act(async () => undefined);
-      expect(failed.queryByTestId("arena-closest-stakes")).toBeNull();
-      expect(failed.getByTestId("arena-closest-cta").props.accessibilityLabel).toBe("Challenge Near");
+      expect(r.getByTestId("arena-closest-cta").props.accessibilityLabel).toBe("Challenge Near");
     });
 
     it("offline, the CTA is a red GO LIVE TO ROLL", () => {
@@ -1224,6 +1258,28 @@ describe("Arena screen", () => {
       expect(getByLabelText("Waiting for Alpha")).toBeTruthy();
       fireEvent.press(getByLabelText("Cancel challenge"));
       expect(mockCancelOutgoing).toHaveBeenCalled();
+    });
+
+    it("waiting: TK-AR2 under the strip only while the timekeeper flag is known ON", () => {
+      mockIsLive = true;
+      mockChallenge.outgoing = { challengeId: "ch-1", opponentId: "a-1", opponentName: "Alpha" };
+      const unknown = render(<ArenaScreen />);
+      expect(unknown.queryByTestId("arena-strip-waiting-helper")).toBeNull();
+      unknown.unmount();
+
+      mockTimekeeperFlag = { enabled: false, known: true };
+      const off = render(<ArenaScreen />);
+      expect(off.queryByTestId("arena-strip-waiting-helper")).toBeNull();
+      off.unmount();
+
+      mockTimekeeperFlag = { enabled: true, known: true };
+      const on = render(<ArenaScreen />);
+      expect(on.getByTestId("arena-strip-waiting-helper")).toHaveTextContent(
+        "You'll both pick a timekeeper the moment they accept.",
+      );
+      // The harness contract is untouched.
+      expect(on.getByLabelText("Waiting for Alpha")).toBeTruthy();
+      expect(on.getByLabelText("Cancel challenge")).toBeTruthy();
     });
 
     it("incoming: a red rail, the challenger and OPEN, which reopens the prompt", () => {

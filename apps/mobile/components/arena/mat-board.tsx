@@ -30,7 +30,6 @@ import {
   spokenCountdown,
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
-import { useViewerStakes, weightsStakesKey } from "@/lib/match-flow/use-viewer-stakes";
 import { TABULAR } from "@/lib/typography";
 
 /** What a countdown counts down to: a challenge's live window. */
@@ -361,7 +360,9 @@ export function IncomingStrip({
 /**
  * `WAITING · ALEX · 8:12` + Cancel. The head is read as `Waiting for Alex`
  * (harness contract, exact), and the countdown as its own element
- * (`8 minutes 12 seconds left`), so VoiceOver hears both.
+ * (`8 minutes 12 seconds left`), so VoiceOver hears both. `helper` is a line
+ * under the strip (timekeeper mode's TK-AR2, only while the flag is known
+ * ON; the screen decides).
  */
 export function WaitingStrip({
   name,
@@ -369,14 +370,16 @@ export function WaitingStrip({
   active,
   onCancel,
   disabled,
+  helper = null,
 }: {
   name: string;
   source: CountdownSource | null;
   active: boolean;
   onCancel: () => void;
   disabled: boolean;
+  helper?: string | null;
 }) {
-  return (
+  const strip = (
     <StripShell rail="neutral" testID="arena-strip-waiting">
       <StripLine
         head={`Waiting · ${name}`}
@@ -392,6 +395,19 @@ export function WaitingStrip({
         disabled={disabled}
       />
     </StripShell>
+  );
+  if (!helper) return strip;
+  return (
+    <View>
+      {strip}
+      <Text
+        testID="arena-strip-waiting-helper"
+        maxFontSizeMultiplier={MAX_SCALE}
+        className="mt-1.5 pl-1 font-body text-body text-ink-2"
+      >
+        {helper}
+      </Text>
+    </View>
   );
 }
 
@@ -532,15 +548,17 @@ interface ClosestMatchProps {
   kind: "challenge" | "go-live" | "none";
   red: boolean;
   disabled: boolean;
-  viewer: { elo: number | null; weight: number | null };
+  /** The viewer's current rating (`You 1512`); never a stake (A11, O1). */
+  viewerElo: number | null;
   onChallenge: () => void;
   onGoLive: () => void;
 }
 
 /**
- * The live athlete nearest the viewer's rating, their stakes, and the
- * surface's single red CTA (AC-A3). Nobody to suggest shows an empty state,
- * with `GO LIVE TO ROLL` under it while offline.
+ * The live athlete nearest the viewer's rating and the surface's single red
+ * CTA (AC-A3). Nobody to suggest shows an empty state, with `GO LIVE TO ROLL`
+ * under it while offline. No rating stakes, in either mode (timekeeper mode
+ * spec 2.3 item 1).
  */
 export function ClosestMatchCard({
   athlete,
@@ -548,22 +566,10 @@ export function ClosestMatchCard({
   kind,
   red,
   disabled,
-  viewer,
+  viewerElo,
   onChallenge,
   onGoLive,
 }: ClosestMatchProps) {
-  // Keyed on the athlete (Rating V9 prices their full rating state, the
-  // rematch history and the weights server-side), from the viewer's side;
-  // both weights are in the key so a weight change reads again.
-  const stakes = useViewerStakes(
-    !!athlete && viewer.elo != null,
-    athlete?.id ?? null,
-    null,
-    viewer.elo,
-    athlete?.currentElo ?? null,
-    weightsStakesKey(viewer.weight, athlete?.weight ?? null),
-  );
-
   if (!athlete || kind === "none") {
     return (
       <View
@@ -609,7 +615,7 @@ export function ClosestMatchCard({
     >
       <MatSectionLabel
         label="Closest match"
-        right={viewer.elo != null ? `You ${viewer.elo}` : undefined}
+        right={viewerElo != null ? `You ${viewerElo}` : undefined}
       />
       <View className="flex-row items-center gap-3">
         <Avatar32 name={name} photoUrl={athlete.profilePhotoUrl ?? null} />
@@ -629,17 +635,6 @@ export function ClosestMatchCard({
           >
             {facts}
           </Text>
-          {stakes ? (
-            <Text
-              testID="arena-closest-stakes"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MAX_SCALE}
-              className="mt-0.5 font-mono-bold text-caption text-ink-2 uppercase"
-              style={TABULAR}
-            >
-              {`Win ${formatGap(stakes.win)} · Loss ${formatGap(stakes.loss)}`}
-            </Text>
-          ) : null}
         </View>
       </View>
       <ClosestCtaButton

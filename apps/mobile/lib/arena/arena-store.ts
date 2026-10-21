@@ -531,6 +531,11 @@ export function useArenaSelfId(): string | null {
   return useSyncExternalStore(subscribe, getSelfId, getSelfId);
 }
 
+/** The same, outside React (the Arena chokepoint, `challenge-api.ts`). */
+export function getArenaSelfId(): string | null {
+  return getSelfId();
+}
+
 // ---------------------------------------------------------------------------
 // Controller
 // ---------------------------------------------------------------------------

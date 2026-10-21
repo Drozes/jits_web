@@ -85,7 +85,7 @@ import { markMatchProximityRequired } from "./location-flags";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
 import { isBlocked } from "@/lib/moderation/block-store";
-import { acceptArenaChallenge, createArenaChallenge, startArenaMatch } from "./challenge-api";
+import { acceptArenaChallenge, createArenaChallenge, isBusyRefusal, startArenaMatch } from "./challenge-api";
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -1945,9 +1945,9 @@ export function useArenaChallenge({
           // Already on the way into a match by another path.
           if (entryBlocked()) return;
           toast.error(
-            started.error.code === "CHALLENGE_NOT_ACCEPTED"
+            started.error.toast ?? (started.error.code === "CHALLENGE_NOT_ACCEPTED"
               ? "That challenge is no longer available."
-              : started.error.message || "Couldn't start the match.",
+              : started.error.message || "Couldn't start the match."),
           );
           requestPendingChallengeResync();
           return;
@@ -1996,11 +1996,11 @@ export function useArenaChallenge({
           });
           return;
         }
-        if (started.error.code === "CHALLENGE_NOT_ACCEPTED") {
+        if (started.error.code === "CHALLENGE_NOT_ACCEPTED" || isBusyRefusal(started.error)) {
           setStartBlocked(null);
           acceptedNotEnteredRef.current.delete(blocked.challengeId);
           clearAccepted(athleteIdRef.current);
-          toast.info("That challenge is no longer available.");
+          toast[started.error.toast ? "error" : "info"](started.error.toast ?? "That challenge is no longer available.");
           requestPendingChallengeResync();
           return;
         }

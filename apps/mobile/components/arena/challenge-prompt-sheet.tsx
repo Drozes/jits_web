@@ -60,13 +60,13 @@ import {
   spokenCountdown,
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
-import { useViewerStakes, viewerStakesKey, weightsStakesKey } from "@/lib/match-flow/use-viewer-stakes";
+import { useTimekeeperEnabled } from "@/lib/match-flow/use-timekeeper-enabled";
+import { TIMEKEEPER_COPY } from "@/lib/match-flow/timekeeper-copy";
 import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
-import type { RatingStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { TABULAR, TYPE_SCALE, typeStep } from "@/lib/typography";
-import { InitialsBlock, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
+import { InitialsBlock, Mono, shortName } from "@/components/match-flow/fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { SteelSheen } from "@/components/ui/steel-sheen";
@@ -180,9 +180,9 @@ interface ChallengePromptSheetProps {
    */
   moreCount?: number;
   /**
-   * The viewer's own rating and weight, for the stakes strip (the server
-   * reads both athletes' state and the weights itself; these key the read).
-   * Omitted (or a missing rating): no strip. Arena challenges are ranked-only.
+   * Not read any more: the stakes strip it keyed is gone in both modes (A11,
+   * O1; timekeeper mode spec 2.3 item 1). Accepted so `<ArenaBootstrap />`
+   * (slice M2's file) keeps compiling until it stops passing it.
    */
   viewer?: { elo: number | null; weight: number | null };
 }
@@ -190,9 +190,7 @@ interface ChallengePromptSheetProps {
 /** What the card shows: frozen while the modal fades out after a null. */
 interface Shown {
   challenge: IncomingChallenge;
-  stakes: RatingStakes | null;
   moreCount: number;
-  viewerElo: number | null;
 }
 
 export function ChallengePromptSheet({
@@ -202,7 +200,6 @@ export function ChallengePromptSheet({
   onDecline,
   onLater,
   moreCount = 0,
-  viewer,
 }: ChallengePromptSheetProps) {
   const p = usePalette();
   // "Sheet / modal present": fades in, appears in place under Reduce Motion.
@@ -213,77 +210,24 @@ export function ChallengePromptSheet({
   const insets = React.useContext(SafeAreaInsetsContext) ?? NO_INSETS;
   const cardHeight = promptCardHeight(windowHeight, insets);
 
-  // Later passes challenge=null, which resets the stakes read below. Keep the
-  // last stakes read so reopening from the chip shows the strip at once
-  // instead of the fallback line followed by the strip. The cache is keyed
-  // EXACTLY as useViewerStakes keys its read (the challenger, no match yet,
-  // both ratings, and both weights as its extra key), never on the challenge
-  // id: useViewerStakes only returns stakes for its current inputs, and reuse
-  // here requires the same challenger, both ratings and both weights
-  // unchanged, so one challenger's stakes can never show for another, nor
-  // for a new challenge from them at another weight (the server prices an
-  // open challenge on its weights), even when it replaces the old one in
-  // place with no null render between.
-  const weightsKey = weightsStakesKey(viewer?.weight, challenge?.challengerWeight);
-  const stakesKey = viewerStakesKey(challenge?.challengerId, null, viewer?.elo, challenge?.challengerElo, weightsKey);
-  // Held in state and written from an effect, never from render: a render
-  // React throws away (concurrent rendering, StrictMode) must not leave its
-  // value behind. The live read is used directly while it exists, so the
-  // cache is only consulted after it has been committed.
-  const [cached, setCached] = React.useState<{
-    key: string;
-    stakes: RatingStakes;
-  } | null>(null);
-  const cacheHit = cached !== null && cached.key === stakesKey;
-  // One get_rating_stakes read per set of inputs, from the viewer's side
-  // (see useViewerStakes). Fails quietly: no strip. Skipped while a committed
-  // read for the same inputs is cached: a Later then reopen (or the same
-  // challenger again) does not hit the network again. Nothing in the key has
-  // changed in between, so only the RD aging of a few minutes could move a
-  // number, by a point at most.
-  const liveStakes = useViewerStakes(
-    !!challenge && viewer?.elo != null && !cacheHit,
-    challenge?.challengerId,
-    null,
-    viewer?.elo,
-    challenge?.challengerElo,
-    weightsKey,
-  );
-  const hasChallenge = challenge !== null;
-  React.useEffect(() => {
-    if (!hasChallenge || !liveStakes) return;
-    setCached((prev) =>
-      prev && prev.key === stakesKey && prev.stakes === liveStakes
-        ? prev
-        : { key: stakesKey, stakes: liveStakes },
-    );
-  }, [hasChallenge, liveStakes, stakesKey]);
-  const stakes =
-    liveStakes ??
-    (challenge && viewer?.elo != null && cacheHit ? cached.stakes : null);
+  // The helper line is timekeeper mode's TK-AR1 only once the flag is known
+  // ON; unknown or off keeps the shipped line (spec 4.2 Arena).
+  const timekeeper = useTimekeeperEnabled();
 
   // React Native keeps rendering a Modal's children while it fades out after
   // visible turns false. The last committed content is kept for that fade so
-  // the card does not go blank (or swap its strip for the fallback line) on
-  // its way out. Written from an effect, like the stakes cache, and only
-  // read while there is no challenge.
+  // the card does not go blank on its way out. Written from an effect, never
+  // from render, and only read while there is no challenge.
   const [lastShown, setLastShown] = React.useState<Shown | null>(null);
-  const viewerElo = viewer?.elo ?? null;
   React.useEffect(() => {
     if (!challenge) return;
     setLastShown((prev) =>
-      prev &&
-      prev.challenge === challenge &&
-      prev.stakes === stakes &&
-      prev.moreCount === moreCount &&
-      prev.viewerElo === viewerElo
+      prev && prev.challenge === challenge && prev.moreCount === moreCount
         ? prev
-        : { challenge, stakes, moreCount, viewerElo },
+        : { challenge, moreCount },
     );
-  }, [challenge, stakes, moreCount, viewerElo]);
-  const shown: Shown | null = challenge
-    ? { challenge, stakes, moreCount, viewerElo }
-    : lastShown;
+  }, [challenge, moreCount]);
+  const shown: Shown | null = challenge ? { challenge, moreCount } : lastShown;
 
   const visible = challenge !== null;
   // iOS presents a Modal exactly once and silently gives up when another
@@ -434,8 +378,7 @@ export function ChallengePromptSheet({
               borderRadius: PROMPT_RADIUS,
               borderWidth: 1,
               borderColor: p.strong,
-              // Follows the app theme: the theme's plate, with the stakes
-              // strip inside on the page color.
+              // Follows the app theme: the theme's plate.
               backgroundColor: p.plate,
               overflow: "hidden",
             }}
@@ -463,30 +406,20 @@ export function ChallengePromptSheet({
                 <PromptHeader challenge={shown.challenge} />
                 <PromptChallenger challenge={shown.challenge} />
 
-                {shown.stakes ? (
-                  <View style={{ gap: 8 }}>
-                    <Mono color={p.text3} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{`YOUR STAKES${shown.viewerElo != null ? ` · ${shown.viewerElo}` : ""}`}</Mono>
-                    <StakesStrip
-                      testID="challenge-prompt-stakes"
-                      win={shown.stakes.win}
-                      draw={shown.stakes.draw}
-                      loss={shown.stakes.loss}
-                      height={64}
-                      background={p.bg}
-                      maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    />
-                  </View>
-                ) : (
-                  <Text
-                    testID="challenge-prompt-fallback"
-                    numberOfLines={2}
-                    maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    className="font-body"
-                    style={[typeStep("body"), { color: p.text2 }]}
-                  >
-                    Accept and you both drop straight into the match.
-                  </Text>
-                )}
+                {/* No rating stakes before a match, in either mode (A11,
+                    O1). The testID predates the stakes removal: the line was
+                    the no-stakes fallback and is now always the card's helper. */}
+                <Text
+                  testID="challenge-prompt-fallback"
+                  numberOfLines={2}
+                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                  className="font-body"
+                  style={[typeStep("body"), { color: timekeeper.enabled ? p.text : p.text2 }]}
+                >
+                  {timekeeper.enabled
+                    ? TIMEKEEPER_COPY["TK-AR1"]
+                    : "Accept and you both drop straight into the match."}
+                </Text>
 
                 {shown.moreCount > 0 ? (
                   <Text
