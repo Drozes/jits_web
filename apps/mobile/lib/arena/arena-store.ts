@@ -1273,8 +1273,15 @@ export function useMatchExitCount(): number {
 export function useArenaMatchScreen(matchId?: string): void {
   React.useEffect(() => {
     matchScreens += 1;
+    const id = matchId && isUuid(matchId) ? matchId : null;
+    if (id) mountedMatchIds.set(id, (mountedMatchIds.get(id) ?? 0) + 1);
     for (const l of matchListeners) l();
     return () => {
+      if (id) {
+        const n = (mountedMatchIds.get(id) ?? 1) - 1;
+        if (n > 0) mountedMatchIds.set(id, n);
+        else mountedMatchIds.delete(id);
+      }
       // Before the listeners run, so a refresh keyed off the exit sees it.
       // Only real ids: a malformed route param must never reach a filter.
       if (matchId && isUuid(matchId)) leftMatchIds.add(matchId);
@@ -1288,6 +1295,32 @@ export function useArenaMatchScreen(matchId?: string): void {
 
 /** Match ids whose screen unmounted during this app process. */
 const leftMatchIds = new Set<string>();
+
+/**
+ * Match ids whose screen is mounted right now, each with its count (a match
+ * pushed over the same match never clears it early). Timekeeper mode M2: a
+ * timekeeper-mode push about a match the viewer is in shows no foreground
+ * banner, and its tap does not stack a second screen of it (spec 8).
+ */
+const mountedMatchIds = new Map<string, number>();
+
+/** Non-hook read: is a screen of this match mounted? */
+export function isInArenaMatchFor(matchId: string): boolean {
+  return (mountedMatchIds.get(matchId) ?? 0) > 0;
+}
+
+/**
+ * Non-hook read: a match screen is mounted, but no screen of a real match
+ * (the practice run mounts `useArenaMatchScreen()` with no id; a match route
+ * with a malformed id, which shows only an error, counts the same).
+ * Timekeeper mode M2: a TK-N1 tap waits for the practice run to end, since
+ * the server cannot refuse an Accept there (practice writes nothing) and the
+ * match opened over it would leave practice's camera mounted under the
+ * timekeeper's.
+ */
+export function isInPracticeOnly(): boolean {
+  return matchScreens > 0 && mountedMatchIds.size === 0;
+}
 
 /** The matches the athlete has left (not a snapshot: read it when needed). */
 export function getLeftMatchIds(): ReadonlySet<string> {
@@ -1432,6 +1465,7 @@ export function __resetArenaStoreForTests(): void {
   matchExits = 0;
   matchListeners.clear();
   leftMatchIds.clear();
+  mountedMatchIds.clear();
   reopenSurfaces = 0;
   reopenListeners.clear();
   incomingEndedListeners.clear();

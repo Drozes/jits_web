@@ -23,9 +23,18 @@ const mockCancel = jest.fn();
 jest.mock("@jits/shared/api/mutations", () => ({
   cancelSessionMatch: (...a: unknown[]) => mockCancel(...a),
 }));
+// The picker's reads (M2), not under test here: nobody to ask, no earlier request.
+jest.mock("@jits/shared/api/timekeeper", () => ({
+  ...jest.requireActual("@jits/shared/api/timekeeper"),
+  getTimekeeperCandidates: async () => ({ ok: true, data: { friends: [], nearby: [] } }),
+  getLatestTimekeeperRequest: async () => ({ ok: true, data: null }),
+}));
 
+import type { MatchDetails } from "@jits/shared/api/queries";
 import { CrewStep } from "@/components/match-flow/crew/crew-step";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
+import { MatchFlowProvider } from "@/lib/match-flow/match-flow-context";
+import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
 import { toast } from "@/components/ui/toast";
 
 const markExiting = jest.fn();
@@ -41,11 +50,38 @@ const SYNC = {
 let backHandlers: (() => boolean | null | undefined)[] = [];
 const removeBack = jest.fn();
 
+const athlete = (id: string, name: string) => ({
+  athlete_id: id,
+  display_name: name,
+  current_elo: 1500,
+  current_weight: 170,
+  profile_photo_url: null,
+  role: "competitor",
+  outcome: null,
+  elo_before: null,
+  elo_after: null,
+  elo_delta: 0,
+  weight_division_gap: null,
+});
+
+/** A timekeeper-mode match while the athletes pick (M2 renders the picker from it). */
+const MATCH = {
+  id: "M1",
+  status: "pending",
+  participants: [athlete("me-1", "Mina Park"), athlete("opp-1", "Demo Okafor")],
+  challenger_id: "me-1",
+  requires_timekeeper: true,
+  timekeeper_id: null,
+  timekeeper: null,
+} as unknown as MatchDetails;
+
 function mount() {
   return render(
-    <MatchSyncProvider value={SYNC}>
-      <CrewStep matchId="M1" exitHref="/arena" />
-    </MatchSyncProvider>,
+    <MatchFlowProvider match={MATCH} roles={deriveMatchRoles(MATCH, "me-1")!} tkState={null}>
+      <MatchSyncProvider value={SYNC}>
+        <CrewStep matchId="M1" exitHref="/arena" />
+      </MatchSyncProvider>
+    </MatchFlowProvider>,
   );
 }
 

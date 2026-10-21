@@ -360,6 +360,8 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
     expect(Object.keys(S).sort()).toEqual(
       [
         "leave",
+        "vs",
+        "elo",
         "confirm",
         "flag",
         "youFlagged",
@@ -393,6 +395,22 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
     expect(crew).toContain("SHIPPED_COPY.leave.text");
     expect(crew).toContain("SHIPPED_COPY.leave.a11y");
     expect(crew).not.toMatch(/"Cancel match"|>\s*Leave\s*</);
+  });
+
+  it("A2: the face-off's VS, the same as the shipped face-off; the asked person's matchup takes it from here", () => {
+    expect(S.vs).toBe("VS");
+    expect(TOP).toMatch(new RegExp(`>\\s*${S.vs}\\s*</Text>`));
+    const matchup = src("components", "match-flow", "crew", "timekeep-matchup.tsx");
+    expect(matchup).toContain("SHIPPED_COPY.vs");
+    expect(matchup).not.toMatch(/>\s*VS\s*</);
+  });
+
+  it("A2-ELO: the Friends row's rating, the same as the shipped Friends row; every picker row takes it from here", () => {
+    expect(S.elo(1301)).toBe("1301 ELO");
+    expect(src("app", "(app)", "friends.tsx")).toContain("{item.current_elo} ELO</Text>");
+    const row = src("components", "match-flow", "crew", "candidate-row.tsx");
+    expect(row).toContain("SHIPPED_COPY.elo(");
+    expect(row).not.toMatch(/\$\{[^}]+\} ELO|\} ELO</);
   });
 
   it.each([
@@ -447,9 +465,10 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
       S.myFlagHold(A),
       S.awaitRecheck(A),
       S.waitingFor("M. REYES"),
+      S.elo(1301),
     ];
-    // 13 plain strings and the 7 builders, rendered.
-    expect(all).toHaveLength(20);
+    // 14 plain strings and the 8 builders, rendered.
+    expect(all).toHaveLength(22);
     for (const s of all) {
       expect([s, s.includes(EM_DASH) || s.includes("!") || /\p{Extended_Pictographic}/u.test(s)]).toEqual([s, false]);
     }
