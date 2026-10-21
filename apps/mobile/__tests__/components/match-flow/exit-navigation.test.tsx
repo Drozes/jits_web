@@ -16,7 +16,11 @@
  *  - an omitted or blank label falls back to the Arena wording;
  *  - no exit anywhere in the match-flow tree can still build a
  *    `/(app)/session/<something>/lobby` URL, so the `undefined` lobby
- *    regression cannot come back.
+ *    regression cannot come back;
+ *  - timekeeper mode (slice M4, spec 6.2): every reason-specific exit goes
+ *    through `exitMatchTo` once, with its deck toast for the roles that see
+ *    it (TK-W2, TK-E1, TK-NC1 to TK-NC7, TK-K17), and the seated
+ *    timekeeper's heartbeat stops with the wizard.
  */
 import * as React from "react";
 import { Alert } from "react-native";
@@ -106,13 +110,31 @@ jest.mock("@jits/shared/api/mutations", () => ({
 
 // The wizard's reconciler reads both on mount; mock both so it never calls
 // through to an unmocked export (which throws into its catch and warns).
-jest.mock("@jits/shared/api/queries", () => ({
-  getMatchDetails: jest.fn(),
-  getMatchConfirmations: jest.fn(() => Promise.resolve([])),
-  // The ranked face-off's stakes strip; null hides it.
-  getRatingStakes: jest.fn(() => Promise.resolve(null)),
-  // The verdict's opening still.
-  getMatchDetailView: jest.fn(() => Promise.resolve({ ok: true, data: { videos: [] } })),
+jest.mock("@jits/shared/api/queries", () => {
+  const getMatchDetails = jest.fn();
+  return {
+    getMatchDetails,
+    getMatchConfirmations: jest.fn(() => Promise.resolve([])),
+    // A timekeeper's reconciler read (the timekeeper-mode exits below): the
+    // same match, with the confirmations the done screen would show.
+    getMatchDetailsWithConfirmations: jest.fn(async (...a: unknown[]) => {
+      const match = await getMatchDetails(...a);
+      return match ? { match, confirmations: [] } : null;
+    }),
+    // The ranked face-off's stakes strip; null hides it.
+    getRatingStakes: jest.fn(() => Promise.resolve(null)),
+    // The verdict's opening still.
+    getMatchDetailView: jest.fn(() => Promise.resolve({ ok: true, data: { videos: [] } })),
+  };
+});
+// Timekeeper mode (the exits below): the state read and the timekeeper's
+// heartbeat. A two-athlete match never calls either.
+const mockGetTimekeeperState = jest.fn();
+const mockTouchTimekeeper = jest.fn();
+jest.mock("@jits/shared/api/timekeeper", () => ({
+  ...jest.requireActual("@jits/shared/api/timekeeper"),
+  getTimekeeperMatchState: (...a: unknown[]) => mockGetTimekeeperState(...a),
+  touchMatchTimekeeper: (...a: unknown[]) => mockTouchTimekeeper(...a),
 }));
 jest.mock("@jits/shared/api/match-rank-change", () => ({
   getMatchRankChange: jest.fn(() => Promise.resolve({ ok: false, error: { code: "UNKNOWN", message: "n/a" } })),
@@ -508,6 +530,210 @@ describe("face-off exit navigation", () => {
     await waitFor(() => expect(mockCancelSessionMatch).toHaveBeenCalledWith(expect.anything(), "M1"));
     await waitFor(() => expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT));
     alertSpy.mockRestore();
+  });
+});
+
+describe("timekeeper-mode exits (spec 6.2; slice M4)", () => {
+  // Every reason-specific exit through `exitMatchTo` with its deck toast
+  // (`noContestExit`, the real one), for the roles that see it: TK-W2, TK-E1,
+  // TK-NC1 to TK-NC7 and TK-K17. The real wizard and reconciler: the match in
+  // hand is pending with the timekeeper seated, and the reconciler's first
+  // read finds it cancelled with its reason.
+  const { getMatchDetails } = jest.requireMock("@jits/shared/api/queries") as { getMatchDetails: jest.Mock };
+  const { toast } = jest.requireMock("@/components/ui/toast") as { toast: { info: jest.Mock } };
+  const TK = "tk-1";
+
+  function tkParticipant(id: string, name: string) {
+    return { ...participant(id, name, null), profile_photo_url: null, role: "competitor", elo_before: null, elo_after: null, elo_delta: null };
+  }
+
+  function tkMatch(status: string, extra: Record<string, unknown> = {}) {
+    return {
+      id: "M1",
+      status,
+      match_type: "ranked",
+      challenge_id: null,
+      session_id: null,
+      duration_seconds: 300,
+      started_at: null,
+      paused_at: null,
+      total_paused_duration: 0,
+      participants: [tkParticipant("me-1", "Mina Park"), tkParticipant("opp-1", "Dana Okafor")],
+      requires_timekeeper: true,
+      tk_weight_check_required: true,
+      challenger_id: "me-1",
+      timekeeper_id: TK,
+      timekeeper: { id: TK, display_name: "Jordan Cruz", profile_photo_url: null },
+      ended_at: null,
+      cancel_reason: null,
+      result_edit_count: 0,
+      ...extra,
+    };
+  }
+
+  const STATE = {
+    ready: [],
+    athleteChecks: [],
+    timekeeperChecks: [],
+    openRequest: null,
+    lastRequestOutcome: null,
+    presence: "online",
+    offlineSince: null,
+    noContestAt: null,
+    reviewPending: false,
+    timeoutAt: null,
+    weights: [],
+    editOpen: false,
+    editClosesAt: null,
+    startBlockers: [],
+  };
+
+  async function flushAll() {
+    await act(async () => {
+      for (let i = 0; i < 8; i++) await Promise.resolve();
+    });
+  }
+
+  /** Mount `viewer`'s wizard on `inHand` (default: a seated pending match) whose first read is `snapshot`. */
+  async function mountTk(viewer: string, snapshot: unknown, inHand: unknown = tkMatch("pending")) {
+    mockUseMatchDetails.mockReturnValue({
+      match: inHand,
+      submissionTypes: [],
+      isLoading: false,
+      error: null,
+      refresh: jest.fn(),
+      applyMatch: jest.fn(),
+    });
+    getMatchDetails.mockResolvedValue(snapshot);
+    const screen = render(<MatchFlowWizard exitHref={ARENA_EXIT} exitLabel={ARENA_LABEL} matchId="M1" currentAthleteId={viewer} />);
+    await flushAll();
+    await flushAll();
+    return screen;
+  }
+
+  const cancelled = (reason: string) => tkMatch("cancelled", { cancel_reason: reason });
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    mockGetTimekeeperState.mockResolvedValue({ ok: true, data: STATE });
+    mockTouchTimekeeper.mockResolvedValue({ ok: true, data: { seenAt: "2026-10-20T12:00:00Z" } });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+    // The module mocks keep the implementations set here (restoreAllMocks
+    // does not reset a jest.fn), so a later two-athlete test would read this
+    // describe's cancelled timekeeper-mode snapshot: put them back as found.
+    getMatchDetails.mockReset();
+    mockGetTimekeeperState.mockReset();
+    mockTouchTimekeeper.mockReset();
+  });
+
+  it.each([
+    ["no_timekeeper", "Match cancelled", "No timekeeper joined in 10 minutes."],
+    ["timekeeper_left", "No contest", "J. Cruz left the match. It won't count."],
+    ["timekeeper_offline", "No contest", "J. Cruz went offline. The match won't count."],
+    ["admin_void", "No contest", "An admin voided M. Park vs D. Okafor. It won't count."],
+    ["faceoff_timeout", "No contest", "The match didn't start within 10 minutes. It won't count."],
+    ["pause_timeout", "No contest", "The match was paused for over 10 minutes. It won't count."],
+    ["athlete_left", "Match cancelled", "D. Okafor left the match."],
+  ])("an athlete, %s: %s / %s, once, through exitMatchTo", async (reason, text1, description) => {
+    await mountTk("me-1", cancelled(reason));
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith({ text1, description });
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
+  });
+
+  it.each([
+    ["timekeeper_left", "No contest", "You left the match. It won't count for M. Park or D. Okafor."],
+    ["timekeeper_offline", "No contest", "You were offline too long. M. Park vs D. Okafor won't count."],
+    ["admin_void", "No contest", "An admin voided M. Park vs D. Okafor. It won't count."],
+    ["faceoff_timeout", "No contest", "The match didn't start within 10 minutes. It won't count."],
+    ["pause_timeout", "No contest", "The match was paused for over 10 minutes. It won't count."],
+  ])("the timekeeper, %s: %s / %s, once, through exitMatchTo", async (reason, text1, description) => {
+    await mountTk(TK, cancelled(reason));
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith({ text1, description });
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
+  });
+
+  it("the timekeeper, an athlete's Leave: TK-E1 naming the athlete the cancel broadcast named", async () => {
+    await mountTk(TK, cancelled("athlete_left"));
+    // Held for the name (`CANCEL_ACTOR_GRACE_MS`) until the broadcast lands.
+    expect(mockRouterDismissTo).not.toHaveBeenCalled();
+    // Timekeeper mode hands the step channel a cancel handler that takes the actor.
+    const onCancel = mockSyncParams?.onMatchCancelled as ((actorId?: string) => void) | undefined;
+    act(() => onCancel?.("opp-1"));
+    await flushAll();
+    expect(toast.info).toHaveBeenCalledWith({ text1: "Match cancelled", description: "D. Okafor left the match." });
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("the timekeeper, an athlete's Leave no broadcast named: the shipped toast after the grace", async () => {
+    await mountTk(TK, cancelled("athlete_left"));
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+    });
+    expect(toast.info).toHaveBeenCalledWith({ text1: "Match cancelled", description: "This match was cancelled." });
+    expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("the timekeeper who lost the seat: TK-K17, one line, through exitMatchTo", async () => {
+    mockGetTimekeeperState.mockResolvedValue({ ok: false, error: { code: "NOT_PARTICIPANT", message: "x" } });
+    await mountTk(TK, null);
+    expect(toast.info).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith({ text1: "You're no longer timekeeping this match.", description: "" });
+    expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
+  });
+
+  it("the seated timekeeper's wizard sends the heartbeat; an athlete's never does", async () => {
+    const tk = await mountTk(TK, tkMatch("pending"));
+    expect(mockTouchTimekeeper).toHaveBeenCalledWith(expect.anything(), "M1");
+    tk.unmount();
+    mockTouchTimekeeper.mockClear();
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+    });
+    // Stopped on exit (the wizard unmounted).
+    expect(mockTouchTimekeeper).not.toHaveBeenCalled();
+    await mountTk("me-1", tkMatch("pending"));
+    await act(async () => {
+      jest.advanceTimersByTime(30_000);
+    });
+    expect(mockTouchTimekeeper).not.toHaveBeenCalled();
+  });
+
+  // The wizard's gate (R23; spec 4.3): the seat beats while the match is
+  // pending or in progress, the result entry after the clock's end included,
+  // and never once the match is completed (the done screen during the edit
+  // window) or cancelled.
+  const STARTED = new Date(Date.now() - 3_600_000).toISOString();
+  it.each([
+    ["in progress, the clock running", tkMatch("in_progress", { started_at: STARTED })],
+    ["in progress after the clock's end (the result is owed)", tkMatch("in_progress", { started_at: STARTED, ended_at: STARTED })],
+  ])("the seated timekeeper's wizard beats while the match is %s", async (_label, m) => {
+    await mountTk(TK, m, m);
+    expect(mockTouchTimekeeper).toHaveBeenCalledWith(expect.anything(), "M1");
+    mockTouchTimekeeper.mockClear();
+    await act(async () => {
+      jest.advanceTimersByTime(15_000);
+    });
+    expect(mockTouchTimekeeper).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["completed (the done screen)", tkMatch("completed", { started_at: STARTED, ended_at: STARTED })],
+    ["cancelled", tkMatch("cancelled", { cancel_reason: "pause_timeout" })],
+  ])("the seated timekeeper's wizard never beats once the match is %s", async (_label, m) => {
+    await mountTk(TK, m, m);
+    await act(async () => {
+      jest.advanceTimersByTime(60_000);
+    });
+    expect(mockTouchTimekeeper).not.toHaveBeenCalled();
   });
 });
 

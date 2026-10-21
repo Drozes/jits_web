@@ -59,6 +59,23 @@ export interface LiveBroadcastProps {
   controls?: LiveControls;
   /** With `controls` "none": shown in the controls' place (the timekeeper-mode strip). */
   controlsStrip?: React.ReactNode;
+  /**
+   * Above the athlete bar, in the lower-third: the timekeeper-mode banners
+   * (TK-D7 with TK-D9, TK-D9 alone, TK-L3). Hidden once the match ended on
+   * this screen. Absent: nothing (a two-athlete match).
+   */
+  banner?: React.ReactNode;
+  /**
+   * Leave out the centred no-video plate (the tally still reads NO VIDEO):
+   * the timekeeper's camera banner (TK-L3, in `banner`) says the camera
+   * stopped and offers the restart instead. Default false.
+   */
+  hideNoVideoPlate?: boolean;
+  /**
+   * A completed hold is final for the button; a new value gives a fresh one
+   * (the timekeeper's server end failed and the hold is offered again).
+   */
+  holdKey?: number;
 }
 
 /**
@@ -91,6 +108,9 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
     recordingOff = false,
     controls: controlsMode = "full",
     controlsStrip,
+    banner,
+    hideNoVideoPlate = false,
+    holdKey,
   } = props;
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -146,7 +166,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
     </>
   );
   const renderNoVideo = (regionWidth?: number) =>
-    view.unavailable ? (
+    view.unavailable && !hideNoVideoPlate ? (
       <NoVideoPlate
         variant={view.unavailable}
         practice={practice}
@@ -179,6 +199,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
     <>
       <PauseButton paused={paused} disabled={controlsDisabled || endPending} onPress={onPauseResume} tile={landscape} />
       <HoldToEndButton
+        key={holdKey}
         disabled={holdDisabled}
         ending={endPending || view.autoEndPending}
         onEnd={onEnd}
@@ -189,6 +210,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
   );
   // A read-only phone shows the strip where the controls would be.
   const strip = opponentEnded || controlsMode === "full" ? null : (controlsStrip ?? null);
+  const bannerSlot = opponentEnded ? null : (banner ?? null);
 
   return (
     <View testID="live-broadcast" pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -218,6 +240,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
           }
           lowerThird={
             <>
+              {bannerSlot}
               {endedPlate}
               {plates}
             </>
@@ -253,6 +276,7 @@ export function LiveBroadcast(props: LiveBroadcastProps) {
             pointerEvents="box-none"
             style={{ width: "100%", maxWidth: BROADCAST_SIZE.maxWidth, alignSelf: "center", gap: 12 }}
           >
+            {bannerSlot}
             {endedPlate}
             {plates}
             {controls ? (

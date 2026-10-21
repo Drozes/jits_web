@@ -1,19 +1,17 @@
 import * as React from "react";
 import { StyleSheet, View } from "react-native";
-import { useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
-import { useLiveControls } from "@/lib/match-flow/use-live-controls";
+import { useLiveControls, type EndVia } from "@/lib/match-flow/use-live-controls";
+import { useLiveReceivePolicy } from "@/lib/match-flow/use-live-receive-policy";
+import { useLiveAutoEnd } from "@/lib/match-flow/use-live-auto-end";
+import type { LiveTimekeeperSeam } from "@/lib/match-flow/step-seams";
 import { usePauseResync } from "@/lib/match-flow/use-pause-resync";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { clampFinishSeconds } from "@/lib/match-flow/clamp-finish-seconds";
 import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
-import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
-import {
-  OPPONENT_ENDED_INTERSTITIAL_MS,
-  toLiveAthlete,
-  type LiveParticipant,
-} from "@/lib/match-flow/live-view-state";
+import { toLiveAthlete, type LiveParticipant } from "@/lib/match-flow/live-view-state";
 import { LiveBroadcast, type LiveControls } from "../live/live-broadcast";
+import { timekeeperLiveSlots } from "../live/timekeeper-live-plates";
 
 export interface LiveStepProps {
   matchId: string;
@@ -60,8 +58,42 @@ export interface LiveStepProps {
   endedByName?: string;
   /** The live screen's pause and end controls (`LiveBroadcast`). Default "full". */
   controls?: LiveControls;
-  /** With `controls` "none": shown in the controls' place. */
+  /** With `controls` "none": shown in the controls' place (default in timekeeper mode: TK-L2). */
   controlsStrip?: React.ReactNode;
+  /**
+   * How this phone ends the clock (`roles.caps.endVia`; timekeeper mode
+   * ARCHITECTURE 2.3 "End"). Default "broadcast": today's two-athlete end.
+   * "end_match_clock": the timekeeper's end, on the server first. null: a
+   * timekeeper-mode athlete, who never ends the clock (no auto-end at 00:00:
+   * the timekeeper's phone, or the server at full time, ends it).
+   *
+   * Anything but "broadcast" means the clock is server-run, so a received
+   * pause, resume or end never changes this screen by itself (M-R8): it
+   * re-reads the DB at once, and the read applies the pause or moves the
+   * wizard on (a read that shows a no contest stops the recorder before the
+   * wizard's exit). On an athlete's phone (null), the seated timekeeper's end
+   * (`actor_id` equal to `timekeeper.id`) also freezes the clock on the
+   * ended plate meanwhile (spec 4.2 End, PM1), with `endedByName`, until the
+   * DB confirms the end or shows the clock still running, which undoes it
+   * (`useLiveReceivePolicy`); the read that shows the end freezes it too,
+   * broadcast or not, on the server's final clock, and the wizard keeps this
+   * step on screen for a moment after it moves on (`useLiveEndHold`). The
+   * timekeeper's own phone never freezes on a received end: nobody else
+   * ends its clock, and a stray `match_ended` on the public match channel
+   * must not lock its controls. On a server-run
+   * clock the end haptic marks the confirmed end only: the server's answer
+   * to this phone's end, or the read that shows it.
+   */
+  endVia?: EndVia;
+  /** Timekeeper mode with a seated timekeeper (`stepSeams`): TK-L1, TK-L2, TK-D7, TK-D9, TK-L3, TK-K16. */
+  timekeeper?: LiveTimekeeperSeam;
+  /**
+   * Draws the TK-D9 no-contest countdown at `timeoutAt`: M3's chip
+   * (`faceoff/timeout-chip.tsx`), rendered here read-only. Until that slice
+   * lands nothing passes it and the live screen draws no countdown; then
+   * M3's chip becomes this prop's default (jits-o47s.29).
+   */
+  renderTimeoutChip?: (timeoutAt: string) => React.ReactNode;
 }
 
 const TIME_WARNING_SECONDS = 10;
@@ -85,6 +117,14 @@ const TIME_WARNING_SECONDS = 10;
  * the full-screen camera the wizard renders underneath. Ending takes a
  * 1.2 s hold. When the opponent ends the match, their plate shows for
  * OPPONENT_ENDED_INTERSTITIAL_MS before the END step.
+ *
+ * Timekeeper mode (spec 4.2 Live and End, 4.3; the `endVia` and
+ * `timekeeper` seams): the timekeeper's phone runs the clock (TK-L1, Leave
+ * with TK-K16, the server end, TK-L3 when its camera fails); an athlete's
+ * phone watches it (TK-L2, TK-D7 while the timekeeper is offline) and never
+ * ends it; every phone shows TK-D9 while paused. The DB moves every phone
+ * off this step (`ended_at`, or a cancel); see `endVia`. What this step does
+ * with received clock events lives in `useLiveReceivePolicy`.
  */
 export function LiveStep(props: LiveStepProps) {
   const {
@@ -102,26 +142,20 @@ export function LiveStep(props: LiveStepProps) {
     endedByName,
     controls,
     controlsStrip,
+    endVia = "broadcast",
+    timekeeper,
+    renderTimeoutChip,
   } = props;
   const endedRef = React.useRef(false);
   const startHapticFiredRef = React.useRef(false);
   const warnHapticFiredRef = React.useRef(false);
   const recordingStartedRef = React.useRef(false);
   const endHapticFiredRef = React.useRef(false);
-  // `endedRef` is the one-shot guard; this state only makes the ended look
-  // (ENDING, dimmed buttons) render, since a ref change alone does not.
-  const [endedView, setEndedView] = React.useState(false);
-  const interstitialTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  // R-P8: set when the opponent's match_ended lands; the clock freezes on it.
-  const [opponentEnded, setOpponentEnded] = React.useState<{
-    name: string;
-    finalFormatted: string;
-    finalRemaining: number;
-  } | null>(null);
 
   // The final whistle, at most once per mount: a completed hold fires it at
   // completion, and the end that follows (after the broadcast settles) must
-  // not fire it a second time.
+  // not fire it a second time. On a server-run clock it marks the confirmed
+  // end only (`wrappedOnEnded`, or the read in `useLiveReceivePolicy`).
   const fireEndHaptic = React.useCallback(() => {
     if (endHapticFiredRef.current) return;
     endHapticFiredRef.current = true;
@@ -136,52 +170,47 @@ export function LiveStep(props: LiveStepProps) {
     pausedAt,
     totalPausedDuration,
   );
-  // The clock at the end moment, clamped to what record_match_result accepts
-  // (above 0, at most the duration: auto-end fires a beat after 00:00).
-  const elapsedRef = React.useRef(timer.elapsed);
-  elapsedRef.current = timer.elapsed;
-  const formattedRef = React.useRef(timer.formatted);
-  formattedRef.current = timer.formatted;
-  const remainingRef = React.useRef(timer.remaining);
-  remainingRef.current = timer.remaining;
-  const sync = useStepMatchSync({
+  // The other side ended it (R-P8), received pauses and resumes, and the DB
+  // reads a server-run clock waits on.
+  const { sync, opponentEnded } = useLiveReceivePolicy({
     matchId,
-    onTimerPaused: (p) => timer.syncFromBroadcast({ type: "paused", pausedAt: p }),
-    onTimerResumed: (d) =>
-      timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: d }),
-    // The other side ended it. Read the finish and stop the recorder NOW,
-    // then hold the "ended" plate briefly before the END step.
-    onMatchEnded: () => {
-      if (endedRef.current) return;
-      endedRef.current = true;
-      const finish = clampFinishSeconds(elapsedRef.current, durationSeconds);
-      void recorder.stop();
-      fireEndHaptic();
-      setOpponentEnded({
-        name: endedByName ?? opponent.displayName,
-        finalFormatted: formattedRef.current,
-        finalRemaining: remainingRef.current,
-      });
-      interstitialTimerRef.current = setTimeout(() => onEnded(finish), OPPONENT_ENDED_INTERSTITIAL_MS);
-    },
+    endVia,
+    timekeeper,
+    endedByName,
+    opponentName: opponent.displayName,
+    durationSeconds,
+    timer,
+    recorder,
+    endedRef,
+    onEnded,
+    fireEndHaptic,
   });
 
   const wrappedOnEnded = React.useCallback(
     (elapsed: number) => {
       void recorder.stop();
       fireEndHaptic();
-      setEndedView(true);
       onEnded(clampFinishSeconds(elapsed, durationSeconds));
     },
     [recorder, onEnded, durationSeconds, fireEndHaptic],
   );
 
-  const { busy, handleEnd, handlePauseResume } = useLiveControls({
+  const {
+    busy,
+    ended: endedView,
+    handleEnd,
+    handlePauseResume,
+    handleLeave,
+    endFailures,
+    canAutoEnd,
+  } = useLiveControls({
     matchId,
     timer,
     sync,
     endedRef,
     onEnded: wrappedOnEnded,
+    endVia,
+    onLeftSeat: () => void recorder.stop(),
   });
 
   // Fire match-start haptic once when the step mounts
@@ -224,51 +253,36 @@ export function LiveStep(props: LiveStepProps) {
     }
   }, [timer.remaining, timer.running, timer.paused]);
 
-  // Auto-end on time expiry, mirroring web. `handleEnd` is a new function
-  // on every render (its `sync` and `onEnded` are), and the timer keeps
-  // re-rendering every second at 00:00, so it is read through a ref: with it
-  // in the deps, the first tick inside AUTO_END_DELAY_MS cancelled the armed
-  // timeout and the match sat LIVE at 00:00 forever (jits-2y8i). The effect
-  // keys only on whether an auto-end is due, so it arms once and is cancelled
-  // only by unmount or by the match stopping being due: a pause at 00:00
-  // holds it (an athlete stopped the clock on purpose) and resuming
-  // re-arms it; an in-flight pause/resume (`busy`) defers it rather than
-  // letting `handleEnd` drop it. `endedRef` makes the end one-shot, whether
-  // this device ended it or the opponent's `match_ended` arrived first.
-  // The practice match (components/practice/practice-live.tsx) mirrors this auto-end.
-  const handleEndRef = React.useRef(handleEnd);
-  handleEndRef.current = handleEnd;
-  const autoEndDue =
-    timer.remaining === 0 &&
-    timer.running &&
-    !timer.paused &&
-    busy === null &&
-    !endedRef.current;
-  React.useEffect(() => {
-    if (!autoEndDue) return;
-    const t = setTimeout(() => {
-      if (!endedRef.current) handleEndRef.current();
-    }, AUTO_END_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [autoEndDue]);
-
-  React.useEffect(
-    () => () => {
-      if (interstitialTimerRef.current) clearTimeout(interstitialTimerRef.current);
-    },
-    [],
-  );
+  // Auto-end on time expiry (`useLiveAutoEnd`; never on a timekeeper-mode
+  // athlete's phone, and bounded retries for a failing server end).
+  useLiveAutoEnd({ canAutoEnd, timer, busy, endedRef, handleEnd, endFailures });
 
   // Hold completed (or a screen reader "End match" action): the haptic
-  // lands at completion, then the same end path as before.
+  // lands at completion, then the same end path as before. The
+  // timekeeper's server end buzzes only once the server has ended the clock
+  // (`wrappedOnEnded`): a failed end must not have buzzed "ended".
   const onHoldEnd = React.useCallback(() => {
     if (endedRef.current || busy !== null) return;
-    fireEndHaptic();
-    setEndedView(true);
+    if (endVia === "broadcast") fireEndHaptic();
     handleEnd();
-  }, [busy, fireEndHaptic, handleEnd]);
+  }, [busy, endVia, fireEndHaptic, handleEnd]);
 
   const ended = endedRef.current || endedView;
+  const runsClock = controls !== "none";
+  const tk = timekeeperLiveSlots({
+    timekeeper,
+    runsClock,
+    paused: timer.paused,
+    ended,
+    busy: busy !== null,
+    // The shipped error plate's state (`deriveLiveView`): the camera is
+    // allowed and the recorder failed, so Restart can work. Without the
+    // permission, the shipped permission plate stays (one action).
+    cameraFailed: runsClock && recordingEnabled && recorder.permission?.granted === true && recorder.state === "error" && !ended,
+    onLeave: handleLeave,
+    onRestartCamera: () => void recorder.start(),
+    renderTimeoutChip,
+  });
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <LiveBroadcast
@@ -286,7 +300,11 @@ export function LiveStep(props: LiveStepProps) {
         opponentEnded={opponentEnded}
         recordingOff={!recordingEnabled}
         controls={controls}
-        controlsStrip={controlsStrip}
+        controlsStrip={controlsStrip ?? tk.controlsStrip}
+        hudExtra={tk.hudExtra}
+        banner={tk.banner}
+        hideNoVideoPlate={tk.hideNoVideoPlate}
+        holdKey={endFailures}
       />
     </View>
   );

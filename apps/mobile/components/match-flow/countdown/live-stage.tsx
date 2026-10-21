@@ -21,9 +21,14 @@ export function clockStartFor(startedAt: string): string {
 
 /**
  * The live step's seams pass straight through (timekeeper mode ARCHITECTURE
- * 2.3); each one's default is today's two-athlete screen.
+ * 2.3); each one's default is today's two-athlete screen. `renderTimeoutChip`
+ * (TK-D9, M3's chip) is the one seam that is not data: the renderer passes it
+ * beside `stepSeams(...).live`.
  */
-type LiveStageProps = Pick<LiveStepProps, "endedByName" | "controls" | "controlsStrip"> & {
+type LiveStageProps = Pick<
+  LiveStepProps,
+  "endedByName" | "controls" | "controlsStrip" | "endVia" | "timekeeper" | "renderTimeoutChip"
+> & {
   matchId: string;
   me: LiveParticipant;
   opponent: LiveParticipant;

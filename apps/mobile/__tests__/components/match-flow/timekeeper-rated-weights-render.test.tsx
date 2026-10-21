@@ -271,8 +271,14 @@ async function mountTimekeeper(startedAt: string, weights: RatedRow[] = RATED) {
   return screen;
 }
 
-/** The live clock ends (the timekeeper's own `match_ended` path), then the end step hands over to the result. */
+/**
+ * The live clock ends: the server has `ended_at`, and a `match_ended`
+ * broadcast only re-reads it (timekeeper mode, M-R8; slice M4), which moves
+ * the timekeeper to the result.
+ */
 async function toResult() {
+  const row = await mockGetMatchDetails();
+  mockGetMatchDetails.mockResolvedValue({ ...row, ended_at: NOW.toISOString(), final_elapsed_s: 48 });
   act(() => handlerOf("onMatchEnded")());
   await tick(OPPONENT_ENDED_INTERSTITIAL_MS);
   await tick(800);
