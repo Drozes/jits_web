@@ -14,8 +14,8 @@
  * gone) asks the caller to re-read, and the DB moves the screen (M-R8).
  */
 import { supabase } from "@/lib/supabase/client";
-import { endMatchClock, leaveMatchAsTimekeeper } from "@jits/shared/api/timekeeper";
-import type { DomainErrorCode } from "@jits/shared/api/errors";
+import { endMatchClock, leaveMatchAsTimekeeper, mapTimekeeperError } from "@jits/shared/api/timekeeper";
+import type { DomainError, DomainErrorCode } from "@jits/shared/api/errors";
 import { TIMEKEEPER_COPY, type AthletePair, type TimekeeperAlert, type TimekeeperToast } from "./timekeeper-copy";
 
 /**
@@ -43,6 +43,39 @@ export async function endClockAsTimekeeper(matchId: string, elapsedSeconds: numb
   } catch {
     return "failed";
   }
+}
+
+/**
+ * The End's moved-on refusals, plus the status refusals of `_tk_pause_match`
+ * and `_tk_resume_match` (jr_be `20261021100400`): the match is no longer in
+ * progress (`match_not_in_progress`: a no contest or a cancel), or the clock
+ * is already in the state asked for (`already_paused`, which the shared
+ * table maps to MATCH_NOT_IN_PROGRESS, and `match_not_paused`), which the
+ * live step's recovery read has already tried to apply.
+ */
+const PAUSE_MOVED_ON: ReadonlySet<DomainErrorCode> = new Set<DomainErrorCode>([
+  ...CLOCK_MOVED_ON,
+  "MATCH_NOT_IN_PROGRESS",
+  "MATCH_NOT_PAUSED",
+]);
+
+/**
+ * A refused pause or resume of the timekeeper's clock that means the clock
+ * is no longer running for this phone (the server's auto-end at full time, a
+ * no contest, the seat gone): the live step shows the shipped title alone,
+ * which is true, and re-reads, so the DB moves the screen (PM29, UX spec
+ * 5.14). Anything else (a network error, no reply within `SEND_CEILING_MS`,
+ * an unknown refusal) is a failure the screen cannot explain, which adds
+ * `Check your connection and try again.`.
+ *
+ * The live step calls the shipped `pauseMatch` / `resumeMatch`, whose shared
+ * mapping knows none of the timekeeper-mode hints (`match_not_live`,
+ * `match_not_in_progress`, `not_timekeeper`): those arrive as UNKNOWN. So
+ * this sorts on the server's own refusal (`raw`) through the timekeeper
+ * table, and on the mapped code only when there is no server refusal.
+ */
+export function clockMovedOn(error: DomainError): boolean {
+  return PAUSE_MOVED_ON.has(error.raw ? mapTimekeeperError(error.raw).code : error.code);
 }
 
 /**

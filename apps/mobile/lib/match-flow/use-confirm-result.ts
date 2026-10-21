@@ -7,6 +7,7 @@ import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { haptics } from "@/lib/motion";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
+import { useSendCeiling } from "./send-timing";
 import { matchHaptics } from "./use-haptics";
 import { CONFIRM_COPY } from "./confirm-copy";
 import { noteResultConfirmed, useResultEditNotice } from "./use-result-edit-notice";
@@ -82,16 +83,34 @@ interface UseConfirmResultParams {
 }
 
 export interface ConfirmResultState {
-  /** This athlete's confirmation stands (for the result on screen). */
+  /**
+   * This athlete's confirmation stands (for the result on screen). The
+   * two-athlete flow: from the tap, as shipped. Timekeeper mode (PM29): only
+   * once the server took a confirm made here at the edit count on screen (ok,
+   * or queued offline), or the DB's list credits one to that count; never on
+   * the tap alone.
+   */
   myConfirmed: boolean;
   opponentConfirmed: boolean;
   /**
-   * Arm the step's timer for `advance`. The two-athlete flow: `myConfirmed`,
-   * as shipped (from the tap). Timekeeper mode: a confirm made here once the
-   * server took it (ok, or queued offline), never on the tap alone; a
-   * confirmation known only from the DB's list while it stands.
+   * Arm the step's timer for `advance`: `myConfirmed`, in both modes (the
+   * two-athlete flow from the tap, as shipped; timekeeper mode once the
+   * server has the confirm).
    */
   canAdvance: boolean;
+  /**
+   * Timekeeper mode (PM29): this phone's confirm is out and has not answered
+   * (Confirm busy, Dispute disabled). Ends with the reply, or as failed after
+   * `SEND_CEILING_MS`. Always false in the two-athlete flow.
+   */
+  sending: boolean;
+  /**
+   * Timekeeper mode (PM29): the server refused a confirm as RESULT_CHANGED
+   * (TK-RC4) and no read with a newer edit count is on screen yet: Confirm
+   * and Dispute wait for it (disabled, not busy). Always false in the
+   * two-athlete flow.
+   */
+  waitingForNewResult: boolean;
   /**
    * The confirm-driven move to the verdict, for the step's timer once
    * `canAdvance` (never on a confirm an edit has since superseded, A8).
@@ -124,11 +143,18 @@ export interface ConfirmResultState {
  * `use-wizard-sync.ts` relies on that). The same holds for a confirmation
  * known only from the DB's list (the relaunch path onto confirm): it stands
  * only when credited to the current count, never on a read that straddles an
- * edit (`ConfirmListing`). And a confirm made here moves the step on only
- * once the server has taken it (`canAdvance`: ok, or queued offline): the
- * CONFIRMED row shows from the tap, but a reply slower than the step's timer
- * can still come back RESULT_CHANGED, and the athlete must never see the
- * verdict of a result that did not stand. A broadcast only triggers a read
+ * edit (`ConfirmListing`). And a confirm made here stands only once the
+ * server has taken it (PM29: ok, or queued offline): until then the row
+ * keeps WAITING ON YOU and Confirm is busy (`sending`), because a reply can
+ * still come back RESULT_CHANGED, and the athlete must never see CONFIRMED,
+ * or the verdict, of a result that did not stand. The press is bounded
+ * (`SEND_CEILING_MS`: the step has no exit, and no layer times a request
+ * out), and its reply sorts into confirmed, result changed (TK-RC4 once,
+ * then `waitingForNewResult` until a read shows a newer count), moved on (the
+ * match is disputed or voided: no toast, the read moves the wizard) and
+ * failed (`Couldn't confirm` / `Check your connection and try again.`). A
+ * failure for a confirmation the DB already credits shows nothing, and a
+ * reply after the step unmounted shows nothing. A broadcast only triggers a read
  * (M-R8): a confirmation heard by broadcast may be of a result the
  * timekeeper has since edited. And the athlete is told once when an edit
  * resets their confirmation (TK-RC3, `useResultEditNotice`): mounted here,
@@ -146,12 +172,18 @@ export function useConfirmResult({
 }: UseConfirmResultParams): ConfirmResultState {
   const timekeeperMode = timekeeper != null;
   const editCount = timekeeper?.editCount ?? 0;
-  /** The edit count this phone confirmed at (always 0 in the two-athlete flow); null before. */
+  /** The two-athlete flow: the edit count this phone confirmed at, from the tap (always 0); null before. Timekeeper mode never sets it (PM29). */
   const [confirmedAt, setConfirmedAt] = React.useState<number | null>(null);
   /** Timekeeper mode: the edit count the server took this phone's confirm at (ok, or queued offline); null before. */
   const [acceptedAt, setAcceptedAt] = React.useState<number | null>(null);
+  /** Timekeeper mode: this phone's confirm is out (PM29); the ref guards a second tap before the render. */
+  const [sending, setSending] = React.useState(false);
+  const sendingRef = React.useRef(false);
+  /** Timekeeper mode: the edit count a confirm was refused at as RESULT_CHANGED (PM29); null before. */
+  const [staleAt, setStaleAt] = React.useState<number | null>(null);
   const [opponentConfirmedLocal, setOpponentConfirmed] = React.useState(false);
   const { reconcileNow } = useMatchSyncContext();
+  const ceiling = useSendCeiling();
   // Timekeeper mode: credit the listings of each new snapshot (A8,
   // `ConfirmListing`), kept from the previous render (React's derived-state
   // pattern). The two-athlete flow never edits, so it reads the list as shipped.
@@ -183,16 +215,28 @@ export function useConfirmResult({
   /** The DB's list has this athlete's confirmation of the result on screen. */
   const listedNow = (id: string, credit: number | null) => (timekeeperMode ? credit === editCount : confirmedAthleteIds.includes(id));
   const listedMine = listedNow(me.athleteId, listing.me);
-  // A confirm made here stands only while the result is the one it confirmed;
-  // otherwise the DB's list says.
-  const myConfirmed = confirmedAt != null ? confirmedAt === editCount : listedMine;
+  // The two-athlete flow: a confirm made here stands from the tap, as
+  // shipped; otherwise the DB's list says. Timekeeper mode (PM29): a confirm
+  // the server took at the count still on screen (an edit deletes it), or
+  // the DB's list credited to that count; never the tap alone.
+  const myConfirmed = timekeeperMode
+    ? acceptedAt === editCount || listedMine
+    : confirmedAt != null
+      ? confirmedAt === editCount
+      : listedMine;
   // Timekeeper mode never sets the local flag (M-R8, below): there the DB's
   // list, which an edit clears, is the only word on the opponent.
   const opponentConfirmed = opponentConfirmedLocal || listedNow(opponent.athleteId, listing.opponent);
-  // The two-athlete flow arms the move on the tap, exactly as shipped.
-  // Timekeeper mode waits for the server to take a confirm made here: its
-  // reply can still be RESULT_CHANGED after the step's timer would have run.
-  const canAdvance = timekeeperMode && confirmedAt != null ? myConfirmed && acceptedAt === confirmedAt : myConfirmed;
+  // Both modes arm the move once the confirmation stands: the two-athlete flow
+  // on the tap, as shipped; timekeeper mode once the server has it.
+  const canAdvance = myConfirmed;
+  // PM29: hold Confirm and Dispute after a RESULT_CHANGED refusal until a read
+  // with a newer count is on screen (the plate, TK-RC1 and TK-RC2 change in
+  // that same render).
+  const waitingForNewResult = timekeeperMode && staleAt != null && editCount <= staleAt;
+  /** Read when a failed reply lands: a confirmation that already stands (a lost reply) shows nothing. */
+  const standsRef = React.useRef(myConfirmed);
+  standsRef.current = myConfirmed;
 
   const recorderName = timekeeper?.recorderName.trim() ?? "";
   useResultEditNotice({
@@ -254,27 +298,46 @@ export function useConfirmResult({
   });
 
   async function confirm() {
-    if (myConfirmed) return;
+    if (myConfirmed || sendingRef.current || waitingForNewResult) return;
     const at = editCount;
-    setConfirmedAt(at);
-    const res = await mutationQueue.enqueue(`confirm-result:${matchId}:${me.athleteId}`, () =>
+    if (timekeeperMode) {
+      // PM29: Confirm busy, Dispute disabled, the row unchanged until the reply.
+      sendingRef.current = true;
+      setSending(true);
+    } else {
+      // The two-athlete row flips at the tap, as shipped.
+      setConfirmedAt(at);
+    }
+    const call = mutationQueue.enqueue(`confirm-result:${matchId}:${me.athleteId}`, () =>
       timekeeperMode ? confirmMatchResult(supabase, matchId, at) : confirmMatchResult(supabase, matchId),
     );
+    // Timekeeper mode: bounded by the ceiling, and silent once the step has gone (PM29).
+    const res = timekeeperMode ? await ceiling.within(call) : await call;
+    if (timekeeperMode) {
+      sendingRef.current = false;
+      setSending(false);
+    }
     if (!res.ok) {
-      setConfirmedAt(null);
-      if (timekeeperMode && res.error.code === "RESULT_CHANGED") {
-        // The timekeeper edited the result under this confirm: show the new one.
+      if (!timekeeperMode) setConfirmedAt(null);
+      const code = res.error.code;
+      if (timekeeperMode && code === "RESULT_CHANGED") {
+        // The timekeeper edited the result under this confirm: show the new
+        // one, and hold the buttons until it is on screen (TK-RC4 once per edit).
+        setStaleAt(at);
         toast.info({ text1: CONFIRM_COPY.resultChanged.title, description: CONFIRM_COPY.resultChanged.description });
-      } else {
+      } else if (!timekeeperMode || (code !== "MATCH_NOT_PENDING" && !standsRef.current)) {
         void matchHaptics.error();
-        // Timekeeper mode shows no DomainError message (M-R4); the two-athlete toast keeps its shipped description.
-        toast.error(timekeeperMode ? { text1: CONFIRM_COPY.couldNotConfirm } : { text1: CONFIRM_COPY.couldNotConfirm, description: res.error.message });
+        // Timekeeper mode shows no DomainError message (M-R4), only the guidance (PM29); the two-athlete toast keeps its shipped description.
+        toast.error(timekeeperMode ? { text1: CONFIRM_COPY.couldNotConfirm, description: CONFIRM_COPY.checkConnection } : { text1: CONFIRM_COPY.couldNotConfirm, description: res.error.message });
       }
+      // Timekeeper mode, moved on (MATCH_NOT_PENDING: the opponent disputed,
+      // or the match was voided) or a confirmation that already stands: no
+      // toast. In every case the read moves the screen.
       reconcileNow();
       return;
     }
     if (timekeeperMode) {
-      // The server took it (or holds it to sync): now the step may move on.
+      // The server took it (or holds it to sync): the confirmation stands at this count.
       setAcceptedAt(at);
       noteResultConfirmed(matchId, me.athleteId, at);
     }
@@ -295,5 +358,5 @@ export function useConfirmResult({
     leave();
   }
 
-  return { myConfirmed, opponentConfirmed, canAdvance, advance, confirm, disputed };
+  return { myConfirmed, opponentConfirmed, canAdvance, sending, waitingForNewResult, advance, confirm, disputed };
 }

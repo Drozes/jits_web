@@ -26,7 +26,9 @@ jest.mock("@jits/shared/api/queries", () => ({
 }));
 
 import { MAX_AUTO_END_ATTEMPTS, useLiveControls } from "@/lib/match-flow/use-live-controls";
+import { SEND_CEILING_MS } from "@/lib/match-flow/send-timing";
 import { toast } from "@/components/ui/toast";
+import { mapPostgrestError } from "@jits/shared/api/errors";
 
 const NOT_PAUSED = { ok: false, error: { code: "MATCH_NOT_PAUSED", message: "Match is not currently paused." } };
 
@@ -168,6 +170,8 @@ const mockLeaveSeat = jest.fn();
 jest.mock("@jits/shared/api/timekeeper", () => ({
   endMatchClock: (...a: unknown[]) => mockEndMatchClock(...a),
   leaveMatchAsTimekeeper: (...a: unknown[]) => mockLeaveSeat(...a),
+  // The real timekeeper table: the pause and resume refusals are sorted on the server's own hint.
+  mapTimekeeperError: jest.requireActual("@jits/shared/api/timekeeper").mapTimekeeperError,
 }));
 
 describe("timekeeper mode", () => {
@@ -310,22 +314,196 @@ describe("timekeeper mode", () => {
     expect(setupTk(null).result.current.canAutoEnd).toBe(false);
   });
 
-  it("a refused pause or resume shows the shipped title alone, never the server's text, and re-reads (M-R4)", async () => {
-    mockPause.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "The clock has ended" } });
+  /**
+   * What the shipped `pauseMatch` / `resumeMatch` return for a server refusal:
+   * the shared mapping of the PostgrestError `_tk_pause_match` /
+   * `_tk_resume_match` raise (jr_be 20261021100400), whose hint the shared
+   * table may not know (then UNKNOWN, carrying the server's own text).
+   */
+  const refusedBy = (hint: string, message: string) => ({
+    ok: false,
+    error: mapPostgrestError({ code: "P0001", hint, message, details: "" } as never),
+  });
+  const GUIDANCE = "Check your connection and try again.";
+  const shown = () => JSON.stringify((toast.error as jest.Mock).mock.calls);
+
+  it.each([
+    ["match_not_live", "The clock has ended"],
+    ["match_not_in_progress", "Match is not in progress"],
+    ["not_timekeeper", "Only the timekeeper can pause this match"],
+  ])("a pause or resume the server refused because the clock moved on (%s): the shipped title alone, which is true, never the server's text, and a re-read (M-R4, PM29)", async (hint, message) => {
+    const refusal = refusedBy(hint, message);
+    // The shared table knows none of these hints: the code alone cannot tell.
+    expect(refusal.error.code).toBe("UNKNOWN");
+    mockPause.mockResolvedValue(refusal);
     const running = setupTk("end_match_clock");
     await act(async () => {
       await running.result.current.handlePauseResume();
     });
-    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't pause" });
-    expect(reconcileNow).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't pause" });
+    expect(reconcileNow).toHaveBeenCalledTimes(1);
+    expect(mockGetMatchDetails).not.toHaveBeenCalled();
 
-    mockResume.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "The clock has ended" } });
+    mockResume.mockResolvedValue(refusal);
     const paused = setupTk("end_match_clock", true);
     await act(async () => {
       await paused.result.current.handlePauseResume();
     });
-    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't resume" });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't resume" });
+    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(reconcileNow).toHaveBeenCalledTimes(2);
     expect(running.sync.broadcastTimerPaused).not.toHaveBeenCalled();
+    expect(paused.sync.broadcastTimerResumed).not.toHaveBeenCalled();
+    expect(shown()).not.toContain(message);
+  });
+
+  it("a pause or resume that failed for a reason the screen cannot show (a network error, an unknown refusal): the title with the guidance, never the error's text, and a re-read (PM29)", async () => {
+    // supabase-js on a dead connection: no SQLSTATE, no hint.
+    mockPause.mockResolvedValue({ ok: false, error: mapPostgrestError({ code: "", hint: "", message: "TypeError: Network request failed", details: "" } as never) });
+    const running = setupTk("end_match_clock");
+    await act(async () => {
+      await running.result.current.handlePauseResume();
+    });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't pause", description: GUIDANCE });
+    mockResume.mockResolvedValue(refusedBy("not_found", "Match not found"));
+    const paused = setupTk("end_match_clock", true);
+    await act(async () => {
+      await paused.result.current.handlePauseResume();
+    });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't resume", description: GUIDANCE });
+    // A DomainError with no server refusal behind it (a wrapper that built one itself).
+    mockPause.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "The clock has ended" } });
+    const again = setupTk("end_match_clock");
+    await act(async () => {
+      await again.result.current.handlePauseResume();
+    });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't pause", description: GUIDANCE });
+    expect(reconcileNow).toHaveBeenCalledTimes(3);
+    expect(shown()).not.toMatch(/Network request failed|Match not found|The clock has ended/);
+  });
+
+  it("already in the state asked for, and the recovery read finds the match no longer running: the title alone and a re-read", async () => {
+    mockPause.mockResolvedValue(refusedBy("already_paused", "Match is already paused"));
+    mockGetMatchDetails.mockResolvedValueOnce({ status: "completed", paused_at: null, total_paused_duration: 0 });
+    const running = setupTk("end_match_clock");
+    await act(async () => {
+      await running.result.current.handlePauseResume();
+    });
+    expect(mockGetMatchDetails).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't pause" });
+    mockResume.mockResolvedValue(refusedBy("match_not_paused", "Match is not paused"));
+    mockGetMatchDetails.mockResolvedValueOnce({ status: "cancelled", paused_at: null, total_paused_duration: 0 });
+    const paused = setupTk("end_match_clock", true);
+    await act(async () => {
+      await paused.result.current.handlePauseResume();
+    });
+    expect(mockGetMatchDetails).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't resume" });
+    expect(reconcileNow).toHaveBeenCalledTimes(2);
+  });
+
+  it("already in the state asked for, but the recovery read failed (null): this phone cannot tell, so the guidance and a re-read", async () => {
+    mockPause.mockResolvedValue(refusedBy("already_paused", "Match is already paused"));
+    mockGetMatchDetails.mockResolvedValueOnce(null);
+    const running = setupTk("end_match_clock");
+    await act(async () => {
+      await running.result.current.handlePauseResume();
+    });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't pause", description: GUIDANCE });
+    mockResume.mockResolvedValue(refusedBy("match_not_paused", "Match is not paused"));
+    mockGetMatchDetails.mockResolvedValueOnce(null);
+    const paused = setupTk("end_match_clock", true);
+    await act(async () => {
+      await paused.result.current.handlePauseResume();
+    });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't resume", description: GUIDANCE });
+    expect(running.syncFromBroadcast).not.toHaveBeenCalled();
+    expect(paused.syncFromBroadcast).not.toHaveBeenCalled();
+    expect(reconcileNow).toHaveBeenCalledTimes(2);
+    expect(shown()).not.toContain("Match is");
+  });
+
+  it("two-athlete mode keeps the shipped toast for the same refusals: the error's own message, no re-read", async () => {
+    mockPause.mockResolvedValue(refusedBy("match_not_in_progress", "Match is not in progress"));
+    const running = setupTk("broadcast");
+    await act(async () => {
+      await running.result.current.handlePauseResume();
+    });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't pause", description: "Match is not in progress" });
+    mockPause.mockResolvedValue(refusedBy("already_paused", "Match is already paused"));
+    mockGetMatchDetails.mockResolvedValueOnce(null);
+    const again = setupTk("broadcast");
+    await act(async () => {
+      await again.result.current.handlePauseResume();
+    });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't pause", description: "Match is already paused." });
+    expect(reconcileNow).not.toHaveBeenCalled();
+  });
+
+  describe("PM29: the ceiling on a server-run pause and resume", () => {
+    afterEach(() => jest.useRealTimers());
+
+    it("no reply: the controls stay busy just before the ceiling; at it Couldn't pause with the guidance, the controls back (End works again), and a late reply is dropped", async () => {
+      jest.useFakeTimers();
+      let reply: (v: unknown) => void = () => undefined;
+      mockPause.mockReturnValue(new Promise((r) => (reply = r)));
+      const running = setupTk("end_match_clock");
+      await act(async () => {
+        void running.result.current.handlePauseResume();
+      });
+      expect(running.result.current.busy).toBe("pause");
+      await act(async () => {
+        jest.advanceTimersByTime(SEND_CEILING_MS - 1);
+      });
+      expect(running.result.current.busy).toBe("pause");
+      expect(toast.error).not.toHaveBeenCalled();
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(running.result.current.busy).toBeNull();
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't pause", description: "Check your connection and try again." });
+      expect(reconcileNow).toHaveBeenCalledTimes(1);
+      // The late pause reply: the DB reads resync the clock; this phone applies and announces nothing.
+      await act(async () => {
+        reply({ ok: true, data: { paused_at: PAUSED_AT } });
+      });
+      expect(running.syncFromBroadcast).not.toHaveBeenCalled();
+      expect(running.sync.broadcastTimerPaused).not.toHaveBeenCalled();
+      // End is no longer held behind the dead pause.
+      await act(async () => {
+        running.result.current.handleEnd();
+      });
+      expect(mockEndMatchClock).toHaveBeenCalledTimes(1);
+    });
+
+    it("a resume with no reply ends the same way", async () => {
+      jest.useFakeTimers();
+      mockResume.mockReturnValue(new Promise(() => undefined));
+      const paused = setupTk("end_match_clock", true);
+      await act(async () => {
+        void paused.result.current.handlePauseResume();
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(SEND_CEILING_MS);
+      });
+      expect(paused.result.current.busy).toBeNull();
+      expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't resume", description: "Check your connection and try again." });
+    });
+
+    it("a two-athlete pause is never bounded (PM29 is timekeeper mode only)", async () => {
+      jest.useFakeTimers();
+      mockPause.mockReturnValue(new Promise(() => undefined));
+      const running = setupTk("broadcast");
+      await act(async () => {
+        void running.result.current.handlePauseResume();
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(SEND_CEILING_MS * 2);
+      });
+      expect(running.result.current.busy).toBe("pause");
+      expect(toast.error).not.toHaveBeenCalled();
+    });
   });
 
   it("names the timekeeper on the pause and resume broadcasts", async () => {

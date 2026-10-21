@@ -19,6 +19,15 @@ export const READY_ECHO_HOLD_MS = 6_000;
 /** The refusals that mean "your weight is held" (a flag on me): the shipped `Match on hold`. */
 const WEIGHT_HOLD: readonly DomainErrorCode[] = ["WEIGHT_FLAGGED", "WEIGHT_CHECK_PENDING", "WEIGHT_RECHECK_PENDING"];
 
+/**
+ * The refusals that mean the match moved on (`invalid_status`: it was
+ * cancelled; `timekeeper_required`: the timekeeper left): the shipped
+ * `Couldn't save your check` alone, which is true, and the re-read moves the
+ * screen. Only a failure the screen cannot explain adds `Check your
+ * connection and try again.` (PM29, UX spec 5.4).
+ */
+const MOVED_ON: readonly DomainErrorCode[] = ["MATCH_NOT_PENDING", "TIMEKEEPER_REQUIRED"];
+
 /** A timekeeper-mode athlete's face-off, from the server, plus the merged ready's own state. */
 export interface FaceoffTimekeeperView extends AthleteTimekeeperState {
   /** `mark_match_ready` is in flight, or succeeded and the state read does not show it yet. */
@@ -48,7 +57,8 @@ interface MergedReadyParams {
  * and a successful call holds the button busy until that state shows it
  * (never an optimistic ready of its own). No retry: a refusal says so once
  * (the shipped `Match on hold` for a weight hold, else `Couldn't save your
- * check`) and the caller re-reads the weight checks and the match
+ * check`, with `Check your connection and try again.` unless the match moved
+ * on, PM29) and the caller re-reads the weight checks and the match
  * (`onRefused`); the timekeeper-mode state (the ready rows) follows on its
  * realtime rows or its next poll.
  *
@@ -114,7 +124,8 @@ export function useMergedReady(p: MergedReadyParams): { view: FaceoffTimekeeperV
       }
       setPhase("idle");
       if (WEIGHT_HOLD.includes(res.error.code)) toast.info({ text1: SHIPPED_COPY.matchOnHold });
-      else toast.error({ text1: SHIPPED_COPY.couldNotSaveCheck });
+      else if (MOVED_ON.includes(res.error.code)) toast.error({ text1: SHIPPED_COPY.couldNotSaveCheck });
+      else toast.error({ text1: SHIPPED_COPY.couldNotSaveCheck, description: SHIPPED_COPY.checkConnection });
       l.onRefused();
     })();
   }, []);

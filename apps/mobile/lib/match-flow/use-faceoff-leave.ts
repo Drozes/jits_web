@@ -9,6 +9,7 @@ import { exitMatchTo } from "./exit-to";
 import { SEND_GRACE_MS, useMatchSyncContext } from "./match-sync-context";
 import type { MatchRoles } from "./match-roles";
 import { athleteLeaveAlert, leaveSeat, prestartLeaveAlert, UNSEATED_TOAST } from "./timekeeper-actions";
+import { PRESS_COPY } from "./press-copy";
 
 /** The names a timekeeper-mode Leave alert gives (`MatchRoles` satisfies it). */
 type LeaveRoles = Pick<MatchRoles, "opponent" | "athletes" | "timekeeper">;
@@ -69,8 +70,9 @@ function leaveAlert(p: LeavePolicy): typeof SHIPPED_ALERT {
  * then act on the policy above and exit through `exitMatchTo`. An athlete's
  * cancel tells the other phones and exits; a failed cancel re-arms Leave
  * with the shipped toast, which in a timekeeper-mode match (the crew step,
- * the face-off; the sync context's `timekeeperModeSelfId`) is its title
- * alone and a re-read, never the server's text (M-R4, spec 14.9 X1). The
+ * the face-off; the sync context's `timekeeperModeSelfId`) is its title (with
+ * `Check your connection and try again.`, PM29, unless the match already
+ * started) and a re-read, never the server's text (M-R4, spec 14.9 X1). The
  * timekeeper's leave exits with TK-K17; when the server refuses it (the
  * match moved on: started, cancelled, the seat already gone) or it fails, it
  * re-arms and re-reads, so the DB moves the screen. Split out of
@@ -98,9 +100,14 @@ export function useFaceoffLeave(p: FaceoffLeaveParams): { cancelling: boolean; l
         toast.error({ text1: "Could not cancel", description: result.error.message });
         return;
       }
-      // The refusal may mean the match moved on (the timekeeper started it):
-      // the shipped title alone, and the DB moves the screen.
-      toast.error({ text1: "Could not cancel" });
+      // The match moved on (MATCH_NOT_PENDING: the timekeeper started it): the
+      // shipped title alone, which is true. Any other failure adds the
+      // guidance (PM29). Either way the DB moves the screen.
+      toast.error(
+        result.error.code === "MATCH_NOT_PENDING"
+          ? { text1: "Could not cancel" }
+          : { text1: "Could not cancel", description: PRESS_COPY.checkConnection },
+      );
       reconcileNow();
       return;
     }

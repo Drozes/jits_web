@@ -11,6 +11,13 @@
  * mounts the TK-RC3 notice (`useResultEditNotice`, through
  * `useConfirmResult`): an athlete the wizard brings back after an edit reset
  * their confirmation is told once; never in a two-athlete match.
+ *
+ * PM29 (honest presses): from the tap Confirm is busy and Dispute disabled,
+ * the you row keeps WAITING ON YOU until the server has the confirm, a press
+ * with no reply ends as failed after SEND_CEILING_MS, a refusal sorts into
+ * result changed (TK-RC4, then Confirm and Dispute wait for the newer
+ * result), moved on (no toast) and failed (`Couldn't confirm` / `Check your
+ * connection and try again.`), and nothing shows after the step unmounted.
  */
 import * as React from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -80,6 +87,7 @@ jest.mock("@/lib/match-flow/use-result-edit-notice", () => {
 });
 
 import { ADVANCE_AFTER_CONFIRM_MS, ConfirmStep } from "@/components/match-flow/steps/confirm-step";
+import { SEND_CEILING_MS } from "@/lib/match-flow/send-timing";
 import { resetResultEditNotices } from "@/lib/match-flow/use-result-edit-notice";
 import { useConfirmResult } from "@/lib/match-flow/use-confirm-result";
 
@@ -214,11 +222,30 @@ describe("confirming", () => {
     expect(mockReconcileNow).toHaveBeenCalledTimes(1);
     expect(mockNoteConfirmed).not.toHaveBeenCalled();
     s.getByTestId("confirm-panel-you-your-call");
-    s.getByTestId("confirm-result");
+    // PM29: Confirm and Dispute wait for the newer result (disabled, not busy); a press sends nothing.
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual({ disabled: true, busy: false });
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: true });
+    await act(async () => {
+      fireEvent.press(s.getByTestId("confirm-result"));
+      fireEvent.press(s.getByTestId("confirm-dispute"));
+    });
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(s.queryByTestId("dispute-submit")).toBeNull();
     act(() => {
       jest.advanceTimersByTime(5_000);
     });
     expect(onCompleted).not.toHaveBeenCalled();
+    // The read with the newer count and its result: the plate, TK-RC1 and TK-RC2 change, and the buttons come back.
+    s.rerender(
+      <ConfirmStep
+        {...props({ onCompleted, timekeeperResult: { editCount: 1, recordedByAdmin: false, result: { result: "submission", winnerId: "opp-1" } } })}
+      />,
+    );
+    s.getByText("D. Okafor won");
+    s.getByText("J. CRUZ CHANGED THE RESULT");
+    expect(s.getByTestId("confirm-helper")).toHaveTextContent("Check it and confirm again.");
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual({ disabled: false, busy: false });
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: false });
   });
 
   it("an edit landing between the tap and the reply keeps the athlete on confirm (A8)", async () => {
@@ -263,8 +290,10 @@ describe("confirming", () => {
     await act(async () => {
       fireEvent.press(s.getByTestId("confirm-result"));
     });
-    // The CONFIRMED row shows while the reply is out.
-    s.getByTestId("confirm-panel-you-confirmed");
+    // PM29: while the reply is out the row keeps WAITING ON YOU, Confirm is busy and Dispute disabled.
+    s.getByTestId("confirm-panel-you-your-call");
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual({ disabled: true, busy: true });
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: true });
     // The timekeeper's edit committed before the confirm reached the server, and no read of it has landed here.
     act(() => {
       jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS + 500);
@@ -277,7 +306,8 @@ describe("confirming", () => {
     expect(mockReconcileNow).toHaveBeenCalledTimes(1);
     expect(mockNoteConfirmed).not.toHaveBeenCalled();
     s.getByTestId("confirm-panel-you-your-call");
-    s.getByTestId("confirm-result");
+    // No read with a newer count yet: Confirm waits for it (PM29).
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual({ disabled: true, busy: false });
     act(() => {
       jest.advanceTimersByTime(10_000);
     });
@@ -297,10 +327,13 @@ describe("confirming", () => {
       jest.advanceTimersByTime(3_000);
     });
     expect(onCompleted).not.toHaveBeenCalled();
-    s.getByTestId("confirm-panel-you-confirmed");
+    // PM29: no CONFIRMED before the server has it.
+    s.getByTestId("confirm-panel-you-your-call");
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual({ disabled: true, busy: true });
     await act(async () => {
       reply({ ok: true, data: {} });
     });
+    s.getByTestId("confirm-panel-you-confirmed");
     // The CONFIRMED row shows its full time once the server took the confirm.
     expect(onCompleted).not.toHaveBeenCalled();
     act(() => {
@@ -323,8 +356,16 @@ describe("confirming", () => {
       fireEvent.press(s.getByTestId("confirm-result"));
     });
     expect(mockToast.success).toHaveBeenCalledWith({ text1: "Saved locally", description: "Confirmation will sync when you're back online." });
+    // Shipped: the queued confirm reads CONFIRMED, with no busy button left.
+    s.getByTestId("confirm-panel-you-confirmed");
+    expect(s.queryByTestId("confirm-result")).toBeNull();
+    expect(s.queryByTestId("confirm-result-spinner")).toBeNull();
     act(() => {
-      jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS);
+      jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS - 1);
+    });
+    expect(onCompleted).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(1);
     });
     expect(onCompleted).toHaveBeenCalledTimes(1);
   });
@@ -473,15 +514,384 @@ describe("confirming", () => {
     expect(mockConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("any other refusal: Couldn't confirm, with no DomainError message (M-R4)", async () => {
+  it("any other refusal: Couldn't confirm with the guidance, never a DomainError message (M-R4, PM29)", async () => {
     mockConfirm.mockResolvedValue({ ok: false, error: { code: "NOT_PARTICIPANT", message: "You are not a participant in this match." } });
     const s = render(<ConfirmStep {...props()} />);
     await act(async () => {
       fireEvent.press(s.getByTestId("confirm-result"));
     });
-    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't confirm" });
+    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't confirm", description: "Check your connection and try again." });
     expect(mockHapticError).toHaveBeenCalledTimes(1);
+    expect(mockReconcileNow).toHaveBeenCalledTimes(1);
     s.getByTestId("confirm-panel-you-your-call");
+    // The buttons come back.
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual({ disabled: false, busy: false });
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: false });
+  });
+});
+
+describe("PM29: an honest confirm press", () => {
+  const RC4 = { text1: "The result just changed", description: "Check the new result, then confirm." };
+  const FAILED = { text1: "Couldn't confirm", description: "Check your connection and try again." };
+  const SENDING = { disabled: true, busy: true };
+  const READY = { disabled: false, busy: false };
+  const WAITING = { disabled: true, busy: false };
+  const impact = () => (jest.requireMock("expo-haptics") as { impactAsync: jest.Mock }).impactAsync;
+  const edited = (editCount: number, winnerId = "me-1") => ({ editCount, recordedByAdmin: false, result: { result: "submission" as const, winnerId } });
+
+  /** A confirm whose reply this test hands back. */
+  function deferReply() {
+    let reply: (v: unknown) => void = () => undefined;
+    mockConfirm.mockImplementation(() => new Promise((resolve) => (reply = resolve)));
+    return (v: unknown) => act(async () => reply(v));
+  }
+
+  async function tapConfirm(s: ReturnType<typeof render>) {
+    await act(async () => {
+      fireEvent.press(s.getByTestId("confirm-result"));
+    });
+  }
+
+  it("sending: one call, Confirm busy with its spinner, Dispute disabled and inert, the row still WAITING ON YOU, a second tap sends nothing", async () => {
+    jest.useFakeTimers();
+    deferReply();
+    const onCompleted = jest.fn();
+    const s = render(<ConfirmStep {...props({ onCompleted })} />);
+    await tapConfirm(s);
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(SENDING);
+    s.getByTestId("confirm-result-spinner");
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: true });
+    fireEvent.press(s.getByTestId("confirm-dispute"));
+    expect(s.queryByTestId("dispute-submit")).toBeNull();
+    expect(s.getByTestId("confirm-panel-you-your-call")).toHaveTextContent(/WAITING ON YOU/);
+    expect(s.queryByText("CONFIRMED ✓")).toBeNull();
+    await tapConfirm(s);
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    act(() => {
+      jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS * 2);
+    });
+    expect(impact()).not.toHaveBeenCalled();
+    expect(onCompleted).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["ok", { ok: true, data: {} }],
+    ["already_confirmed", { ok: true, data: { already_confirmed: true } }],
+  ])("an %s reply: CONFIRMED, the buttons gone, one haptic, and the verdict after exactly ADVANCE_AFTER_CONFIRM_MS", async (_name, reply) => {
+    jest.useFakeTimers();
+    const answer = deferReply();
+    const onCompleted = jest.fn();
+    const s = render(<ConfirmStep {...props({ onCompleted })} />);
+    await tapConfirm(s);
+    await answer(reply);
+    s.getByTestId("confirm-panel-you-confirmed");
+    s.getByText("CONFIRMED ✓");
+    expect(s.queryByTestId("confirm-result")).toBeNull();
+    expect(s.queryByTestId("confirm-dispute")).toBeNull();
+    expect(impact()).toHaveBeenCalledTimes(1);
+    expect(mockNoteConfirmed).toHaveBeenCalledWith("M1", "me-1", 0);
+    act(() => {
+      jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS - 1);
+    });
+    expect(onCompleted).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("the ceiling: still sending just before it; at SEND_CEILING_MS with no reply, Couldn't confirm with the guidance and the buttons back", async () => {
+    jest.useFakeTimers();
+    const answer = deferReply();
+    const onCompleted = jest.fn();
+    const s = render(<ConfirmStep {...props({ onCompleted })} />);
+    await tapConfirm(s);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS - 1);
+    });
+    expect(SEND_CEILING_MS).toBe(20_000);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(SENDING);
+    expect(mockToast.error).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(mockToast.error).toHaveBeenCalledTimes(1);
+    expect(mockToast.error).toHaveBeenCalledWith(FAILED);
+    expect(mockHapticError).toHaveBeenCalledTimes(1);
+    expect(mockReconcileNow).toHaveBeenCalledTimes(1);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(READY);
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: false });
+    s.getByTestId("confirm-panel-you-your-call");
+
+    // The late ok of that attempt changes nothing: no haptic, no verdict, no TK-RC3 record.
+    await answer({ ok: true, data: {} });
+    act(() => {
+      jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS * 2);
+    });
+    expect(impact()).not.toHaveBeenCalled();
+    expect(mockNoteConfirmed).not.toHaveBeenCalled();
+    expect(onCompleted).not.toHaveBeenCalled();
+    s.getByTestId("confirm-panel-you-your-call");
+
+    // It did land: the reads list the confirmation at the current count, and the step moves on once.
+    s.rerender(<ConfirmStep {...props({ onCompleted, confirmedAthleteIds: ["me-1"] })} />);
+    s.rerender(<ConfirmStep {...props({ onCompleted, confirmedAthleteIds: ["me-1"] })} />);
+    s.getByTestId("confirm-panel-you-confirmed");
+    act(() => {
+      jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS * 4);
+    });
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("a retry after the ceiling sends the count on screen and confirms", async () => {
+    jest.useFakeTimers();
+    deferReply();
+    const onCompleted = jest.fn();
+    const s = render(<ConfirmStep {...props({ onCompleted })} />);
+    await tapConfirm(s);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS);
+    });
+    mockConfirm.mockResolvedValue({ ok: true, data: { already_confirmed: true } });
+    await tapConfirm(s);
+    expect(mockConfirm).toHaveBeenCalledTimes(2);
+    expect(mockConfirm).toHaveBeenLastCalledWith({ tag: "client" }, "M1", 0);
+    s.getByTestId("confirm-panel-you-confirmed");
+    act(() => {
+      jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS);
+    });
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("moved on (MATCH_NOT_PENDING: disputed or voided): no toast, no haptic, one re-read, the buttons back", async () => {
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "This match has already been started." } });
+    const s = render(<ConfirmStep {...props()} />);
+    await tapConfirm(s);
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockToast.info).not.toHaveBeenCalled();
+    expect(mockHapticError).not.toHaveBeenCalled();
+    expect(mockReconcileNow).toHaveBeenCalledTimes(1);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(READY);
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: false });
+  });
+
+  it("result changed, the newer read not in yet: TK-RC4 once, Confirm and Dispute disabled with no timer, until the newer read; then the press carries the new count", async () => {
+    jest.useFakeTimers();
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "RESULT_CHANGED", message: "The result just changed" } });
+    const s = render(<ConfirmStep {...props()} />);
+    await tapConfirm(s);
+    expect(mockToast.info).toHaveBeenCalledTimes(1);
+    expect(mockToast.info).toHaveBeenCalledWith(RC4);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(WAITING);
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: true });
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS * 3);
+    });
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockToast.info).toHaveBeenCalledTimes(1);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(WAITING);
+    // A read at the same count changes nothing.
+    s.rerender(<ConfirmStep {...props({ confirmedAthleteIds: [] })} />);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(WAITING);
+    s.rerender(<ConfirmStep {...props({ timekeeperResult: edited(1, "opp-1") })} />);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(READY);
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: false });
+    s.getByText("D. Okafor won");
+    mockConfirm.mockResolvedValue({ ok: true, data: {} });
+    await tapConfirm(s);
+    expect(mockConfirm).toHaveBeenLastCalledWith({ tag: "client" }, "M1", 1);
+    s.getByTestId("confirm-panel-you-confirmed");
+  });
+
+  it("result changed, the newer read already in (the edit landed while sending): the buttons are back at once, TK-RC4 once", async () => {
+    jest.useFakeTimers();
+    const answer = deferReply();
+    const s = render(<ConfirmStep {...props()} />);
+    await tapConfirm(s);
+    s.rerender(<ConfirmStep {...props({ timekeeperResult: edited(1, "opp-1") })} />);
+    // Still sending: the reply decides.
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(SENDING);
+    await answer({ ok: false, error: { code: "RESULT_CHANGED", message: "The result just changed" } });
+    expect(mockToast.info).toHaveBeenCalledTimes(1);
+    expect(mockToast.info).toHaveBeenCalledWith(RC4);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(READY);
+    expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: false });
+  });
+
+  it("two edits, two refusals: TK-RC4 once per change, never twice for one", async () => {
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "RESULT_CHANGED", message: "The result just changed" } });
+    const s = render(<ConfirmStep {...props()} />);
+    await tapConfirm(s);
+    await tapConfirm(s);
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(mockToast.info).toHaveBeenCalledTimes(1);
+    s.rerender(<ConfirmStep {...props({ timekeeperResult: edited(1) })} />);
+    await tapConfirm(s);
+    expect(mockConfirm).toHaveBeenCalledTimes(2);
+    expect(mockConfirm).toHaveBeenLastCalledWith({ tag: "client" }, "M1", 1);
+    expect(mockToast.info).toHaveBeenCalledTimes(2);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(WAITING);
+    await tapConfirm(s);
+    expect(mockConfirm).toHaveBeenCalledTimes(2);
+    expect(mockToast.info).toHaveBeenCalledTimes(2);
+  });
+
+  it("the DB lists the confirmation while sending (a lost reply): CONFIRMED and the verdict; the later failure shows nothing", async () => {
+    jest.useFakeTimers();
+    const answer = deferReply();
+    const onCompleted = jest.fn();
+    const s = render(<ConfirmStep {...props({ onCompleted })} />);
+    await tapConfirm(s);
+    s.rerender(<ConfirmStep {...props({ onCompleted, confirmedAthleteIds: ["me-1"] })} />);
+    s.getByTestId("confirm-panel-you-confirmed");
+    expect(s.queryByTestId("confirm-result")).toBeNull();
+    await answer({ ok: false, error: { code: "UNKNOWN", message: "network" } });
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockHapticError).not.toHaveBeenCalled();
+    s.getByTestId("confirm-panel-you-confirmed");
+    act(() => {
+      jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS);
+    });
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("the ceiling for a confirmation the DB already lists shows nothing", async () => {
+    jest.useFakeTimers();
+    deferReply();
+    const s = render(<ConfirmStep {...props()} />);
+    await tapConfirm(s);
+    s.rerender(<ConfirmStep {...props({ confirmedAthleteIds: ["me-1"] })} />);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS);
+    });
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockHapticError).not.toHaveBeenCalled();
+  });
+
+  it("a thrown call is a failure like any other", async () => {
+    mockConfirm.mockRejectedValue(new Error("boom"));
+    // The real queue re-queues a throw; this one passes it on.
+    const s = render(<ConfirmStep {...props()} />);
+    await tapConfirm(s);
+    expect(mockToast.error).toHaveBeenCalledWith(FAILED);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(READY);
+  });
+
+  it("the dispute form opened here is in timekeeper mode: a moved-on refusal brings the athlete back to confirm, with no toast, and re-reads", async () => {
+    mockDispute.mockResolvedValue({ ok: false, error: { code: "ALREADY_DISPUTED", message: "This result has already been disputed." } });
+    const s = render(<ConfirmStep {...props()} />);
+    fireEvent.press(s.getByTestId("confirm-dispute"));
+    await act(async () => {
+      fireEvent.press(s.getByTestId("dispute-submit"));
+    });
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockReconcileNow).toHaveBeenCalledTimes(1);
+    s.getByTestId("confirm-result");
+  });
+
+  it("an edit while the dispute form is open: TK-RC4 there, and Back shows the new result", () => {
+    const s = render(<ConfirmStep {...props()} />);
+    fireEvent.press(s.getByTestId("confirm-dispute"));
+    s.rerender(<ConfirmStep {...props({ timekeeperResult: edited(1, "opp-1") })} />);
+    expect(mockToast.info).toHaveBeenCalledWith(RC4);
+    fireEvent.press(s.getByTestId("dispute-back"));
+    s.getByText("D. Okafor won");
+    s.getByText("J. CRUZ CHANGED THE RESULT");
+  });
+
+  /** The hook alone, in timekeeper mode: its own guards, below the kit's busy and disabled states. */
+  function tkHook(editCount = 0) {
+    return renderHook(() =>
+      useConfirmResult({
+        matchId: "M1",
+        me: ME,
+        opponent: { athleteId: "opp-1", displayName: "Demo Okafor" },
+        confirmedAthleteIds: [],
+        timekeeper: { editCount, recorderName: "Jamal Cruz" },
+        onCompleted: jest.fn(),
+      }),
+    );
+  }
+
+  it("two confirm() calls before the busy render send one confirm (the sending guard, not the button's busy state)", async () => {
+    const answer = deferReply();
+    const { result } = tkHook();
+    const press = result.current.confirm;
+    await act(async () => {
+      void press();
+      // Same render, so the same closure: only the in-flight ref can stop it.
+      void press();
+    });
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(result.current.sending).toBe(true);
+    await answer({ ok: true, data: {} });
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(result.current.myConfirmed).toBe(true);
+  });
+
+  it("after RESULT_CHANGED at the same count, confirm() sends nothing until a newer read (the waiting guard, not the button's disabled state)", async () => {
+    mockConfirm.mockResolvedValue({ ok: false, error: { code: "RESULT_CHANGED", message: "The result just changed" } });
+    const { result } = tkHook();
+    await act(async () => {
+      await result.current.confirm();
+    });
+    expect(result.current.waitingForNewResult).toBe(true);
+    expect(mockToast.info).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await result.current.confirm();
+    });
+    expect(mockConfirm).toHaveBeenCalledTimes(1);
+    expect(mockToast.info).toHaveBeenCalledTimes(1);
+    expect(mockToast.error).not.toHaveBeenCalled();
+  });
+
+  it("unmounted while sending: the press leaves no timer behind", async () => {
+    jest.useFakeTimers();
+    deferReply();
+    const { result, unmount } = renderHook(() =>
+      useConfirmResult({
+        matchId: "M1",
+        me: ME,
+        opponent: { athleteId: "opp-1", displayName: "Demo Okafor" },
+        confirmedAthleteIds: [],
+        timekeeper: { editCount: 0, recorderName: "Jamal Cruz" },
+        onCompleted: jest.fn(),
+      }),
+    );
+    const set = jest.spyOn(global, "setTimeout");
+    const clear = jest.spyOn(global, "clearTimeout");
+    try {
+      await act(async () => {
+        void result.current.confirm();
+      });
+      expect(result.current.sending).toBe(true);
+      // The press's one timer: the ceiling.
+      const ceilings = set.mock.results.filter((_r, i) => set.mock.calls[i][1] === SEND_CEILING_MS).map((r) => r.value);
+      expect(ceilings).toHaveLength(1);
+      expect(clear).not.toHaveBeenCalledWith(ceilings[0]);
+      unmount();
+      expect(clear).toHaveBeenCalledWith(ceilings[0]);
+    } finally {
+      set.mockRestore();
+      clear.mockRestore();
+    }
+  });
+
+  it("unmounted while sending: a reply, or the ceiling, then shows nothing", async () => {
+    jest.useFakeTimers();
+    const answer = deferReply();
+    const s = render(<ConfirmStep {...props()} />);
+    await tapConfirm(s);
+    s.unmount();
+    await answer({ ok: false, error: { code: "UNKNOWN", message: "network" } });
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS * 2);
+    });
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockToast.info).not.toHaveBeenCalled();
+    expect(mockHapticError).not.toHaveBeenCalled();
+    expect(impact()).not.toHaveBeenCalled();
   });
 });
 
@@ -723,6 +1133,36 @@ describe("the two-athlete confirm is unchanged", () => {
     expect(mockConfirm.mock.calls[0]).toHaveLength(2);
     expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't confirm", description: "nope" });
     expect(mockNoteConfirmed).not.toHaveBeenCalled();
+  });
+
+  it("its dispute form is the shipped one: a refusal keeps the error's message and the form", async () => {
+    mockDispute.mockResolvedValue({ ok: false, error: { code: "ALREADY_DISPUTED", message: "This result has already been disputed." } });
+    const s = render(<ConfirmStep {...props({ recorderName: undefined, timekeeperResult: undefined })} />);
+    fireEvent.press(s.getByTestId("confirm-dispute"));
+    await act(async () => {
+      fireEvent.press(s.getByTestId("dispute-submit"));
+    });
+    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't dispute", description: "This result has already been disputed." });
+    s.getByTestId("dispute-submit");
+    expect(mockReconcileNow).not.toHaveBeenCalled();
+  });
+
+  it("is never busy, and never toasts at the ceiling (PM29 is timekeeper mode only)", async () => {
+    jest.useFakeTimers();
+    mockConfirm.mockReturnValue(new Promise(() => undefined));
+    const s = render(<ConfirmStep {...props({ recorderName: undefined, timekeeperResult: undefined })} />);
+    expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual({ disabled: false, busy: false });
+    await act(async () => {
+      fireEvent.press(s.getByTestId("confirm-result"));
+    });
+    // The two-athlete row flips at the tap, as shipped.
+    s.getByTestId("confirm-panel-you-confirmed");
+    expect(s.queryByTestId("confirm-result-spinner")).toBeNull();
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS * 2);
+    });
+    expect(mockToast.error).not.toHaveBeenCalled();
+    expect(mockHapticError).not.toHaveBeenCalled();
   });
 
   it("moves on from the tap, before the reply, as shipped", async () => {

@@ -8,7 +8,12 @@
  *    sends `timer_started` naming the timekeeper and re-reads the match;
  *  - Start and the timekeeper's Leave exclude each other (`StartClaim`,
  *    `useStartClaim`): no Start while a Leave is in flight, no Leave from the
- *    Start's claim on, and none after the Start went through (A5, R21).
+ *    Start's claim on, and none after the Start went through (A5, R21);
+ *  - PM29: a blocker refusal says the title alone, any other failure adds
+ *    the guidance, an already-started refusal says nothing; with no reply
+ *    after SEND_CEILING_MS the press ends as that failure and Start comes
+ *    back, while the claim (no Leave) is held until every Start call sent
+ *    has answered.
  */
 import * as React from "react";
 import { act, renderHook } from "@testing-library/react-native";
@@ -33,6 +38,7 @@ import {
   type StartClaim,
   type StartGate,
 } from "@/lib/match-flow/use-timekeeper-start";
+import { SEND_CEILING_MS } from "@/lib/match-flow/send-timing";
 
 const OPEN: StartGate = { canStart: true, reason: null };
 
@@ -246,6 +252,155 @@ describe("useTimekeeperStart", () => {
       expect(mockStart).toHaveBeenCalledTimes(2);
     } finally {
       jest.useRealTimers();
+    }
+  });
+});
+
+describe("useTimekeeperStart, PM29: honest Start", () => {
+  const reconcileNow = jest.fn();
+  const broadcast = jest.fn(() => Promise.resolve("ok"));
+  function wrapper({ children }: { children: React.ReactNode }) {
+    return React.createElement(
+      MatchSyncProvider,
+      { value: { onChannelStatus: () => {}, reconcileNow, markExiting: () => {}, subscribeSnapshot: () => () => {}, timekeeperModeSelfId: "tk-1" } },
+      children,
+    );
+  }
+  const release = jest.fn();
+  const claim: StartClaim = { claim: () => true, release };
+  const params = { matchId: "M1", timekeeperId: "tk-1", gate: OPEN, claim, broadcastTimerStarted: broadcast };
+  const GUIDANCE = "Check your connection and try again.";
+
+  /** start_match calls whose replies the test hands back, in order. */
+  function deferStarts() {
+    const replies: ((v: unknown) => void)[] = [];
+    mockStart.mockImplementation(() => new Promise((r) => replies.push(r)));
+    return (i: number, v: unknown) => act(async () => replies[i](v));
+  }
+
+  async function tap(result: { current: { start: () => void } }) {
+    await act(async () => {
+      result.current.start();
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it.each([
+    ["a blocker refusal: the title alone (the reason line says why)", "WEIGHT_RECHECK_PENDING", { text1: "Couldn't start match" }],
+    ["any other failure: the title and the guidance", "NOT_TIMEKEEPER", { text1: "Couldn't start match", description: GUIDANCE }],
+  ])("%s", async (_name, code, toastArgs) => {
+    mockStart.mockResolvedValue({ ok: false, error: { code, message: "server words" } });
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    expect(toast.error).toHaveBeenCalledWith(toastArgs);
+    expect(release.mock.calls).toEqual([[false]]);
+    expect(result.current.starting).toBe(false);
+  });
+
+  it("already started (MATCH_NOT_PENDING): no toast, a re-read", async () => {
+    mockStart.mockResolvedValue({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(reconcileNow).toHaveBeenCalledTimes(1);
+    expect(result.current.starting).toBe(false);
+  });
+
+  it("a thrown call is a failure with the guidance", async () => {
+    mockStart.mockRejectedValue(new Error("boom"));
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't start match", description: GUIDANCE });
+    expect(release.mock.calls).toEqual([[false]]);
+  });
+
+  it("no reply: busy until the ceiling, then the failure and Start back; the claim is held until that call answers", async () => {
+    const answer = deferStarts();
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS - 1);
+    });
+    expect(result.current.starting).toBe(true);
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(result.current.starting).toBe(false);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't start match", description: GUIDANCE });
+    expect(reconcileNow).toHaveBeenCalledTimes(1);
+    expect(release).not.toHaveBeenCalled();
+    await answer(0, { ok: false, error: { code: "UNKNOWN", message: "network" } });
+    expect(release.mock.calls).toEqual([[false]]);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("a retry while the first call is still out: the claim waits for both; the retry's own failure is said", async () => {
+    const answer = deferStarts();
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS);
+    });
+    await tap(result);
+    expect(mockStart).toHaveBeenCalledTimes(2);
+    expect(result.current.starting).toBe(true);
+    await answer(0, { ok: false, error: { code: "UNKNOWN", message: "network" } });
+    // The retry is still out: no Leave, and the first's late failure is not said again.
+    expect(release).not.toHaveBeenCalled();
+    expect(result.current.starting).toBe(true);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    await answer(1, { ok: false, error: { code: "UNKNOWN", message: "network" } });
+    expect(release.mock.calls).toEqual([[false]]);
+    expect(result.current.starting).toBe(false);
+    expect(toast.error).toHaveBeenCalledTimes(2);
+  });
+
+  it("a late Start that went through keeps Leave gone, says it started and re-reads", async () => {
+    const answer = deferStarts();
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS);
+    });
+    await answer(0, { ok: true, data: { startedAt: "2026-10-21T12:00:00.000Z" } });
+    expect(release.mock.calls).toEqual([[true]]);
+    expect(broadcast).toHaveBeenCalledWith("2026-10-21T12:00:00.000Z", "tk-1");
+    expect(reconcileNow).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("an answer in time clears the ceiling: nothing fires later", async () => {
+    mockStart.mockResolvedValue({ ok: true, data: { startedAt: "2026-10-21T12:00:00.000Z" } });
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS * 2);
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(result.current.starting).toBe(true);
+  });
+
+  it("unmounted with a Start out: the ceiling's timer is cleared and nothing shows", async () => {
+    deferStarts();
+    const clear = jest.spyOn(global, "clearTimeout");
+    try {
+      const { result, unmount } = renderHook(() => useTimekeeperStart(params), { wrapper });
+      await tap(result);
+      const before = clear.mock.calls.length;
+      unmount();
+      expect(clear.mock.calls.length).toBeGreaterThan(before);
+      await act(async () => {
+        jest.advanceTimersByTime(SEND_CEILING_MS * 2);
+      });
+      expect(toast.error).not.toHaveBeenCalled();
+    } finally {
+      clear.mockRestore();
     }
   });
 });

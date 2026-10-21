@@ -2,8 +2,10 @@ import * as React from "react";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { checkOpponentWeight, reweighForMatch, type WeightVerdict } from "@jits/shared/api/match-weight-checks";
+import type { DomainError } from "@jits/shared/api/errors";
 import type { WeightChecksHandle } from "./use-match-weight-checks";
 import { useMatchSyncContext } from "./match-sync-context";
+import { PRESS_COPY } from "./press-copy";
 
 /** reweigh_for_match accepts 0 < w < 500 lbs (stored to 0.01). */
 export function isValidReweigh(lbs: number): boolean {
@@ -22,9 +24,12 @@ interface WeightCheckActionsParams {
  * `use-faceoff.ts`: judge the opponent's weigh-in and re-weigh for this
  * match. Each applies what the RPC returned, or re-reads the checks on a
  * refusal and says so with the shipped toast. In a timekeeper-mode match
- * (the sync context's `timekeeperModeSelfId`) that toast is its title alone,
- * never the server's text (M-R4, spec 14.9 X1), and the match is re-read
- * too, since the refusal may mean it moved on.
+ * (the sync context's `timekeeperModeSelfId`) that toast is its title,
+ * never the server's text (M-R4, spec 14.9 X1), with `Check your connection
+ * and try again.` under a failure the screen cannot explain (PM29;
+ * `Weight changed` and a match that moved on, MATCH_NOT_PENDING, keep the
+ * title alone, which is true), and the match is re-read too, since the
+ * refusal may mean it moved on.
  */
 export function useWeightCheckActions(params: WeightCheckActionsParams) {
   const [busy, setBusy] = React.useState(false);
@@ -34,13 +39,19 @@ export function useWeightCheckActions(params: WeightCheckActionsParams) {
   const modeRef = React.useRef({ timekeeperMode: false, reconcileNow });
   modeRef.current = { timekeeperMode: timekeeperModeSelfId != null, reconcileNow };
 
-  /** The refusal's toast: the shipped title and the server's reason; in timekeeper mode the title alone, and a re-read. */
-  const refused = React.useCallback((kind: "error" | "info", title: string, message: string) => {
+  /**
+   * The refusal's toast: the shipped title and the server's reason; in
+   * timekeeper mode the title and a re-read. A failure adds the guidance
+   * (PM29), except MATCH_NOT_PENDING (`invalid_status`: the match started or
+   * was cancelled), which the re-read explains.
+   */
+  const refused = React.useCallback((kind: "error" | "info", title: string, error: DomainError) => {
     if (!modeRef.current.timekeeperMode) {
-      toast[kind]({ text1: title, description: message });
+      toast[kind]({ text1: title, description: error.message });
       return;
     }
-    toast[kind]({ text1: title });
+    const explained = kind === "info" || error.code === "MATCH_NOT_PENDING";
+    toast[kind](explained ? { text1: title } : { text1: title, description: PRESS_COPY.checkConnection });
     modeRef.current.reconcileNow();
   }, []);
 
@@ -58,10 +69,10 @@ export function useWeightCheckActions(params: WeightCheckActionsParams) {
     }
     handle.refetch();
     if (res.error.code === "WEIGHT_CHANGED") {
-      refused("info", "Weight changed", res.error.message);
+      refused("info", "Weight changed", res.error);
       return;
     }
-    refused("error", "Couldn't save your check", res.error.message);
+    refused("error", "Couldn't save your check", res.error);
   }, [refused]);
 
   const reweigh = React.useCallback(async (lbs: number) => {
@@ -78,7 +89,7 @@ export function useWeightCheckActions(params: WeightCheckActionsParams) {
       return true;
     }
     handle.refetch();
-    refused("error", "Couldn't re-weigh", res.error.message);
+    refused("error", "Couldn't re-weigh", res.error);
     return false;
   }, [refused]);
 

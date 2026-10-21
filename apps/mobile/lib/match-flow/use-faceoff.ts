@@ -15,6 +15,7 @@ import { useDualAutoStart } from "./use-dual-auto-start";
 import { useFaceoffLeave } from "./use-faceoff-leave";
 import { useMergedReady, type FaceoffTimekeeperView } from "./use-merged-ready";
 import { useStartClaim, type StartClaim } from "./use-timekeeper-start";
+import { PRESS_COPY } from "./press-copy";
 
 export type { WeightCheckView } from "./weight-check-view";
 export type { FaceoffTimekeeperView } from "./use-merged-ready";
@@ -270,8 +271,8 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
     const res = await updateAthleteWeight(supabase, pRef.current.meId, lbs);
     setSavingWeight(false);
     if (!res.ok) {
-      // A timekeeper-mode surface never shows the server's text (M-R4, spec 14.9 X1).
-      if (timekeeperModeRef.current) toast.error({ text1: "Couldn't update weight" });
+      // A timekeeper-mode surface never shows the server's text (M-R4, spec 14.9 X1), only the guidance (PM29).
+      if (timekeeperModeRef.current) toast.error({ text1: "Couldn't update weight", description: PRESS_COPY.checkConnection });
       else toast.error({ text1: "Couldn't update weight", description: res.error.message });
       return false;
     }

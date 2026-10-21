@@ -2,9 +2,11 @@ import * as React from "react";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { startMatchAsTimekeeper, type TimekeeperStartBlocker } from "@jits/shared/api/timekeeper";
+import type { DomainErrorCode } from "@jits/shared/api/errors";
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { SHIPPED_COPY } from "./timekeeper-copy";
 import { SEND_GRACE_MS, useMatchSyncContext } from "./match-sync-context";
+import { NO_REPLY, SEND_CEILING_MS } from "./send-timing";
 
 /**
  * Why the timekeeper's Start is disabled: a copy deck id (TK-K7 `WAITING FOR
@@ -118,6 +120,20 @@ export function useStartClaim(
   return { claim, claimed };
 }
 
+/**
+ * Start refusals for a blocker that still stands (`start_match` refuses with
+ * the first of `_tk_start_blockers`): the reason line above Start says why
+ * on the next state read, so the toast is the shipped title alone.
+ */
+const BLOCKER_REFUSALS: ReadonlySet<DomainErrorCode> = new Set<DomainErrorCode>([
+  "TIMEKEEPER_REQUIRED",
+  "ATHLETES_NOT_READY",
+  "WEIGHT_FLAGGED",
+  "WEIGHT_RECHECK_PENDING",
+  "WEIGHT_CHECK_PENDING",
+  "TIMEKEEPER_NOT_RECORDING",
+]);
+
 interface TimekeeperStartParams {
   matchId: string;
   /** The seated timekeeper (this phone): the `timer_started` actor. */
@@ -139,34 +155,87 @@ interface TimekeeperStartParams {
  * athletes re-read, M-R8) and re-reads the match, so the wizard's reconciler
  * moves all three phones to live on the DB's status; Start stays busy until
  * then. Never while a Leave is in flight (`claim`).
+ *
+ * PM29: a refusal for a blocker says the title alone (the reason line says
+ * why); any other failure adds `Check your connection and try again.`; a
+ * refusal that means the match already started (MATCH_NOT_PENDING: a start
+ * whose reply was lost, or a retry after a late landing) shows no toast, and
+ * the re-read moves all three phones to live. With no reply after
+ * `SEND_CEILING_MS` the press ends as that failure and Start comes back (a
+ * retry is safe: a second start is refused as already started), but Leave
+ * stays hidden while any Start call sent might still land, that is, until
+ * every one has answered: a Leave racing a late Start would make the match a
+ * `timekeeper_left` no contest. A late Start that went through keeps Leave
+ * gone and re-reads, as any other.
  */
 export function useTimekeeperStart(p: TimekeeperStartParams): { starting: boolean; start: () => void } {
   const { reconcileNow } = useMatchSyncContext();
   const [starting, setStarting] = React.useState(false);
+  /** The press this phone shows busy (`starting`); the ceiling can end it before its call answers. */
+  const pressRef = React.useRef(0);
   const inFlightRef = React.useRef(false);
+  /** Start calls sent that have not answered (PM29): Leave stays hidden while any is left. */
+  const unansweredRef = React.useRef(0);
   const pRef = React.useRef(p);
   pRef.current = p;
   const mountedRef = React.useRef(true);
+  const timersRef = React.useRef(new Set<ReturnType<typeof setTimeout>>());
   React.useEffect(() => {
     mountedRef.current = true;
+    const timers = timersRef.current;
     return () => {
       mountedRef.current = false;
+      for (const t of timers) clearTimeout(t);
+      timers.clear();
     };
   }, []);
 
   const start = React.useCallback(() => {
     const s = pRef.current;
     if (inFlightRef.current || !s.gate.canStart || !s.claim.claim()) return;
+    const press = ++pressRef.current;
     inFlightRef.current = true;
     setStarting(true);
+    unansweredRef.current += 1;
+    /** This reply still owns the busy press (the ceiling has not ended it). */
+    const owns = () => press === pressRef.current && inFlightRef.current;
+    const endPress = () => {
+      inFlightRef.current = false;
+      setStarting(false);
+    };
+    // PM29: no reply within the ceiling ends the press as failed; Start comes back, Leave does not.
+    const ceiling = setTimeout(() => {
+      timersRef.current.delete(ceiling);
+      if (!mountedRef.current || !owns()) return;
+      endPress();
+      toast.error({ text1: SHIPPED_COPY.couldNotStart, description: SHIPPED_COPY.checkConnection });
+      reconcileNow();
+    }, SEND_CEILING_MS);
+    timersRef.current.add(ceiling);
     void (async () => {
-      const res = await startMatchAsTimekeeper(supabase, s.matchId);
+      const res = await startMatchAsTimekeeper(supabase, s.matchId).then(
+        (r) => r,
+        () => NO_REPLY,
+      );
+      clearTimeout(ceiling);
+      timersRef.current.delete(ceiling);
+      unansweredRef.current -= 1;
       if (!mountedRef.current) return;
       if (!res.ok) {
-        inFlightRef.current = false;
-        setStarting(false);
-        s.claim.release(false);
-        toast.error({ text1: SHIPPED_COPY.couldNotStart });
+        // Leave comes back once no Start call might still land (and none went through).
+        if (unansweredRef.current === 0) s.claim.release(false);
+        // The ceiling already ended this press, and said so.
+        if (!owns()) return;
+        endPress();
+        const code = res.error.code;
+        // Already started (a lost reply, or a retry after a late landing): the read moves all three phones to live.
+        if (code !== "MATCH_NOT_PENDING") {
+          toast.error(
+            BLOCKER_REFUSALS.has(code)
+              ? { text1: SHIPPED_COPY.couldNotStart }
+              : { text1: SHIPPED_COPY.couldNotStart, description: SHIPPED_COPY.checkConnection },
+          );
+        }
         reconcileNow();
         return;
       }
