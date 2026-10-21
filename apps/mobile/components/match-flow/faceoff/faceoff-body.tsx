@@ -1,7 +1,8 @@
 import * as React from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
-import { useViewerStakes, weightsStakesKey } from "@/lib/match-flow/use-viewer-stakes";
+import { weightDivisionGap } from "@/lib/match-flow/weight-division";
+import { TIMEKEEPER_COPY } from "@/lib/match-flow/timekeeper-copy";
 import { useAiConsentGate } from "@/lib/moderation/use-ai-consent-gate";
 import { AiConsentSheet } from "@/components/moderation/ai-consent-sheet";
 import { useRecordingSpaceWarning } from "@/lib/video/recording-space";
@@ -9,7 +10,7 @@ import { usePalette } from "@/lib/theme/palette";
 import { Switch } from "@/components/ui/switch";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { TRACKING, typeStep } from "@/lib/typography";
-import { FightButton, Mono, StakesStrip, StatusPlate, shortName } from "../fight/fight-ui";
+import { FightButton, Mono, StatusPlate, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 import { WeightCheckPanel, WeightCheckPlate } from "./faceoff-weight-check";
 import type { FaceoffParticipant } from "./faceoff-top";
@@ -18,7 +19,10 @@ interface FaceoffBodyProps {
   phase: "weight" | "ready";
   me: FaceoffParticipant;
   opponent: FaceoffParticipant;
-  /** This match: the stakes are priced on its challenge weights. */
+  /**
+   * This match. Not read since the stakes read went (A11, O1); kept because
+   * the step renderer (slice M1's file) passes it.
+   */
   matchId?: string | null;
   /** The match length, for the recording's free-space estimate. */
   durationSeconds?: number | null;
@@ -26,34 +30,27 @@ interface FaceoffBodyProps {
 
 /**
  * The face-off below the header (and, on the ready phase, below the camera
- * the wizard renders between the two): stakes and weigh-in status, then the
- * recording opt-in and the ready handshake.
+ * the wizard renders between the two): the weight gap and weigh-in status,
+ * then the recording opt-in and the ready handshake. No rating stakes, in
+ * either mode (timekeeper mode spec 2.3 item 1, A11, O1).
  */
 export function FaceoffBody(props: FaceoffBodyProps) {
   return props.phase === "weight" ? <WeighIn {...props} /> : <ReadyCheck {...props} />;
 }
 
-function WeighIn({ me, opponent, matchId }: FaceoffBodyProps) {
+function WeighIn({ opponent }: FaceoffBodyProps) {
   const f = useFaceoffContext();
   const p = usePalette();
-  // Priced by the server on this match's challenge weights, exactly as
-  // record_match_result will rate it (a missing one means no offset). Read
-  // once the rated weights are read here too, so the LBS line beside the
-  // division line is the same pair of weights. The weights are in the key: a
-  // reweigh (reweigh_for_match) writes new challenge weights, and the strip,
-  // the division line and the note must be read again for them.
-  const stakes = useViewerStakes(
-    f.weightsRated,
-    opponent.athleteId,
-    matchId ?? null,
-    me.currentElo,
-    opponent.currentElo,
-    weightsStakesKey(f.myWeight, f.opponentWeight),
-  );
-  const gap = stakes?.weight_division_gap ?? 0;
   const both = f.myWeight != null && f.opponentWeight != null;
   const diff = both ? Math.round(Math.abs(f.myWeight! - f.opponentWeight!) * 10) / 10 : null;
-  const division = !stakes ? null : gap > 0 ? `${gap} ${gap > 1 ? "DIVISIONS" : "DIVISION"} APART` : "SAME DIVISION";
+  // The division gap from the two rated (challenge) weights, as
+  // record_match_result rates it (A28): computed here, no server read. None
+  // from profile stand-ins (no division line until the rated weights are
+  // read). A missing rated weight is gap 0, the server's own rule (both
+  // record_match_result and get_rating_stakes set v_gap := 0), so the line
+  // reads SAME DIVISION as it shipped. A reweigh changes the weights and so this.
+  const gap = f.weightsRated ? (both ? weightDivisionGap(f.myWeight!, f.opponentWeight!) : 0) : null;
+  const division = gap === null ? null : gap > 0 ? `${gap} ${gap > 1 ? "DIVISIONS" : "DIVISION"} APART` : "SAME DIVISION";
   const gapLine = [diff != null ? `${diff} LBS APART` : null, division].filter(Boolean).join(" · ");
   const oppName = shortName(opponent.displayName).toUpperCase();
   const cta = f.myWeight != null ? `Confirm ${Number(f.myWeight.toFixed(1))} lbs` : "Confirm weight";
@@ -70,12 +67,9 @@ function WeighIn({ me, opponent, matchId }: FaceoffBodyProps) {
           <Mono size="caption">{gapLine}</Mono>
         </View>
       ) : null}
-      {stakes ? (
-        <StakesStrip testID="weight-stakes" win={stakes.win} draw={stakes.draw} loss={stakes.loss} />
-      ) : null}
-      {gap > 0 ? (
+      {gap !== null && gap > 0 ? (
         <Text testID="weight-gap-note" className="font-body" style={[typeStep("body"), { color: p.text2 }]}>
-          The heavier athlete is favoured, so they win fewer points.
+          {TIMEKEEPER_COPY["TK-WG1"]}
         </Text>
       ) : null}
       <View style={{ flexDirection: "row", gap: 12 }}>

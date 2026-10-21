@@ -85,8 +85,8 @@ const STAKES = ratingStakes();
 function Harness({ phase, onWeighedIn = jest.fn(), onStarted = jest.fn(), onCancelledRemotely = jest.fn(), weightsRated = true, myWeight = 170, opponentWeight = 167 }: {
   phase: "weight" | "ready";
   weightsRated?: boolean;
-  myWeight?: number;
-  opponentWeight?: number;
+  myWeight?: number | null;
+  opponentWeight?: number | null;
   onWeighedIn?: () => void;
   onStarted?: (s: string) => void;
   onCancelledRemotely?: (d?: string) => void;
@@ -135,7 +135,7 @@ beforeEach(() => {
 });
 
 describe("weigh-in", () => {
-  it("shows the fight card, the stakes and the division line", async () => {
+  it("shows the fight card and the division line, and no stakes in either mode (A11, O1)", async () => {
     const s = render(<Harness phase="weight" />);
     await flush();
     s.getByText("FACE-OFF · WEIGH IN");
@@ -144,20 +144,11 @@ describe("weigh-in", () => {
     s.getByText("ELO 1512");
     expect(s.getByTestId("faceoff-my-weight")).toHaveTextContent("170 LBS");
     expect(s.getByTestId("faceoff-opponent-weight")).toHaveTextContent("167 LBS");
+    // The division from the two rated weights, with no server read (A28).
     s.getByText("3 LBS APART · SAME DIVISION");
-    expect(s.getByTestId("weight-stakes-win")).toHaveTextContent("▲ +14");
-    expect(s.getByTestId("weight-stakes-draw")).toHaveTextContent("▼ −2");
-    expect(s.getByTestId("weight-stakes-loss")).toHaveTextContent("▼ −9");
-    // The face-off passes no Dynamic Type cap, so the shared strip neither
-    // caps nor truncates its cells here (only the incoming prompt does).
-    for (const key of ["win", "draw", "loss"]) {
-      const cell = s.getByTestId(`weight-stakes-${key}`);
-      expect([key, cell.props.numberOfLines, cell.props.maxFontSizeMultiplier]).toEqual([key, undefined, undefined]);
-    }
-    expect(s.getByText("WIN").props.numberOfLines).toBeUndefined();
-    // Rating V9: keyed on the opponent's id and this match (its challenge
-    // weights), never the retired value-only calculate_elo_stakes.
-    expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "opp-1", "M1");
+    expect(s.queryByTestId("weight-stakes")).toBeNull();
+    expect(s.queryByText("WIN")).toBeNull();
+    expect(mockGetRatingStakes).not.toHaveBeenCalled();
     expect(mockGetEloStakes).not.toHaveBeenCalled();
   });
 
@@ -188,11 +179,10 @@ describe("weigh-in", () => {
     expect(s.getByTestId("faceoff-opponent-weight")).toHaveTextContent("167 LBS");
   });
 
-  it("the pencil edits the PROFILE weight: this match's weight, stakes and weigh-in stay", async () => {
+  it("the pencil edits the PROFILE weight: this match's weight, division line and weigh-in stay", async () => {
     mockUpdateWeight.mockResolvedValue({ ok: true, data: { weight: 172.5 } });
     const s = render(<Harness phase="weight" />);
     await flush();
-    const stakesCalls = mockGetRatingStakes.mock.calls.length;
     fireEvent.press(s.getByTestId("faceoff-edit-weight"));
     s.getByText("Updates your profile weight for future matches. This match keeps its weigh-in.");
     // Confirm waits while the editor is open.
@@ -208,7 +198,7 @@ describe("weigh-in", () => {
     s.getByText("Profile weight saved: 172.5 lbs, for future matches.");
     s.getByText("Confirm 170 lbs");
     await flush();
-    expect(mockGetRatingStakes.mock.calls.length).toBe(stakesCalls);
+    s.getByText("3 LBS APART · SAME DIVISION");
     expect(s.getByTestId("weight-confirm").props.accessibilityState.disabled).toBe(false);
     await act(async () => {
       fireEvent.press(s.getByTestId("weight-confirm"));
@@ -227,84 +217,52 @@ describe("weigh-in", () => {
     expect(s.queryByTestId("faceoff-weight-input")).toBeNull();
   });
 
-  it("prices nothing until the match's rated (challenge) weights are read", async () => {
-    render(<Harness phase="weight" weightsRated={false} />);
+  it("shows no division line or note until the match's rated (challenge) weights are read", async () => {
+    const s = render(<Harness phase="weight" weightsRated={false} opponentWeight={195} />);
     await flush();
+    // Profile stand-ins: the LBS line only; the server rates the challenge's weights.
+    s.getByText("25 LBS APART");
+    expect(s.queryByText(/DIVISION/)).toBeNull();
+    expect(s.queryByTestId("weight-gap-note")).toBeNull();
     expect(mockGetRatingStakes).not.toHaveBeenCalled();
   });
 
-  it("a reweigh (new challenge weights) reads the stakes again and hides the old strip meanwhile", async () => {
+  it("a reweigh (new challenge weights) recomputes the division line and the note at once, with no read", async () => {
     const s = render(<Harness phase="weight" />);
     await flush();
-    expect(s.getByTestId("weight-stakes-win")).toHaveTextContent("▲ +14");
-    expect(mockGetRatingStakes).toHaveBeenCalledTimes(1);
+    s.getByText("3 LBS APART · SAME DIVISION");
+    expect(s.queryByTestId("weight-gap-note")).toBeNull();
 
     // reweigh_for_match wrote a new opponent weight; the wizard feeds it in.
-    let resolve!: (v: unknown) => void;
-    mockGetRatingStakes.mockReturnValueOnce(new Promise((r) => (resolve = r)));
-    s.rerender(<Harness phase="weight" opponentWeight={190} />);
-    expect(s.queryByTestId("weight-stakes")).toBeNull();
-    await flush();
-    expect(mockGetRatingStakes).toHaveBeenCalledTimes(2);
-    expect(mockGetRatingStakes).toHaveBeenLastCalledWith(expect.anything(), "opp-1", "M1");
-    expect(s.queryByTestId("weight-stakes")).toBeNull();
-
-    await act(async () => {
-      resolve(ratingStakes({ win: 19, draw: 3, loss: -5, weight_division_gap: 1 }));
-    });
-    expect(s.getByTestId("weight-stakes-win")).toHaveTextContent("▲ +19");
-    s.getByText("20 LBS APART · 1 DIVISION APART");
+    s.rerender(<Harness phase="weight" opponentWeight={180} />);
+    s.getByText("10 LBS APART · 1 DIVISION APART");
     s.getByTestId("weight-gap-note");
+    expect(mockGetRatingStakes).not.toHaveBeenCalled();
   });
 
-  it("an underdog's positive draw shows in the gain colour, not amber", async () => {
-    mockGetRatingStakes.mockResolvedValue(ratingStakes({ win: 31, draw: 4, loss: -6 }));
-    const s = render(<Harness phase="weight" />);
-    await flush();
-    const draw = s.getByTestId("weight-stakes-draw");
-    expect(draw).toHaveTextContent("▲ +4");
-    expect(colorOf(draw)).toBe(colorOf(s.getByTestId("weight-stakes-win")));
-  });
+  it.each([
+    ["the opponent's", { opponentWeight: null }],
+    ["my", { myWeight: null }],
+  ] as const)(
+    "%s rated weight missing reads SAME DIVISION with no note, as shipped (the server's gap is 0 then)",
+    async (_whose, weights) => {
+      const s = render(<Harness phase="weight" {...weights} />);
+      await flush();
+      // No LBS figure without both weights: the division line alone.
+      s.getByText("SAME DIVISION");
+      expect(s.queryByText(/APART/)).toBeNull();
+      expect(s.queryByTestId("weight-gap-note")).toBeNull();
+      expect(s.queryByText(/error|failed/i)).toBeNull();
+      expect(mockGetRatingStakes).not.toHaveBeenCalled();
+    },
+  );
 
-  it("a negative draw is amber and a draw between equals is neutral ink", async () => {
-    const neg = render(<Harness phase="weight" />);
+  it("a weight-class gap says the heavier athlete is favoured, without points (A28, TK-WG1)", async () => {
+    const s = render(<Harness phase="weight" opponentWeight={195} />);
     await flush();
-    const negColor = colorOf(neg.getByTestId("weight-stakes-draw"));
-    expect(negColor).not.toBe(colorOf(neg.getByTestId("weight-stakes-loss")));
-    neg.unmount();
-    mockGetRatingStakes.mockResolvedValue(ratingStakes({ draw: 0 }));
-    const zero = render(<Harness phase="weight" />);
-    await flush();
-    const zeroDraw = zero.getByTestId("weight-stakes-draw");
-    expect(zeroDraw).toHaveTextContent("0");
-    expect(colorOf(zeroDraw)).not.toBe(negColor);
-    expect(colorOf(zeroDraw)).not.toBe(colorOf(zero.getByTestId("weight-stakes-win")));
-  });
-
-  it("a null response hides the strip and the division line, with no error", async () => {
-    mockGetRatingStakes.mockResolvedValue(null);
-    const s = render(<Harness phase="weight" />);
-    await flush();
-    expect(s.queryByTestId("weight-stakes")).toBeNull();
-    expect(s.queryByTestId("weight-gap-note")).toBeNull();
-    s.getByText("3 LBS APART");
-    expect(s.queryByText(/error|failed/i)).toBeNull();
-  });
-
-  it("a failed read hides the strip, with no error", async () => {
-    mockGetRatingStakes.mockRejectedValue(new Error("function get_rating_stakes does not exist"));
-    const s = render(<Harness phase="weight" />);
-    await flush();
-    expect(s.queryByTestId("weight-stakes")).toBeNull();
-    expect(s.queryByText(/error|failed/i)).toBeNull();
-  });
-
-  it("a weight-class gap says the heavier athlete is favoured (Rating V9 copy)", async () => {
-    mockGetRatingStakes.mockResolvedValue(ratingStakes({ weight_division_gap: 2 }));
-    const s = render(<Harness phase="weight" />);
-    await flush();
-    s.getByText("3 LBS APART · 2 DIVISIONS APART");
-    expect(s.getByTestId("weight-gap-note")).toHaveTextContent("The heavier athlete is favoured, so they win fewer points.");
+    s.getByText("25 LBS APART · 2 DIVISIONS APART");
+    expect(s.getByTestId("weight-gap-note")).toHaveTextContent("Weight gap: the heavier athlete is favoured.");
+    expect(s.queryByText(/points/)).toBeNull();
     expect(s.queryByText(/adjusted/)).toBeNull();
   });
 });

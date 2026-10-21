@@ -36,7 +36,7 @@ import { ON_MEDIA, paletteFor, usePalette } from "@/lib/theme/palette";
 import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { darkTokens, lightTokens } from "@/lib/tokens";
-import { FightButton, StakesStrip } from "@/components/match-flow/fight/fight-ui";
+import { FightButton, drawDeltaColor } from "@/components/match-flow/fight/fight-ui";
 import { FilmBadge } from "@/components/film-room/status-badge";
 import { FaceoffChip } from "@/components/match-flow/faceoff/faceoff-top";
 
@@ -132,35 +132,27 @@ describe("shared match-flow pieces render with the active theme", () => {
   it.each([
     ["light", lightTokens],
     ["dark", darkTokens],
-  ] as const)("%s: stakes strip plate and deltas, secondary button label", (scheme, t) => {
+  ] as const)("%s: secondary button label", (scheme, t) => {
+    // The stakes strip this case also rendered is gone in both modes
+    // (timekeeper mode A11, O1).
     mockScheme = scheme;
     const s = render(
       <View>
-        <StakesStrip testID="stakes" win={12} draw={-2} loss={-9} />
         <FightButton testID="btn" variant="secondary" label="Record it myself" onPress={jest.fn()} />
       </View>,
     );
-    expect(bgOf(s.getByTestId("stakes"))).toBe(t.bgElevated);
-    expect(color(s.getByTestId("stakes-win"))).toBe(t.statePositive);
-    expect(color(s.getByTestId("stakes-loss"))).toBe(t.stateNegative);
     expect(color(s.getByText("Record it myself"))).toBe(t.textPrimary);
   });
 
   it.each([
     ["light", lightTokens],
     ["dark", darkTokens],
-  ] as const)("%s: the draw cell is coloured by its sign (Rating V9: an underdog's draw gains)", (scheme, t) => {
-    mockScheme = scheme;
-    const s = render(
-      <View>
-        <StakesStrip testID="up" win={31} draw={4} loss={-6} />
-        <StakesStrip testID="down" win={3} draw={-2} loss={-17} />
-        <StakesStrip testID="even" win={10} draw={0} loss={-10} />
-      </View>,
-    );
-    expect(color(s.getByTestId("up-draw"))).toBe(t.statePositive);
-    expect(color(s.getByTestId("down-draw"))).toBe(t.attention);
-    expect(color(s.getByTestId("even-draw"))).toBe(t.textPrimary);
+  ] as const)("%s: a draw delta is coloured by its sign (Rating V9: an underdog's draw gains)", (scheme, t) => {
+    // Was the stakes strip's draw cell; the verdict's rating moment keeps it.
+    const p = paletteFor(scheme);
+    expect(drawDeltaColor(4, p)).toBe(t.statePositive);
+    expect(drawDeltaColor(-2, p)).toBe(t.attention);
+    expect(drawDeltaColor(0, p)).toBe(t.textPrimary);
   });
 
   it("chrome over camera or film keeps the fixed on-media colors in the light theme", () => {

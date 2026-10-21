@@ -267,8 +267,9 @@ describe("verdict copy and the harness contract", () => {
     const s = renderVerdict({ me: { athleteId: "me", displayName: "Kai Reyes", eloBefore: 1512, eloAfter: 1526, eloDelta: 14, weightDivisionGap: 1 } });
     await flush();
     expect(s.getByText(/1 weight class apart/)).toBeTruthy();
-    // Rating V9 copy (spec 019 section 7.3): the weight is in the odds, not an adjustment.
-    s.getByText("1 weight class apart. The heavier athlete was favoured, so they win fewer points.");
+    // Without points (timekeeper mode A28, TK-WG2), both modes: no Elo hints in matches.
+    s.getByText("1 weight class apart. The heavier athlete was favoured.");
+    expect(s.queryByText(/points/)).toBeNull();
     expect(s.queryByText(/ELO was adjusted/)).toBeNull();
   });
 });

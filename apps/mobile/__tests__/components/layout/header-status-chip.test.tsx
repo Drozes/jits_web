@@ -50,6 +50,16 @@ let mockToConfirm: { matchId: string; status: "in_progress"; opponentName: strin
 jest.mock("@/lib/match-flow/active-match-store", () => ({
   useMatchToConfirm: () => mockToConfirm,
 }));
+// The match this athlete timekeeps (timekeeper mode A20): none unless a test says so.
+let mockTimekeeping: Record<string, unknown> | null = null;
+const mockTimekeepingSelf: Array<string | null | undefined> = [];
+jest.mock("@/lib/match-flow/timekeeping-match-store", () => ({
+  ...jest.requireActual("@/lib/match-flow/timekeeping-match-store"),
+  useMyTimekeepingMatch: (selfId: string | null | undefined) => {
+    mockTimekeepingSelf.push(selfId);
+    return mockTimekeeping;
+  },
+}));
 
 import * as ReactNative from "react-native";
 import {
@@ -62,6 +72,7 @@ import {
   CHIP_PENDING_TEST_ID,
   CHIP_RING_TEST_ID,
   HeaderStatusChip,
+  timekeepingTextScale,
 } from "@/components/layout/header-status-chip";
 import {
   CHIP_HEIGHT,
@@ -1835,5 +1846,161 @@ describe("HeaderStatusChip", () => {
     expect(getByTestId("header-status-chip-lead").props.maxFontSizeMultiplier).toBe(
       layoutChip(m, CHIP_MAX_FONT_SCALE).textScale,
     );
+  });
+});
+
+// Timekeeper mode A20, PM20 (spec 9.1; TK-H6): the chip while on duty as a timekeeper.
+describe("HeaderStatusChip TIMEKEEPING (A20)", () => {
+  const ON_DUTY = {
+    matchId: "tk-1",
+    status: "in_progress",
+    startedAt: null,
+    endedAt: null,
+    athletes: [
+      { athleteId: "c-1", displayName: "Mina Reyes" },
+      { athleteId: "o-1", displayName: "Dan Okafor" },
+    ],
+    reviewPending: false,
+    editOpen: false,
+    editClosesAt: null,
+  };
+  let ctl: ArenaController;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    __resetArenaStoreForTests();
+    mockOnMat = 12;
+    mockToConfirm = null;
+    mockTimekeeping = null;
+    mockTimekeepingSelf.length = 0;
+    ctl = controller();
+    registerArenaController(ctl);
+  });
+
+  afterEach(() => {
+    mockTimekeeping = null;
+  });
+
+  it.each(["pending", "in_progress"])(
+    "%s: TIMEKEEPING in the attention token, labelled `Live status: timekeeping A vs B`; a tap opens the match",
+    (status) => {
+      mockTimekeeping = { ...ON_DUTY, status };
+      publishArenaSelfId("me-1");
+      const { getByTestId } = render(<HeaderStatusChip />);
+      // Read for the signed-in athlete only.
+      expect(mockTimekeepingSelf).toContain("me-1");
+      const chip = getByTestId("header-status-chip");
+      expect(getByTestId("header-status-chip-lead").props.children).toBe("TIMEKEEPING");
+      const label = chip.props.accessibilityLabel as string;
+      expect(label).toBe("Live status: timekeeping M. Reyes vs D. Okafor");
+      expect(label.startsWith("Live status:")).toBe(true);
+      expect(["Go live", "Go offline"]).not.toContain(label);
+      expect(chip.props.accessibilityRole).toBe("button");
+      // Amber, never Signal Red or Gain Green.
+      expect(getByTestId("header-status-chip-frame").props.className).toMatch(/\bborder-attention\b/);
+      expect(getByTestId("header-status-chip-lead").props.className).toMatch(/\btext-attention\b/);
+      for (const id of ["header-status-chip-frame", "header-status-chip-lead"]) {
+        expect(getByTestId(id).props.className).not.toMatch(/cta|positive|negative/);
+      }
+      fireEvent.press(chip);
+      expect(mockNavigate).toHaveBeenCalledWith(arenaMatchHref("tk-1"));
+      expect(ctl.goLive).not.toHaveBeenCalled();
+    },
+  );
+
+  it("takes precedence over the live state and over CONFIRM", () => {
+    mockTimekeeping = ON_DUTY;
+    mockToConfirm = { matchId: "m-1", status: "in_progress", opponentName: "Sam" };
+    setArena({ isLive: true });
+    const { getByTestId, queryByTestId } = render(<HeaderStatusChip />);
+    expect(getByTestId("header-status-chip-lead").props.children).toBe("TIMEKEEPING");
+    expect(queryByTestId("header-status-chip-fill")).toBeNull();
+    expect(queryByTestId("header-status-chip-confirm")).toBeNull();
+  });
+
+  it("not during the edit window: a completed match shows the real live state (PM20)", async () => {
+    mockTimekeeping = { ...ON_DUTY, status: "completed", editOpen: true, editClosesAt: "2026-10-20T12:30:00Z" };
+    const { getByTestId } = render(<HeaderStatusChip />);
+    expect(chipText(getByTestId)).toBe("○GO LIVE · 12");
+    await act(async () => {
+      fireEvent.press(getByTestId("header-status-chip"));
+    });
+    expect(ctl.goLive).toHaveBeenCalledTimes(1);
+  });
+
+  it("nothing to timekeep: the shipped chip, unchanged", () => {
+    const { getByTestId } = render(<HeaderStatusChip />);
+    expect(chipText(getByTestId)).toBe("○GO LIVE · 12");
+  });
+
+  /** Lays the chip's slot out at `width` points. */
+  function layoutSlot(getByTestId: ReturnType<typeof render>["getByTestId"], width: number) {
+    act(() => {
+      fireEvent(getByTestId("header-status-chip-slot"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width, height: 44 } },
+      });
+    });
+  }
+
+  it("fits a narrow header the way the live chip does: the whole label, drawn smaller", () => {
+    mockTimekeeping = ON_DUTY;
+    const restore = setFontScale(1);
+    try {
+      const { getByTestId } = render(<HeaderStatusChip />);
+      const lead = () => getByTestId("header-status-chip-lead");
+      const fontSize = () => ReactNative.StyleSheet.flatten(lead().props.style).fontSize;
+
+      // Room for it at 1x: drawn as the system draws it.
+      layoutSlot(getByTestId, 160);
+      expect(timekeepingTextScale("TIMEKEEPING", 1, 160)).toBe(1);
+      expect(lead().props.maxFontSizeMultiplier).toBe(1);
+      expect(fontSize()).toBeUndefined();
+
+      // A narrow header (a 320pt-wide phone): under 1x, through the font size.
+      layoutSlot(getByTestId, 90);
+      const scale = timekeepingTextScale("TIMEKEEPING", 1, 90);
+      expect(scale).toBeLessThan(1);
+      expect(scale).toBeGreaterThanOrEqual(NARROW_MIN_TEXT_SCALE);
+      expect(lead().props.children).toBe("TIMEKEEPING");
+      expect(lead().props.maxFontSizeMultiplier).toBe(1);
+      expect(fontSize()).toBeCloseTo(10 * scale);
+      // And it fits: both paddings, the 10pt stopwatch, the gap, 11 mono characters at 0.6em.
+      expect(8 + 10 + 5 + 11 * 10 * scale * 0.6 + 8).toBeLessThanOrEqual(90);
+    } finally {
+      restore();
+    }
+  });
+
+  it("at the 1.3x cap a short slot steps the text down, still above 1x where that fits", () => {
+    mockTimekeeping = ON_DUTY;
+    const restore = setFontScale(CHIP_MAX_FONT_SCALE);
+    try {
+      const { getByTestId } = render(<HeaderStatusChip />);
+      layoutSlot(getByTestId, 160);
+      expect(getByTestId("header-status-chip-lead").props.maxFontSizeMultiplier).toBe(CHIP_MAX_FONT_SCALE);
+      layoutSlot(getByTestId, 110);
+      const scale = timekeepingTextScale("TIMEKEEPING", CHIP_MAX_FONT_SCALE, 110);
+      expect(scale).toBeLessThan(CHIP_MAX_FONT_SCALE);
+      expect(scale).toBeGreaterThan(1);
+      expect(getByTestId("header-status-chip-lead").props.maxFontSizeMultiplier).toBe(scale);
+      expect(8 + 10 + 5 + 11 * 10 * scale * 0.6 + 8).toBeLessThanOrEqual(110);
+    } finally {
+      restore();
+    }
+  });
+
+  it("reports the spare width like the live chip", () => {
+    mockTimekeeping = ON_DUTY;
+    const onSpareWidth = jest.fn();
+    const { getByTestId } = render(<HeaderStatusChip onSpareWidth={onSpareWidth} />);
+    act(() => {
+      fireEvent(getByTestId("header-status-chip-slot"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 160, height: 44 } },
+      });
+      fireEvent(getByTestId("header-status-chip"), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 110, height: 44 } },
+      });
+    });
+    expect(onSpareWidth).toHaveBeenLastCalledWith(50);
   });
 });

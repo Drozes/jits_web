@@ -190,6 +190,21 @@ jest.mock("@jits/shared/api/queries", () => ({
 
 jest.mock("@jits/shared/types/composites", () => ({}), { virtual: true });
 
+// Home's invite fallback card reads `invites_enabled`: off (fail-closed, as an
+// unmocked read here resolves) unless a test turns it on.
+let mockInvitesOn = false;
+jest.mock("@/lib/invites/use-invites-enabled", () => ({
+  ...jest.requireActual("@/lib/invites/use-invites-enabled"),
+  useInvitesEnabled: () => mockInvitesOn,
+}));
+
+// The match this athlete timekeeps (timekeeper mode A20): none unless a test says so.
+const mockGetMyTimekeepingMatch = jest.fn((..._a: unknown[]) => Promise.resolve({ ok: true, data: null as unknown }));
+jest.mock("@jits/shared/api/timekeeper", () => ({
+  ...jest.requireActual("@jits/shared/api/timekeeper"),
+  getMyTimekeepingMatch: (...a: unknown[]) => mockGetMyTimekeepingMatch(...a),
+}));
+
 // The Highlights carousel's source (specs/matches-tab 7, via useReelLane), and
 // cold-start push routing armed by Home.
 const mockGetMyHighlights = jest.fn();
@@ -638,6 +653,150 @@ describe("DashboardScreen resume-match card", () => {
     });
     await waitFor(() => expect(queries.getMyActiveMatch).toHaveBeenCalledTimes(2));
     expect(getByLabelText("Resume your match")).toBeTruthy();
+  });
+});
+
+// Timekeeper mode A20, A24, PM20 (spec 9.1): the match this athlete TIMEKEEPS.
+describe("DashboardScreen timekeeper card (A20)", () => {
+  const ATHLETES = [
+    { athleteId: "c-1", displayName: "Mina Reyes" },
+    { athleteId: "o-1", displayName: "Dan Okafor" },
+  ];
+  const tk = (over: Record<string, unknown> = {}) => ({
+    ok: true,
+    data: {
+      matchId: "tk-match-1",
+      status: "in_progress",
+      startedAt: "2026-10-20T12:00:00Z",
+      endedAt: null,
+      athletes: ATHLETES,
+      reviewPending: false,
+      editOpen: false,
+      editClosesAt: null,
+      ...over,
+    },
+  });
+  const athleteOpen = {
+    ok: true,
+    data: { matchId: "99999999-9999-4999-8999-999999999999", status: "in_progress", opponentName: "Demo Red" },
+  };
+
+  afterEach(() => {
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve({ ok: true, data: null }));
+    mockInvitesOn = false;
+    mockHasEverPlayed = false;
+  });
+
+  it("on duty: the TIMEKEEPER card with the matchup, TK-H3 and the one red CTA; a tap opens the match, nothing auto-navigates", async () => {
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve(tk()));
+    const utils = render(React.createElement(DashboardScreen));
+    const card = await utils.findByTestId("timekeeping-resume-card");
+    expect(utils.getByTestId("timekeeping-resume-role")).toHaveTextContent("TIMEKEEPER");
+    expect(utils.getByTestId("timekeeping-resume-title")).toHaveTextContent("M. Reyes vs D. Okafor");
+    expect(utils.getByTestId("timekeeping-resume-line")).toHaveTextContent("You run the clock and record the result.");
+    expect(card).toBeTruthy();
+    // Not the athlete card.
+    expect(utils.queryByLabelText("Resume your match")).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
+    const cta = utils.getByLabelText("Back to the match");
+    expect(redCtas(utils)).toHaveLength(1);
+    fireEvent.press(cta);
+    expect(mockPush).toHaveBeenCalledWith("/match/tk-match-1");
+  });
+
+  it("after the clock ended: TK-H4", async () => {
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve(tk({ endedAt: "2026-10-20T12:06:00Z" })));
+    const utils = render(React.createElement(DashboardScreen));
+    expect(await utils.findByText("The result is waiting on you.")).toBeTruthy();
+    expect(utils.getByLabelText("Back to the match")).toBeTruthy();
+  });
+
+  it("in the edit window: Review result BELOW the athlete's Resume card, which keeps the one red CTA (PM20)", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(athleteOpen);
+    mockGetMyTimekeepingMatch.mockImplementation(() =>
+      Promise.resolve(tk({ status: "completed", endedAt: "2026-10-20T12:06:00Z", editOpen: true, editClosesAt: new Date(mockNow + 20 * 60_000).toISOString() })),
+    );
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("timekeeping-resume-card");
+    await utils.findByLabelText("Resume your match");
+    expect(utils.getByTestId("timekeeping-resume-line").props.children).toMatch(/^Result recorded\. You can fix it until .+\.$/);
+    const review = utils.getByLabelText("Review result");
+    expect(review.props.className ?? "").not.toMatch(/(^|\s)bg-cta(\s|$)/);
+    expect(redCtas(utils)).toHaveLength(1);
+    // The athlete card first, the timekeeper card below it.
+    type Node = { props: { testID?: unknown; accessibilityLabel?: unknown } };
+    const all: Node[] = utils.UNSAFE_root.findAll((n: Node) => n.props.testID === "timekeeping-resume-card" || n.props.accessibilityLabel === "Resume your match");
+    const athleteAt = all.findIndex((n) => n.props.accessibilityLabel === "Resume your match");
+    const tkAt = all.findIndex((n) => n.props.testID === "timekeeping-resume-card");
+    expect(athleteAt).toBeGreaterThanOrEqual(0);
+    expect(tkAt).toBeGreaterThan(athleteAt);
+  });
+
+  it("on duty, a never-played athlete gets no practice offer: the timekeeper card keeps the one red CTA", async () => {
+    // Practice-eligible but for the duty: no matches, never played, never offered.
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getDashboardSummary.mockResolvedValue({
+      ...mockSummary,
+      stats: { wins: 0, losses: 0, draws: 0, win_streak: 0, best_win_streak: 0 },
+    });
+    mockHasEverPlayed = false;
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve(tk()));
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("timekeeping-resume-card");
+    await utils.findByText(LOADED);
+    expect(utils.queryByTestId("practice-offer-card")).toBeNull();
+    expect(utils.getByLabelText("Back to the match").props.className).toMatch(/(^|\s)bg-cta(\s|$)/);
+    expect(redCtas(utils)).toHaveLength(1);
+  });
+
+  it("on duty with an athlete Resume card too (defensive, R2 forbids it): Resume keeps the one red CTA", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(athleteOpen);
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve(tk()));
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("timekeeping-resume-card");
+    const resume = await utils.findByLabelText("Resume your match");
+    expect(resume.props.className).toMatch(/(^|\s)bg-cta(\s|$)/);
+    expect(utils.getByLabelText("Back to the match").props.className ?? "").not.toMatch(/(^|\s)bg-cta(\s|$)/);
+    expect(redCtas(utils)).toHaveLength(1);
+  });
+
+  it("hides the invite card while it shows; the invite card comes back once the edit window closes, with no new read", async () => {
+    mockInvitesOn = true;
+    // A short window on the real clock: the card's own timer re-renders Home.
+    const closesAt = mockNow + 50;
+    mockGetMyTimekeepingMatch.mockImplementation(() =>
+      Promise.resolve(tk({ status: "completed", endedAt: "2026-10-20T12:06:00Z", editOpen: true, editClosesAt: new Date(closesAt).toISOString() })),
+    );
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("timekeeping-resume-card");
+    await utils.findByText(LOADED);
+    expect(utils.queryByTestId("home-invite-card")).toBeNull();
+    const reads = mockGetMyTimekeepingMatch.mock.calls.length;
+
+    // The window closes on this device's clock.
+    mockNow = closesAt + 1;
+    await waitFor(() => expect(utils.getByTestId("home-invite-card")).toBeTruthy());
+    expect(utils.queryByTestId("timekeeping-resume-card")).toBeNull();
+    expect(mockGetMyTimekeepingMatch.mock.calls.length).toBe(reads);
+  });
+
+  it("no card once the edit window has closed, or with nothing to timekeep", async () => {
+    mockGetMyTimekeepingMatch.mockImplementation(() =>
+      Promise.resolve(tk({ status: "completed", editOpen: true, editClosesAt: new Date(mockNow - 1000).toISOString() })),
+    );
+    const closed = render(React.createElement(DashboardScreen));
+    await closed.findByText(LOADED);
+    await act(async () => {});
+    expect(closed.queryByTestId("timekeeping-resume-card")).toBeNull();
+    closed.unmount();
+
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve({ ok: true, data: null }));
+    const none = render(React.createElement(DashboardScreen));
+    await none.findByText(LOADED);
+    await act(async () => {});
+    expect(none.queryByTestId("timekeeping-resume-card")).toBeNull();
   });
 });
 

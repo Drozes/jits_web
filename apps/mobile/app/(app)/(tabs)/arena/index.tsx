@@ -45,6 +45,7 @@ import {
 import { useArenaNearby } from "@/lib/arena/use-arena-nearby";
 import { OnlineCloseSection } from "@/components/arena/online-close-section";
 import { useMatchToConfirm } from "@/lib/match-flow/active-match-store";
+import { useArenaTimekeeper } from "@/lib/arena/use-arena-timekeeper";
 import { useFreshIncomingCount } from "@/lib/notifications/bell-store";
 import {
   arenaActions,
@@ -129,8 +130,10 @@ export default function ArenaScreen() {
   // (round 5): the bar and the chip never read different frames.
   const surface = useLiveSurface();
   const displayLive = surface.drawnLive;
-  // Both choices are always open with an owner mounted (review round 3).
-  const canGoLive = useCanGoLive();
+  // Both choices are always open with an owner mounted (review round 3),
+  // except going live while on duty as a timekeeper (A20).
+  const timekeeper = useArenaTimekeeper(athlete?.id);
+  const canGoLive = useCanGoLive() && !timekeeper.onDuty;
   const canGoOffline = useCanGoOffline();
   const switchLocked = !canGoLive;
   // The athlete chose live and it is on its way (QA 4): LIVE shows pending,
@@ -385,6 +388,7 @@ export default function ArenaScreen() {
             active={ticking}
             onCancel={() => void cancelOutgoing()}
             disabled={isBusy}
+            helper={timekeeper.waitingHelper}
           />
         ) : null}
         {/* Fresh challenges the Arena cannot raise yet (challenger off the
@@ -451,7 +455,7 @@ export default function ArenaScreen() {
                     ? actionsLocked || liveSaving || capReached
                     : switchLocked
                 }
-                viewer={{ elo: selfElo, weight: athlete.current_weight ?? null }}
+                viewerElo={selfElo}
                 onChallenge={() => {
                   if (closest) void sendChallenge(closest.id, closest.displayName);
                 }}

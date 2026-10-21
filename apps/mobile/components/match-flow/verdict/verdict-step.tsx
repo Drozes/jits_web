@@ -36,6 +36,7 @@ import { HERO_CAPTION } from "@/lib/video/video-status-copy";
 import { videoHref } from "@/lib/film-room/href";
 import { noteRatingWatched, noteVerdictOutcome } from "@/lib/rating/header-elo";
 import type { MatchAthleteView } from "@/lib/match-flow/match-roles";
+import { TIMEKEEPER_COPY } from "@/lib/match-flow/timekeeper-copy";
 
 /** While the opponent's confirmation is missing, re-read the match this often. */
 export const VERDICT_DISPUTE_POLL_MS = 15_000;
@@ -280,7 +281,7 @@ export function VerdictStep(props: VerdictStepProps) {
         ) : null}
 
         {gap > 0 ? (
-          <Mono size="micro" spacing="caps">{`${gap} weight ${gap > 1 ? "classes" : "class"} apart. The heavier athlete was favoured, so they win fewer points.`}</Mono>
+          <Mono size="micro" spacing="caps">{TIMEKEEPER_COPY["TK-WG2"](gap)}</Mono>
         ) : null}
 
         {fsView ? (

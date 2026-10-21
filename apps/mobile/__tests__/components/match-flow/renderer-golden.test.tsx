@@ -19,11 +19,11 @@
  * renders, since every mobile Arena match has a challenge: the wizard then
  * reads the challenge's rated weights (useMatchWeights) and, on the
  * face-off, the weight checks (useMatchWeightChecks), so its cases pin the
- * rated weights on the fight card, the chip and the countdown, the gap line,
- * the stakes strip (a null get_rating_stakes response, and one case with
- * stakes), the weight check plate and panel, and the ready step's weight
- * hold. The countdown (started_at one second before NOW) and the confirm and
- * verdict screens for a win, a loss and a draw are pinned too.
+ * rated weights on the fight card, the chip and the countdown, the gap line
+ * (in one case a division apart, with its note), the weight check plate and
+ * panel, and the ready step's weight hold. The countdown (started_at one
+ * second before NOW) and the confirm and verdict screens for a win, a loss
+ * and a draw are pinned too.
  *
  * The snapshot is the baseline (PLAN.md section 5, "Golden baseline", R3-6).
  * Every entry was captured by running this file, unchanged, in a clean
@@ -42,11 +42,25 @@
  * `get_rating_stakes` (opponent id and match id) with the same numbers, so
  * the strip itself is unchanged.
  *
+ * And slice M6's re-capture (timekeeper mode A11, O1 and A28; spec 2.3 item
+ * 1), in both modes: the face-off has no stakes strip and reads no stakes;
+ * its division line comes from the two rated weights, so it now shows on
+ * every challenge-backed weigh-in (before, only once stakes loaded); the
+ * face-off note is TK-WG1 ("Weight gap: the heavier athlete is favoured.")
+ * and the verdict weight-class line TK-WG2 ("1 weight class apart. The
+ * heavier athlete was favoured."), without points. The two weigh-in case
+ * names keep their stakes-era names so the entries stay comparable; the
+ * "stakes" case is now the one whose rated weights sit a division apart
+ * (`A_DIVISION_APART`: the challenger at 160 lbs against 170.2, so its fight
+ * card weight and LBS line change with its gap line and note; 168 and 170.2
+ * are both Middle, so the #81 mock's one-division gap was not reachable).
+ *
  * Only the data layer, the realtime hook, the recorder and the native
  * modules are stubbed (the same set `wizard-reconcile.test.tsx` uses, plus
- * the challenge weight, weight check and stakes reads). Exactly two raw
- * differences between f88a9920 and the refactor are accepted, and each is
- * normalized narrowly in `serialize` / `normalize` below:
+ * the challenge weight and weight check reads, and the stakes read, which
+ * must never be called). Exactly two raw differences between f88a9920 and
+ * the refactor are accepted, and each is normalized narrowly in `serialize`
+ * / `normalize` below:
  *  - the dev-only step marker's "Step N of T" index (PR1 deleted the dead
  *    `wait` step: "of 8" became "of 7"). It is a harness hook hidden in
  *    release builds; the marker's step name stays in the tree.
@@ -240,7 +254,6 @@ import { __resetFreshForTests, __resetPlayedMomentsForTests } from "@/components
 import { __resetHeaderEloForTests } from "@/lib/rating/header-elo";
 import { __resetStripSuppressionsForTests } from "@/lib/video/upload-strip-visibility";
 import { parseMatchWeightChecks } from "@jits/shared/api/match-weight-checks";
-import { ratingStakes } from "../../support/rating-stakes";
 
 // ---- fixtures ----
 
@@ -279,7 +292,8 @@ function participant(id: string, name: string, outcome: Outcome | null, elo: num
  * The challenge (sent by opp-1, accepted by me-1) and its stamped weights,
  * lbs. They differ from both profile weights (172.5 and 171.4) on purpose,
  * so a screen that shows the profile pair instead of the rated one shows up
- * in the snapshot. 168 and 170.2 sit one IBJJF division apart.
+ * in the snapshot. 168 and 170.2 sit in the same IBJJF division (Middle);
+ * `A_DIVISION_APART` moves the challenger down one.
  */
 const CHALLENGE_WEIGHTS = {
   challengerId: "opp-1",
@@ -334,22 +348,17 @@ function checksPayload({ required = false, mine = "pending", theirs = "pending" 
 }
 
 /** What the weight-check reads resolve to: the app's own parse of the raw payload. */
-function checksReply(spec: ChecksSpec = {}) {
-  return { ok: true, data: parseMatchWeightChecks(checksPayload(spec)) };
+function checksReply(spec: ChecksSpec = {}, weights = CHALLENGE_WEIGHTS) {
+  const payload = checksPayload(spec);
+  payload.weights = [
+    { athlete_id: weights.challengerId, weight: weights.challengerWeight },
+    { athlete_id: weights.opponentId, weight: weights.opponentWeight },
+  ];
+  return { ok: true, data: parseMatchWeightChecks(payload) };
 }
 
-/** `get_rating_stakes` from the viewer's side, one division apart. */
-const STAKES = ratingStakes({
-  win: 14,
-  draw: -3,
-  loss: -18,
-  opponent_win: 18,
-  opponent_draw: 3,
-  opponent_loss: -14,
-  win_probability: 0.54,
-  expected: 0.54,
-  weight_division_gap: 1,
-});
+/** The challenger at 160 lbs (Light): one division under me at 170.2 (Middle). */
+const A_DIVISION_APART = { ...CHALLENGE_WEIGHTS, challengerWeight: 160 };
 
 /**
  * The shapes a flag-OFF match can arrive in (spec 14.7 P4), plus the
@@ -440,7 +449,7 @@ async function mount(fx: Fixture, extra: Record<string, unknown>) {
   await flush();
   await flush();
   // A challenge-backed match settles in more hops: the rated weights, then
-  // the weight checks, then the stakes priced on them.
+  // the weight checks.
   if (fx.challenge) {
     await flush();
     await flush();
@@ -535,11 +544,17 @@ const CASES: Record<string, Case> = {
   "challenge: weight, stakes": {
     fixture: { status: "pending", challenge: true },
     step: "weight",
-    setup: () => mockGetRatingStakes.mockResolvedValue(STAKES),
+    // No stakes any more (A11, O1): the rated weights sit a division apart,
+    // so the gap line and the TK-WG1 note show (A28).
+    setup: () => {
+      mockGetMatchChallengeWeights.mockResolvedValue(A_DIVISION_APART);
+      mockGetMatchWeightChecks.mockResolvedValue(checksReply({}, A_DIVISION_APART));
+    },
     shows: (s) => {
       RATED_PAIR(s);
-      s.getByTestId("weight-stakes");
-      s.getByTestId("weight-gap-note");
+      s.getByText("10.2 LBS APART · 1 DIVISION APART");
+      expect(s.getByTestId("weight-gap-note")).toHaveTextContent("Weight gap: the heavier athlete is favoured.");
+      expect(s.queryByTestId("weight-stakes")).toBeNull();
     },
   },
   "challenge: weight, my check pending": {
@@ -660,7 +675,7 @@ function serialize(screen: Screen): string {
 function resetModuleState() {
   mockSyncCalls.length = 0;
   mockGetMatchConfirmations.mockResolvedValue([]);
-  // A null get_rating_stakes response: the face-off shows no stakes strip.
+  // Never called (A11, O1); a response would change nothing.
   mockGetRatingStakes.mockResolvedValue(null);
   mockGetMatchChallengeWeights.mockResolvedValue(CHALLENGE_WEIGHTS);
   mockGetMatchWeightChecks.mockResolvedValue(checksReply());
@@ -711,13 +726,13 @@ describe("flag-OFF golden output: identical whatever the timekeeper keys say", (
     expect(missing).toMatchSnapshot();
   });
 
-  it("the challenge-backed cases read the challenge, the checks and the stakes", async () => {
+  it("the challenge-backed cases read the challenge and the checks, and never the stakes", async () => {
     // Guards the fixture itself: without these reads the challenge cases
     // would silently pin the challenge-free screens again.
     await capture("challenge: weight, stakes", VARIANTS.missing);
     expect(mockGetMatchChallengeWeights).toHaveBeenCalledWith(expect.anything(), "C1");
     expect(mockGetMatchWeightChecks).toHaveBeenCalledWith(expect.anything(), "M1");
-    // Rating V9: against the opponent's id, priced on this match's challenge weights.
-    expect(mockGetRatingStakes).toHaveBeenCalledWith(expect.anything(), "opp-1", "M1");
+    // No rating stakes in either mode (timekeeper mode A11, O1).
+    expect(mockGetRatingStakes).not.toHaveBeenCalled();
   });
 });
