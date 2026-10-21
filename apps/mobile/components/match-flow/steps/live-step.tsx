@@ -12,6 +12,7 @@ import type { UseVideoRecorderReturn } from "@/lib/video/use-video-recorder";
 import { toLiveAthlete, type LiveParticipant } from "@/lib/match-flow/live-view-state";
 import { LiveBroadcast, type LiveControls } from "../live/live-broadcast";
 import { timekeeperLiveSlots } from "../live/timekeeper-live-plates";
+import { liveTimeoutChip } from "../faceoff/timeout-chip";
 
 export interface LiveStepProps {
   matchId: string;
@@ -88,10 +89,11 @@ export interface LiveStepProps {
   /** Timekeeper mode with a seated timekeeper (`stepSeams`): TK-L1, TK-L2, TK-D7, TK-D9, TK-L3, TK-K16. */
   timekeeper?: LiveTimekeeperSeam;
   /**
-   * Draws the TK-D9 no-contest countdown at `timeoutAt`: M3's chip
-   * (`faceoff/timeout-chip.tsx`), rendered here read-only. Until that slice
-   * lands nothing passes it and the live screen draws no countdown; then
-   * M3's chip becomes this prop's default (jits-o47s.29).
+   * Draws the TK-D9 no-contest countdown at `timeoutAt`. Default: M3's chip
+   * (`faceoff/timeout-chip.tsx`, `liveTimeoutChip`), read-only, on the
+   * on-media ground (jits-o47s.29). It shows only with a seated timekeeper
+   * whose state names a timeout, while paused or offline
+   * (`timekeeperLiveSlots`), so a two-athlete match never draws it.
    */
   renderTimeoutChip?: (timeoutAt: string) => React.ReactNode;
 }
@@ -144,7 +146,7 @@ export function LiveStep(props: LiveStepProps) {
     controlsStrip,
     endVia = "broadcast",
     timekeeper,
-    renderTimeoutChip,
+    renderTimeoutChip = liveTimeoutChip,
   } = props;
   const endedRef = React.useRef(false);
   const startHapticFiredRef = React.useRef(false);

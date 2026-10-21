@@ -254,11 +254,39 @@ export type TimekeeperCopyId = keyof typeof TIMEKEEPER_COPY;
 
 /**
  * Shipped strings a timekeeper-mode surface reuses unchanged, as the deck's
- * "Current flow" boards list them (COPY-DECK.md, A2). The shipped screen keeps
- * its own literal; `timekeeper-copy.test.ts` pins each entry to that shipped
- * source, so the two copies cannot drift.
+ * "Current flow" boards list them (COPY-DECK.md, A2) and the "shipped" rows
+ * of the athlete and timekeeper face-offs (B5, B6) name them. The shipped
+ * screen keeps its own literal; `timekeeper-copy.test.ts` pins each entry to
+ * that shipped source, so the two copies cannot drift.
+ *
+ * Placeholders as the shipped face-off writes them: `OPP` an upper-cased
+ * short name, `opp` the short name, `weight` the face-off's `{w} LBS`
+ * (`weightText` in `faceoff/faceoff-top.tsx`).
  */
 export const SHIPPED_COPY = {
   /** A2: the face-off's Leave (`faceoff/faceoff-top.tsx`), also the crew step's: it cancels the match for both athletes. */
   leave: { text: "Leave", a11y: "Cancel match" },
+  /** A2, B5 and B6: the weight verdicts (`faceoff/faceoff-weight-check.tsx`). */
+  confirm: "Confirm",
+  flag: "Doesn't look right",
+  youFlagged: "YOU FLAGGED",
+  withdrawFlag: "Withdraw flag",
+  /** A2 and B5: the opponent's weigh-in line (`faceoff-weight-check.tsx`). */
+  weighedInAt: (OPP: string, weight: string) => `${OPP} WEIGHED IN AT ${weight}`,
+  reweighedAt: (OPP: string, weight: string) => `${OPP} RE-WEIGHED AT ${weight}`,
+  noWeighIn: (OPP: string) => `${OPP} HAS NO WEIGH-IN ON RECORD`,
+  /** A2: the weight-check notices (`faceoff-weight-check.tsx`). */
+  opponentFlaggedMe: (opp: string) => `${opp} says your weight doesn't look right. Re-weigh to continue.`,
+  myFlagHold: (opp: string) => `You flagged ${opp}'s weight. Match is on hold.`,
+  awaitRecheck: (opp: string) => `Waiting for ${opp} to check your new weight.`,
+  /** A2 and B6: the ready check (`faceoff/faceoff-body.tsx`). */
+  recordFromMyPhone: "Record from my phone",
+  waitingFor: (OPP: string) => `WAITING FOR ${OPP}...`,
+  hold: "MATCH ON HOLD · WEIGHT CHECK",
+  starting: "STARTING MATCH...",
+  /** A2: the face-off toast titles (`lib/match-flow/use-dual-auto-start.ts`, `use-weight-check-actions.ts`). */
+  couldNotStart: COULD_NOT_START,
+  matchOnHold: "Match on hold",
+  couldNotSaveCheck: "Couldn't save your check",
+  weightChanged: "Weight changed",
 } as const;

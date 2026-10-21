@@ -55,7 +55,7 @@ export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName:
   const sections: React.ReactNode[] = [];
 
   if (w.mustReweigh) {
-    sections.push(<ReweighPrompt key="reweigh" opp={opp} />);
+    sections.push(<ReweighPrompt key="reweigh" notice={`${opp} says your weight doesn't look right. Re-weigh to continue.`} />);
   } else if (w.awaitingTheirRecheck) {
     sections.push(
       <Notice key="await-recheck" testID="weight-await-recheck" text={`Waiting for ${opp} to check your new weight.`} />,
@@ -115,7 +115,8 @@ export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName:
   return <View style={{ gap: 16 }}>{sections}</View>;
 }
 
-function Notice({ text, alert = false, testID }: { text: string; alert?: boolean; testID?: string }) {
+/** An amber attention notice (also the timekeeper-mode merged ready's, `merged-ready.tsx`). */
+export function Notice({ text, alert = false, testID }: { text: string; alert?: boolean; testID?: string }) {
   const p = usePalette();
   return (
     <View
@@ -142,8 +143,12 @@ function Notice({ text, alert = false, testID }: { text: string; alert?: boolean
   );
 }
 
-/** The flagged athlete's re-weigh: a new rated weight for this match only. */
-function ReweighPrompt({ opp }: { opp: string }) {
+/**
+ * The flagged athlete's re-weigh: a new rated weight for this match only.
+ * `notice` says who flagged it (the opponent here; the timekeeper, TK-F7, in
+ * the timekeeper-mode merged ready).
+ */
+export function ReweighPrompt({ notice }: { notice: string }) {
   const f = useFaceoffContext();
   const p = usePalette();
   const [text, setText] = React.useState(f.myWeight != null ? String(f.myWeight) : "");
@@ -151,7 +156,7 @@ function ReweighPrompt({ opp }: { opp: string }) {
   const valid = text.trim() !== "" && isValidReweigh(value);
   return (
     <View testID="weight-reweigh" style={{ gap: 12 }}>
-      <Notice text={`${opp} says your weight doesn't look right. Re-weigh to continue.`} alert />
+      <Notice text={notice} alert />
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <TextInput
           testID="weight-reweigh-input"

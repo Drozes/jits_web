@@ -23,6 +23,7 @@ import { MatchRecorderCamera } from "./match-recorder-surface";
 import { MatchOrientationController, orientationModeFor } from "./match-orientation-controller";
 import { FaceoffProvider } from "./faceoff/faceoff-context";
 import { FaceoffTop } from "./faceoff/faceoff-top";
+import { FaceoffTimekeeperTop } from "./faceoff/faceoff-timekeeper";
 import { usePalette } from "@/lib/theme/palette";
 import { BROADCAST } from "./live/broadcast-tokens";
 import { WizardScrollContext, useWizardScrollSource } from "./wizard-scroll";
@@ -337,6 +338,7 @@ export function MatchFlowWizard({
                   setStep("live");
                 }}
                 onCancelledRemotely={exitCancelled}
+                flow={{ match, roles, tkState }}
               >
                 <RecorderStopBridge stopRef={stopRecorderRef} />
                 {/* Before the step renderer so the live lock lands before recording starts. */}
@@ -346,8 +348,12 @@ export function MatchFlowWizard({
                 />
                 <StepMarker step={step} />
                 {live ? null : <QueueStatusBanner />}
-                {faceoff && me && opponent ? (
-                  <FaceoffTop phase={step} me={me} opponent={opponent} />
+                {faceoff ? (
+                  me && opponent ? (
+                    <FaceoffTop phase={step} me={me} opponent={opponent} />
+                  ) : (
+                    <FaceoffTimekeeperTop />
+                  )
                 ) : null}
                 <MatchRecorderCamera step={cameraStep} optedIn={recording} capture={capture} />
                 <MatchStepRenderer

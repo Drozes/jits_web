@@ -8,15 +8,17 @@ import { FIGHT_RADIUS, TABULAR } from "../fight/fight-tokens";
 import { TRACKING, typeSize, typeStep } from "@/lib/typography";
 import { InitialsBlock, Mono, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
+import { TimeoutChip } from "./timeout-chip";
+import { TimekeeperOfflineBanner } from "../live/timekeeper-offline-banner";
 import { StatePressable } from "@/components/ui/state-pressable";
 import type { MatchAthleteView } from "@/lib/match-flow/match-roles";
 
 export type FaceoffAthlete = Pick<MatchAthleteView, "displayName" | "currentElo">;
 
 /**
- * A face-off athlete with their id: the weigh-in reads the stakes against the
- * opponent's id (get_rating_stakes). Kept apart from `FaceoffAthlete`, which
- * the countdown and live stage share without an id.
+ * A face-off athlete with their id, as the step renderer hands the body its
+ * two athletes (no stakes are read since A11 and O1). Kept apart from
+ * `FaceoffAthlete`, which the countdown and live stage share without an id.
  */
 export type FaceoffParticipant = Pick<MatchAthleteView, "athleteId" | "displayName" | "currentElo">;
 
@@ -34,24 +36,18 @@ export const TOP_BAR_FONT_CAP = 1.3;
  */
 const LEAVE_MIN_WIDTH = 88;
 
-function weightText(lbs: number | null): string {
+/** A weight as the face-off writes it: `170.2 LBS`, or `-- LBS` with none (also the timekeeper's rows). */
+export function weightText(lbs: number | null): string {
   return lbs != null ? `${Number(lbs.toFixed(1))} LBS` : "-- LBS";
 }
 
 /**
- * The face-off header, above the camera: the top bar (Leave, phase)
- * and the fight card. Big on the weigh-in, compressed to the light athlete
- * chip on the ready phase so the camera framing panel fits under it.
+ * Android back is the face-off's Leave, and never pops the match screen:
+ * leaving without cancelling left the match pending with nobody in it
+ * (jits-bh2v), and a timekeeper who left that way left both athletes waiting
+ * on a Start nobody would tap until the face-off timed out.
  */
-export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
-  const f = useFaceoffContext();
-  const p = usePalette();
-  const { canLeave, leave } = f;
-  // Leave's laid-out width: both side slots keep at least this much room.
-  const [leaveWidth, setLeaveWidth] = React.useState(LEAVE_MIN_WIDTH);
-
-  // Android back is the Leave control here: leaving without cancelling left
-  // the match pending with nobody in it (jits-bh2v).
+export function useLeaveOnBack(canLeave: boolean, leave: () => void) {
   React.useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (canLeave) leave();
@@ -59,71 +55,149 @@ export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
     });
     return () => sub.remove();
   }, [canLeave, leave]);
+}
+
+/**
+ * The face-off header, above the camera: the top bar (Leave, phase)
+ * and the fight card. Big on the weigh-in, compressed to the light athlete
+ * chip on the ready phase so the camera framing panel fits under it. In
+ * timekeeper mode an athlete also sees the face-off timeout (TK-D9) under
+ * the bar, from the seat, and under it TK-D7 while the server reads the
+ * seated timekeeper offline (spec 4.3 "Seated, before start").
+ */
+export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
+  const f = useFaceoffContext();
+  const { canLeave, leave } = f;
+  useLeaveOnBack(canLeave, leave);
 
   return (
     <View style={{ gap: phase === "weight" ? 20 : 16 }}>
-      {/* The label sits between two equal side slots, so it is centred
-          whether or not Leave is showing. Each slot is at least as wide as
-          Leave (measured), so a narrow screen or a large Dynamic Type size
-          ellipsizes the label instead of drawing Leave over it. The Leave
-          text never changes width (cancelling swaps the chevron for a
-          same-size spinner) and both texts cap their font scale. */}
-      <View style={{ height: 44, flexDirection: "row", alignItems: "center" }}>
-        <View
-          testID="faceoff-top-left"
-          style={{ flex: 1, minWidth: leaveWidth, flexDirection: "row", alignItems: "center", justifyContent: "flex-start" }}
-        >
-          {canLeave ? (
-            <View testID="faceoff-leave-measure" onLayout={(e) => setLeaveWidth(Math.ceil(e.nativeEvent.layout.width))}>
-              <StatePressable
-                testID="faceoff-leave"
-                accessibilityRole="button"
-                // The harness and screen readers know this control as "Cancel
-                // match": it cancels the match for both athletes.
-                accessibilityLabel="Cancel match"
-                accessibilityState={{ disabled: f.cancelling, busy: f.cancelling }}
-                disabled={f.cancelling}
-                onPress={leave}
-                hitSlop={8}
-                style={({ pressed }) => ({ height: 44, flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed || f.cancelling ? 0.6 : 1 })}
-              >
-                <View style={{ width: 18, height: 18, alignItems: "center", justifyContent: "center" }}>
-                  {f.cancelling ? (
-                    <ActivityIndicator testID="faceoff-leave-spinner" size="small" color={p.text} />
-                  ) : (
-                    <ChevronLeft size={18} color={p.text} />
-                  )}
-                </View>
-                <Text
-                  testID="faceoff-leave-text"
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={TOP_BAR_FONT_CAP}
-                  className="font-heading uppercase"
-                  style={[typeStep("body"), { letterSpacing: TRACKING.caps, color: p.text }]}
-                >
-                  Leave
-                </Text>
-              </StatePressable>
-            </View>
-          ) : null}
-        </View>
-        <View style={{ flexShrink: 1, minWidth: 0, alignItems: "center" }}>
-          <Mono testID="faceoff-top-label" bold color={p.text3} numberOfLines={1} maxFontSizeMultiplier={TOP_BAR_FONT_CAP}>
-            {phase === "weight" ? "FACE-OFF · WEIGH IN" : "FACE-OFF · READY"}
-          </Mono>
-        </View>
-        {/* Right slot: empty (no match-kind tag), mirrors the left slot. */}
-        <View
-          testID="faceoff-top-right"
-          style={{ flex: 1, minWidth: leaveWidth, flexDirection: "row", alignItems: "center", justifyContent: "flex-end" }}
-        />
-      </View>
+      <FaceoffTopBar
+        label={phase === "weight" ? "FACE-OFF · WEIGH IN" : "FACE-OFF · READY"}
+        leave={
+          canLeave ? (
+            <LeaveButton
+              testID="faceoff-leave"
+              accessibilityRole="button"
+              // The harness and screen readers know this control as "Cancel
+              // match": it cancels the match for both athletes.
+              accessibilityLabel="Cancel match"
+              cancelling={f.cancelling}
+              onPress={leave}
+            />
+          ) : null
+        }
+      />
+      {f.timekeeper ? <TimeoutChip timeoutAt={f.timekeeper.timeoutAt} /> : null}
+      {/* TK-D7 before the start, with no chip of its own: TK-D9 above already counts down (spec 4.3). */}
+      {f.timekeeper?.offlineName != null ? <TimekeeperOfflineBanner name={f.timekeeper.offlineName} tone="themed" /> : null}
       {phase === "weight" ? (
         <FightCard me={me} opponent={opponent} />
       ) : (
         <FaceoffChip me={me} opponent={opponent} myWeight={f.myWeight} opponentWeight={f.opponentWeight} />
       )}
     </View>
+  );
+}
+
+/**
+ * The face-off's top bar: Leave on the left (when offered), the label in the
+ * middle. Also the timekeeper's face-off header (`faceoff-timekeeper.tsx`,
+ * TK-K0), whose Leave is its own policy's.
+ */
+export function FaceoffTopBar({
+  label,
+  leave,
+  labelTestID = "faceoff-top-label",
+}: {
+  label: string;
+  /** The `LeaveButton`, or null to hide Leave (once the match is starting, or no Leave is offered). */
+  leave: React.ReactNode;
+  /** The label's testID (the athletes' `faceoff-top-label` by default). */
+  labelTestID?: string;
+}) {
+  const p = usePalette();
+  // Leave's laid-out width: both side slots keep at least this much room.
+  const [leaveWidth, setLeaveWidth] = React.useState(LEAVE_MIN_WIDTH);
+  return (
+    // The label sits between two equal side slots, so it is centred
+    // whether or not Leave is showing. Each slot is at least as wide as
+    // Leave (measured), so a narrow screen or a large Dynamic Type size
+    // ellipsizes the label instead of drawing Leave over it.
+    <View style={{ height: 44, flexDirection: "row", alignItems: "center" }}>
+      <View
+        testID="faceoff-top-left"
+        style={{ flex: 1, minWidth: leaveWidth, flexDirection: "row", alignItems: "center", justifyContent: "flex-start" }}
+      >
+        {leave ? (
+          <View testID="faceoff-leave-measure" onLayout={(e) => setLeaveWidth(Math.ceil(e.nativeEvent.layout.width))}>
+            {leave}
+          </View>
+        ) : null}
+      </View>
+      <View style={{ flexShrink: 1, minWidth: 0, alignItems: "center" }}>
+        <Mono testID={labelTestID} bold color={p.text3} numberOfLines={1} maxFontSizeMultiplier={TOP_BAR_FONT_CAP}>
+          {label}
+        </Mono>
+      </View>
+      {/* Right slot: empty (no match-kind tag), mirrors the left slot. */}
+      <View
+        testID="faceoff-top-right"
+        style={{ flex: 1, minWidth: leaveWidth, flexDirection: "row", alignItems: "center", justifyContent: "flex-end" }}
+      />
+    </View>
+  );
+}
+
+/**
+ * The top bar's Leave: a chevron and `Leave`. What it does, and its identity
+ * for the harness and screen readers (testID, role, label), are the
+ * caller's: the athletes' cancel above, the timekeeper's seat in
+ * `faceoff-timekeeper.tsx`. The text never changes width (cancelling swaps
+ * the chevron for a same-size spinner) and caps its font scale.
+ */
+export function LeaveButton({
+  testID,
+  accessibilityRole,
+  accessibilityLabel,
+  cancelling,
+  onPress,
+}: {
+  testID: string;
+  accessibilityRole: "button";
+  accessibilityLabel: string;
+  cancelling: boolean;
+  onPress: () => void;
+}) {
+  const p = usePalette();
+  return (
+    <StatePressable
+      testID={testID}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: cancelling, busy: cancelling }}
+      disabled={cancelling}
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => ({ height: 44, flexDirection: "row", alignItems: "center", gap: 6, opacity: pressed || cancelling ? 0.6 : 1 })}
+    >
+      <View style={{ width: 18, height: 18, alignItems: "center", justifyContent: "center" }}>
+        {cancelling ? (
+          <ActivityIndicator testID="faceoff-leave-spinner" size="small" color={p.text} />
+        ) : (
+          <ChevronLeft size={18} color={p.text} />
+        )}
+      </View>
+      <Text
+        testID="faceoff-leave-text"
+        numberOfLines={1}
+        maxFontSizeMultiplier={TOP_BAR_FONT_CAP}
+        className="font-heading uppercase"
+        style={[typeStep("body"), { letterSpacing: TRACKING.caps, color: p.text }]}
+      >
+        Leave
+      </Text>
+    </StatePressable>
   );
 }
 
