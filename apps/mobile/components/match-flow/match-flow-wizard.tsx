@@ -5,6 +5,8 @@ import { useMatchDetails } from "@/lib/match-flow/use-match-details";
 import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
 import { useWizardSync } from "@/lib/match-flow/use-wizard-sync";
 import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
+import { useTimekeeperPresence } from "@/lib/match-flow/use-timekeeper-presence";
+import { useLiveEndHold } from "@/lib/match-flow/use-live-end-hold";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
 import { useAiConsent, useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
@@ -112,7 +114,7 @@ export function MatchFlowWizard({
   // Step state + the DB reconciler that keeps it honest when a broadcast is
   // missed (jits-wfpo, -bh2v, -vh7m, -bmei, -mzfu). See use-wizard-sync.ts.
   const {
-    step,
+    step: syncedStep,
     setStep,
     startedAt,
     setStartedAt,
@@ -132,6 +134,10 @@ export function MatchFlowWizard({
     applyMatch,
     refresh,
   });
+  // The step on screen: a timekeeper-mode athlete's ended plate stays up for
+  // a moment after the DB moves them to the result (spec 4.2 End,
+  // `useLiveEndHold`); every other phone shows the wizard's step as it is.
+  const step = useLiveEndHold(syncedStep, roles?.caps.endVia === null);
 
   React.useEffect(() => {
     onStepChange?.(step);
@@ -173,6 +179,13 @@ export function MatchFlowWizard({
   // other on the ready -> live handoff. Held on live even when not
   // recording: the clock is on screen for the whole round.
   useMatchKeepAwake(cameraStep === "ready" || cameraStep === "live");
+
+  // The seated timekeeper's 15 s heartbeat, from the seat to the result
+  // (timekeeper mode R23; spec 4.3): once here, so it spans every step.
+  useTimekeeperPresence(
+    matchId,
+    roles?.viewer === "timekeeper" && (match?.status === "pending" || match?.status === "in_progress"),
+  );
 
   // Live shrinks the content to the viewport with scrolling off. Reset any
   // offset left from scrolling the ready step, or every full-screen layer

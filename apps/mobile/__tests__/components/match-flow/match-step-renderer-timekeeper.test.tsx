@@ -196,7 +196,8 @@ describe("timekeeper mode: an athlete", () => {
     renderAs("me", true, "live");
     expect(mockProps.live).toMatchObject({
       controls: "none",
-      endedByName: "Jo Cruz",
+      // The deck's {NAME}: the timekeeper's short name, as on TK-L2 and TK-D7 (slice M4).
+      endedByName: "J. Cruz",
       countdownCaption: "SYNCED TO SERVER CLOCK · ALL PHONES",
     });
     expect(ids(mockProps.live.me)).toBe("me");

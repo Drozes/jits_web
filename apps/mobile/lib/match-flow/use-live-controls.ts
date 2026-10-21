@@ -6,12 +6,25 @@ import { getMatchDetails } from "@jits/shared/api/queries";
 import type { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 // From the protocol module, not the hook module: tests mock the hook module.
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
-import { SEND_GRACE_MS } from "./match-sync-context";
+import { SEND_GRACE_MS, useMatchSyncContext } from "./match-sync-context";
+import type { MatchCaps } from "./match-roles";
+import { endClockAsTimekeeper } from "./timekeeper-actions";
+import { useTimekeeperLiveLeave } from "./use-timekeeper-live-leave";
 import type { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 
 type Sync = ReturnType<typeof useSessionMatchSync>;
 type Timer = ReturnType<typeof useSessionMatchTimer>;
-type Action = "pause" | "resume" | "end";
+type Action = "pause" | "resume" | "end" | "leave";
+
+/** How the clock's end travels from this phone (`roles.caps.endVia`). */
+export type EndVia = MatchCaps["endVia"];
+
+/**
+ * Server ends (`end_match_clock`) the auto-end at 00:00 tries before it
+ * stops retrying a failure (a network error). The server ends the clock at
+ * full time itself, and the reconciler then moves the timekeeper on.
+ */
+export const MAX_AUTO_END_ATTEMPTS = 3;
 
 interface UseLiveControlsParams {
   matchId: string;
@@ -20,24 +33,98 @@ interface UseLiveControlsParams {
   endedRef: React.MutableRefObject<boolean>;
   /** Called with the pause-aware clock reading taken at the End tap. */
   onEnded: (elapsedSeconds: number) => void;
+  /**
+   * How this phone ends the clock (timekeeper mode ARCHITECTURE 2.3, "End").
+   * Default "broadcast": today's two-athlete end, a `match_ended` broadcast
+   * and nothing on the server. "end_match_clock": the timekeeper's end, the
+   * `end_match_clock` RPC first and then `match_ended` with `actor_id`. null:
+   * this phone never ends the clock (a timekeeper-mode athlete): End does
+   * nothing.
+   */
+  endVia?: EndVia;
+  /** The timekeeper left while the clock ran (a no contest): stop what the live step runs (the recorder). */
+  onLeftSeat?: () => void;
 }
 
 /**
- * Encapsulates the three live-match buttons (pause, resume, end) plus
- * busy-state debouncing and toast error surfaces, so the live step keeps
- * only its view, its clock and its effects.
+ * Encapsulates the live-match buttons (pause, resume, end and, for a
+ * timekeeper, Leave through `useTimekeeperLiveLeave`) plus busy-state
+ * debouncing, toast error surfaces and the end's view state (`ended`, and
+ * the re-arm after a failed server end), so the live step keeps only its
+ * view, its clock and its effects.
+ *
+ * Timekeeper mode (the sync context's `timekeeperModeSelfId`): every clock
+ * broadcast this phone sends names it as `actor_id`, so the other phones can
+ * name who ran the clock; a two-athlete match sends exactly the payloads it
+ * always did. In timekeeper mode a broadcast is only a hint: the receivers
+ * re-read the DB (M-R8), which `end_match_clock`, `pause_match` and
+ * `resume_match` have already changed by the time the broadcast goes out.
  */
-export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: UseLiveControlsParams) {
-  const [busy, setBusy] = React.useState<Action | null>(null);
+export function useLiveControls({
+  matchId,
+  timer,
+  sync,
+  endedRef,
+  onEnded,
+  endVia = "broadcast",
+  onLeftSeat,
+}: UseLiveControlsParams) {
+  const { reconcileNow, timekeeperModeSelfId: actorId } = useMatchSyncContext();
+  const [busy, setBusyState] = React.useState<Action | null>(null);
+  // The leave confirmation lands later than the render that showed it.
+  const busyRef = React.useRef<Action | null>(null);
+  const setBusy = React.useCallback((next: Action | null) => {
+    busyRef.current = next;
+    setBusyState(next);
+  }, []);
+  // `endedRef` is the one-shot guard; this state only makes the ended look
+  // (ENDING, dimmed buttons) render, since a ref change alone does not.
+  const [ended, setEnded] = React.useState(false);
+  /** Server ends that failed (a network error): each one offers a fresh hold, and the auto-end stops retrying at MAX_AUTO_END_ATTEMPTS. */
+  const [endFailures, setEndFailures] = React.useState(0);
   // Read through a ref: handleEnd does not re-memoise on every clock tick.
   const elapsedRef = React.useRef(timer.elapsed);
   elapsedRef.current = timer.elapsed;
 
+  /**
+   * The timekeeper's end: `end_match_clock`, then `match_ended` with the
+   * actor, then the result. A refusal that means the clock is no longer
+   * running here (the server's own auto-end at full time, a no contest)
+   * leaves the controls ended and re-reads, so the DB moves the screen; a
+   * failure that changed nothing offers the hold again.
+   */
+  const endOnServer = React.useCallback(
+    async (elapsed: number) => {
+      const outcome = await endClockAsTimekeeper(matchId, elapsed);
+      if (outcome === "ended") {
+        await settleWithin(actorId ? sync.broadcastMatchEnded(actorId) : sync.broadcastMatchEnded(), SEND_GRACE_MS);
+        setBusy(null);
+        onEnded(elapsed);
+        return;
+      }
+      if (outcome === "failed") {
+        // Nothing changed on the server: offer the hold again.
+        endedRef.current = false;
+        setEnded(false);
+        setEndFailures((n) => n + 1);
+      }
+      setBusy(null);
+      reconcileNow();
+    },
+    [actorId, endedRef, matchId, onEnded, reconcileNow, setBusy, sync],
+  );
+
   const handleEnd = React.useCallback(() => {
-    if (endedRef.current || busy) return;
+    if (endedRef.current || busy || endVia === null) return;
     endedRef.current = true;
+    setEnded(true);
     // The finish time is the moment of the tap, not after the broadcast settles.
     const elapsed = elapsedRef.current;
+    setBusy("end");
+    if (endVia === "end_match_clock") {
+      void endOnServer(elapsed);
+      return;
+    }
     // Do NOT call end_match here. end_match flips the match to 'completed',
     // but record_match_result (the next step) requires status='in_progress'
     // and would fail with invalid_status, so the result + ELO would never be
@@ -52,12 +139,30 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
     // match_ended, so let the broadcast leave the device first (bounded):
     // a lost match_ended strands the opponent on the live timer
     // (jits-mzfu). `busy` disables the controls meanwhile.
-    setBusy("end");
     void settleWithin(sync.broadcastMatchEnded(), SEND_GRACE_MS).then(() => {
       setBusy(null);
       onEnded(elapsed);
     });
-  }, [busy, endedRef, onEnded, sync]);
+  }, [busy, endVia, endOnServer, endedRef, onEnded, setBusy, sync]);
+
+  /**
+   * A pause or resume that failed: the shipped toast. On a server-run clock
+   * (the timekeeper) the refusal may come from a timekeeper-mode branch whose
+   * text is the server's own (the clock already ended at full time), which a
+   * timekeeper-mode screen never shows (M-R4): the shipped title alone, and a
+   * re-read so the DB moves the screen if the match moved on.
+   */
+  const failed = React.useCallback(
+    (title: string, message: string) => {
+      if (endVia === "broadcast") {
+        toast.error({ text1: title, description: message });
+        return;
+      }
+      toast.error({ text1: title });
+      reconcileNow();
+    },
+    [endVia, reconcileNow],
+  );
 
   const handlePauseResume = React.useCallback(async () => {
     if (busy || endedRef.current) return;
@@ -83,11 +188,12 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
         }
       }
       if (!res.ok) {
-        toast.error({ text1: "Couldn't resume", description: res.error.message });
+        failed("Couldn't resume", res.error.message);
         return;
       }
       timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: res.data.total_paused_duration });
-      sync.broadcastTimerResumed(res.data.total_paused_duration);
+      if (actorId) sync.broadcastTimerResumed(res.data.total_paused_duration, actorId);
+      else sync.broadcastTimerResumed(res.data.total_paused_duration);
     } else {
       setBusy("pause");
       const res = await pauseMatch(supabase, matchId);
@@ -107,13 +213,33 @@ export function useLiveControls({ matchId, timer, sync, endedRef, onEnded }: Use
         }
       }
       if (!res.ok) {
-        toast.error({ text1: "Couldn't pause", description: res.error.message });
+        failed("Couldn't pause", res.error.message);
         return;
       }
       timer.syncFromBroadcast({ type: "paused", pausedAt: res.data.paused_at });
-      sync.broadcastTimerPaused(res.data.paused_at);
+      if (actorId) sync.broadcastTimerPaused(res.data.paused_at, actorId);
+      else sync.broadcastTimerPaused(res.data.paused_at);
     }
-  }, [busy, endedRef, matchId, sync, timer]);
+  }, [actorId, busy, endedRef, failed, matchId, setBusy, sync, timer]);
 
-  return { busy, handleEnd, handlePauseResume };
+  const setLeaving = React.useCallback((leaving: boolean) => setBusy(leaving ? "leave" : null), [setBusy]);
+  const handleLeave = useTimekeeperLiveLeave({
+    matchId,
+    endedRef,
+    busyRef,
+    setLeaving,
+    broadcastMatchCancelled: sync.broadcastMatchCancelled,
+    onLeftSeat,
+  });
+
+  return {
+    busy,
+    ended,
+    handleEnd,
+    handlePauseResume,
+    handleLeave,
+    endFailures,
+    /** This phone may auto-end at 00:00: it ends the clock, and a failing server end has tries left. */
+    canAutoEnd: endVia !== null && endFailures < MAX_AUTO_END_ATTEMPTS,
+  };
 }
