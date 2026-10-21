@@ -236,6 +236,7 @@ jest.mock("expo-image", () => {
 });
 
 import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
+import { duration } from "@/lib/motion";
 import { __setHighlightReadThrottleForTests, resetHighlightStore } from "@/lib/highlight/highlight-store";
 import { __resetSessionPulses } from "@/lib/highlight/reel-lane";
 
@@ -685,6 +686,8 @@ describe("DashboardScreen timekeeper card (A20)", () => {
     mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve({ ok: true, data: null }));
     mockInvitesOn = false;
     mockHasEverPlayed = false;
+    // A test that drives the device clock with fake timers hands it back.
+    jest.useRealTimers();
   });
 
   it("on duty: the TIMEKEEPER card with the matchup, TK-H3 and the one red CTA; a tap opens the match, nothing auto-navigates", async () => {
@@ -763,9 +766,12 @@ describe("DashboardScreen timekeeper card (A20)", () => {
   });
 
   it("hides the invite card while it shows; the invite card comes back once the edit window closes, with no new read", async () => {
+    // Fake timers own the device clock (Date.now) and the card's own deadline
+    // timer, so the window closes exactly when the test advances the clock,
+    // inside act, never on the wall clock of a loaded runner.
+    jest.useFakeTimers({ now: mockNow });
     mockInvitesOn = true;
-    // A short window on the real clock: the card's own timer re-renders Home.
-    const closesAt = mockNow + 50;
+    const closesAt = Date.now() + 20 * 60_000;
     mockGetMyTimekeepingMatch.mockImplementation(() =>
       Promise.resolve(tk({ status: "completed", endedAt: "2026-10-20T12:06:00Z", editOpen: true, editClosesAt: new Date(closesAt).toISOString() })),
     );
@@ -775,9 +781,18 @@ describe("DashboardScreen timekeeper card (A20)", () => {
     expect(utils.queryByTestId("home-invite-card")).toBeNull();
     const reads = mockGetMyTimekeepingMatch.mock.calls.length;
 
-    // The window closes on this device's clock.
-    mockNow = closesAt + 1;
-    await waitFor(() => expect(utils.getByTestId("home-invite-card")).toBeTruthy());
+    // One ms before the window closes on this device's clock: still the timekeeper's card.
+    act(() => {
+      jest.advanceTimersByTime(closesAt - 1 - Date.now());
+    });
+    expect(utils.getByTestId("timekeeping-resume-card")).toBeTruthy();
+    expect(utils.queryByTestId("home-invite-card")).toBeNull();
+
+    // The window closes: the card's own timer re-renders Home.
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(utils.getByTestId("home-invite-card")).toBeTruthy();
     expect(utils.queryByTestId("timekeeping-resume-card")).toBeNull();
     expect(mockGetMyTimekeepingMatch.mock.calls.length).toBe(reads);
   });
@@ -827,6 +842,8 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
 
   afterEach(() => {
     store.__resetArenaStoreForTests();
+    // A test that drives the banner's timers with fake timers hands them back.
+    jest.useRealTimers();
   });
 
   it("arms notification routing once Home is up", async () => {
@@ -899,6 +916,10 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
   });
 
   it("the first highlight celebrates over the carousel (C-C3), once, and logs matches.milestone_shown", async () => {
+    // Fake timers own the banner's 4 s hold, its fade and the reel motions:
+    // the tap's dismissal lands when the test advances the clock, never on a
+    // real-time window that a loaded runner can miss.
+    jest.useFakeTimers({ now: mockNow });
     (require("@/lib/milestones/milestone-store") as { __resetMilestonesForTests: () => void }).__resetMilestonesForTests();
     mockGetMyHighlights.mockResolvedValue(highlightsPage([reel("h1", { unseen: true, readyAt: new Date(mockNow - 60_000).toISOString() })]));
     const utils = render(React.createElement(DashboardScreen));
@@ -906,12 +927,18 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
     const banner = await utils.findByTestId("milestone-banner-first_highlight");
     expect(banner.props.accessibilityLabel).toBe("Your first highlight is ready");
     expect(mockCapture).toHaveBeenCalledWith("matches.milestone_shown", { level: "info", tags: { milestone: "first_highlight" } });
+    // The tap starts the fade; the banner leaves once the fade has run.
     fireEvent.press(banner);
-    await waitFor(() => expect(utils.queryByTestId("milestone-banner-first_highlight")).toBeNull());
-    // A later visit (remount) does not celebrate again.
+    act(() => {
+      jest.advanceTimersByTime(duration.fast);
+    });
+    expect(utils.queryByTestId("milestone-banner-first_highlight")).toBeNull();
+    // A later visit (remount) does not celebrate again: let its milestone
+    // decision (the marks load) land before asserting there is no banner.
     utils.unmount();
     const again = render(React.createElement(DashboardScreen));
     await again.findByTestId("reel-tile-ready:h1");
+    await act(async () => {});
     expect(again.queryByTestId("milestone-banner-first_highlight")).toBeNull();
     expect(mockCapture.mock.calls.filter((c) => c[0] === "matches.milestone_shown")).toHaveLength(1);
   });
