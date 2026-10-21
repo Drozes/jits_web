@@ -13,6 +13,10 @@
  * - A successful confirm gives a light impact (`haptics.press`); a failed one
  *   the error buzz.
  * - A submission result draws the tap marks still and silent (Adding Flare).
+ * - No rating on the confirm step, in both modes (timekeeper mode A25): it
+ *   shows who won, how it ended (TK-R6) and the match length (TK-R7), and
+ *   the helper is TK-R8 (the shipped rating sentence is gone); the rating
+ *   shows on the verdict.
  */
 import * as React from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
@@ -75,11 +79,14 @@ import { ConfirmPanel, ResultBanner } from "@/components/match-flow/steps/confir
 
 type StepProps = React.ComponentProps<typeof ConfirmStep>;
 
+/** The viewer, with the rating the match stamped: the confirm step must not show it (A25). */
+const ME_RATED = { athleteId: "me-1", displayName: "Mina Park", eloBefore: 1498, eloAfter: 1489, eloDelta: -9 };
+
 function renderStep(overrides: Partial<StepProps> = {}) {
   return render(
     <ConfirmStep
       matchId="M1"
-      me={{ athleteId: "me-1", displayName: "Mina Park", eloBefore: 1498, eloAfter: 1489, eloDelta: -9 }}
+      me={ME_RATED}
       opponent={{ athleteId: "opp-1", displayName: "Demo Red" }}
       resultData={{ result: "submission", winnerId: "me-1" }}
       confirmedAthleteIds={[]}
@@ -101,13 +108,12 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 
 describe("ResultBanner subtitle", () => {
-  it("says the rating is already updated and what to do (every match is ranked)", () => {
+  it("says what to do, without the rating sentence (TK-R8, A25)", () => {
     const { getByText, queryByText } = render(
       <ResultBanner resultData={null} currentAthleteId="me-1" />,
     );
-    getByText(
-      "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review.",
-    );
+    getByText("Confirm if this is right, or dispute it and an admin will review.");
+    expect(queryByText(/rating/i)).toBeNull();
     expect(queryByText(/ELO already applied/i)).toBeNull();
   });
 
@@ -163,19 +169,43 @@ describe("ConfirmPanel states", () => {
 });
 
 describe("ConfirmStep (opponent view, match-flow redesign)", () => {
-  it("shows who won, how, and the viewer's rating move; keeps the harness verdict", () => {
+  it("shows who won, how it ended and the match length, and no rating (A25); keeps the harness verdict", () => {
     const s = renderStep({
       resultData: { result: "submission", winnerId: "opp-1" },
       submissionName: "Rear-naked choke",
       finishTimeSeconds: 377,
     });
     s.getByText("D. Red won");
-    s.getByText("by Rear-naked choke \u00b7 06:17");
+    s.getByText("HOW IT ENDED");
+    expect(s.getByTestId("result-how-it-ended")).toHaveTextContent("Rear-naked choke");
+    s.getByText("MATCH LENGTH");
+    expect(s.getByTestId("result-match-length")).toHaveTextContent("06:17");
     expect(s.getByTestId("confirm-verdict")).toHaveTextContent("YOU LOST");
-    s.getByText("1498 \u2192 1489");
-    s.getByText("\u25bc \u22129");
+    // No rating block, though the viewer's rating moved (A25).
+    expect(s.queryByText("YOUR RATING")).toBeNull();
+    expect(s.queryByText("1498 \u2192 1489")).toBeNull();
+    expect(s.queryByText("\u25bc \u22129")).toBeNull();
+    // The helper without the rating sentence (TK-R8).
+    expect(s.getByTestId("confirm-helper")).toHaveTextContent("Confirm if this is right, or dispute it and an admin will review.");
+    expect(s.queryByText(/rating/i)).toBeNull();
     // The heading and the red CTA both say it.
     expect(s.getAllByText("Confirm result")).toHaveLength(2);
+  });
+
+  it("a draw: DRAW is how it ended, and the match length is the clock it reached (A25)", () => {
+    const s = renderStep({ resultData: { result: "draw" }, finishTimeSeconds: 300 });
+    s.getByText("Draw");
+    expect(s.getByTestId("result-how-it-ended")).toHaveTextContent("DRAW");
+    expect(s.getByTestId("result-match-length")).toHaveTextContent("05:00");
+  });
+
+  it("a draw rebuilt from the DB (no finish time): this phone's clock at the end is its length, else --:--", () => {
+    const own = renderStep({ resultData: { result: "draw" }, finishTimeSeconds: null, matchLengthSeconds: 287 });
+    expect(own.getByTestId("result-match-length")).toHaveTextContent("04:47");
+    own.unmount();
+    const none = renderStep({ resultData: { result: "draw" }, finishTimeSeconds: null });
+    expect(none.getByTestId("result-how-it-ended")).toHaveTextContent("DRAW");
+    expect(none.getByTestId("result-match-length")).toHaveTextContent("--:--");
   });
 
   it("draws the tap marks still and silent on a submission, none on a draw (Adding Flare)", () => {

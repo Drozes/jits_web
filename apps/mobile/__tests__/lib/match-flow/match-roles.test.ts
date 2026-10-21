@@ -51,8 +51,8 @@ const SELF_RUN: MatchCaps = {
   recordingRequired: false,
   readyPolicy: "broadcast",
   weightVerdicts: "opponent",
-  // Today's confirm step shows the rating block; A25 (slice M5) turns it off.
-  showsRatingOnConfirm: true,
+  // A25 (slice M5): the confirm step shows no rating block in either mode.
+  showsRatingOnConfirm: false,
   submissionLayout: "chips",
 };
 

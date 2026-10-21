@@ -73,6 +73,25 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
             ]
            },
            "type": "Text"
+          },
+          {
+           "children": [
+            "Confirm if this is right, or dispute it and an admin will review."
+           ],
+           "props": {
+            "className": "font-body",
+            "style": [
+             {
+              "fontSize": 13,
+              "lineHeight": 17
+             },
+             {
+              "color": "#9CA3AF"
+             }
+            ],
+            "testID": "confirm-helper"
+           },
+           "type": "Text"
           }
          ],
          "props": {
@@ -192,74 +211,18 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
              "children": [
               {
                "children": [
-                {
-                 "children": [
-                  "YOUR RATING"
-                 ],
-                 "props": {
-                  "className": "font-mono-medium",
-                  "style": [
-                   {
-                    "fontSize": 10,
-                    "lineHeight": 13
-                   },
-                   {
-                    "color": "#8D929D",
-                    "letterSpacing": 2.52
-                   },
-                   {
-                    "fontVariant": [
-                     "tabular-nums"
-                    ]
-                   }
-                  ]
-                 },
-                 "type": "Text"
-                },
-                {
-                 "children": [
-                  "1512 → 1506"
-                 ],
-                 "props": {
-                  "className": "font-mono-bold",
-                  "style": [
-                   {
-                    "fontSize": 22,
-                    "lineHeight": 26
-                   },
-                   {
-                    "color": "#E8EDF2"
-                   },
-                   {
-                    "fontVariant": [
-                     "tabular-nums"
-                    ]
-                   }
-                  ]
-                 },
-                 "type": "Text"
-                }
+                "HOW IT ENDED"
                ],
                "props": {
-                "style": {
-                 "gap": 6
-                }
-               },
-               "type": "View"
-              },
-              {
-               "children": [
-                "▼ −6"
-               ],
-               "props": {
-                "className": "font-mono-bold",
+                "className": "font-mono-medium",
                 "style": [
                  {
-                  "fontSize": 26,
-                  "lineHeight": 31
+                  "fontSize": 10,
+                  "lineHeight": 13
                  },
                  {
-                  "color": "#EC6A74"
+                  "color": "#8D929D",
+                  "letterSpacing": 2.52
                  },
                  {
                   "fontVariant": [
@@ -269,20 +232,115 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
                 ]
                },
                "type": "Text"
+              },
+              {
+               "children": [
+                {
+                 "children": [
+                  "DRAW"
+                 ],
+                 "props": {
+                  "className": "font-heading uppercase",
+                  "numberOfLines": 2,
+                  "style": [
+                   {
+                    "fontSize": 16,
+                    "lineHeight": 21
+                   },
+                   {
+                    "color": "#E8EDF2",
+                    "flexShrink": 1,
+                    "letterSpacing": 0.56
+                   }
+                  ],
+                  "testID": "result-how-it-ended"
+                 },
+                 "type": "Text"
+                }
+               ],
+               "props": {
+                "style": {
+                 "alignItems": "center",
+                 "flexDirection": "row"
+                }
+               },
+               "type": "View"
               }
              ],
              "props": {
               "style": {
-               "alignItems": "center",
-               "backgroundColor": "#1E222B",
-               "borderColor": "rgba(107, 114, 128, 0.45)",
-               "borderRadius": 4,
-               "borderWidth": 1,
-               "flexDirection": "row",
-               "height": 64,
-               "justifyContent": "space-between",
-               "paddingHorizontal": 16
+               "flex": 1,
+               "gap": 8,
+               "paddingHorizontal": 12,
+               "paddingVertical": 14
               }
+             },
+             "type": "View"
+            },
+            {
+             "children": [
+              {
+               "children": [
+                "MATCH LENGTH"
+               ],
+               "props": {
+                "className": "font-mono-medium",
+                "style": [
+                 {
+                  "fontSize": 10,
+                  "lineHeight": 13
+                 },
+                 {
+                  "color": "#8D929D",
+                  "letterSpacing": 2.52
+                 },
+                 {
+                  "fontVariant": [
+                   "tabular-nums"
+                  ]
+                 }
+                ]
+               },
+               "type": "Text"
+              },
+              {
+               "children": [
+                "--:--"
+               ],
+               "props": {
+                "className": "font-mono-bold",
+                "style": [
+                 {
+                  "fontSize": 18,
+                  "lineHeight": 22
+                 },
+                 {
+                  "color": "#E8EDF2"
+                 },
+                 {
+                  "fontVariant": [
+                   "tabular-nums"
+                  ]
+                 }
+                ],
+                "testID": "result-match-length"
+               },
+               "type": "Text"
+              }
+             ],
+             "props": {
+              "style": [
+               {
+                "flex": 1,
+                "gap": 8,
+                "paddingHorizontal": 12,
+                "paddingVertical": 14
+               },
+               {
+                "borderColor": "rgba(107, 114, 128, 0.45)",
+                "borderLeftWidth": 1
+               }
+              ]
              },
              "type": "View"
             }
@@ -291,7 +349,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
             "style": {
              "borderColor": "rgba(107, 114, 128, 0.45)",
              "borderTopWidth": 1,
-             "padding": 12
+             "flexDirection": "row"
             }
            },
            "type": "View"
@@ -990,6 +1048,25 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
             ]
            },
            "type": "Text"
+          },
+          {
+           "children": [
+            "Confirm if this is right, or dispute it and an admin will review."
+           ],
+           "props": {
+            "className": "font-body",
+            "style": [
+             {
+              "fontSize": 13,
+              "lineHeight": 17
+             },
+             {
+              "color": "#9CA3AF"
+             }
+            ],
+            "testID": "confirm-helper"
+           },
+           "type": "Text"
           }
          ],
          "props": {
@@ -1152,74 +1229,18 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
              "children": [
               {
                "children": [
-                {
-                 "children": [
-                  "YOUR RATING"
-                 ],
-                 "props": {
-                  "className": "font-mono-medium",
-                  "style": [
-                   {
-                    "fontSize": 10,
-                    "lineHeight": 13
-                   },
-                   {
-                    "color": "#8D929D",
-                    "letterSpacing": 2.52
-                   },
-                   {
-                    "fontVariant": [
-                     "tabular-nums"
-                    ]
-                   }
-                  ]
-                 },
-                 "type": "Text"
-                },
-                {
-                 "children": [
-                  "1512 → 1496"
-                 ],
-                 "props": {
-                  "className": "font-mono-bold",
-                  "style": [
-                   {
-                    "fontSize": 22,
-                    "lineHeight": 26
-                   },
-                   {
-                    "color": "#E8EDF2"
-                   },
-                   {
-                    "fontVariant": [
-                     "tabular-nums"
-                    ]
-                   }
-                  ]
-                 },
-                 "type": "Text"
-                }
+                "HOW IT ENDED"
                ],
                "props": {
-                "style": {
-                 "gap": 6
-                }
-               },
-               "type": "View"
-              },
-              {
-               "children": [
-                "▼ −16"
-               ],
-               "props": {
-                "className": "font-mono-bold",
+                "className": "font-mono-medium",
                 "style": [
                  {
-                  "fontSize": 26,
-                  "lineHeight": 31
+                  "fontSize": 10,
+                  "lineHeight": 13
                  },
                  {
-                  "color": "#EC6A74"
+                  "color": "#8D929D",
+                  "letterSpacing": 2.52
                  },
                  {
                   "fontVariant": [
@@ -1229,20 +1250,115 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
                 ]
                },
                "type": "Text"
+              },
+              {
+               "children": [
+                {
+                 "children": [
+                  "--"
+                 ],
+                 "props": {
+                  "className": "font-heading uppercase",
+                  "numberOfLines": 2,
+                  "style": [
+                   {
+                    "fontSize": 16,
+                    "lineHeight": 21
+                   },
+                   {
+                    "color": "#E8EDF2",
+                    "flexShrink": 1,
+                    "letterSpacing": 0.56
+                   }
+                  ],
+                  "testID": "result-how-it-ended"
+                 },
+                 "type": "Text"
+                }
+               ],
+               "props": {
+                "style": {
+                 "alignItems": "center",
+                 "flexDirection": "row"
+                }
+               },
+               "type": "View"
               }
              ],
              "props": {
               "style": {
-               "alignItems": "center",
-               "backgroundColor": "#1E222B",
-               "borderColor": "rgba(107, 114, 128, 0.45)",
-               "borderRadius": 4,
-               "borderWidth": 1,
-               "flexDirection": "row",
-               "height": 64,
-               "justifyContent": "space-between",
-               "paddingHorizontal": 16
+               "flex": 1,
+               "gap": 8,
+               "paddingHorizontal": 12,
+               "paddingVertical": 14
               }
+             },
+             "type": "View"
+            },
+            {
+             "children": [
+              {
+               "children": [
+                "MATCH LENGTH"
+               ],
+               "props": {
+                "className": "font-mono-medium",
+                "style": [
+                 {
+                  "fontSize": 10,
+                  "lineHeight": 13
+                 },
+                 {
+                  "color": "#8D929D",
+                  "letterSpacing": 2.52
+                 },
+                 {
+                  "fontVariant": [
+                   "tabular-nums"
+                  ]
+                 }
+                ]
+               },
+               "type": "Text"
+              },
+              {
+               "children": [
+                "--:--"
+               ],
+               "props": {
+                "className": "font-mono-bold",
+                "style": [
+                 {
+                  "fontSize": 18,
+                  "lineHeight": 22
+                 },
+                 {
+                  "color": "#E8EDF2"
+                 },
+                 {
+                  "fontVariant": [
+                   "tabular-nums"
+                  ]
+                 }
+                ],
+                "testID": "result-match-length"
+               },
+               "type": "Text"
+              }
+             ],
+             "props": {
+              "style": [
+               {
+                "flex": 1,
+                "gap": 8,
+                "paddingHorizontal": 12,
+                "paddingVertical": 14
+               },
+               {
+                "borderColor": "rgba(107, 114, 128, 0.45)",
+                "borderLeftWidth": 1
+               }
+              ]
              },
              "type": "View"
             }
@@ -1251,7 +1367,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
             "style": {
              "borderColor": "rgba(107, 114, 128, 0.45)",
              "borderTopWidth": 1,
-             "padding": 12
+             "flexDirection": "row"
             }
            },
            "type": "View"
@@ -1950,6 +2066,25 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
             ]
            },
            "type": "Text"
+          },
+          {
+           "children": [
+            "Confirm if this is right, or dispute it and an admin will review."
+           ],
+           "props": {
+            "className": "font-body",
+            "style": [
+             {
+              "fontSize": 13,
+              "lineHeight": 17
+             },
+             {
+              "color": "#9CA3AF"
+             }
+            ],
+            "testID": "confirm-helper"
+           },
+           "type": "Text"
           }
          ],
          "props": {
@@ -2112,74 +2247,18 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
              "children": [
               {
                "children": [
-                {
-                 "children": [
-                  "YOUR RATING"
-                 ],
-                 "props": {
-                  "className": "font-mono-medium",
-                  "style": [
-                   {
-                    "fontSize": 10,
-                    "lineHeight": 13
-                   },
-                   {
-                    "color": "#8D929D",
-                    "letterSpacing": 2.52
-                   },
-                   {
-                    "fontVariant": [
-                     "tabular-nums"
-                    ]
-                   }
-                  ]
-                 },
-                 "type": "Text"
-                },
-                {
-                 "children": [
-                  "1512 → 1528"
-                 ],
-                 "props": {
-                  "className": "font-mono-bold",
-                  "style": [
-                   {
-                    "fontSize": 22,
-                    "lineHeight": 26
-                   },
-                   {
-                    "color": "#E8EDF2"
-                   },
-                   {
-                    "fontVariant": [
-                     "tabular-nums"
-                    ]
-                   }
-                  ]
-                 },
-                 "type": "Text"
-                }
+                "HOW IT ENDED"
                ],
                "props": {
-                "style": {
-                 "gap": 6
-                }
-               },
-               "type": "View"
-              },
-              {
-               "children": [
-                "▲ +16"
-               ],
-               "props": {
-                "className": "font-mono-bold",
+                "className": "font-mono-medium",
                 "style": [
                  {
-                  "fontSize": 26,
-                  "lineHeight": 31
+                  "fontSize": 10,
+                  "lineHeight": 13
                  },
                  {
-                  "color": "#22C55E"
+                  "color": "#8D929D",
+                  "letterSpacing": 2.52
                  },
                  {
                   "fontVariant": [
@@ -2189,20 +2268,115 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
                 ]
                },
                "type": "Text"
+              },
+              {
+               "children": [
+                {
+                 "children": [
+                  "--"
+                 ],
+                 "props": {
+                  "className": "font-heading uppercase",
+                  "numberOfLines": 2,
+                  "style": [
+                   {
+                    "fontSize": 16,
+                    "lineHeight": 21
+                   },
+                   {
+                    "color": "#E8EDF2",
+                    "flexShrink": 1,
+                    "letterSpacing": 0.56
+                   }
+                  ],
+                  "testID": "result-how-it-ended"
+                 },
+                 "type": "Text"
+                }
+               ],
+               "props": {
+                "style": {
+                 "alignItems": "center",
+                 "flexDirection": "row"
+                }
+               },
+               "type": "View"
               }
              ],
              "props": {
               "style": {
-               "alignItems": "center",
-               "backgroundColor": "#1E222B",
-               "borderColor": "rgba(107, 114, 128, 0.45)",
-               "borderRadius": 4,
-               "borderWidth": 1,
-               "flexDirection": "row",
-               "height": 64,
-               "justifyContent": "space-between",
-               "paddingHorizontal": 16
+               "flex": 1,
+               "gap": 8,
+               "paddingHorizontal": 12,
+               "paddingVertical": 14
               }
+             },
+             "type": "View"
+            },
+            {
+             "children": [
+              {
+               "children": [
+                "MATCH LENGTH"
+               ],
+               "props": {
+                "className": "font-mono-medium",
+                "style": [
+                 {
+                  "fontSize": 10,
+                  "lineHeight": 13
+                 },
+                 {
+                  "color": "#8D929D",
+                  "letterSpacing": 2.52
+                 },
+                 {
+                  "fontVariant": [
+                   "tabular-nums"
+                  ]
+                 }
+                ]
+               },
+               "type": "Text"
+              },
+              {
+               "children": [
+                "--:--"
+               ],
+               "props": {
+                "className": "font-mono-bold",
+                "style": [
+                 {
+                  "fontSize": 18,
+                  "lineHeight": 22
+                 },
+                 {
+                  "color": "#E8EDF2"
+                 },
+                 {
+                  "fontVariant": [
+                   "tabular-nums"
+                  ]
+                 }
+                ],
+                "testID": "result-match-length"
+               },
+               "type": "Text"
+              }
+             ],
+             "props": {
+              "style": [
+               {
+                "flex": 1,
+                "gap": 8,
+                "paddingHorizontal": 12,
+                "paddingVertical": 14
+               },
+               {
+                "borderColor": "rgba(107, 114, 128, 0.45)",
+                "borderLeftWidth": 1
+               }
+              ]
              },
              "type": "View"
             }
@@ -2211,7 +2385,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say chal
             "style": {
              "borderColor": "rgba(107, 114, 128, 0.45)",
              "borderTopWidth": 1,
-             "padding": 12
+             "flexDirection": "row"
             }
            },
            "type": "View"
@@ -13530,6 +13704,25 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say conf
             ]
            },
            "type": "Text"
+          },
+          {
+           "children": [
+            "Confirm if this is right, or dispute it and an admin will review."
+           ],
+           "props": {
+            "className": "font-body",
+            "style": [
+             {
+              "fontSize": 13,
+              "lineHeight": 17
+             },
+             {
+              "color": "#9CA3AF"
+             }
+            ],
+            "testID": "confirm-helper"
+           },
+           "type": "Text"
           }
          ],
          "props": {
@@ -13692,74 +13885,18 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say conf
              "children": [
               {
                "children": [
-                {
-                 "children": [
-                  "YOUR RATING"
-                 ],
-                 "props": {
-                  "className": "font-mono-medium",
-                  "style": [
-                   {
-                    "fontSize": 10,
-                    "lineHeight": 13
-                   },
-                   {
-                    "color": "#8D929D",
-                    "letterSpacing": 2.52
-                   },
-                   {
-                    "fontVariant": [
-                     "tabular-nums"
-                    ]
-                   }
-                  ]
-                 },
-                 "type": "Text"
-                },
-                {
-                 "children": [
-                  "1512 → 1528"
-                 ],
-                 "props": {
-                  "className": "font-mono-bold",
-                  "style": [
-                   {
-                    "fontSize": 22,
-                    "lineHeight": 26
-                   },
-                   {
-                    "color": "#E8EDF2"
-                   },
-                   {
-                    "fontVariant": [
-                     "tabular-nums"
-                    ]
-                   }
-                  ]
-                 },
-                 "type": "Text"
-                }
+                "HOW IT ENDED"
                ],
                "props": {
-                "style": {
-                 "gap": 6
-                }
-               },
-               "type": "View"
-              },
-              {
-               "children": [
-                "▲ +16"
-               ],
-               "props": {
-                "className": "font-mono-bold",
+                "className": "font-mono-medium",
                 "style": [
                  {
-                  "fontSize": 26,
-                  "lineHeight": 31
+                  "fontSize": 10,
+                  "lineHeight": 13
                  },
                  {
-                  "color": "#22C55E"
+                  "color": "#8D929D",
+                  "letterSpacing": 2.52
                  },
                  {
                   "fontVariant": [
@@ -13769,20 +13906,115 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say conf
                 ]
                },
                "type": "Text"
+              },
+              {
+               "children": [
+                {
+                 "children": [
+                  "--"
+                 ],
+                 "props": {
+                  "className": "font-heading uppercase",
+                  "numberOfLines": 2,
+                  "style": [
+                   {
+                    "fontSize": 16,
+                    "lineHeight": 21
+                   },
+                   {
+                    "color": "#E8EDF2",
+                    "flexShrink": 1,
+                    "letterSpacing": 0.56
+                   }
+                  ],
+                  "testID": "result-how-it-ended"
+                 },
+                 "type": "Text"
+                }
+               ],
+               "props": {
+                "style": {
+                 "alignItems": "center",
+                 "flexDirection": "row"
+                }
+               },
+               "type": "View"
               }
              ],
              "props": {
               "style": {
-               "alignItems": "center",
-               "backgroundColor": "#1E222B",
-               "borderColor": "rgba(107, 114, 128, 0.45)",
-               "borderRadius": 4,
-               "borderWidth": 1,
-               "flexDirection": "row",
-               "height": 64,
-               "justifyContent": "space-between",
-               "paddingHorizontal": 16
+               "flex": 1,
+               "gap": 8,
+               "paddingHorizontal": 12,
+               "paddingVertical": 14
               }
+             },
+             "type": "View"
+            },
+            {
+             "children": [
+              {
+               "children": [
+                "MATCH LENGTH"
+               ],
+               "props": {
+                "className": "font-mono-medium",
+                "style": [
+                 {
+                  "fontSize": 10,
+                  "lineHeight": 13
+                 },
+                 {
+                  "color": "#8D929D",
+                  "letterSpacing": 2.52
+                 },
+                 {
+                  "fontVariant": [
+                   "tabular-nums"
+                  ]
+                 }
+                ]
+               },
+               "type": "Text"
+              },
+              {
+               "children": [
+                "--:--"
+               ],
+               "props": {
+                "className": "font-mono-bold",
+                "style": [
+                 {
+                  "fontSize": 18,
+                  "lineHeight": 22
+                 },
+                 {
+                  "color": "#E8EDF2"
+                 },
+                 {
+                  "fontVariant": [
+                   "tabular-nums"
+                  ]
+                 }
+                ],
+                "testID": "result-match-length"
+               },
+               "type": "Text"
+              }
+             ],
+             "props": {
+              "style": [
+               {
+                "flex": 1,
+                "gap": 8,
+                "paddingHorizontal": 12,
+                "paddingVertical": 14
+               },
+               {
+                "borderColor": "rgba(107, 114, 128, 0.45)",
+                "borderLeftWidth": 1
+               }
+              ]
              },
              "type": "View"
             }
@@ -13791,7 +14023,7 @@ exports[`flag-OFF golden output: identical whatever the timekeeper keys say conf
             "style": {
              "borderColor": "rgba(107, 114, 128, 0.45)",
              "borderTopWidth": 1,
-             "padding": 12
+             "flexDirection": "row"
             }
            },
            "type": "View"

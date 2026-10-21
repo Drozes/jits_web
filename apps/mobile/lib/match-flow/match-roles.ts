@@ -106,8 +106,8 @@ const SELF_RUN_CAPS: MatchCaps = {
   recordingRequired: false,
   readyPolicy: "broadcast",
   weightVerdicts: "opponent",
-  // The confirm step shows YOUR RATING today; owner decision A25 removes it (slice M5).
-  showsRatingOnConfirm: true,
+  // Owner decision A25 (slice M5): the confirm step shows no rating in either mode.
+  showsRatingOnConfirm: false,
   submissionLayout: "chips",
 };
 

@@ -67,6 +67,17 @@
  *  - the countdown caption's text children (PR3 made the caption a prop:
  *    JSX's three adjacent children "SYNCED TO SERVER CLOCK ", "·",
  *    " BOTH PHONES" became one string). The rendered text is the same.
+ *
+ * Slice M5's one re-capture (owner decision A25: no rating on confirm, in
+ * both modes) changed exactly the four confirm entries ("confirm" and
+ * "challenge: confirm, win / loss / draw"), and only two pieces of each:
+ * a NEW helper line under the heading, TK-R8 ("Confirm if this is right, or
+ * dispute it and an admin will review."), and the YOUR RATING block
+ * replaced by HOW IT ENDED (TK-R6) and MATCH LENGTH (TK-R7). The helper is
+ * an added line, not a replaced one: at the baseline the confirm step drew
+ * no helper (the rating sentence lived only in `ResultBanner`'s default
+ * subtitle, which practice overrides). These fixtures carry no finish, so
+ * the two cells read "--" (DRAW on the draw) and "--:--".
  */
 import * as React from "react";
 import { AppState } from "react-native";
