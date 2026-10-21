@@ -3,6 +3,7 @@ import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { checkOpponentWeight, reweighForMatch, type WeightVerdict } from "@jits/shared/api/match-weight-checks";
 import type { WeightChecksHandle } from "./use-match-weight-checks";
+import { useMatchSyncContext } from "./match-sync-context";
 
 /** reweigh_for_match accepts 0 < w < 500 lbs (stored to 0.01). */
 export function isValidReweigh(lbs: number): boolean {
@@ -20,12 +21,28 @@ interface WeightCheckActionsParams {
  * The face-off's two weight-check actions (jr_be-ahn.4), split out of
  * `use-faceoff.ts`: judge the opponent's weigh-in and re-weigh for this
  * match. Each applies what the RPC returned, or re-reads the checks on a
- * refusal.
+ * refusal and says so with the shipped toast. In a timekeeper-mode match
+ * (the sync context's `timekeeperModeSelfId`) that toast is its title alone,
+ * never the server's text (M-R4, spec 14.9 X1), and the match is re-read
+ * too, since the refusal may mean it moved on.
  */
 export function useWeightCheckActions(params: WeightCheckActionsParams) {
   const [busy, setBusy] = React.useState(false);
   const pRef = React.useRef(params);
   pRef.current = params;
+  const { reconcileNow, timekeeperModeSelfId } = useMatchSyncContext();
+  const modeRef = React.useRef({ timekeeperMode: false, reconcileNow });
+  modeRef.current = { timekeeperMode: timekeeperModeSelfId != null, reconcileNow };
+
+  /** The refusal's toast: the shipped title and the server's reason; in timekeeper mode the title alone, and a re-read. */
+  const refused = React.useCallback((kind: "error" | "info", title: string, message: string) => {
+    if (!modeRef.current.timekeeperMode) {
+      toast[kind]({ text1: title, description: message });
+      return;
+    }
+    toast[kind]({ text1: title });
+    modeRef.current.reconcileNow();
+  }, []);
 
   const check = React.useCallback(async (verdict: WeightVerdict) => {
     const handle = pRef.current.checks;
@@ -41,11 +58,11 @@ export function useWeightCheckActions(params: WeightCheckActionsParams) {
     }
     handle.refetch();
     if (res.error.code === "WEIGHT_CHANGED") {
-      toast.info({ text1: "Weight changed", description: res.error.message });
+      refused("info", "Weight changed", res.error.message);
       return;
     }
-    toast.error({ text1: "Couldn't save your check", description: res.error.message });
-  }, []);
+    refused("error", "Couldn't save your check", res.error.message);
+  }, [refused]);
 
   const reweigh = React.useCallback(async (lbs: number) => {
     const handle = pRef.current.checks;
@@ -61,9 +78,9 @@ export function useWeightCheckActions(params: WeightCheckActionsParams) {
       return true;
     }
     handle.refetch();
-    toast.error({ text1: "Couldn't re-weigh", description: res.error.message });
+    refused("error", "Couldn't re-weigh", res.error.message);
     return false;
-  }, []);
+  }, [refused]);
 
   return { busy, check, reweigh };
 }

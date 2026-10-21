@@ -2,7 +2,8 @@
  * Clean-code guard for the two match modes (timekeeper mode ARCHITECTURE 5):
  *
  *  - M-R1: no read of `requires_timekeeper` in the app outside
- *    `lib/match-flow/match-roles.ts`;
+ *    `lib/match-flow/match-roles.ts`, and none of its sub-flag
+ *    `tk_weight_check_required` outside it and one recorded exception;
  *  - M-R2: no "me / the other one" pair derived from the participant array
  *    under `components/match-flow/` or `lib/match-flow/`, again outside
  *    `match-roles.ts`. Everything reads `MatchRoles` instead;
@@ -58,6 +59,19 @@ const MODE_READ = /\.requires_timekeeper\b|\brequires_timekeeper\s*[,}:=]|["'`]r
 const MODE_IN_BRACES = /\{[^{}]*\brequires_timekeeper\b[^{}]*\}/;
 
 /**
+ * M-R1, the mode's sub-flag (`tk_weight_check_required`, the timekeeper
+ * weight check snapshot, A19): `match-roles.ts` turns it into the
+ * timekeeper's caps (`weightVerdicts`). The athletes' caps do not carry it,
+ * so `use-merged-ready.ts` reads it for display only (TK-F2, TK-F3): ONE
+ * recorded exception (M3 review round 2), until the orchestrator decides on
+ * a roles field in `match-roles.ts`, which would retire it. Any other read
+ * fails here, so the sub-flag cannot spread the way the mode key could.
+ */
+const SUB_FLAG_READ = /\.tk_weight_check_required\b|\btk_weight_check_required\s*[,}:=]|["'`]tk_weight_check_required["'`]/;
+const SUB_FLAG_EXCEPTIONS = ["lib/match-flow/use-merged-ready.ts"];
+const fileOf = (offender: string) => offender.slice(0, offender.indexOf(":"));
+
+/**
  * M-R2: any read of the match's participant array (jits-o47s.26): a property
  * read (`.find`, `[1]`, `for...of`, `.map(...).find`, an array destructure),
  * a one-line object destructure, a quoted key, a bare `participants.find`
@@ -105,6 +119,21 @@ describe("timekeeper mode guard", () => {
   it("M-R1: only match-roles.ts reads requires_timekeeper", () => {
     expect(offenders(["app", "components", "lib"], MODE_READ)).toEqual([]);
     expect(fileOffenders(["app", "components", "lib"], MODE_IN_BRACES)).toEqual([]);
+  });
+
+  it("M-R1: the sub-flag is read only in match-roles.ts and its one recorded exception", () => {
+    const reads = offenders(["app", "components", "lib"], SUB_FLAG_READ);
+    expect(reads.filter((o) => !SUB_FLAG_EXCEPTIONS.includes(fileOf(o)))).toEqual([]);
+    // The exception list prunes itself: once a read goes through roles, its entry must go too.
+    expect([...new Set(reads.map(fileOf))]).toEqual(SUB_FLAG_EXCEPTIONS);
+    for (const line of [
+      "checksWeights: p.flow?.match.tk_weight_check_required === true,",
+      "const { tk_weight_check_required } = match;",
+      'const on = match["tk_weight_check_required"];',
+    ]) {
+      expect([line, SUB_FLAG_READ.test(line)]).toEqual([line, true]);
+    }
+    expect(SUB_FLAG_READ.test("const checksWeights = roles.caps.weightVerdicts === \"both_athletes\";")).toBe(false);
   });
 
   it("M-R2: no participant pair is derived outside match-roles.ts", () => {

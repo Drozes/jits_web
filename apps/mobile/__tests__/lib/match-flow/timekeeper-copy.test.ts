@@ -348,23 +348,109 @@ describe("the shared refusal messages are deck strings", () => {
 
 describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck 'Current flow')", () => {
   const APP = join(__dirname, "..", "..", "..");
+  const src = (...rel: string[]) => readFileSync(join(APP, ...rel), "utf8");
+  const S = SHIPPED_COPY;
+  const TOP = src("components", "match-flow", "faceoff", "faceoff-top.tsx");
+  const BODY = src("components", "match-flow", "faceoff", "faceoff-body.tsx");
+  const CHECK = src("components", "match-flow", "faceoff", "faceoff-weight-check.tsx");
+  const START = src("lib", "match-flow", "use-dual-auto-start.ts");
+  const ACTIONS = src("lib", "match-flow", "use-weight-check-actions.ts");
+
+  it("holds exactly the shipped words the timekeeper-mode screens reuse", () => {
+    expect(Object.keys(S).sort()).toEqual(
+      [
+        "leave",
+        "confirm",
+        "flag",
+        "youFlagged",
+        "withdrawFlag",
+        "weighedInAt",
+        "reweighedAt",
+        "noWeighIn",
+        "opponentFlaggedMe",
+        "myFlagHold",
+        "awaitRecheck",
+        "recordFromMyPhone",
+        "waitingFor",
+        "hold",
+        "starting",
+        "couldNotStart",
+        "matchOnHold",
+        "couldNotSaveCheck",
+        "weightChanged",
+      ].sort(),
+    );
+  });
 
   it("A2: the face-off's Leave and its label, the same words as the shipped face-off", () => {
-    expect(SHIPPED_COPY).toEqual({ leave: { text: "Leave", a11y: "Cancel match" } });
-    const faceoffTop = readFileSync(join(APP, "components", "match-flow", "faceoff", "faceoff-top.tsx"), "utf8");
-    expect(faceoffTop).toContain(`accessibilityLabel="${SHIPPED_COPY.leave.a11y}"`);
-    expect(faceoffTop).toMatch(new RegExp(`>\\s*${SHIPPED_COPY.leave.text}\\s*</Text>`));
+    expect(S.leave).toEqual({ text: "Leave", a11y: "Cancel match" });
+    expect(TOP).toContain(`accessibilityLabel="${S.leave.a11y}"`);
+    expect(TOP).toMatch(new RegExp(`>\\s*${S.leave.text}\\s*</Text>`));
   });
 
   it("the crew step takes its Leave from here, with no literal of its own", () => {
-    const crew = readFileSync(join(APP, "components", "match-flow", "crew", "crew-step.tsx"), "utf8");
+    const crew = src("components", "match-flow", "crew", "crew-step.tsx");
     expect(crew).toContain("SHIPPED_COPY.leave.text");
     expect(crew).toContain("SHIPPED_COPY.leave.a11y");
     expect(crew).not.toMatch(/"Cancel match"|>\s*Leave\s*</);
   });
 
+  it.each([
+    ["confirm", S.confirm, "Confirm", CHECK, 'label="Confirm"'],
+    ["flag", S.flag, "Doesn't look right", CHECK, `label="Doesn't look right"`],
+    ["youFlagged", S.youFlagged, "YOU FLAGGED", CHECK, '"YOU FLAGGED"'],
+    ["withdrawFlag", S.withdrawFlag, "Withdraw flag", CHECK, 'label="Withdraw flag"'],
+    ["recordFromMyPhone", S.recordFromMyPhone, "Record from my phone", BODY, "Record from my phone"],
+    ["hold", S.hold, "MATCH ON HOLD · WEIGHT CHECK", BODY, '"MATCH ON HOLD · WEIGHT CHECK"'],
+    ["starting", S.starting, "STARTING MATCH...", BODY, "STARTING MATCH..."],
+    ["couldNotStart", S.couldNotStart, "Couldn't start match", START, `"Couldn't start match"`],
+    ["matchOnHold", S.matchOnHold, "Match on hold", START, '"Match on hold"'],
+    ["couldNotSaveCheck", S.couldNotSaveCheck, "Couldn't save your check", ACTIONS, `"Couldn't save your check"`],
+    ["weightChanged", S.weightChanged, "Weight changed", ACTIONS, '"Weight changed"'],
+  ])("A2, B5, B6: %s reads as the shipped face-off source", (_key, value, deck, source, literal) => {
+    expect(value).toBe(deck);
+    expect(literal).toContain(value);
+    expect(source).toContain(literal);
+  });
+
+  it("A2, B5: the opponent's weigh-in line, as the shipped check panel builds it", () => {
+    expect(CHECK).toContain('const verb = w.opponentReweighed ? "RE-WEIGHED AT" : "WEIGHED IN AT";');
+    expect(CHECK).toContain("`${OPP} ${verb} ${lbs(f.opponentWeight)}`");
+    expect(CHECK).toContain("`${OPP} HAS NO WEIGH-IN ON RECORD`");
+    // The panel's weight and the face-off header's `weightText` (the one the
+    // timekeeper-mode screens pass in) write a weight the same way.
+    expect(CHECK).toContain("`${Number(w.toFixed(1))} LBS`");
+    expect(TOP).toContain('function weightText(lbs: number | null): string {\n  return lbs != null ? `${Number(lbs.toFixed(1))} LBS` : "-- LBS";');
+    expect(S.weighedInAt("M. REYES", "167 LBS")).toBe("M. REYES WEIGHED IN AT 167 LBS");
+    expect(S.reweighedAt("M. REYES", "167.6 LBS")).toBe("M. REYES RE-WEIGHED AT 167.6 LBS");
+    expect(S.noWeighIn("M. REYES")).toBe("M. REYES HAS NO WEIGH-IN ON RECORD");
+  });
+
+  it("A2: the weight-check notices and the waiting line", () => {
+    expect(CHECK).toContain("`${opp} says your weight doesn't look right. Re-weigh to continue.`");
+    expect(CHECK).toContain("`You flagged ${opp}'s weight. Match is on hold.`");
+    expect(CHECK).toContain("`Waiting for ${opp} to check your new weight.`");
+    expect(BODY).toContain("`WAITING FOR ${oppName}...`");
+    expect(S.opponentFlaggedMe(A)).toBe("M. Reyes says your weight doesn't look right. Re-weigh to continue.");
+    expect(S.myFlagHold(A)).toBe("You flagged M. Reyes's weight. Match is on hold.");
+    expect(S.awaitRecheck(A)).toBe("Waiting for M. Reyes to check your new weight.");
+    expect(S.waitingFor("M. REYES")).toBe("WAITING FOR M. REYES...");
+  });
+
   it("no string has an em dash, an exclamation mark or an emoji", () => {
-    for (const s of strings(SHIPPED_COPY)) {
+    const all = [
+      ...strings(S),
+      S.weighedInAt("M. REYES", "167 LBS"),
+      S.reweighedAt("M. REYES", "167 LBS"),
+      S.noWeighIn("M. REYES"),
+      S.opponentFlaggedMe(A),
+      S.myFlagHold(A),
+      S.awaitRecheck(A),
+      S.waitingFor("M. REYES"),
+    ];
+    // 13 plain strings and the 7 builders, rendered.
+    expect(all).toHaveLength(20);
+    for (const s of all) {
       expect([s, s.includes(EM_DASH) || s.includes("!") || /\p{Extended_Pictographic}/u.test(s)]).toEqual([s, false]);
     }
   });

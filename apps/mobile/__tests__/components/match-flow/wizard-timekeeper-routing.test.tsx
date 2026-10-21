@@ -614,9 +614,11 @@ describe("timekeeper mode: the timekeeper", () => {
     expect(screen.queryByText("Not a participant")).toBeNull();
     screen.getByTestId("match-step-weight");
     screen.getByTestId("faceoff-timekeeper");
-    // The athletes' face-off header (and its Leave) is not theirs.
+    // The athletes' face-off header (and its "Cancel match") is not theirs:
+    // their Leave is the seat's drop-out before the start (A5, R21; slice M3).
     expect(screen.queryByTestId("faceoff-top-label")).toBeNull();
-    expect(screen.queryByTestId("faceoff-leave")).toBeNull();
+    expect(screen.queryByLabelText("Cancel match")).toBeNull();
+    expect(screen.getByTestId("faceoff-leave").props.accessibilityLabel).toBe("Leave");
     expect(mockCameraStep).toHaveBeenLastCalledWith("ready");
     // Their device toggle is off (first use), and they record anyway (D12).
     expect(mockCameraOptedIn).toHaveBeenLastCalledWith(true);
