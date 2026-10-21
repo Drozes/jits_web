@@ -254,10 +254,13 @@ export type TimekeeperCopyId = keyof typeof TIMEKEEPER_COPY;
 
 /**
  * Shipped strings a timekeeper-mode surface reuses unchanged, as the deck's
- * "Current flow" boards list them (COPY-DECK.md, A2) and the "shipped" rows
- * of the athlete and timekeeper face-offs (B5, B6) name them. The shipped
+ * "Current flow" boards list them (COPY-DECK.md, A2 and A4) and the "shipped"
+ * rows of the athlete and timekeeper face-offs (B5, B6) name them. The shipped
  * screen keeps its own literal; `timekeeper-copy.test.ts` pins each entry to
- * that shipped source, so the two copies cannot drift.
+ * that shipped source, so the two copies cannot drift. A component both modes
+ * render (the A4 result plate, the confirm's error toast) keeps no literal of
+ * its own: it reads the entry in both modes, and the renderer golden and the
+ * flag-OFF confirm tests pin its words.
  *
  * Placeholders as the shipped face-off writes them: `OPP` an upper-cased
  * short name, `opp` the short name, `weight` the face-off's `{w} LBS`
@@ -293,4 +296,29 @@ export const SHIPPED_COPY = {
   matchOnHold: "Match on hold",
   couldNotSaveCheck: "Couldn't save your check",
   weightChanged: "Weight changed",
+  /** A4: the confirm kicker that names nobody (`steps/confirm-step.tsx`), also the timekeeper-mode kicker with no name. */
+  resultRecorded: "RESULT RECORDED",
+  /**
+   * A4: the recorded-result plate (`steps/confirm-step.tsx`, `RecordedResultPlate`), on the
+   * confirm step in both modes and on the timekeeper's done screen (boards P-TK-B8 frame 3, B13).
+   */
+  winner: "WINNER",
+  result: "RESULT",
+  draw: "Draw",
+  won: (name: string) => `${name} won`,
+  resultIn: "Result in",
+  /** A4 and TK-R6: a draw's HOW IT ENDED, the confirm verdict's `DRAW`. */
+  drawValue: "DRAW",
+  /** A4: the shipped empty value and empty clock (`steps/result-waiting.tsx`), the plate's HOW IT ENDED and MATCH LENGTH before they are known. */
+  noValue: "--",
+  noClock: "--:--",
+  /** A4: the confirm progress rows (`steps/confirm-step.tsx`), also on the timekeeper's done screen. */
+  athleteConfirmed: (NAME: string) => `${NAME} CONFIRMED ✓`,
+  waiting: "WAITING",
+  /** A4: the verdict's disputed tag (`verdict/verdict-step.tsx`), also the done screen's tag on a disputed result. */
+  disputed: "DISPUTED",
+  /** A4: the dispute form's way back (`steps/dispute-form.tsx`), also the timekeeper's edit form (B13). */
+  back: "Back",
+  /** A4: the confirm's error toast title (`lib/match-flow/use-confirm-result.ts`); timekeeper mode adds no description (M-R4). */
+  couldNotConfirm: "Couldn't confirm",
 } as const;

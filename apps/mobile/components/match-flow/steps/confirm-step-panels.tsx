@@ -3,6 +3,7 @@ import { Check } from "lucide-react-native";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { Plate } from "@/components/ui/elo-system";
 import { cn } from "@/lib/cn";
+import { CONFIRM_COPY } from "@/lib/match-flow/confirm-copy";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 
 /**
@@ -18,7 +19,11 @@ export function ResultBanner({
 }: {
   resultData: BroadcastResult | null;
   currentAthleteId: string;
-  /** Overrides the default line under the verdict (practice has no dispute). */
+  /**
+   * Overrides the default line under the verdict (practice has no dispute).
+   * The default is the confirm helper without the rating sentence (TK-R8,
+   * A25: no rating on confirm, in both modes).
+   */
   subtitle?: string;
   /** Overrides the small line above the verdict. */
   kicker?: string;
@@ -58,8 +63,7 @@ export function ResultBanner({
         {verdictText}
       </Text>
       <Text className="text-center font-body text-small text-ink-2">
-        {subtitle ??
-          "Your rating is already updated. Confirm if this is right, or dispute it and an admin will review."}
+        {subtitle ?? CONFIRM_COPY.helper}
       </Text>
     </Plate>
   );

@@ -9,8 +9,12 @@ import type { ResultAthlete } from "./result-form";
 /**
  * The other phone while someone else records the result: the claimer of a
  * claim-first entry, or whoever records it for this match (`ResultStep`'s
- * "wait" entry, with no take-over). Nothing to do here but wait: the result
- * arrives by broadcast or the reconciler and moves this phone to confirm.
+ * "wait" entry, with no take-over: the timekeeper). Nothing to do here but
+ * wait: the result arrives by broadcast or the reconciler and moves this
+ * phone to confirm. A `notice` (the timekeeper's stalled result going to an
+ * admin, TK-D8) replaces the "is recording" headline, the dots and "You'll
+ * confirm it in a moment.": nobody is recording any more (board B9 frame 7,
+ * the admin review state, in the attention token).
  * There is no "leave and confirm later" button (jits-02vo.7): closing the
  * app is still allowed, and an undisputed result is confirmed by the backend
  * once its lock window passes (jr_be-ahn.5).
@@ -22,6 +26,7 @@ export function ResultWaiting({
   durationSeconds,
   endedAtSeconds,
   onTakeOver,
+  notice = null,
 }: {
   /** Who is recording; only the name is shown. */
   claimer: Pick<ResultAthlete, "displayName">;
@@ -31,6 +36,8 @@ export function ResultWaiting({
   endedAtSeconds?: number;
   /** Offered once the claim has gone a minute without a result. */
   onTakeOver?: () => void;
+  /** A state the waiting athletes must know about (TK-D8); null shows nothing. */
+  notice?: string | null;
 }) {
   const p = usePalette();
   const name = shortName(claimer.displayName);
@@ -41,16 +48,23 @@ export function ResultWaiting({
   return (
     <View testID="result-waiting" style={{ gap: 20 }}>
       <Mono>MATCH OVER</Mono>
-      <View accessibilityRole="summary" accessibilityLiveRegion="polite" style={{ alignItems: "center", gap: 24, paddingVertical: 24 }}>
-        <InitialsBlock name={claimer.displayName} size={96} fontSize="headline-2xl" />
-        <Text className="font-display" style={[typeStep("display-48"), { maxWidth: 320, textAlign: "center", lineHeight: 46, color: p.text }]}>
-          {`${name} is recording the result`}
-        </Text>
-        <Dots />
-        <Text className="font-body" style={[typeStep("callout"), { color: p.text2, textAlign: "center" }]}>
-          You{"’"}ll confirm it in a moment.
-        </Text>
-      </View>
+      {notice ? (
+        <View accessibilityRole="summary" accessibilityLiveRegion="polite" style={{ alignItems: "center", gap: 20, paddingVertical: 24 }}>
+          <InitialsBlock name={claimer.displayName} size={96} fontSize="headline-2xl" />
+          <ReviewNotice text={notice} />
+        </View>
+      ) : (
+        <View accessibilityRole="summary" accessibilityLiveRegion="polite" style={{ alignItems: "center", gap: 24, paddingVertical: 24 }}>
+          <InitialsBlock name={claimer.displayName} size={96} fontSize="headline-2xl" />
+          <Text className="font-display" style={[typeStep("display-48"), { maxWidth: 320, textAlign: "center", lineHeight: 46, color: p.text }]}>
+            {`${name} is recording the result`}
+          </Text>
+          <Dots />
+          <Text className="font-body" style={[typeStep("callout"), { color: p.text2, textAlign: "center" }]}>
+            You{"’"}ll confirm it in a moment.
+          </Text>
+        </View>
+      )}
       <View style={{ backgroundColor: p.plate, borderWidth: 1, borderColor: p.hairline, borderRadius: FIGHT_RADIUS.plate, overflow: "hidden" }}>
         <View style={{ flexDirection: "row" }}>
           {cells.map((c, i) => (
@@ -79,6 +93,22 @@ export function ResultWaiting({
           <FightButton testID="result-take-over" variant="secondary" label="Record it myself" onPress={onTakeOver} />
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/** The admin review state (TK-D8, board B9 frame 7): a dashed attention plate with its dot. */
+function ReviewNotice({ text }: { text: string }) {
+  const p = usePalette();
+  return (
+    <View
+      testID="result-waiting-review"
+      style={{ alignSelf: "stretch", flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderWidth: 1, borderStyle: "dashed", borderColor: p.amber, borderRadius: FIGHT_RADIUS.button }}
+    >
+      <View style={{ width: 8, height: 8, marginTop: 3, borderRadius: 4, backgroundColor: p.amber }} />
+      <Text testID="result-waiting-notice" className="font-mono-bold" style={[typeStep("caption"), { flex: 1, letterSpacing: TRACKING["caps-l"], color: p.amber }, TABULAR]}>
+        {text}
+      </Text>
     </View>
   );
 }

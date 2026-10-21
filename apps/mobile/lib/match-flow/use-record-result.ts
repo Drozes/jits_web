@@ -45,16 +45,27 @@ interface SubmitParams {
  * isn't lost: when offline, the call is queued under a stable per-match
  * key and the wizard advances optimistically; the queue auto-flushes on
  * reconnect (see `lib/network/mutation-queue.ts`).
+ *
+ * Timekeeper mode (the step channels carry `timekeeperModeSelfId`; spec 10,
+ * ARCHITECTURE M-R8): the timekeeper's `result_submitted` names them
+ * (`actor_id`), and a received one only re-reads the match, never moves this
+ * phone by itself: the completed match the read brings moves the athletes to
+ * confirm. A refused record toasts the shipped title with no DomainError
+ * message (M-R4). A two-athlete match sends and handles it exactly as before.
  */
 export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResultClaimed }: UseRecordResultParams) {
   const [loading, setLoading] = React.useState(false);
   const recordedRef = React.useRef(false);
 
-  const { reconcileNow } = useMatchSyncContext();
+  const { reconcileNow, timekeeperModeSelfId } = useMatchSyncContext();
   const sync = useStepMatchSync({
     matchId,
     onResultSubmitted: (r) => {
       if (recordedRef.current) return;
+      if (timekeeperModeSelfId) {
+        reconcileNow();
+        return;
+      }
       recordedRef.current = true;
       onRecorded(r, { recorderConfirmed: false });
     },
@@ -82,7 +93,10 @@ export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResul
       if (!res.ok) {
         setLoading(false);
         void matchHaptics.error();
-        toast.error({ text1: "Couldn't record result", description: res.error.message });
+        // Timekeeper mode shows no DomainError message (M-R4, spec 14.9 X1): the
+        // shared table maps its refusals to two-athlete words. The two-athlete
+        // toast keeps its shipped description.
+        toast.error(timekeeperModeSelfId ? { text1: "Couldn't record result" } : { text1: "Couldn't record result", description: res.error.message });
         // The usual cause is that the opponent recorded first and their
         // result_submitted never arrived: re-read the match now so the
         // wizard moves on instead of offering a form that cannot succeed.
@@ -111,7 +125,10 @@ export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResul
       // opponent's wizard picks the result up from the DB (reconciler) once
       // the queued write lands.
       const recorderConfirmed = !queued && (res.data as { recorder_confirmed?: boolean }).recorder_confirmed === true;
-      const sent = sync.broadcastResultSubmitted(broadcast);
+      // Timekeeper mode names its actor (spec 10); a two-athlete send is unchanged.
+      const sent = timekeeperModeSelfId
+        ? sync.broadcastResultSubmitted(broadcast, timekeeperModeSelfId)
+        : sync.broadcastResultSubmitted(broadcast);
       // The server confirmed this side too: tell the opponent's confirm step
       // now, so it shows this athlete confirmed without waiting on a poll.
       const confirmedSent =
@@ -125,7 +142,7 @@ export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResul
       }
       onRecorded(broadcast, { recorderConfirmed });
     },
-    [matchId, onRecorded, sync, reconcileNow, currentAthleteId],
+    [matchId, onRecorded, sync, reconcileNow, currentAthleteId, timekeeperModeSelfId],
   );
 
   return { loading, submit, broadcastResultClaimed: sync.broadcastResultClaimed };

@@ -6,6 +6,7 @@ import type { MatchExtras } from "@/lib/match-flow/match-extras";
 import type { RecordedMeta } from "@/lib/match-flow/use-record-result";
 import { useMatchFlow } from "@/lib/match-flow/match-flow-context";
 import { stepSeams } from "@/lib/match-flow/step-seams";
+import { confirmStepInputs, resultStepInputs } from "@/lib/match-flow/result-confirm-inputs";
 import { EndStep } from "./steps/end-step";
 import { ResultStep } from "./steps/result-step";
 import { ConfirmStep } from "./steps/confirm-step";
@@ -109,7 +110,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
   // countdown and live screen, and for this match's own job everywhere in
   // the wizard (the compact line and the verdict's Film block say it).
   useSuppressUploadStrip(step === "live" ? { kind: "all" } : { kind: "match", matchId });
-  const { roles, tkState } = useMatchFlow();
+  const { match, roles, tkState } = useMatchFlow();
   const { me, opponent, caps } = roles;
   // An athlete sees themselves and their opponent (`pair`); the timekeeper
   // sees the two athletes, challenger first.
@@ -182,6 +183,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
           opponent={right}
           submissionTypes={submissionTypes}
           submissionLayout={caps.submissionLayout}
+          {...resultStepInputs(match, tkState)}
           {...seams.resultEntry}
           onRecorded={(r: BroadcastResult, meta: RecordedMeta) => {
             setResultData(r);
@@ -232,6 +234,7 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
           disputeLocksAt={extras.disputeLocksAt}
           completedAt={extras.completedAt}
           recorderName={seams.confirmRecorderName}
+          {...confirmStepInputs(match, roles, initialFinishSeconds)}
           onCompleted={() => {
             refresh();
             setStep("summary");

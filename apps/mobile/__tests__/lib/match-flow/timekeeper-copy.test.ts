@@ -380,6 +380,20 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
         "matchOnHold",
         "couldNotSaveCheck",
         "weightChanged",
+        "resultRecorded",
+        "winner",
+        "result",
+        "draw",
+        "won",
+        "resultIn",
+        "drawValue",
+        "noValue",
+        "noClock",
+        "athleteConfirmed",
+        "waiting",
+        "disputed",
+        "back",
+        "couldNotConfirm",
       ].sort(),
     );
   });
@@ -455,6 +469,77 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
     expect(S.waitingFor("M. REYES")).toBe("WAITING FOR M. REYES...");
   });
 
+  describe("A4: the result and confirm words the timekeeper-mode screens reuse", () => {
+    const CONFIRM = src("components", "match-flow", "steps", "confirm-step.tsx");
+    const CONFIRM_ADAPTER = src("lib", "match-flow", "confirm-copy.ts");
+    const CONFIRM_HOOK = src("lib", "match-flow", "use-confirm-result.ts");
+    const DONE = src("components", "match-flow", "steps", "timekeeper-done.tsx");
+    const EDIT = src("components", "match-flow", "steps", "result-edit-entry.tsx");
+    const FORM = src("components", "match-flow", "steps", "result-form.tsx");
+    const WAITING = src("components", "match-flow", "steps", "result-waiting.tsx");
+    const DISPUTE = src("components", "match-flow", "steps", "dispute-form.tsx");
+    const VERDICT = src("components", "match-flow", "verdict", "verdict-step.tsx");
+    /** The plate's function body: the confirm step's other words stay its own. */
+    const PLATE = CONFIRM.slice(CONFIRM.indexOf("export function RecordedResultPlate"), CONFIRM.indexOf("export function StatusRow"));
+
+    it.each([
+      ["resultRecorded", S.resultRecorded, "RESULT RECORDED", CONFIRM, '"RESULT RECORDED", line: null'],
+      ["waiting", S.waiting, "WAITING", CONFIRM, 'CONFIRMED ✓` : "WAITING"'],
+      ["disputed", S.disputed, "DISPUTED", VERDICT, 'disputed ? "DISPUTED"'],
+      ["back", S.back, "Back", DISPUTE, "\n          Back\n        </Text>"],
+      ["drawValue", S.drawValue, "DRAW", CONFIRM, 'return "DRAW";'],
+      ["winner", S.winner, "WINNER", FORM, "<Mono color={p.text3}>WINNER</Mono>"],
+      ["draw", S.draw, "Draw", FORM, 'label="Draw"'],
+      ["noValue", S.noValue, "--", WAITING, ': "--"))'],
+      ["noClock", S.noClock, "--:--", WAITING, ': "--:--" }'],
+    ])("A4: %s reads as the shipped source", (_key, value, deck, source, literal) => {
+      expect(value).toBe(deck);
+      expect(literal).toContain(value);
+      expect(source).toContain(literal);
+    });
+
+    it("A4: the confirm progress row, as the shipped confirm step builds it", () => {
+      expect(CONFIRM).toContain("`${oppShort.toUpperCase()} CONFIRMED ✓`");
+      expect(S.athleteConfirmed("M. REYES")).toBe("M. REYES CONFIRMED ✓");
+    });
+
+    it("A4: the plate's own words (no other shipped screen has them) and the confirm's error toast", () => {
+      expect(S.result).toBe("RESULT");
+      expect(S.won("M. Reyes")).toBe("M. Reyes won");
+      expect(S.resultIn).toBe("Result in");
+      expect(S.couldNotConfirm).toBe("Couldn't confirm");
+    });
+
+    it("the result plate (confirm step, both modes; the timekeeper's done screen) takes every word from here, through the confirm adapter", () => {
+      expect(PLATE.length).toBeGreaterThan(0);
+      for (const key of ["winner", "result", "draw", "won", "resultIn", "drawValue", "noValue", "noClock"]) {
+        expect([key, CONFIRM_ADAPTER.includes(`${key}: SHIPPED_COPY.${key},`)]).toEqual([key, true]);
+      }
+      expect(PLATE).toContain("const w = CONFIRM_COPY.plate;");
+      expect(PLATE).not.toMatch(/"WINNER"|"RESULT"|"Draw"|"DRAW"|"Result in"|"--"|"--:--"|\bwon`/);
+    });
+
+    it("the confirm's error toast takes its title from here in both modes, through the confirm adapter", () => {
+      expect(CONFIRM_ADAPTER).toContain("couldNotConfirm: SHIPPED_COPY.couldNotConfirm,");
+      expect(CONFIRM_HOOK).toContain("timekeeperMode ? { text1: CONFIRM_COPY.couldNotConfirm } : { text1: CONFIRM_COPY.couldNotConfirm, description: res.error.message }");
+      expect(CONFIRM_HOOK).not.toContain(`"Couldn't confirm"`);
+    });
+
+    it("the timekeeper-mode kicker with no name takes the shipped RESULT RECORDED from here", () => {
+      expect(CONFIRM_ADAPTER).toContain("SHIPPED_COPY.resultRecorded");
+      expect(CONFIRM_ADAPTER).not.toContain('"RESULT RECORDED"');
+    });
+
+    it("the timekeeper's done screen and edit form take their shipped words from here, with no literal of their own", () => {
+      expect(DONE).toContain("SHIPPED_COPY.disputed");
+      expect(DONE).toContain("SHIPPED_COPY.athleteConfirmed(");
+      expect(DONE).toContain("SHIPPED_COPY.waiting");
+      expect(DONE).not.toMatch(/"DISPUTED"|CONFIRMED ✓`|"WAITING"/);
+      expect(EDIT).toContain("label={SHIPPED_COPY.back}");
+      expect(EDIT).not.toMatch(/"Back"/);
+    });
+  });
+
   it("no string has an em dash, an exclamation mark or an emoji", () => {
     const all = [
       ...strings(S),
@@ -466,9 +551,11 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
       S.awaitRecheck(A),
       S.waitingFor("M. REYES"),
       S.elo(1301),
+      S.won(A),
+      S.athleteConfirmed("M. REYES"),
     ];
-    // 14 plain strings and the 8 builders, rendered.
-    expect(all).toHaveLength(22);
+    // 26 plain strings and the 10 builders, rendered.
+    expect(all).toHaveLength(36);
     for (const s of all) {
       expect([s, s.includes(EM_DASH) || s.includes("!") || /\p{Extended_Pictographic}/u.test(s)]).toEqual([s, false]);
     }
