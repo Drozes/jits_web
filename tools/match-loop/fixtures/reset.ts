@@ -15,9 +15,14 @@
  *  - Red and Green (bot-only accounts) have looking_for_ranked cleared, in
  *    case a crashed run left them advertised. Blue's live state is owned by
  *    the running app and is normalised through the UI only.
+ *  - Timekeeper-mode leftovers involving the harness accounts (the fourth
+ *    account included) are cleared (`resetTimekeeperState`): a no-op on a
+ *    clean stack, so the flag-OFF tiers start from exactly the state they
+ *    always did even after a timekeeper scenario was killed half way.
  */
 import type { AthleteIds } from "../config";
 import { lit, psql } from "../lib/psql";
+import { resetTimekeeperState } from "./timekeeper";
 
 export interface ResetOptions {
   weights?: Partial<Record<keyof AthleteIds, number>>;
@@ -58,5 +63,6 @@ export async function resetFixtures(ids: AthleteIds, opts: ResetOptions = {}): P
       where id in (${lit(ids.red)}, ${lit(ids.green)});
     commit;`;
   const out = await psql(sql);
+  await resetTimekeeperState([ids.blue, ids.red, ids.green]);
   return out.split("\n").find((l) => l.includes("cancelled")) ?? out;
 }

@@ -169,6 +169,28 @@ test("endMatch counts one hold when the live step ends", async () => {
   assert.deepEqual(taps, ["hold:live-end"]);
 });
 
+test("endMatch counts a second hold when the first did not end the live step (jits-o47s.28)", async () => {
+  // Deterministic: what the screen shows depends on how many holds were
+  // made, never on timing. Until the second hold the live step stays up with
+  // End enabled (the app dropped the first hold); after it the end step shows.
+  let holds = 0;
+  const taps: string[] = [];
+  const idb = {
+    async waitFor(q: Query) {
+      return el({ AXUniqueId: q.id ?? null, enabled: true });
+    },
+    async longPress(e: El) {
+      holds++;
+      taps.push(`hold:${e.AXUniqueId}`);
+    },
+    async describe() {
+      return holds >= 2 ? [marker("Step 5 of 8, Ended")] : [LIVE_END];
+    },
+  } as unknown as Idb;
+  assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).endMatch(300), { holds: 2 });
+  assert.deepEqual(taps, ["hold:live-end", "hold:live-end"]);
+});
+
 test("endMatch failing both holds is the app not ending (ExpectationTimeout), not a harness error", async () => {
   const { idb, taps } = scriptedIdb([[LIVE_END]]);
   await assert.rejects(new Screens(idb, simctl, NO_DELAY).endMatch(300), (e: unknown) => {
@@ -216,12 +238,36 @@ test("exitSummary taps again when a toast lay over the exit's tap point at tap t
   assert.deepEqual(taps, ["tap:summary-exit", "tap:summary-exit"]);
 });
 
-test("exitSummary taps again when a toast was closed just before the first tap", async () => {
-  const { idb } = scriptedIdb([[]], { goneAfterTap: [2], logBoxClosed: [true] });
+test("exitSummary taps again when a toast closed just before the first tap opened the inspector (on screen at tap time)", async () => {
+  // The close tap missed the glyph and opened the inspector, which the read
+  // just before the exit tap shows: physical evidence it took that tap.
+  const { idb, taps } = scriptedIdb([inspector, [], []], { goneAfterTap: [2], logBoxClosed: [true] });
   assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).exitSummary(), {
     taps: 2,
     logBoxRetap: true,
     logBoxExcuse: "closed-before",
+  });
+  assert.deepEqual(taps, ["tap:summary-exit", "tap:summary-exit"]);
+});
+
+test("exitSummary: a toast closed before the tap excuses nothing without physical evidence (jits-o47s.28)", async () => {
+  // A clean close (no inspector at tap time, none after, no toast over the
+  // point) is only an inference that a LogBox took the tap: no second tap.
+  const { idb, taps } = scriptedIdb([[]], { goneAfterTap: [2], logBoxClosed: [true] });
+  await assert.rejects(new Screens(idb, simctl, NO_DELAY).exitSummary(), (e: unknown) => {
+    assert.ok(e instanceof ExpectationTimeout, String(e));
+    assert.match(e.message, /one tap on Back to Arena .*no LogBox could have taken the tap/);
+    return true;
+  });
+  assert.deepEqual(taps, ["tap:summary-exit"]);
+});
+
+test("exitSummary: the inspector open at tap time excuses a second tap even with nothing closed before", async () => {
+  const { idb } = scriptedIdb([inspector, [], []], { goneAfterTap: [2] });
+  assert.deepEqual(await new Screens(idb, simctl, NO_DELAY).exitSummary(), {
+    taps: 2,
+    logBoxRetap: true,
+    logBoxExcuse: "inspector-open",
   });
 });
 

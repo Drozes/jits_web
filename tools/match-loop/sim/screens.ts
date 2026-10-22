@@ -19,6 +19,23 @@ import type { Simctl } from "./simctl";
 import { ExpectationTimeout, HarnessError } from "../lib/util";
 import { PROMPT_INPUT_GUARD_MS } from "../../../apps/mobile/lib/arena/constants";
 import { MATCH_STEPS, type MatchStep } from "../../../apps/mobile/lib/match-flow/step-router";
+import { DOB_REQUIRED_COPY } from "../../../packages/shared/src/utils/invite-copy";
+
+/**
+ * The invite claim screen (apps/mobile/app/(app)/invite/claim.tsx): what
+ * marks it (the account confirm's title, the date of birth step's message,
+ * the plates' testIDs where idb reports them) and its Not now, which drops
+ * the device's pending invite. `tests/timekeeper.test.ts` pins them to the
+ * screen's source.
+ */
+export const INVITE_CLAIM_MARKERS: readonly Query[] = [
+  { label: /^Open this invite\?$/i, type: "StaticText" },
+  { label: DOB_REQUIRED_COPY, type: "StaticText" },
+  { id: "claim-confirm" },
+  { id: "claim-dob" },
+  { id: "claim-message" },
+];
+export const INVITE_NOT_NOW: Query = { label: "Not now", type: "Button" };
 
 /**
  * How long to wait after the prompt is detected before trying its buttons:
@@ -132,12 +149,36 @@ export interface EndPress {
 }
 
 /**
- * Why a second Back to Arena tap was allowed: a LogBox toast was closed just
- * before the first tap (that close tap can open the inspector), a toast lay
- * over the first tap's point when it was made, or the LogBox inspector was
- * open after it.
+ * Why a second Back to Arena tap was allowed. Each is physical evidence read
+ * from the screen, never an inference (jits-o47s.28):
+ *  - `closed-before`: the harness closed a LogBox toast just before the first
+ *    tap AND the LogBox inspector was on screen in the read just before that
+ *    tap (the close tap missed the glyph and opened it, and it took the tap);
+ *  - `toast-over-tap`: a toast lay over the first tap's point in that read;
+ *  - `inspector-open`: the inspector was on screen at the tap (nothing closed
+ *    before it) or after the ignored tap.
+ * A toast closed before the tap with no inspector at or after it excuses
+ * nothing: the close is not evidence that anything took the tap.
  */
 export type LogBoxExcuse = "closed-before" | "toast-over-tap" | "inspector-open";
+
+/** The excuse for a second Back to Arena tap, or undefined (pure, for tests). */
+export function logBoxExcuseFor(x: {
+  /** `dismissLogBox` closed a toast or minimised the inspector just before the tap. */
+  closedBefore: boolean;
+  /** The screen read just before the tap. */
+  atTap: AXElement[];
+  /** Where the tap landed. */
+  point: { x: number; y: number };
+  /** The screen read after the verdict ignored the tap. */
+  after: AXElement[];
+}): LogBoxExcuse | undefined {
+  const inspectorAtTap = !!logBoxInspectorMinimize(x.atTap);
+  if (x.closedBefore && inspectorAtTap) return "closed-before";
+  if (logBoxOver(x.atTap, x.point)) return "toast-over-tap";
+  if (inspectorAtTap || logBoxInspectorMinimize(x.after)) return "inspector-open";
+  return undefined;
+}
 
 /** How Blue's Back to Arena went. */
 export interface ExitPress {
@@ -417,6 +458,33 @@ export class Screens {
       }
     }
     throw new HarnessError(`alert button "${label}" did not dismiss the alert`);
+  }
+
+  // --- invites --------------------------------------------------------------
+
+  /**
+   * Drop a pending invite the device still holds: when the invite claim
+   * screen is up with its Not now (the account confirm, the date of birth
+   * step, or a retryable failure), tap it. Not now clears the pending invite
+   * (`clearPendingInvite`) and goes to the Arena; a pending invite left on
+   * the device brings every cold launch back to the claim screen
+   * (`lib/invites/launch-route.ts`). Keyed on the claim screen's own copy, so
+   * the other screens' Not now (the practice offer, the go-live location
+   * and AI consent sheets) are never touched. Returns whether it tapped.
+   */
+  async dropPendingInvite(els?: AXElement[]): Promise<boolean> {
+    const all = els ?? (await this.idb.describe());
+    if (!all.some((e) => INVITE_CLAIM_MARKERS.some((q) => matches(e, q)))) return false;
+    const notNow = all.find((e) => matches(e, { ...INVITE_NOT_NOW, enabled: true }));
+    if (!notNow) return false;
+    await this.idb.tap(this.idb.onScreen(notNow) ? notNow : await this.idb.scrollTo({ ...INVITE_NOT_NOW, enabled: true }, 4));
+    // The claim screen leaves for the Arena; a caller that loops (normaliseApp) reads it again anyway.
+    for (const start = Date.now(); Date.now() - start < 8_000; ) {
+      const now = await this.idb.describe();
+      if (!now.some((e) => INVITE_CLAIM_MARKERS.some((q) => matches(e, q)))) break;
+      await new Promise((r) => setTimeout(r, 350));
+    }
+    return true;
   }
 
   // --- Arena ----------------------------------------------------------------
@@ -851,10 +919,11 @@ export class Screens {
    * verdict, where a dev build's LogBox banner ("Open debugger to view
    * warnings") can lie over it and swallow the tap: close the banner, scroll
    * the exit clear of that band, tap. Tap a second time ONLY when a LogBox
-   * could physically have taken the first tap: a toast was closed just
-   * before it (that close tap can open the inspector), a toast lay over the
-   * tap's point in the screen read just before the tap, or the LogBox
-   * inspector is open after it. A toast elsewhere on screen excuses
+   * physically could have taken the first tap, on evidence read from the
+   * screen (`logBoxExcuseFor`): the inspector on screen in the read just
+   * before the tap or after it (a toast closed just before the tap only
+   * explains how it opened), or a toast over the tap's point in the read
+   * just before the tap. A toast elsewhere on screen excuses
    * nothing: the exit was scrolled LOGBOX_CLEAR_INSET clear of the toast
    * band, so a verdict that ignores the tap is the app's failure
    * (ExpectationTimeout), never retried away. Returns the tap count (and
@@ -875,19 +944,13 @@ export class Screens {
       } catch (e) {
         if (!(e instanceof ExpectationTimeout)) throw e;
         const els = await this.idb.describe();
-        const why: LogBoxExcuse | undefined = closedBefore
-          ? "closed-before"
-          : logBoxOver(atTap, point)
-            ? "toast-over-tap"
-            : logBoxInspectorMinimize(els)
-              ? "inspector-open"
-              : undefined;
+        const why = logBoxExcuseFor({ closedBefore, atTap, point, after: els });
         if (taps === 2 || !why) {
           throw new ExpectationTimeout(
             `the verdict to close after ${taps === 1 ? "one tap" : "two taps"} on Back to Arena (#summary-exit)${
               why
                 ? ""
-                : "; no LogBox could have taken the tap (none closed just before it, none over its point, no inspector open), so no second tap"
+                : "; no LogBox could have taken the tap (no inspector open at or after the tap, no toast over its point; a toast closed just before it is no evidence on its own), so no second tap"
             }`,
             taps * goneMs,
             { taps, logBoxRetap: excuse !== undefined, logBoxExcuse: excuse, point, screen: summarise(els) },

@@ -106,6 +106,13 @@ export async function normaliseApp(ctx: ScenarioCtx): Promise<void> {
       }
       continue;
     }
+    if (await ui.dropPendingInvite(els)) {
+      // A pending invite a killed T17 left on the device (every cold launch
+      // opens the claim screen until it is dropped); Not now drops it. Never
+      // seen on a clean device: the case is a no-op for the flag-OFF tiers.
+      ctx.trace.note("harness", "pending_invite_dropped", null);
+      continue;
+    }
     if (els.some((e) => matches(e, GO_BACK)) && !els.some((e) => e.AXLabel === "Arena" && e.type === "Button")) {
       // Pushed screens (match detail, Stats, an athlete page, the player):
       // pop them all. A back control the match detail hero scrolled away is
@@ -131,7 +138,7 @@ export async function normaliseApp(ctx: ScenarioCtx): Promise<void> {
 }
 
 /** Terminate and relaunch the app, noting why in the trace (setup only, never to pass an oracle). */
-async function relaunch(ctx: ScenarioCtx, why: string, evidence: unknown): Promise<void> {
+export async function relaunch(ctx: ScenarioCtx, why: string, evidence: unknown): Promise<void> {
   ctx.trace.note("harness", why, evidence);
   await ctx.simctl.terminate();
   await ctx.simctl.launch();
@@ -226,17 +233,29 @@ export interface Handshake {
   matchId: string;
 }
 
+/**
+ * How Red's accept runs, for the timekeeper scenarios only: `wrap` runs
+ * around the bot's accept (a flag window around the match's creation, or a
+ * check while Blue's waiting plate is still up) and `step` names it. Every
+ * flag-OFF scenario passes none: the accept is exactly as it always was.
+ */
+export interface AcceptOptions {
+  step?: string;
+  wrap?: (accept: () => Promise<string>) => Promise<string>;
+}
+
 /** Blue taps Challenge on Red, Red's bot accepts. */
-export async function blueChallengesRed(ctx: ScenarioCtx, red: MobileOpponent): Promise<Handshake> {
+export async function blueChallengesRed(ctx: ScenarioCtx, red: MobileOpponent, opts: AcceptOptions = {}): Promise<Handshake> {
+  const { step = "Red accepts", wrap = (accept: () => Promise<string>) => accept() } = opts;
   const since = new Date(Date.now() - 2_000).toISOString();
   await ctx.step("Blue challenges Demo Red", () => ctx.ui.challenge(ctx.cfg.names.red));
   await ctx.step("Blue sees the waiting plate", () => ctx.ui.waitWaitingPlate(ctx.cfg.names.red));
   const row = await ctx.step("Red receives the challenge", () => red.waitForIncoming(T.prompt, ctx.ids.blue));
   const dbRow = await db.latestChallenge(ctx.ids.blue, ctx.ids.red, since);
   ctx.eq("db:challenge-created", { id: row.id, status: "pending", match_type: "ranked" }, dbRow && { id: dbRow.id, status: dbRow.status, match_type: dbRow.match_type });
-  const matchId = await ctx.step("Red accepts", async () => {
+  const matchId = await ctx.step(step, async () => {
     await new Promise((r) => setTimeout(r, ctx.opts.timing === "human" ? 1500 : 50));
-    return red.accept(row.id);
+    return wrap(() => red.accept(row.id));
   });
   return { challengeId: row.id, matchId };
 }
@@ -500,11 +519,16 @@ export async function checkBlueWeightCheckConfirmed(ctx: ScenarioCtx, matchId: s
   ctx.eq("db:weight-checks-confirmed", expected, actual, "match_weight_checks rows with checker = Blue");
 }
 
-/** Both confirm weights and ready up; returns the bot's view of the start. */
-export async function readyToLive(ctx: ScenarioCtx, side: MatchSide): Promise<ReadyOutcome> {
+/**
+ * Both confirm weights and ready up; returns the bot's view of the start.
+ * `onReadyStep` runs while Blue is on the ready step, before Blue taps
+ * Ready (T14 rotates the simulator there); flag-OFF scenarios pass none.
+ */
+export async function readyToLive(ctx: ScenarioCtx, side: MatchSide, opts: { onReadyStep?: () => Promise<void> } = {}): Promise<ReadyOutcome> {
   const botRun = side.confirmWeights().then(() => side.readyAndStart(T.handshake));
   botRun.catch(() => undefined); // awaited below; never an unhandled rejection
   await blueConfirmsWeights(ctx, side.matchId);
+  await opts.onReadyStep?.();
   await ctx.step("Blue taps Ready", () => ctx.ui.tapReady());
   const [outcome] = await Promise.all([
     ctx.step("bot completes the ready handshake", () => botRun),

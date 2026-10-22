@@ -31,6 +31,12 @@ export const HARNESS_DIR = __dirname;
 export const RUNS_DIR = join(__dirname, ".runs");
 export const LOCAL_CONFIG = join(__dirname, "local.config.json");
 
+/**
+ * The fourth account (timekeeper scenarios only, TEST-PLAN 4.2): not seeded
+ * by jr_be, so the harness creates it on first use (`ensureFourthAccount`).
+ */
+export const FOURTH_ACCOUNT = { email: "demo-gold@elorated.dev", name: "Demo Gold" } as const;
+
 export interface Config {
   supabaseUrl: string;
   publishableKey: string;
@@ -45,8 +51,15 @@ export interface Config {
   /** Python that has fb-idb installed (the `idb` console script is broken on 3.14). */
   idbPython: string;
   realtimeContainer: string;
-  emails: { blue: string; red: string; green: string };
-  names: { blue: string; red: string; green: string };
+  /**
+   * The test accounts. Blue (the simulator), Red and Green (bots) are seeded
+   * by jr_be; `gold` is the fourth account the timekeeper scenarios need (a
+   * second timekeeper bot for re-picks, TEST-PLAN 4.2), provisioned by the
+   * harness itself on first use (`ensureFourthAccount`,
+   * fixtures/timekeeper.ts). The flag-OFF tiers never read it.
+   */
+  emails: { blue: string; red: string; green: string; gold: string };
+  names: { blue: string; red: string; green: string; gold: string };
 }
 
 export interface AthleteIds {
@@ -112,8 +125,9 @@ export function loadConfig(): Config {
       blue: "demo-blue@elorated.dev",
       red: "demo-red@elorated.dev",
       green: "demo-green@elorated.dev",
+      gold: FOURTH_ACCOUNT.email,
     },
-    names: { blue: "Demo Blue", red: "Demo Red", green: "Demo Green" },
+    names: { blue: "Demo Blue", red: "Demo Red", green: "Demo Green", gold: FOURTH_ACCOUNT.name },
   };
   assertSafe(cfg);
   return cfg;

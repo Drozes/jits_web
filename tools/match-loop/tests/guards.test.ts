@@ -24,8 +24,8 @@ function cfg(over: Partial<Config> = {}): Config {
     jrBeRoot: "/nonexistent",
     idbPython: "python3",
     realtimeContainer: "supabase_realtime_jr_be",
-    emails: { blue: "b", red: "r", green: "g" },
-    names: { blue: "B", red: "R", green: "G" },
+    emails: { blue: "b", red: "r", green: "g", gold: "o" },
+    names: { blue: "B", red: "R", green: "G", gold: "O" },
     ...over,
   };
 }

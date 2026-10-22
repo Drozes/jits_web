@@ -10,6 +10,8 @@ import { REPO_ROOT, assertSafe } from "./config";
 import { psql, queryJson } from "./lib/psql";
 import { run, log } from "./lib/util";
 import { proveAppOnLocalStack } from "./bot/app-on-local";
+import { metroTreeProblem, readMetroProjectRoot } from "./oracle/logs";
+import { TK_ROLE_FLAG, timekeeperFlagState, timekeeperRoleOffProblem } from "./fixtures/timekeeper";
 import type { Idb } from "./sim/idb";
 import type { Simctl } from "./sim/simctl";
 import type { Screens } from "./sim/screens";
@@ -115,6 +117,13 @@ export async function preflight(d: PreflightDeps): Promise<CheckResult[]> {
     }
     return "SKIPPED: no Metro log; every scenario will record logs:metro-clean as skipped";
   });
+  await check(r, "metro-serves-this-checkout", async () => {
+    // The runner refuses the same mismatch at every start (run.ts).
+    const root = readMetroProjectRoot(cfg.metroLog);
+    const problem = metroTreeProblem(root, REPO_ROOT);
+    if (problem) throw new Error(problem);
+    return root ?? "SKIPPED: the Metro log names no project root";
+  });
   await check(r, "sim-booted", async () => {
     if (!(await simctl.isBooted())) throw new Error(`simulator ${cfg.udid} not booted`);
     return cfg.udid;
@@ -170,6 +179,18 @@ export async function preflight(d: PreflightDeps): Promise<CheckResult[]> {
     const bad = rows.filter((x) => x.status !== "active");
     if (rows.length !== 3 || bad.length) throw new Error(`not active: ${JSON.stringify(bad)}`);
     return rows.length;
+  });
+  await check(r, "timekeeper-role-off", async () => {
+    // The flag-OFF guard runs with the shared flag off; timekeeper scenarios
+    // turn it on only around a match's creation (fixtures/timekeeper.ts) and
+    // the runner restores a killed run's flags at start, then refuses to run
+    // with the flag on (the same check). Never auto-fixed: the harness does
+    // not change a flag it did not set. Checked whenever the flag's row
+    // exists, whatever other timekeeper tables the stack has (fails closed).
+    const problem = await timekeeperRoleOffProblem();
+    if (problem) throw new Error(problem);
+    const { enabled } = await timekeeperFlagState();
+    return enabled === null ? `no ${TK_ROLE_FLAG} row on this stack (nothing can read it)` : `${TK_ROLE_FLAG}=false`;
   });
   await check(r, "submission-types", async () => {
     const n = Number(await psql("select count(*) from public.submission_types"));
