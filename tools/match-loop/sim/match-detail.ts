@@ -21,7 +21,7 @@
  */
 import type { AXElement, Idb, Query } from "./idb";
 import { matches, summarise } from "./idb";
-import { TAB_LABELS, type Screens } from "./screens";
+import { BACK_MIN_CENTRE_Y, TAB_LABELS, type Screens } from "./screens";
 import { ExpectationTimeout, pollUntil } from "../lib/util";
 
 export const DETAIL_MARKER_ID = "match-detail-screen";
@@ -55,8 +55,14 @@ export const TAB_PROOF: Record<ProvenTab, Query[]> = {
  * nothing).
  */
 const HEADER_HALF_BAR = 28;
+/**
+ * The top safe area (status bar and Dynamic Island, 62pt on the iPhone 17
+ * Pro): nothing is tappable above it, so the band never starts higher.
+ * `BACK_MIN_CENTRE_Y` (sim/screens.ts) is the same line.
+ */
+const SAFE_AREA_TOP = BACK_MIN_CENTRE_Y;
 /** Safe area (62pt) plus the bar (56pt) on the iPhone 17 Pro: used when no header control is reported. */
-const HEADER_FALLBACK_BOTTOM = 118;
+const HEADER_FALLBACK_BOTTOM = SAFE_AREA_TOP + 56;
 /** Keep a tap target's centre at least this far inside the band. */
 const BAND_MARGIN = 12;
 /** The header's controls, on tab roots and pushed screens. */
@@ -68,13 +74,22 @@ const HEADER_CONTROLS: Query[] = [
   { label: "Notifications", type: "Button" },
 ];
 
-/** Bottom edge of the header bar, from its controls (pure, for tests). */
+/**
+ * Bottom edge of the header bar, from its controls (pure, for tests). Only a
+ * control centred on screen below the top safe area counts: match detail
+ * has no fixed header, its back control sits in the hero and scrolls away
+ * with the content (idb then reports it above the screen, E17 2026-10-20 at
+ * y=-169), and a control up there covers nothing, so counting it put the
+ * band's top above the screen (jits-o47s.28). The result is clamped to the
+ * safe area too, so the band can never start under the status bar.
+ */
 export function headerBottom(els: AXElement[], screenH: number): number {
-  const controls = els.filter(
-    (e) => HEADER_CONTROLS.some((q) => matches(e, q)) && e.frame.width > 0 && e.frame.y + e.frame.height / 2 < screenH * 0.25,
-  );
+  const controls = els.filter((e) => {
+    const cy = e.frame.y + e.frame.height / 2;
+    return HEADER_CONTROLS.some((q) => matches(e, q)) && e.frame.width > 0 && cy >= SAFE_AREA_TOP && cy < screenH * 0.25;
+  });
   if (controls.length === 0) return HEADER_FALLBACK_BOTTOM;
-  return Math.max(...controls.map((c) => c.frame.y + c.frame.height / 2 + HEADER_HALF_BAR));
+  return Math.max(SAFE_AREA_TOP, ...controls.map((c) => c.frame.y + c.frame.height / 2 + HEADER_HALF_BAR));
 }
 
 /**

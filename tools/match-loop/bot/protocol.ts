@@ -10,6 +10,8 @@ export {
   SESSION_MATCH_EVENTS,
   sessionMatchTopic,
   createSessionMatchChannel,
+  actorPayload,
+  BROADCAST_ACTOR_KEY,
   type BroadcastResult,
   type SessionMatchChannel,
   type SessionMatchEvent,
@@ -22,10 +24,10 @@ export {
  * `completed` row alone maps to `confirm`, never `summary`: only a
  * `disputed` row or a confirmation from BOTH athletes finishes confirm.
  */
-export { pollIntervalFor, targetFor, type ReconcileRoles } from "../../../apps/mobile/lib/match-flow/reconcile";
+export { matchSnapshot, pollIntervalFor, targetFor, type ReconcileRoles } from "../../../apps/mobile/lib/match-flow/reconcile";
 export { MATCH_STEPS, type MatchStep } from "../../../apps/mobile/lib/match-flow/step-router";
 
-import { SESSION_MATCH_EVENTS } from "@jits/shared/hooks/session-match-channel";
+import { BROADCAST_ACTOR_KEY, SESSION_MATCH_EVENTS } from "@jits/shared/hooks/session-match-channel";
 
 /**
  * App timing constants that live in modules the bot cannot import (they pull
@@ -43,7 +45,13 @@ export const APP_TIMING = {
    * how long the confirm step shows CONFIRMED before it moves on to the
    * summary. Since jits-02vo.7 the app starts it on this athlete's own
    * confirm; the bot still starts it once both have confirmed
-   * (`confirmDecision`, scenario drift owned by jits-c3vd). */
+   * (`confirmDecision`). ACCEPTED DRIFT (jits-c3vd, recorded by M7,
+   * jits-o47s.9): the bot is never the app under test, and keeping its
+   * confirm step (and its confirm channel) mounted until both confirmed is
+   * what lets the hard oracle `bot:confirm-channel-received-blue-result_confirmed`
+   * observe Blue's broadcast. Moving it earlier would change no DB outcome
+   * and nothing Blue sees (the bot sends result_confirmed on its own
+   * confirm either way); it would only remove that delivery check. */
   CONFIRM_ADVANCE_MS: 1_500,
   /** `COUNTDOWN_MS` (apps/mobile/components/match-flow/countdown/countdown.tsx):
    * the 3-2-1 in front of the live step. GO is the server's `started_at`
@@ -112,8 +120,46 @@ export const PAYLOAD_VALIDATORS: Record<string, Validator> = {
   [CHALLENGE_EVENTS.DECLINED]: () => null,
 };
 
+/**
+ * Timekeeper mode (spec 10, PM1): the clock events, the cancel and the result
+ * may carry `actor_id` (who acted). Additive, so a payload without one is
+ * valid as before; one that carries it must name somebody.
+ */
+const ACTOR_EVENTS: ReadonlySet<string> = new Set([
+  SESSION_MATCH_EVENTS.TIMER_STARTED,
+  SESSION_MATCH_EVENTS.TIMER_PAUSED,
+  SESSION_MATCH_EVENTS.TIMER_RESUMED,
+  SESSION_MATCH_EVENTS.MATCH_ENDED,
+  SESSION_MATCH_EVENTS.RESULT_SUBMITTED,
+  SESSION_MATCH_EVENTS.MATCH_CANCELLED,
+]);
+
 export function validatePayload(event: string, payload: unknown): string | null {
   const v = PAYLOAD_VALIDATORS[event];
   if (!v) return `unknown event ${event}`;
-  return v((payload ?? {}) as Record<string, unknown>);
+  const p = (payload ?? {}) as Record<string, unknown>;
+  if (BROADCAST_ACTOR_KEY in p) {
+    if (!ACTOR_EVENTS.has(event)) return `${BROADCAST_ACTOR_KEY} on ${event}, which never carries one`;
+    if (!isStr(p[BROADCAST_ACTOR_KEY])) return `${BROADCAST_ACTOR_KEY} not a non-empty string`;
+  }
+  return v(p);
 }
+
+/**
+ * Timekeeper-mode timing the bot mirrors. The heartbeat is fixed by the spec
+ * (R23: every 15 s while seated and foregrounded); `tests/timekeeper.test.ts`
+ * pins it to the app's presence hook once slice M4 adds it
+ * (`apps/mobile/lib/match-flow/use-timekeeper-presence.ts`). The send
+ * ceiling is PM29's, pinned the same way to `lib/match-flow/send-timing.ts`
+ * once the PM29 change adds it.
+ */
+export const TK_TIMING = {
+  /** `touch_match_timekeeper` cadence while seated (R23). */
+  HEARTBEAT_MS: 15_000,
+  /**
+   * `SEND_CEILING_MS` (PM29 (1)): how long a timekeeper-mode server press
+   * (the athlete's Confirm among them) stays busy with no reply before it
+   * ends as failed and its buttons come back.
+   */
+  SEND_CEILING_MS: 20_000,
+} as const;

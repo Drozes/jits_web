@@ -235,6 +235,22 @@ test("taps stay inside the band between the header bar and the tab bar", () => {
   assert.equal(hittableBand([], H).top, 130);
 });
 
+test("a header control scrolled above the safe area never moves the band's top (jits-o47s.28)", () => {
+  const H = 874;
+  // Match detail scrolled down: its hero's back control is reported at its
+  // real, off-screen frame (E17, 2026-10-20: y=-169) and covers nothing.
+  const heroBack = el({ AXLabel: "Go back", AXUniqueId: "match-back", type: "Button", frame: { x: 4, y: -191.3, width: 44, height: 44 } });
+  const band = hittableBand([heroBack], H);
+  assert.ok(band.top >= BACK_MIN_CENTRE_Y, `band top ${band.top} must not start above the safe area`);
+  assert.equal(band.top, 130, "with no on-screen header control, the conservative fallback");
+  // Half scrolled under the status bar (centre above the safe area): ignored too.
+  assert.equal(hittableBand([el({ AXLabel: "Go back", type: "Button", frame: { x: 4, y: 20, width: 44, height: 44 } })], H).top, 130);
+  // At rest the same control still counts: centre 90, bar to 118, plus the margin.
+  assert.equal(hittableBand([el({ AXLabel: "Go back", type: "Button", frame: { x: 4, y: 68, width: 44, height: 44 } })], H).top, 130);
+  // AppHeader's chevron alone (centre 88) ends the bar at 116.
+  assert.equal(hittableBand([el({ AXLabel: "Go back", type: "Button", frame: { x: 16, y: 74, width: 28, height: 28 } })], H).top, 128);
+});
+
 test("a scroll move aims at the band's middle, capped and slow", () => {
   const band = { top: 130, bottom: 770 };
   // Below the band (E17's first Stats row at 830): the finger moves up.

@@ -1,8 +1,10 @@
 /**
  * Scenario registry. Core runs every iteration; extended when core is green
- * or every third iteration (LOOP.md).
+ * or every third iteration (LOOP.md). Core and extended are the flag-OFF
+ * guard; the timekeeper tier (T1 to T18, `scenarios/timekeeper/`) is never
+ * part of it and runs with `--tier timekeeper`.
  */
-import type { Scenario } from "./context";
+import type { Scenario, Tier } from "./context";
 import c1 from "./core/c1-blue-challenges-submission-win";
 import c2 from "./core/c2-red-challenges-home-red-wins";
 import c3 from "./core/c3-draw";
@@ -30,10 +32,12 @@ import e17 from "./extended/e17-match-video-history";
 import e18 from "./extended/e18-crossing-challenges";
 import e19 from "./extended/e19-many-on-one";
 import e20 from "./extended/e20-accepted-stuck";
+import { TIMEKEEPER_NOT_IMPLEMENTED, TIMEKEEPER_SCENARIOS } from "./timekeeper";
 
 export const SCENARIOS: Scenario[] = [
   c1, c2, c3, c4, c5, c6, c6b,
   e1, e2, e3, e3b, e4, e5, e6, e7, e8, e9, e10, e11, e12, e14, e15, e16, e17, e18, e19, e20,
+  ...TIMEKEEPER_SCENARIOS,
 ];
 
 /** Extended scenarios that are specified but not implemented, with why. */
@@ -45,4 +49,15 @@ export const NOT_IMPLEMENTED: { id: string; reason: string }[] = [
       "recording and the upload/playback path this scenario exists for cannot run; granting the permission only " +
       "exercises the viewfinder's error state. Needs a physical device (or a mocked recorder build) to be meaningful.",
   },
+  ...TIMEKEEPER_NOT_IMPLEMENTED,
 ];
+
+/**
+ * The scenarios a `--tier` runs. `all` is the flag-OFF guard, core and
+ * extended, as it was before the timekeeper tier existed: the timekeeper
+ * tier (T0 to T18) turns `timekeeper_role` on around its matches, so it runs
+ * only when asked by name (`--tier timekeeper`, or `--only`).
+ */
+export function scenariosForTier(tier: Tier | "all", all: readonly Scenario[] = SCENARIOS): Scenario[] {
+  return all.filter((s) => (tier === "all" ? s.tier !== "timekeeper" : s.tier === tier));
+}
