@@ -221,6 +221,16 @@ runner closes the app right after the hold (the first scenario's
 `normaliseApp` launches it with the flag ON) and again after the flag is
 restored (so the next run's app does not keep the ON it read).
 
+What happens to the app on an interrupt: on Ctrl-C or SIGTERM the cleanup
+hooks run in the order they were registered, so the flag is put back first
+and then the app is closed (a hook the runner registers right after the
+hold; T11 registers its own inside its window), and the next launch reads
+the flag as it was put back. A run killed outright (SIGKILL) runs no hook:
+the next run's start puts the flag back from the restore record, but the
+app may still show the ON it read (TK-AR2 under the waiting strip, TK-AR1
+on the prompt; copy only) until it is relaunched or foregrounded, so
+relaunch it (`xcrun simctl terminate`, then launch) before the next gate.
+
 Baseline flag states (local `public.feature_flags`, read 2026-10-20 on the
 jr_be-tk-build stack with Rating V9 and TK Wave 1 backend):
 `timekeeper_role=false` (the mode under guard is OFF),
@@ -355,6 +365,22 @@ Rules every timekeeper scenario follows:
   screen, so a tap then would be lost and read as an app timeout. The wait
   for the verdict after it (`TK.handshake`, 45 s) covers the ceiling plus
   `ADVANCE_AFTER_CONFIRM_MS` plus a margin (`TK_CONFIRM_SETTLE_MS`).
+- Blue's timekeeper-mode taps (`TimekeeperScreens`: Ask, the weigh-in,
+  TK-F4, Re-weigh, Confirm) never go to a point from one screen read. A bot
+  action can move the screen between the read and the tap: in the first
+  Wave 3 gate (T10, run 2026-10-22T05-52-40-251Z) the "Waiting for D. Red
+  to check your new weight." notice above TK-F4 went away after the read,
+  both buttons moved up about 60 pt, and the tap meant for TK-F4 landed on
+  "Doesn't look right" and flagged Red. Each tap reads again first and
+  taps only once the control has held one frame for `STILL_TIMING.stillMs`
+  (`tapWhenStill`, `sim/idb.ts`; about a third of a second), at the newest
+  frame; a control that goes away, turns busy or keeps moving is not tapped
+  and the helper reads again. A control below the fold is scrolled into
+  view (`Idb.scrollTo`, which waits for it to settle) and tapped only if it
+  is still an enabled control there. A press counts only once it is made.
+  (The app also stopped moving those buttons, PM31 (1).) Taps a scenario
+  makes itself (the crew's Leave, the T3 and T17 alerts) are outside
+  `TimekeeperScreens` and keep their single read.
 - Every server change is asserted in the database (`oracle/tk-db.ts`, read
   as postgres), not only on Blue's screen: the mode snapshot and both
   capability stamps, the open request, the seat (history row, recording
@@ -379,7 +405,17 @@ and the next run's start, in any worktree, repair a killed run. The
 harness friendships are not in that record: their interrupt hook removes
 them, and after a run killed outright the reset before the next scenario
 (`resetTimekeeperState`, which every scenario runs, flag-OFF ones
-included) removes every `manual` friendship among the four accounts:
+included) removes every `manual` friendship among the four accounts.
+When a put-back fails after the scenario itself had failed, the
+scenario's own error is what the run records (its status, `error` and
+fingerprint, so a known bead still matches and triage reads the real
+failure); the put-back is listed beside it in the scenario's
+`putBackFailures`, noted in the trace (`<fixture>_body_error` next to the
+fixture's own `*_failed` note, `friendships_remove_failed` for the
+friendships), and its interrupt hook stays for the exit, with its restore
+record for the next start (the friendships have no record: the next
+scenario's reset removes them). Such a scenario is never `known`. When only the
+put-back fails, its error is the scenario's, as before:
 
 - `timekeeper_role` (and the snapshotted sub-flag `timekeeper_weight_check`)
   is ON only around the creation of the timekeeper match (`withFlags`: the

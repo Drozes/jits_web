@@ -228,6 +228,60 @@ async function setFlags(values: Record<string, boolean>, exec: SqlIo["exec"] = p
   }
 }
 
+/** A fixture's trace note (`ctx.trace.note("harness", what, payload)`). */
+type Note = (what: string, payload: unknown) => void;
+
+/** Put-backs that failed after their scenario had already failed, by the scenario's error. */
+const putBacksAfterFailure = new WeakMap<object, string[]>();
+
+function errorText(e: unknown): string {
+  return e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+}
+
+/**
+ * The fixture put-backs that failed after the scenario had already failed,
+ * as `<fixture>: <error>`, or none (any other error, or none at all). The
+ * runner writes them into the scenario's result next to its own error
+ * (`putBackFailures` in `lib/results.ts`).
+ */
+export function putBackFailures(error: unknown): string[] {
+  return error !== null && typeof error === "object" ? [...(putBacksAfterFailure.get(error) ?? [])] : [];
+}
+
+/**
+ * Run a fixture's body, then its put-back whatever the body did (every
+ * fixture below; M7 review). When both fail, the body's error is still the
+ * scenario's failure and is rethrown unchanged, so the run records its
+ * status, its error and its fingerprint exactly as if the put-back had
+ * worked: a psql hiccup on the way out never renames an app failure, and
+ * never breaks the match with a known bead (PM30 (5) triage). The put-back's
+ * failure is not lost: the put-back's own `*_failed` note is in the trace,
+ * `<fixture>_body_error` names the error it would have hidden, the scenario's
+ * result lists it (`putBackFailures`), and the fixture's interrupt hook and
+ * restore record stay, so the run's exit or the next run's start puts it
+ * back. When only the put-back fails, its error is thrown, as before.
+ */
+async function bodyThenPutBack<T>(fixture: string, body: () => Promise<T>, putBack: () => Promise<void>, note?: Note): Promise<T> {
+  let outcome: { ok: true; value: T } | { ok: false; error: unknown };
+  try {
+    outcome = { ok: true, value: await body() };
+  } catch (e) {
+    outcome = { ok: false, error: e };
+  }
+  try {
+    await putBack();
+  } catch (e) {
+    if (outcome.ok) throw e;
+    note?.(`${fixture}_body_error`, { error: errorText(outcome.error) });
+    if (outcome.error !== null && typeof outcome.error === "object") {
+      putBacksAfterFailure.set(outcome.error, [...putBackFailures(outcome.error), `${fixture}: ${errorText(e)}`]);
+    }
+    throw outcome.error;
+  }
+  if (!outcome.ok) throw outcome.error;
+  return outcome.value;
+}
+
 /**
  * Where a flag window reads and writes the flags and records what to put
  * back. A run always uses `LOCAL_FLAG_IO` (the local stack and the one
@@ -292,12 +346,13 @@ async function releaseHeld(keys: readonly string[], restore: Record<string, bool
  * Run `fn` with the flags set to `want`, then put back every flag this call
  * changed, whatever happens. A flag already at the wanted value (for example
  * held by the run-level `--tk-flag-on`) is left alone. When the put-back
- * itself fails the error propagates (see `releaseHeld`).
+ * itself fails its error propagates (see `releaseHeld`), unless `fn` had
+ * failed first: then `fn`'s error does (`bodyThenPutBack`).
  */
 export async function withFlags<T>(
   want: Record<string, boolean>,
   fn: () => Promise<T>,
-  note?: (what: string, payload: unknown) => void,
+  note?: Note,
   io: FlagIo = LOCAL_FLAG_IO,
 ): Promise<T> {
   const current = await io.read(Object.keys(want));
@@ -309,19 +364,24 @@ export async function withFlags<T>(
   const unhook = onInterrupt("restore-tk-flags", () => restoreFlags(plan.restore, io));
   for (const k of keys) held.set(k, plan.flip[k]);
   note?.("flag_window_open", plan.flip);
-  try {
-    await io.write(plan.flip);
-    return await fn();
-  } finally {
-    try {
-      await releaseHeld(keys, plan.restore, io);
-    } catch (e) {
-      note?.("flag_restore_failed", { restore: plan.restore, error: e instanceof Error ? e.message : String(e) });
-      throw e;
-    }
-    unhook();
-    note?.("flag_window_closed", plan.restore);
-  }
+  return bodyThenPutBack(
+    "flag_window",
+    async () => {
+      await io.write(plan.flip);
+      return fn();
+    },
+    async () => {
+      try {
+        await releaseHeld(keys, plan.restore, io);
+      } catch (e) {
+        note?.("flag_restore_failed", { restore: plan.restore, error: e instanceof Error ? e.message : String(e) });
+        throw e;
+      }
+      unhook();
+      note?.("flag_window_closed", plan.restore);
+    },
+    note,
+  );
 }
 
 async function restoreFlags(restore: Record<string, boolean>, io: FlagIo): Promise<void> {
@@ -416,13 +476,14 @@ export function clearWindowsSql(keys: readonly string[]): string {
  * Run `fn` with shortened sweep windows (seconds), removed afterwards. The
  * keys go to the restore record BEFORE the upsert; the finally removes them
  * and settles the record whatever `fn` did. When the removal itself fails
- * the error propagates and the interrupt hook and the record stay, so the
+ * the error propagates (`fn`'s instead, when `fn` had failed first:
+ * `bodyThenPutBack`) and the interrupt hook and the record stay, so the
  * run's exit or the next run's start removes them (like `withFlags`).
  */
 export async function withWindows<T>(
   windows: Partial<Record<TkWindow, number>>,
   fn: () => Promise<T>,
-  note?: (what: string, payload: unknown) => void,
+  note?: Note,
   io: SqlIo = LOCAL_SQL_IO,
 ): Promise<T> {
   const keys = Object.keys(windows);
@@ -437,19 +498,24 @@ export async function withWindows<T>(
   };
   const unhook = onInterrupt("clear-tk-windows", clear);
   note?.("windows_set", windows);
-  try {
-    await io.exec(upsert);
-    return await fn();
-  } finally {
-    try {
-      await clear();
-    } catch (e) {
-      note?.("windows_clear_failed", { keys, error: e instanceof Error ? e.message : String(e) });
-      throw e;
-    }
-    unhook();
-    note?.("windows_cleared", keys);
-  }
+  return bodyThenPutBack(
+    "windows",
+    async () => {
+      await io.exec(upsert);
+      return fn();
+    },
+    async () => {
+      try {
+        await clear();
+      } catch (e) {
+        note?.("windows_clear_failed", { keys, error: e instanceof Error ? e.message : String(e) });
+        throw e;
+      }
+      unhook();
+      note?.("windows_cleared", keys);
+    },
+    note,
+  );
 }
 
 // --- athlete columns ----------------------------------------------------------------------
@@ -507,8 +573,9 @@ export const LOCAL_ATHLETE_IO: AthleteColumnIo = { ...LOCAL_SQL_IO, read: readAt
  * BEFORE anything changes, so an interrupt hook and the next run's start
  * repair a killed run. The finally restores and settles the record whatever
  * `fn` (or the `set` write) did; when the restore itself fails the error
- * propagates and the hook and the record stay, so the run's exit or the
- * next run's start puts the columns back (like `withWindows`).
+ * propagates (`fn`'s instead, when `fn` had failed first:
+ * `bodyThenPutBack`) and the hook and the record stay, so the run's exit or
+ * the next run's start puts the columns back (like `withWindows`).
  */
 export async function withAthleteColumns<T>(
   ids: readonly string[],
@@ -516,6 +583,7 @@ export async function withAthleteColumns<T>(
   fn: () => Promise<T>,
   set: Partial<Record<AthleteColumn, string>> = {},
   io: AthleteColumnIo = LOCAL_ATHLETE_IO,
+  note?: Note,
 ): Promise<T> {
   const unrestored = unrestoredSetColumns(columns, set);
   if (unrestored.length) {
@@ -531,14 +599,24 @@ export async function withAthleteColumns<T>(
     }, io.restorePath);
   };
   const unhook = onInterrupt(`restore-athletes-${original.map((o) => `${o.id}:${o.column}`).join(",")}`, restore);
-  try {
-    const writes = Object.entries(set).flatMap(([column, value]) => ids.map((id) => ({ id, column: column as AthleteColumn, value: value ?? null })));
-    if (writes.length) await io.exec(athleteColumnsSql(writes));
-    return await fn();
-  } finally {
-    await restore();
-    unhook();
-  }
+  return bodyThenPutBack(
+    "athlete_columns",
+    async () => {
+      const writes = Object.entries(set).flatMap(([column, value]) => ids.map((id) => ({ id, column: column as AthleteColumn, value: value ?? null })));
+      if (writes.length) await io.exec(athleteColumnsSql(writes));
+      return fn();
+    },
+    async () => {
+      try {
+        await restore();
+      } catch (e) {
+        note?.("athlete_columns_restore_failed", { athletes: original, error: e instanceof Error ? e.message : String(e) });
+        throw e;
+      }
+      unhook();
+    },
+    note,
+  );
 }
 
 // --- challenge invites (T17) ----------------------------------------------------------------
@@ -618,7 +696,7 @@ export function inviteCleanupSql(entries: readonly InviteRestore[]): string {
 export async function withInviteCleanup<T>(
   inviter: string,
   fn: () => Promise<T>,
-  note?: (what: string, payload: unknown) => void,
+  note?: Note,
   io: SqlIo = LOCAL_SQL_IO,
 ): Promise<T> {
   const since = (await io.exec("select now()::text")).trim();
@@ -633,19 +711,22 @@ export async function withInviteCleanup<T>(
     return n;
   };
   const unhook = onInterrupt(`delete-tk-invites-${inviter}`, async () => void (await clean()));
-  try {
-    return await fn();
-  } finally {
-    let deleted: string;
-    try {
-      deleted = await clean();
-    } catch (e) {
-      note?.("invites_cleanup_failed", { inviter, since, error: e instanceof Error ? e.message : String(e) });
-      throw e;
-    }
-    unhook();
-    note?.("invites_deleted", { inviter, since, deleted: Number(deleted) });
-  }
+  return bodyThenPutBack(
+    "invites",
+    fn,
+    async () => {
+      let deleted: string;
+      try {
+        deleted = await clean();
+      } catch (e) {
+        note?.("invites_cleanup_failed", { inviter, since, error: e instanceof Error ? e.message : String(e) });
+        throw e;
+      }
+      unhook();
+      note?.("invites_deleted", { inviter, since, deleted: Number(deleted) });
+    },
+    note,
+  );
 }
 
 // --- recovery ---------------------------------------------------------------------------
@@ -745,17 +826,27 @@ export async function removeFriendships(pairs: readonly [string, string][]): Pro
  * added are removed). Not in the restore record: a run killed before the
  * finally leaves them to the next scenario's reset (`timekeeperResetSql`
  * removes every `manual` friendship among the harness accounts), which runs
- * before any scenario, flag-OFF ones included.
+ * before any scenario, flag-OFF ones included. A failed removal is noted
+ * (`friendships_remove_failed`) and keeps the interrupt hook for the run's
+ * exit, like every other fixture's put-back (`bodyThenPutBack`).
  */
-export async function withFriendships<T>(ids: readonly string[], fn: () => Promise<T>): Promise<T> {
+export async function withFriendships<T>(ids: readonly string[], fn: () => Promise<T>, note?: Note): Promise<T> {
   const added = await addFriendships(ids);
   const unhook = onInterrupt("remove-tk-friendships", () => removeFriendships(added));
-  try {
-    return await fn();
-  } finally {
-    await removeFriendships(added);
-    unhook();
-  }
+  return bodyThenPutBack(
+    "friendships",
+    fn,
+    async () => {
+      try {
+        await removeFriendships(added);
+      } catch (e) {
+        note?.("friendships_remove_failed", { pairs: added, error: e instanceof Error ? e.message : String(e) });
+        throw e;
+      }
+      unhook();
+    },
+    note,
+  );
 }
 
 // --- the fourth account ----------------------------------------------------------------

@@ -85,7 +85,7 @@ import { markMatchProximityRequired } from "./location-flags";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
 import { isBlocked } from "@/lib/moderation/block-store";
-import { acceptArenaChallenge, createArenaChallenge, isBusyRefusal, startArenaMatch } from "./challenge-api";
+import { acceptArenaChallenge, createArenaChallenge, isBusyRefusal, isRawRefusal, SEND_REFUSED_TOAST, startArenaMatch } from "./challenge-api";
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -1725,7 +1725,7 @@ export function useArenaChallenge({
             await explainRefusedInsert(opponentId, opponentName);
             return;
           }
-          toast.error(result.error.message || "Couldn't send that challenge.");
+          toast.error((!isRawRefusal(result.error) && result.error.message) || SEND_REFUSED_TOAST);
           return;
         }
 

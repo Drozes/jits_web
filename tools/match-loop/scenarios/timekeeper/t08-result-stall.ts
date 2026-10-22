@@ -52,7 +52,8 @@ const scenario: Scenario = {
     await tkScenario(ctx, { windows: { tk_stall_window: STALL_S } }, async (cast) => {
       const gold = ctx.fourthId;
       if (!gold) throw new HarnessError("T8 needs the fourth account (tkScenario provisions it)");
-      await withAthleteColumns([gold], PLATFORM_ROLE_COLUMNS, () => stall(ctx, cast, gold), { platform_role: "admin" });
+      const note = (what: string, payload: unknown) => ctx.trace.note("harness", what, payload);
+      await withAthleteColumns([gold], PLATFORM_ROLE_COLUMNS, () => stall(ctx, cast, gold), { platform_role: "admin" }, undefined, note);
     });
   },
 };

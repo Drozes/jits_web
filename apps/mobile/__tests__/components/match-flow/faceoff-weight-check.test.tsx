@@ -56,6 +56,7 @@ import { FaceoffBody } from "@/components/match-flow/faceoff/faceoff-body";
 import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin";
 import { toast as mockToast } from "@/components/ui/toast";
 import type { WeightChecksHandle, WeightChecksStatus } from "@/lib/match-flow/use-match-weight-checks";
+import { renderedAbove, testIDsInOrder } from "../../support/rendered-above";
 
 const ME = { athleteId: "me-1", displayName: "Marco Reyes", currentElo: 1487 };
 const OPP = { athleteId: "opp-1", displayName: "Dayo Okafor", currentElo: 1512 };
@@ -346,5 +347,34 @@ describe("ready step gate", () => {
     // Ready is cleared: the button is back for a fresh tap.
     s.getByTestId("ready-button");
     s.getByText("Match starts when you both tap ready");
+  });
+});
+
+describe("the actions hold still when the re-check notice comes and goes (PM31 (1))", () => {
+  // I re-weighed after their flag (stamped), so I wait for their re-check;
+  // my own verdict on them is still owed (or my flag on them still open).
+  const FLAGGED_AT = "2026-09-30T10:00:00Z";
+  const REWEIGHED_AT = "2026-09-30T10:01:00Z";
+  const waiting = (mine: Spec) =>
+    stateOf({ ...mine, theirs: "flagged", myWeight: 171.4, theirsFlaggedAt: FLAGGED_AT, theirsReweighedAt: REWEIGHED_AT });
+  const rechecked = (mine: Spec) => stateOf({ ...mine, theirs: "confirmed", myWeight: 171.4 });
+  const NOTICE = "Waiting for D. Okafor to check your new weight.";
+
+  it.each([
+    ["weigh-in, my verdict owed", "weight", { mine: "pending" }, "weight-check-flag"],
+    ["weigh-in, my flag open", "weight", { mine: "flagged", mineFlaggedAt: FLAGGED_AT }, "weight-check-withdraw"],
+    ["ready step weight hold, my re-check owed", "ready", { mine: "recheck" }, "weight-check-flag"],
+  ] as const)("%s: the notice sits under the actions, and its going moves none of them", async (_name, phase, mine, lastAction) => {
+    const s = render(<Harness phase={phase} initial={waiting(mine)} />);
+    if (phase === "weight") await weighIn(s);
+    s.getByText(NOTICE);
+    const ids = testIDsInOrder(s.toJSON());
+    expect(ids.indexOf(lastAction)).toBeGreaterThan(-1);
+    expect(ids.indexOf("weight-await-recheck")).toBeGreaterThan(ids.indexOf(lastAction));
+    const before = renderedAbove(s.toJSON(), lastAction);
+    // The opponent re-checks my new weight: the notice goes, the actions stay put.
+    act(() => pushState(rechecked(mine)));
+    expect(s.queryByText(NOTICE)).toBeNull();
+    expect(renderedAbove(s.toJSON(), lastAction)).toEqual(before);
   });
 });

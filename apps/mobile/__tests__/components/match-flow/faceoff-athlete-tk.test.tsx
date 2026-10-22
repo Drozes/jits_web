@@ -94,6 +94,7 @@ import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin"
 import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 import { __resetRecordingIntentForTests } from "@/lib/match-flow/recording-intent";
 import { CH, OP, tkFlow, tkState } from "../../support/timekeeper-faceoff";
+import { renderedAbove, testIDsInOrder } from "../../support/rendered-above";
 
 const mockReconcile = jest.fn();
 const mockRefetch = jest.fn();
@@ -341,6 +342,25 @@ describe("the merged ready (TK-F4 to TK-F6)", () => {
     const s = render(<Harness phase="ready" checks={checksHandle([check(OP, CH, "recheck"), check(CH, OP, "confirmed")])} />);
     await flush();
     expect(s.getByTestId("weight-check-line").props.children).toBe("M. REYES RE-WEIGHED AT 167 LBS");
+  });
+
+  it("after my re-weigh, the shipped waiting notice sits under TK-F4 and the flag, and its going moves neither (PM31 (1); Wave 3 gate, T10)", async () => {
+    // I re-weighed (the checks on me are voided), so I wait for the
+    // opponent's re-check; my check of them is still owed (TK-F4 gives it).
+    const notice = "Waiting for M. Reyes to check your new weight.";
+    const s = render(<Harness phase="ready" checks={checksHandle([check(OP, CH, "pending"), check(CH, OP, "recheck")])} />);
+    await flush();
+    s.getByText(notice);
+    const ids = testIDsInOrder(s.toJSON());
+    expect(ids.indexOf("ready-button")).toBeGreaterThan(-1);
+    expect(ids.indexOf("weight-check-flag")).toBeGreaterThan(ids.indexOf("ready-button"));
+    expect(ids.indexOf("weight-await-recheck")).toBeGreaterThan(ids.indexOf("weight-check-flag"));
+    const before = renderedAbove(s.toJSON(), "weight-check-flag");
+    // The opponent's ready confirms my new weight: the notice goes, TK-F4 and the flag stay put.
+    s.rerender(<Harness phase="ready" checks={checksHandle([check(OP, CH, "pending"), check(CH, OP, "confirmed")])} />);
+    await flush();
+    expect(s.queryByText(notice)).toBeNull();
+    expect(renderedAbove(s.toJSON(), "weight-check-flag")).toEqual(before);
   });
 });
 

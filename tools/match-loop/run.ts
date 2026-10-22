@@ -25,53 +25,26 @@
  * .runs/history.jsonl. Exits non-zero when any scenario is fail,
  * harness_error or env_error (`known` and `flake` do not fail the run).
  */
-import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, loadPassword, resolveAthleteIds, RUNS_DIR, REPO_ROOT, type Config, type AthleteIds } from "./config";
-import { EnvError, HarnessError, ExpectationTimeout, isoStamp, log, normaliseError, run } from "./lib/util";
+import { EnvError, HarnessError, ExpectationTimeout, isoStamp, log, run } from "./lib/util";
 import { redact, redactJson } from "./lib/redact";
-import { installSignalHandlers, runCleanup } from "./lib/cleanup";
+import { installSignalHandlers, onInterrupt, runCleanup } from "./lib/cleanup";
 import { Idb } from "./sim/idb";
 import { Simctl } from "./sim/simctl";
 import { Screens } from "./sim/screens";
 import { MetroLog, metroTreeProblem, readMetroProjectRoot } from "./oracle/logs";
 import { readRealtimeLog, scanRealtimeLog } from "./oracle/realtime";
 import { preflight, signInBlue } from "./preflight";
-import { ScenarioCtx, type OracleRecord, type Scenario, type StepRecord, type RunOptions } from "./scenarios/context";
+import { ScenarioCtx, type Scenario, type RunOptions } from "./scenarios/context";
 import { SCENARIOS, NOT_IMPLEMENTED, scenariosForTier } from "./scenarios";
 import { validatePayload } from "./bot/protocol";
 import type { Fidelity, Timing } from "./bot/match-side";
-import { holdFlagForRun, recoverFixtures, timekeeperRoleOffProblem } from "./fixtures/timekeeper";
+import { holdFlagForRun, putBackFailures, recoverFixtures, timekeeperRoleOffProblem } from "./fixtures/timekeeper";
 import { acquireRunLock } from "./lib/run-lock";
 import { integratedSlices, pendingFails, pendingReason } from "./scenarios/timekeeper/integration";
-
-/**
- * `pending`: a timekeeper scenario whose slices are not in this build yet;
- * not run. It does not fail the run while the build is still partial;
- * on a build with M8, or with `--no-pending`, it is recorded `fail` instead.
- */
-type Status = "pass" | "fail" | "flake" | "harness_error" | "env_error" | "known" | "pending";
-
-interface ScenarioResult {
-  id: string;
-  title: string;
-  status: Status;
-  attempts: number;
-  expectedFailure?: string;
-  steps: StepRecord[];
-  oracles: OracleRecord[];
-  artifacts: Record<string, string>;
-  /** First failure's fingerprint (the one used for bead external refs). */
-  fingerprint: string | null;
-  /** Every failed oracle's fingerprint. */
-  fingerprints: string[];
-  knownBeads: string[];
-  skippedOracles: string[];
-  error?: string;
-  ms: number;
-  previousAttempts?: { status: Status; fingerprint: string | null; dir: string }[];
-}
+import { errorFingerprint, exitCodeFor, oracleFingerprint, pendingResult, type ScenarioResult, type Status } from "./lib/results";
 
 interface Args {
   tier: "core" | "extended" | "timekeeper" | "all";
@@ -146,28 +119,6 @@ async function knownFingerprints(): Promise<Map<string, string>> {
     }
   }
   return out;
-}
-
-function sha12(basis: string): string {
-  return createHash("sha1").update(basis).digest("hex").slice(0, 12);
-}
-
-/**
- * Fingerprint of one failed oracle. Stable across runs: scenario + oracle id
- * + what it EXPECTED (the actual value carries screen dumps and timings).
- * The generic "error" oracle expects nothing useful, so it hashes the
- * normalised actual (the error message) instead.
- * NOTE: this formula backs the external refs on filed beads
- * (match-loop:<fp>). Changing it orphans them.
- */
-export function oracleFingerprint(scenarioId: string, o: OracleRecord): string {
-  const detail = o.id === "error" ? JSON.stringify(o.actual ?? "") : JSON.stringify(o.expected ?? "");
-  return sha12([scenarioId, o.id, normaliseError(detail)].join("|"));
-}
-
-/** Fingerprint of a scenario that died with no failed oracle. */
-export function errorFingerprint(scenarioId: string, error: string): string {
-  return sha12([scenarioId, "error", normaliseError(error)].join("|"));
 }
 
 /** Protocol oracle over the bot trace: shapes, unknown events, send status. */
@@ -304,8 +255,12 @@ async function runOne(env: Env, s: Scenario, dir: string, known: Map<string, str
     if (fingerprints.length === 0 && errMsg) fingerprints = [errorFingerprint(s.id, errMsg)];
   }
   const fp = fingerprints[0] ?? null;
-  // `known` only when EVERY failure is already filed; one new failure keeps it `fail`.
-  if (status === "fail" && fingerprints.length > 0 && fingerprints.every((f) => known.has(f))) status = "known";
+  // A fixture put-back that failed after the scenario had failed: the error
+  // above stays the scenario's own, and the put-back rides alongside it.
+  const putBacks = putBackFailures(error);
+  // `known` only when EVERY failure is already filed; one new failure keeps
+  // it `fail`, and so does a failed put-back (no bead files one).
+  if (status === "fail" && putBacks.length === 0 && fingerprints.length > 0 && fingerprints.every((f) => known.has(f))) status = "known";
   const result: ScenarioResult = {
     id: s.id,
     title: s.title,
@@ -320,36 +275,13 @@ async function runOne(env: Env, s: Scenario, dir: string, known: Map<string, str
     knownBeads: fingerprints.filter((f) => known.has(f)).map((f) => `${f}=${known.get(f)}`),
     skippedOracles: ctx.oracles.filter((o) => o.status === "skipped").map((o) => o.id),
     error: errMsg,
+    ...(putBacks.length ? { putBackFailures: putBacks } : {}),
     ms: Date.now() - t0,
   };
   writeFileSync(join(dir, "scenario.json"), redactJson(result, 2));
   log(`== ${s.id}: ${status.toUpperCase()}${fp ? ` (${fp})` : ""} in ${Math.round(result.ms / 1000)}s${errMsg ? ` - ${errMsg}` : ""}`);
+  for (const p of putBacks) log(`   and a put-back failed after it: ${p}`);
   return result;
-}
-
-/**
- * The result of a scenario that was not run because its slices are not in
- * this build: `pending`, or `fail` when this run may not leave one pending
- * (`pendingFails`).
- */
-function pendingResult(s: Pick<Scenario, "id" | "title">, reason: string, fails: boolean): ScenarioResult {
-  const error = fails ? `${reason} (a build with M8, or --no-pending, must run every timekeeper scenario)` : reason;
-  const fingerprint = fails ? errorFingerprint(s.id, error) : null;
-  return {
-    id: s.id,
-    title: s.title,
-    status: fails ? "fail" : "pending",
-    attempts: 0,
-    steps: [],
-    oracles: [],
-    artifacts: {},
-    fingerprint,
-    fingerprints: fingerprint ? [fingerprint] : [],
-    knownBeads: [],
-    skippedOracles: [],
-    error,
-    ms: 0,
-  };
 }
 
 let releaseRunLock: () => void = () => undefined;
@@ -436,6 +368,11 @@ async function main(): Promise<number> {
   const failPending = pendingFails(present, args.noPending);
   const results: ScenarioResult[] = [];
   const releaseFlag = args.tkFlagOn ? await holdFlagForRun() : null;
+  // On Ctrl-C or SIGTERM the cleanup hooks run in the order they were
+  // registered: holdFlagForRun's put-back first, then this one, which closes
+  // the app so it does not keep the ON it read (M7 review). Removed only
+  // after the normal path below has closed it.
+  const unhookAppClose = releaseFlag ? onInterrupt("tk-flag-run-app-close", () => simctl.terminate()) : () => undefined;
   // The app reads timekeeper_role on mount and on foreground only (slice
   // M6's use-timekeeper-enabled.ts): close it, so the first scenario's
   // normaliseApp launches it with the flag ON and the Arena copy follows it.
@@ -478,6 +415,7 @@ async function main(): Promise<number> {
       await releaseFlag();
       // And again, so the next run's app does not keep the ON it read here.
       await simctl.terminate();
+      unhookAppClose();
     }
   }
 
@@ -504,8 +442,7 @@ async function main(): Promise<number> {
   );
   log(`result: ${resultPath}`);
   log(`summary: ${JSON.stringify(summary)}`);
-  const bad = results.some((r) => r.status === "fail" || r.status === "harness_error" || r.status === "env_error");
-  return bad ? 1 : 0;
+  return exitCodeFor(results);
 }
 
 main()

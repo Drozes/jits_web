@@ -112,15 +112,24 @@ export async function tkScenario(ctx: ScenarioCtx, opts: TkScenarioOptions, body
   const friends = [ctx.ids.blue, ctx.ids.red, ctx.ids.green, fourthId];
   const open = await tkDb.openResults(friends);
   if (open.length) ctx.trace.note("harness", "open_timekeeper_results_left_by_earlier_runs", open);
-  await withAthleteColumns([ctx.ids.green, fourthId], CONSENT_COLUMNS, () =>
-    withFriendships(friends, () =>
-      withWindows(windows ?? {}, async () => {
-        const red = await ctx.bot("red", { capabilities: [TIMEKEEPER_CAP] });
-        const green = await ctx.timekeeperBot("green");
-        const goldBot = gold ? await ctx.timekeeperBot("gold") : null;
-        await body({ red, green, gold: goldBot, ui: new TimekeeperScreens(ctx.idb, ctx.ui) });
-      }, (what, payload) => ctx.trace.note("harness", what, payload)),
-    ),
+  await withAthleteColumns(
+    [ctx.ids.green, fourthId],
+    CONSENT_COLUMNS,
+    () =>
+      withFriendships(
+        friends,
+        () =>
+          withWindows(windows ?? {}, async () => {
+            const red = await ctx.bot("red", { capabilities: [TIMEKEEPER_CAP] });
+            const green = await ctx.timekeeperBot("green");
+            const goldBot = gold ? await ctx.timekeeperBot("gold") : null;
+            await body({ red, green, gold: goldBot, ui: new TimekeeperScreens(ctx.idb, ctx.ui) });
+          }, note(ctx)),
+        note(ctx),
+      ),
+    {},
+    undefined,
+    note(ctx),
   );
 }
 

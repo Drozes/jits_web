@@ -4,7 +4,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { describeQuery, Idb, logBoxInspectorMinimize, logBoxOver, matches, tapPoint, type AXElement } from "../sim/idb";
+import { describeQuery, Idb, logBoxInspectorMinimize, logBoxOver, matches, sameFrame, tapPoint, tapWhenStill, type AXElement, type Query, type StillTiming } from "../sim/idb";
 
 function el(over: Partial<AXElement> = {}): AXElement {
   return {
@@ -109,4 +109,78 @@ test("dismissLogBox with no LogBox taps nothing", async () => {
   const idb = new ScriptedIdb([[el()]]);
   assert.equal(await idb.dismissLogBox(), false);
   assert.deepEqual(idb.tapped, []);
+});
+
+// --- tapWhenStill: a tap only where the screen holds the control still (Wave 3 gate, T10) ---
+
+/** A screen that serves `reads` in turn (the last one repeats) and records each tap's frame. */
+function stillScreen(reads: AXElement[][]) {
+  let n = 0;
+  const taps: AXElement[] = [];
+  const idb = {
+    async describe() {
+      const r = reads[Math.min(n, reads.length - 1)];
+      n++;
+      return r;
+    },
+    async tap(e: AXElement) {
+      taps.push(e);
+    },
+  } as unknown as Pick<Idb, "describe" | "tap">;
+  return { idb, taps, reads: () => n };
+}
+
+const READY: Query = { label: "Weight looks right, I'm ready", enabled: true, type: "Button" };
+const readyAt = (y: number, enabled = true) => el({ AXLabel: "Weight looks right, I'm ready", enabled, frame: { x: 16, y, width: 370, height: 72 } });
+const QUICK: StillTiming = { stillMs: 0, gapMs: 1, timeoutMs: 100 };
+
+test("sameFrame: every edge within 1 pt", () => {
+  assert.equal(sameFrame(readyAt(700), readyAt(700.5)), true);
+  assert.equal(sameFrame(readyAt(700), readyAt(640)), false);
+  assert.equal(sameFrame(readyAt(700), el({ ...readyAt(700), frame: { x: 16, y: 700, width: 370, height: 60 } })), false, "a resize is a move");
+});
+
+test("tapWhenStill never taps on the caller's read alone: one more read must find the control in the same place", async () => {
+  const s = stillScreen([[readyAt(700)]]);
+  const tapped = await tapWhenStill(s.idb, READY, { el: readyAt(700), at: Date.now() }, QUICK);
+  assert.equal(tapped?.frame.y, 700);
+  assert.equal(s.reads(), 1, "exactly one confirming read");
+  assert.deepEqual(s.taps.map((t) => t.frame.y), [700]);
+});
+
+test("tapWhenStill taps a control that moved where it settled, never where the first read put it (T10)", async () => {
+  const s = stillScreen([[readyAt(640)], [readyAt(640)]]);
+  const tapped = await tapWhenStill(s.idb, READY, { el: readyAt(700), at: Date.now() }, QUICK);
+  assert.equal(tapped?.frame.y, 640);
+  assert.equal(s.reads(), 2, "the move restarts the wait: a second read confirms the new place");
+  assert.deepEqual(s.taps.map((t) => t.frame.y), [640]);
+});
+
+test("tapWhenStill waits stillMs of reads in one place before it taps", async () => {
+  const s = stillScreen([[readyAt(700)]]);
+  const t0 = Date.now();
+  await tapWhenStill(s.idb, READY, { el: readyAt(700), at: t0 }, { stillMs: 40, gapMs: 5, timeoutMs: 1_000 });
+  assert.ok(Date.now() - t0 >= 40, "not before the control held still for stillMs");
+  assert.ok(s.reads() >= 2);
+  assert.equal(s.taps.length, 1);
+});
+
+test("tapWhenStill taps nothing when the control goes, turns disabled, or never holds still", async () => {
+  const gone = stillScreen([[]]);
+  assert.equal(await tapWhenStill(gone.idb, READY, { el: readyAt(700), at: Date.now() }, QUICK), undefined);
+  assert.equal(gone.taps.length, 0);
+  const busy = stillScreen([[readyAt(700, false)]]);
+  assert.equal(await tapWhenStill(busy.idb, READY, { el: readyAt(700), at: Date.now() }, QUICK), undefined, "a busy TK-F4 is never pressed");
+  assert.equal(busy.taps.length, 0);
+  let y = 700;
+  const moving = {
+    async describe() {
+      y -= 10;
+      return [readyAt(y)];
+    },
+    async tap() {
+      throw new Error("tapped a moving control");
+    },
+  } as unknown as Pick<Idb, "describe" | "tap">;
+  assert.equal(await tapWhenStill(moving, READY, { el: readyAt(700), at: Date.now() }, { stillMs: 0, gapMs: 1, timeoutMs: 30 }), undefined);
 });

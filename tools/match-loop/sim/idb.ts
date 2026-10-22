@@ -350,6 +350,71 @@ export function frameContains(e: AXElement, p: { x: number; y: number }): boolea
   return p.x >= f.x && p.x <= f.x + f.width && p.y >= f.y && p.y <= f.y + f.height;
 }
 
+/** True when two reads put an element in the same place (every edge within 1 pt). */
+export function sameFrame(a: AXElement, b: AXElement): boolean {
+  const f = a.frame;
+  const g = b.frame;
+  return Math.abs(f.x - g.x) < 1 && Math.abs(f.y - g.y) < 1 && Math.abs(f.width - g.width) < 1 && Math.abs(f.height - g.height) < 1;
+}
+
+/** When `tapWhenStill` taps. Tests shorten all three. */
+export interface StillTiming {
+  /** The element must have kept one frame across reads that started at least this far apart. */
+  stillMs: number;
+  /** Between reads. */
+  gapMs: number;
+  /** Give up, with no tap, when the element has not held still for this long. */
+  timeoutMs: number;
+}
+
+/**
+ * One confirming read after the caller's (a read takes about 200 ms on a
+ * simulator), so a tap waits about a third of a second for the screen to
+ * settle after a bot action moved it.
+ */
+export const STILL_TIMING: StillTiming = { stillMs: 300, gapMs: 150, timeoutMs: 3_000 };
+
+/**
+ * Tap the element `q` finds, but only once the screen holds it still. A tap
+ * goes to a point computed from a read that is already a few hundred ms old
+ * when idb taps, and a bot action can move the screen in between: in the
+ * Wave 3 gate (T10) a notice above TK-F4 went away after the read, the two
+ * buttons moved up, and the tap meant for TK-F4 landed on "Doesn't look
+ * right" and flagged the opponent. So this reads again, right before the
+ * tap, and taps only when the element is still where an earlier read put it
+ * and has stayed there for `stillMs`; then it taps the newest read's frame.
+ *
+ * `first` is the element as the caller's own read found it, with the time
+ * that read started. Returns the element tapped, or undefined with NO tap
+ * when the element went away (or turned disabled, for a query that asks for
+ * enabled) or kept moving for `timeoutMs`: the caller reads the screen
+ * again and decides.
+ */
+export async function tapWhenStill(
+  idb: Pick<Idb, "describe" | "tap">,
+  q: Query,
+  first: { el: AXElement; at: number },
+  timing: StillTiming = STILL_TIMING,
+): Promise<AXElement | undefined> {
+  const start = Date.now();
+  let held = first.el;
+  let since = first.at;
+  for (;;) {
+    await new Promise((r) => setTimeout(r, timing.gapMs));
+    const at = Date.now();
+    const cur = (await idb.describe()).find((e) => matches(e, q));
+    if (!cur) return undefined;
+    if (!sameFrame(cur, held)) {
+      held = cur;
+      since = at;
+    } else if (at - since >= timing.stillMs) {
+      await idb.tap(cur);
+      return cur;
+    }
+    if (Date.now() - start > timing.timeoutMs) return undefined;
+  }
+}
+
 /** The LogBox toast lying over a point, i.e. the toast that would take a tap there. */
 export function logBoxOver(els: AXElement[], p: { x: number; y: number }): AXElement | undefined {
   return els.find((e) => isLogBox(e) && frameContains(e, p));

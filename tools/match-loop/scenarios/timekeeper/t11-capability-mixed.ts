@@ -1,6 +1,7 @@
 import type { Scenario, ScenarioCtx } from "../context";
 import { TIMEKEEPER_CAP } from "../../bot/opponent";
 import { readFlags, TK_ROLE_FLAG, withFlags } from "../../fixtures/timekeeper";
+import { onInterrupt } from "../../lib/cleanup";
 import { tkDb } from "../../oracle/tk-db";
 import { db } from "../../oracle/db";
 import { TK_UI } from "../../sim/timekeeper-screens";
@@ -118,14 +119,27 @@ const scenario: Scenario = {
   async run(ctx) {
     const slices = integratedSlices();
     const note = (what: string, payload: unknown) => ctx.trace.note("harness", what, payload);
+    // On Ctrl-C or SIGTERM the cleanup hooks run in the order they were
+    // registered: the window's flag put-back first, then this one,
+    // registered inside the window, which closes the app so it does not keep
+    // the ON it read (M7 review). It stays until the relaunch below.
+    let unhookAppClose: () => void = () => undefined;
     try {
-      await withFlags({ [TK_ROLE_FLAG]: true }, () => mixedPairC1(ctx, slices), note);
+      await withFlags(
+        { [TK_ROLE_FLAG]: true },
+        () => {
+          unhookAppClose = onInterrupt("t11-app-close", () => ctx.simctl.terminate());
+          return mixedPairC1(ctx, slices);
+        },
+        note,
+      );
     } finally {
       // The app keeps the value it last read until it launches or
       // foregrounds again; setup only, never an oracle.
       await relaunch(ctx, "t11_app_rereads_the_flag", { after: "timekeeper_role window" }).catch((e: unknown) =>
         note("t11_relaunch_after_failed", e instanceof Error ? e.message : String(e)),
       );
+      unhookAppClose();
     }
   },
 };
