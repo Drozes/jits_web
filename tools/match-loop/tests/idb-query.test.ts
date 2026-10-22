@@ -113,6 +113,9 @@ test("dismissLogBox with no LogBox taps nothing", async () => {
 
 // --- tapWhenStill: a tap only where the screen holds the control still (Wave 3 gate, T10) ---
 
+/** The real on-screen band (an 874 pt screen: top 60 pt and bottom 100 pt are off screen). */
+const BAND = new Idb("udid", "python3");
+
 /** A screen that serves `reads` in turn (the last one repeats) and records each tap's frame. */
 function stillScreen(reads: AXElement[][]) {
   let n = 0;
@@ -126,7 +129,8 @@ function stillScreen(reads: AXElement[][]) {
     async tap(e: AXElement) {
       taps.push(e);
     },
-  } as unknown as Pick<Idb, "describe" | "tap">;
+    onScreen: (e: AXElement) => BAND.onScreen(e),
+  } as unknown as Pick<Idb, "describe" | "tap" | "onScreen">;
   return { idb, taps, reads: () => n };
 }
 
@@ -165,6 +169,17 @@ test("tapWhenStill waits stillMs of reads in one place before it taps", async ()
   assert.equal(s.taps.length, 1);
 });
 
+test("tapWhenStill never taps a control that settled outside the on-screen band (the LogBox toast's bottom band): the caller reads again and scrolls (W3FIX review minor 2)", async () => {
+  assert.equal(BAND.onScreen(readyAt(700)), true, "the caller's read: on screen");
+  assert.equal(BAND.onScreen(readyAt(800)), false, "settled: in the bottom band");
+  const s = stillScreen([[readyAt(800)]]);
+  assert.equal(await tapWhenStill(s.idb, READY, { el: readyAt(700), at: Date.now() }, QUICK), undefined);
+  assert.deepEqual(s.taps, [], "no tap where onScreen says none goes");
+  const top = stillScreen([[readyAt(10)]]);
+  assert.equal(await tapWhenStill(top.idb, READY, { el: readyAt(700), at: Date.now() }, QUICK), undefined, "nor under the top band");
+  assert.deepEqual(top.taps, []);
+});
+
 test("tapWhenStill taps nothing when the control goes, turns disabled, or never holds still", async () => {
   const gone = stillScreen([[]]);
   assert.equal(await tapWhenStill(gone.idb, READY, { el: readyAt(700), at: Date.now() }, QUICK), undefined);
@@ -181,6 +196,6 @@ test("tapWhenStill taps nothing when the control goes, turns disabled, or never 
     async tap() {
       throw new Error("tapped a moving control");
     },
-  } as unknown as Pick<Idb, "describe" | "tap">;
+  } as unknown as Pick<Idb, "describe" | "tap" | "onScreen">;
   assert.equal(await tapWhenStill(moving, READY, { el: readyAt(700), at: Date.now() }, { stillMs: 0, gapMs: 1, timeoutMs: 30 }), undefined);
 });

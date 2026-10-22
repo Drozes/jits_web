@@ -8,8 +8,8 @@
  *
  * Create and accept are the shipped wrapper with the app's client: same
  * arguments, same `Result`, nothing added. So is a start, except for the
- * busy refusals. Which refused sends are raw text lives here too
- * (`isRawRefusal`, `SEND_REFUSED_TOAST`).
+ * busy refusals. Which refused writes are raw text lives here too
+ * (`isRawRefusal`, and the send's, accept's and start's toasts for one).
  */
 import type { DomainError } from "@jits/shared/api/errors";
 import {
@@ -49,21 +49,23 @@ export function createArenaChallenge(params: CreateParams): ReturnType<typeof cr
 
 /**
  * The codes of a refusal whose words are not the app's own: `mapPostgrestError`
- * leaves the server's or the network library's raw text under `UNKNOWN` for
- * any refusal it does not map (a statement timeout, a dropped connection) and
- * under `RLS_VIOLATION`, and `createChallenge` says "Could not identify
- * current athlete" under `UNKNOWN`. Every other code a send can come back
- * with carries the shared table's user-safe line.
+ * (behind the create, the accept and the start alike) leaves the server's or
+ * the network library's raw text under `UNKNOWN` for any refusal it does not
+ * map (a statement timeout, a dropped connection) and under `RLS_VIOLATION`,
+ * and `createChallenge` says "Could not identify current athlete" under
+ * `UNKNOWN`. Every other code these writes can come back with carries the
+ * shared table's user-safe line.
  */
 const RAW_MESSAGE_CODES: ReadonlySet<DomainError["code"]> = new Set<DomainError["code"]>(["UNKNOWN", "RLS_VIOLATION"]);
 
 /**
- * Whether a refused send's words are raw text the app never shows
- * (timekeeper mode PM31 (2), both modes). Decided by the code alone: this
- * file is a timekeeper-mode surface, which never reads an error's words
- * (M-R4, `timekeeper-mode-guard.test.ts`), so the handshake, the shipped
- * two-athlete file, keeps showing a mapped refusal's own line, for example
- * "You can't challenge this athlete." (`BLOCKED`), exactly as it always did.
+ * Whether a refused send's, accept's or start's words are raw text the app
+ * never shows (timekeeper mode PM31 (2), both modes). Decided by the code
+ * alone: this file is a timekeeper-mode surface, which never reads an
+ * error's words (M-R4, `timekeeper-mode-guard.test.ts`), so the handshake,
+ * the shipped two-athlete file, keeps showing a mapped refusal's own line,
+ * for example "You can't challenge this athlete." (`BLOCKED`), exactly as it
+ * always did.
  * The cap, `MAX_PENDING_CHALLENGES`, is answered by the handshake's
  * `explainRefusedInsert` and never gets this far.
  */
@@ -71,16 +73,26 @@ export function isRawRefusal(error: DomainError): boolean {
   return RAW_MESSAGE_CODES.has(error.code);
 }
 
+/** A refused write's shipped title over the shipped guidance, never the raw text. */
+const refusedToast = (text1: string): Readonly<Required<StartRefusalToast>> =>
+  Object.freeze({ text1, description: SHIPPED_COPY.checkConnection });
+
 /**
  * The toast for a refused send that is raw (`isRawRefusal`) or has no words:
  * the send's shipped title (the handshake's words before PM31, also the web
- * handshake's) over the shipped guidance, never the raw text. The Wave 3 gate
- * saw "canceling statement due to statement timeout" on this toast.
+ * handshake's) over the shipped guidance. The Wave 3 gate saw "canceling
+ * statement due to statement timeout" on this toast.
  */
-export const SEND_REFUSED_TOAST: Readonly<Required<StartRefusalToast>> = Object.freeze({
-  text1: "Couldn't send that challenge.",
-  description: SHIPPED_COPY.checkConnection,
-});
+export const SEND_REFUSED_TOAST = refusedToast("Couldn't send that challenge.");
+
+/**
+ * The same for a refused accept and a refused start, one step later in the
+ * handshake (W3FIX review minor 4), each under the handshake's shipped title
+ * for it. A busy start keeps its deck toast (`ArenaStartError.toast`), and a
+ * start of a challenge no longer accepted keeps its own line.
+ */
+export const ACCEPT_REFUSED_TOAST = refusedToast("Couldn't accept that challenge.");
+export const START_REFUSED_TOAST = refusedToast("Couldn't start the match.");
 
 /** Accept a pending challenge (the opponent's side). */
 export function acceptArenaChallenge(params: AcceptParams): ReturnType<typeof acceptChallenge> {

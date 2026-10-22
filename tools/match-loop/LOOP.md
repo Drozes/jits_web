@@ -374,8 +374,11 @@ Rules every timekeeper scenario follows:
   "Doesn't look right" and flagged Red. Each tap reads again first and
   taps only once the control has held one frame for `STILL_TIMING.stillMs`
   (`tapWhenStill`, `sim/idb.ts`; about a third of a second), at the newest
-  frame; a control that goes away, turns busy or keeps moving is not tapped
-  and the helper reads again. A control below the fold is scrolled into
+  frame, and only when that frame is inside `Idb.onScreen`'s band (the dev
+  build's LogBox toast lies in the bottom band, and a tap on it opens the
+  inspector, which swallows every later tap); a control that goes away,
+  turns busy, keeps moving or settles outside the band is not tapped and the
+  helper reads again (off screen, it scrolls). A control below the fold is scrolled into
   view (`Idb.scrollTo`, which waits for it to settle) and tapped only if it
   is still an enabled control there. A press counts only once it is made.
   (The app also stopped moving those buttons, PM31 (1).) Taps a scenario
@@ -414,7 +417,8 @@ failure); the put-back is listed beside it in the scenario's
 fixture's own `*_failed` note, `friendships_remove_failed` for the
 friendships), and its interrupt hook stays for the exit, with its restore
 record for the next start (the friendships have no record: the next
-scenario's reset removes them). Such a scenario is never `known`. When only the
+scenario's reset removes them). Such a scenario is never `known`
+(`finalStatus` and `scenarioResult` in `lib/results.ts`). When only the
 put-back fails, its error is the scenario's, as before:
 
 - `timekeeper_role` (and the snapshotted sub-flag `timekeeper_weight_check`)

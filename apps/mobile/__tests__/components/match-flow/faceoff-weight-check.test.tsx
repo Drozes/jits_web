@@ -56,7 +56,7 @@ import { FaceoffBody } from "@/components/match-flow/faceoff/faceoff-body";
 import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin";
 import { toast as mockToast } from "@/components/ui/toast";
 import type { WeightChecksHandle, WeightChecksStatus } from "@/lib/match-flow/use-match-weight-checks";
-import { renderedAbove, testIDsInOrder } from "../../support/rendered-above";
+import { renderedAbove, renderedNode, testIDsInOrder } from "../../support/rendered-above";
 
 const ME = { athleteId: "me-1", displayName: "Marco Reyes", currentElo: 1487 };
 const OPP = { athleteId: "opp-1", displayName: "Dayo Okafor", currentElo: 1512 };
@@ -376,5 +376,108 @@ describe("the actions hold still when the re-check notice comes and goes (PM31 (
     act(() => pushState(rechecked(mine)));
     expect(s.queryByText(NOTICE)).toBeNull();
     expect(renderedAbove(s.toJSON(), lastAction)).toEqual(before);
+  });
+
+  it.each([
+    ["weigh-in, my verdict owed", "weight", { mine: "pending" }],
+    ["weigh-in, my flag open", "weight", { mine: "flagged", mineFlaggedAt: FLAGGED_AT }],
+    ["ready step weight hold, my re-check owed", "ready", { mine: "recheck" }],
+  ] as const)(
+    "%s: once shown, the notice keeps its slot while the actions stay, so nothing under them shrinks (Android clamps the scroll)",
+    async (_name, phase, mine) => {
+      const s = render(<Harness phase={phase} initial={waiting(mine)} />);
+      if (phase === "weight") await weighIn(s);
+      const shown = renderedNode(s.toJSON(), "weight-await-recheck");
+      act(() => pushState(rechecked(mine)));
+      const held = renderedNode(s.toJSON(), "weight-await-recheck-held");
+      // Invisible and out of the screen reader's way...
+      expect(held.props.style).toEqual({ opacity: 0 });
+      expect(held.props.accessibilityElementsHidden).toBe(true);
+      expect(held.props.importantForAccessibility).toBe("no-hide-descendants");
+      expect(s.queryByText(NOTICE)).toBeNull();
+      // ...and the same notice, so the same height, in the same place.
+      expect(held.children).toEqual([{ ...shown, props: { ...shown.props, testID: undefined } }]);
+      expect(s.getByText(NOTICE, { includeHiddenElements: true })).toBeTruthy();
+      // Coming back (a second re-weigh) shows it in the slot it kept.
+      act(() => pushState(waiting(mine)));
+      s.getByText(NOTICE);
+      expect(s.queryByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeNull();
+    },
+  );
+
+  it("the slot goes with the actions: once my verdict is no longer owed, nothing is held", async () => {
+    const s = render(<Harness phase="weight" initial={waiting({ mine: "pending" })} />);
+    await weighIn(s);
+    act(() => pushState(rechecked({ mine: "pending" })));
+    expect(s.getByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeTruthy();
+    act(() => pushState(stateOf({ mine: "confirmed", theirs: "confirmed", myWeight: 171.4 })));
+    expect(s.queryByTestId("weight-check-prompt")).toBeNull();
+    expect(s.queryByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeNull();
+    expect(s.queryByText(NOTICE, { includeHiddenElements: true })).toBeNull();
+  });
+
+  it("the slot is the verdict's: my flag replaces the verdict with the hold, and the held slot goes with it", async () => {
+    const s = render(<Harness phase="weight" initial={waiting({ mine: "pending" })} />);
+    await weighIn(s);
+    act(() => pushState(rechecked({ mine: "pending" })));
+    expect(s.getByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeTruthy();
+    mockCheck.mockResolvedValue({ ok: true, data: stateOf({ mine: "flagged", mineFlaggedAt: FLAGGED_AT, theirs: "confirmed", myWeight: 171.4 }) });
+    await act(async () => {
+      fireEvent.press(s.getByTestId("weight-check-flag"));
+    });
+    s.getByTestId("weight-check-withdraw");
+    expect(s.queryByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeNull();
+  });
+
+  it("with no actions above it, the notice holds nothing when it goes", async () => {
+    // I re-weighed and already confirmed them: only their re-check is owed.
+    const s = render(<Harness phase="ready" initial={waiting({ mine: "confirmed" })} />);
+    s.getByText(NOTICE);
+    expect(s.queryByTestId("weight-check-prompt")).toBeNull();
+    act(() => pushState(rechecked({ mine: "confirmed" })));
+    expect(s.queryByText(NOTICE, { includeHiddenElements: true })).toBeNull();
+    expect(s.queryByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeNull();
+  });
+
+  it.each([
+    ["weigh-in, my verdict owed", "weight", { mine: "pending" }],
+    ["weigh-in, my flag open", "weight", { mine: "flagged", mineFlaggedAt: FLAGGED_AT }],
+    ["ready step weight hold, my re-check owed", "ready", { mine: "recheck" }],
+  ] as const)(
+    "%s: a notice that first shows after its slot is on screen (their flag, then my re-weigh) still keeps its slot when they re-check",
+    async (_name, phase, mine) => {
+      // Their flag on me, not yet answered: the re-weigh above my actions, and
+      // the slot under them is mounted with nothing to show yet.
+      const s = render(<Harness phase={phase} initial={stateOf({ ...mine, theirs: "flagged", theirsFlaggedAt: FLAGGED_AT })} />);
+      if (phase === "weight") await weighIn(s);
+      s.getByTestId("weight-reweigh");
+      expect(s.queryByText(NOTICE, { includeHiddenElements: true })).toBeNull();
+      expect(s.queryByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeNull();
+      // I re-weigh: the notice shows in the slot that was already there.
+      mockReweigh.mockResolvedValue({ ok: true, data: waiting(mine) });
+      await act(async () => {
+        fireEvent.press(s.getByTestId("weight-reweigh-submit"));
+      });
+      expect(s.queryByTestId("weight-reweigh")).toBeNull();
+      const shown = renderedNode(s.toJSON(), "weight-await-recheck");
+      const aboveNotice = renderedAbove(s.toJSON(), "weight-await-recheck");
+      // They re-check my new weight: the notice goes, its slot stays.
+      act(() => pushState(rechecked(mine)));
+      const held = renderedNode(s.toJSON(), "weight-await-recheck-held");
+      expect(held.props.style).toEqual({ opacity: 0 });
+      expect(held.props.accessibilityElementsHidden).toBe(true);
+      expect(held.props.importantForAccessibility).toBe("no-hide-descendants");
+      expect(s.queryByText(NOTICE)).toBeNull();
+      expect(held.children).toEqual([{ ...shown, props: { ...shown.props, testID: undefined } }]);
+      expect(renderedAbove(s.toJSON(), "weight-await-recheck-held")).toEqual(aboveNotice);
+    },
+  );
+
+  it("a verdict that never showed the notice renders no slot (the shipped face-off is unchanged)", async () => {
+    const s = render(<Harness phase="weight" />);
+    await weighIn(s);
+    s.getByTestId("weight-check-flag");
+    expect(s.queryByText(NOTICE, { includeHiddenElements: true })).toBeNull();
+    expect(s.queryByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeNull();
   });
 });

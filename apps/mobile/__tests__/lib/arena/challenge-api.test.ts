@@ -37,8 +37,10 @@ import {
   acceptArenaChallenge,
   createArenaChallenge,
   isBusyRefusal,
+  ACCEPT_REFUSED_TOAST,
   isRawRefusal,
   SEND_REFUSED_TOAST,
+  START_REFUSED_TOAST,
   startArenaMatch,
 } from "@/lib/arena/challenge-api";
 import type { DomainError } from "@jits/shared/api/errors";
@@ -73,6 +75,13 @@ describe("a refused send's words (timekeeper mode PM31 (2)): isRawRefusal and SE
   it("the send's shipped title over the shipped guidance, written out so a change to either fails here", () => {
     expect(SEND_REFUSED_TOAST).toEqual({ text1: "Couldn't send that challenge.", description: "Check your connection and try again." });
     expect(Object.isFrozen(SEND_REFUSED_TOAST)).toBe(true);
+  });
+
+  it("the accept's and the start's shipped titles over the same guidance (W3FIX review minor 4)", () => {
+    expect(ACCEPT_REFUSED_TOAST).toEqual({ text1: "Couldn't accept that challenge.", description: "Check your connection and try again." });
+    expect(START_REFUSED_TOAST).toEqual({ text1: "Couldn't start the match.", description: "Check your connection and try again." });
+    expect(Object.isFrozen(ACCEPT_REFUSED_TOAST)).toBe(true);
+    expect(Object.isFrozen(START_REFUSED_TOAST)).toBe(true);
   });
 
   it.each(["UNKNOWN", "RLS_VIOLATION"])("%s carries raw text (a statement timeout, a dropped connection, an unmapped policy refusal): raw", (code) => {

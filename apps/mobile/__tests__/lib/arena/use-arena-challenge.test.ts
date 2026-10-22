@@ -174,6 +174,17 @@ const CHALLENGE = "ch-1";
 const MATCH = "match-1";
 /** A refused send the app cannot word: the shipped title and guidance (PM31 (2)). */
 const SEND_FAILED = { text1: "Couldn't send that challenge.", description: "Check your connection and try again." };
+/** The same for a refused accept and a refused start (W3FIX review minor 4). */
+const ACCEPT_FAILED = { text1: "Couldn't accept that challenge.", description: "Check your connection and try again." };
+const START_FAILED = { text1: "Couldn't start the match.", description: "Check your connection and try again." };
+/** Raw refusals, as the shared wrappers pass them on (`mapPostgrestError`). */
+const RAW_REFUSALS = [
+  // What the Wave 3 gate saw on the send: the statement timeout, as PostgREST words it.
+  ["a statement timeout", { code: "UNKNOWN", message: "canceling statement due to statement timeout" }],
+  ["a dropped connection", { code: "UNKNOWN", message: "TypeError: Network request failed" }],
+  ["an unmapped RLS refusal", { code: "RLS_VIOLATION", message: "new row violates row-level security policy for table \"challenges\"" }],
+  ["a mapped code with no words", { code: "MATCH_ALREADY_EXISTS", message: "" }],
+] as const;
 /** A normal 7-day `expires_at`, well past anything a test waits for. */
 const FAR_EXPIRY = new Date(Date.now() + 7 * 86_400_000).toISOString();
 
@@ -705,6 +716,62 @@ describe("accepting", () => {
     );
     expect(result.current.incoming).toBeNull();
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  describe("a refused accept or start never shows the server's raw text (PM31 (2), W3FIX review minor 4)", () => {
+    const noRawText = (message: string) => {
+      if (message) expect(JSON.stringify(mockToastError.mock.calls)).not.toContain(JSON.stringify(message).slice(1, -1));
+    };
+
+    it.each(RAW_REFUSALS)("accept, %s: the shipped title and guidance, and the prompt goes", async (_name, error) => {
+      mockAcceptChallenge.mockResolvedValue({ ok: false, error });
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockToastError).toHaveBeenCalledTimes(1);
+      expect(mockToastError).toHaveBeenCalledWith(ACCEPT_FAILED);
+      noRawText(error.message);
+      expect(mockStartMatch).not.toHaveBeenCalled();
+      expect(result.current.incoming).toBeNull();
+    });
+
+    it("accept: a refusal the shared table maps keeps its own line", async () => {
+      mockAcceptChallenge.mockResolvedValue({ ok: false, error: { code: "OPPONENT_INACTIVE", message: "That athlete is no longer active." } });
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockToastError).toHaveBeenCalledWith("That athlete is no longer active.");
+    });
+
+    it.each(RAW_REFUSALS)("start, %s: the shipped title and guidance after the retry and the withdraw", async (_name, error) => {
+      mockStartMatch.mockResolvedValue({ ok: false, error });
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockStartMatch).toHaveBeenCalledTimes(2);
+      expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+      expect(mockToastError).toHaveBeenCalledTimes(1);
+      expect(mockToastError).toHaveBeenCalledWith(START_FAILED);
+      noRawText(error.message);
+      expect(result.current.incoming).toBeNull();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("start: a refusal the shared table maps keeps its own line", async () => {
+      mockStartMatch.mockResolvedValue({ ok: false, error: { code: "MATCH_ALREADY_EXISTS", message: "A match already exists for this challenge." } });
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockToastError).toHaveBeenCalledWith("A match already exists for this challenge.");
+    });
   });
 
   it("produces exactly one match for a double tap on Accept", async () => {

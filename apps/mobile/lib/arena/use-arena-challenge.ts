@@ -85,7 +85,7 @@ import { markMatchProximityRequired } from "./location-flags";
 import { notifyIncomingChallengeEnded } from "./arena-store";
 import { superviseChannel, type SupervisedChannel } from "../supabase/supervise-channel";
 import { isBlocked } from "@/lib/moderation/block-store";
-import { acceptArenaChallenge, createArenaChallenge, isBusyRefusal, isRawRefusal, SEND_REFUSED_TOAST, startArenaMatch } from "./challenge-api";
+import { ACCEPT_REFUSED_TOAST, acceptArenaChallenge, createArenaChallenge, isBusyRefusal, isRawRefusal, SEND_REFUSED_TOAST, START_REFUSED_TOAST, startArenaMatch } from "./challenge-api";
 
 export interface IncomingChallenge {
   challengeId: string;
@@ -1851,7 +1851,7 @@ export function useArenaChallenge({
         });
         if (!accepted.ok) {
           toast.error(
-            accepted.error.message || "Couldn't accept that challenge.",
+            (!isRawRefusal(accepted.error) && accepted.error.message) || ACCEPT_REFUSED_TOAST,
           );
           setIncomingBoth(null);
           requestPendingChallengeResync();
@@ -1947,7 +1947,7 @@ export function useArenaChallenge({
           toast.error(
             started.error.toast ?? (started.error.code === "CHALLENGE_NOT_ACCEPTED"
               ? "That challenge is no longer available."
-              : started.error.message || "Couldn't start the match."),
+              : (!isRawRefusal(started.error) && started.error.message) || START_REFUSED_TOAST),
           );
           requestPendingChallengeResync();
           return;

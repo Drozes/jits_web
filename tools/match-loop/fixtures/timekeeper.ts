@@ -805,20 +805,23 @@ export function addFriendshipsSql(pairs: readonly [string, string][]): string {
 }
 
 /** Insert the missing friendships between `ids` (source `manual`); returns the pairs this call created. */
-export async function addFriendships(ids: readonly string[]): Promise<[string, string][]> {
+export async function addFriendships(ids: readonly string[], exec: SqlIo["exec"] = psql): Promise<[string, string][]> {
   const pairs = friendshipPairs(ids);
   if (pairs.length === 0) return [];
-  const rows = JSON.parse((await psql(addFriendshipsSql(pairs))) || "[]") as { athlete_a: string; athlete_b: string }[];
+  const rows = JSON.parse((await exec(addFriendshipsSql(pairs))) || "[]") as { athlete_a: string; athlete_b: string }[];
   return rows.map((r) => [r.athlete_a, r.athlete_b]);
 }
 
-export async function removeFriendships(pairs: readonly [string, string][]): Promise<void> {
+/** SQL deleting exactly these `manual` friendships (pure, for tests). */
+export function removeFriendshipsSql(pairs: readonly [string, string][]): string {
+  return `delete from public.athlete_friendships where source = 'manual' and (athlete_a, athlete_b) in (${pairs
+    .map(([a, b]) => `(${lit(a)}::uuid, ${lit(b)}::uuid)`)
+    .join(", ")})`;
+}
+
+export async function removeFriendships(pairs: readonly [string, string][], exec: SqlIo["exec"] = psql): Promise<void> {
   if (pairs.length === 0) return;
-  await psql(
-    `delete from public.athlete_friendships where source = 'manual' and (athlete_a, athlete_b) in (${pairs
-      .map(([a, b]) => `(${lit(a)}::uuid, ${lit(b)}::uuid)`)
-      .join(", ")})`,
-  );
+  await exec(removeFriendshipsSql(pairs));
 }
 
 /**
@@ -828,17 +831,23 @@ export async function removeFriendships(pairs: readonly [string, string][]): Pro
  * removes every `manual` friendship among the harness accounts), which runs
  * before any scenario, flag-OFF ones included. A failed removal is noted
  * (`friendships_remove_failed`) and keeps the interrupt hook for the run's
- * exit, like every other fixture's put-back (`bodyThenPutBack`).
+ * exit, like every other fixture's put-back (`bodyThenPutBack`). A run
+ * uses the local stack (`LOCAL_SQL_IO`); tests pass their own `io`.
  */
-export async function withFriendships<T>(ids: readonly string[], fn: () => Promise<T>, note?: Note): Promise<T> {
-  const added = await addFriendships(ids);
-  const unhook = onInterrupt("remove-tk-friendships", () => removeFriendships(added));
+export async function withFriendships<T>(
+  ids: readonly string[],
+  fn: () => Promise<T>,
+  note?: Note,
+  io: Pick<SqlIo, "exec"> = LOCAL_SQL_IO,
+): Promise<T> {
+  const added = await addFriendships(ids, io.exec);
+  const unhook = onInterrupt("remove-tk-friendships", () => removeFriendships(added, io.exec));
   return bodyThenPutBack(
     "friendships",
     fn,
     async () => {
       try {
-        await removeFriendships(added);
+        await removeFriendships(added, io.exec);
       } catch (e) {
         note?.("friendships_remove_failed", { pairs: added, error: e instanceof Error ? e.message : String(e) });
         throw e;

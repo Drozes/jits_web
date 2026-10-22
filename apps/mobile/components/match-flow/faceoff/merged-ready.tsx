@@ -8,7 +8,7 @@ import { typeStep } from "@/lib/typography";
 import { FightButton, Mono, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 import { weightText } from "./faceoff-top";
-import { Notice, ReweighPrompt } from "./faceoff-weight-check";
+import { HeldNotice, Notice, ReweighPrompt } from "./faceoff-weight-check";
 
 /**
  * A timekeeper-mode athlete's ready actions (spec 4.2 Ready and Start;
@@ -24,7 +24,8 @@ import { Notice, ReweighPrompt } from "./faceoff-weight-check";
  *    never above them (PM31 (1)): it goes when the opponent's ready
  *    confirms my new weight, and above them its going moved TK-F4 up by its
  *    height, under a tap that then landed on `Doesn't look right` (Wave 3
- *    gate, T10).
+ *    gate, T10). Under them it keeps its slot until this prompt goes
+ *    (`HeldNotice`): content that shrinks below them moves them on Android.
  * The timekeeper is named through `clockRunnerName`: a read without their
  * name prints the role (TK-F1), never a blank (jits-o47s.27).
  */
@@ -98,8 +99,8 @@ function ReadyPrompt({ opp, timekeeper: tk }: { opp: string; timekeeper: Faceoff
           onPress={() => void w.check("flag")}
         />
       ) : null}
-      {/* Under the buttons, so its going moves neither (PM31 (1)). */}
-      {w.awaitingTheirRecheck ? <Notice testID="weight-await-recheck" text={SHIPPED_COPY.awaitRecheck(opp)} /> : null}
+      {/* Under the buttons, its slot held until this prompt goes, so its going moves neither (PM31 (1)). */}
+      <HeldNotice show={w.awaitingTheirRecheck} testID="weight-await-recheck" text={SHIPPED_COPY.awaitRecheck(opp)} />
       <Text className="font-body" style={[typeStep("body"), { alignSelf: "center", textAlign: "center", color: p.text2 }]}>
         {TIMEKEEPER_COPY["TK-F6"](clockRunnerName(tk.name))}
       </Text>

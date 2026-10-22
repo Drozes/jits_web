@@ -35,6 +35,7 @@ import {
   PLATFORM_ROLE_COLUMNS,
   putBackFailures,
   readRestoreRecord,
+  removeFriendshipsSql,
   recoverFixtures,
   RESTORE_FILE,
   roleOffProblem,
@@ -48,6 +49,7 @@ import {
   windowsSql,
   withAthleteColumns,
   withFlags,
+  withFriendships,
   withInviteCleanup,
   withWindows,
   type AthleteColumnIo,
@@ -76,7 +78,7 @@ import { PRACTICE_PARTNER, PRACTICE_UI, portraitIn } from "../sim/capture-screen
 import { appleScriptString, deviceNameIn, orientationOf, parseWindowSize, rotateScript } from "../sim/simctl";
 import { acquireRunLock, psProbe, readRunLock, RUN_LOCK_FILE, runLockRefusal, selfStarted, type ProcessIdentity, type RunLock } from "../lib/run-lock";
 import { onInterrupt, runCleanup } from "../lib/cleanup";
-import { errorFingerprint, exitCodeFor, pendingResult } from "../lib/results";
+import { errorFingerprint, exitCodeFor, finalStatus, oracleFingerprint, pendingResult, scenarioResult, type ScenarioRun } from "../lib/results";
 import { EnvError, ExpectationTimeout, HarnessError } from "../lib/util";
 import { SCENARIOS, NOT_IMPLEMENTED, scenariosForTier } from "../scenarios";
 import { TIMEKEEPER_COPY as C, SHIPPED_COPY } from "../../../apps/mobile/lib/match-flow/timekeeper-copy";
@@ -84,7 +86,7 @@ import { DOB_REQUIRED_COPY } from "../../../packages/shared/src/utils/invite-cop
 import { TK } from "../scenarios/timekeeper/tk-flows";
 import type { Config } from "../config";
 import { Trace } from "../bot/trace";
-import { frameContains, tapPoint, type AXElement, type Idb, type Query, type StillTiming } from "../sim/idb";
+import { frameContains, Idb, tapPoint, type AXElement, type Query, type StillTiming } from "../sim/idb";
 
 const ROOT = resolve(__dirname, "../../..");
 const src = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -224,6 +226,8 @@ test("a flag window whose put-back fails stops holding the flag: the leftover ON
  * review's reproduction), to check that a failing put-back never replaces it.
  */
 const bodyFailure = () => new ExpectationTimeout("the app never showed TK-D9", 10, null);
+/** How a fixture's trace names an error (`errorText` in fixtures/timekeeper.ts). */
+const errorTextOf = (e: Error) => `${e.name}: ${e.message}`;
 
 test("a flag window whose put-back fails after the scenario failed rethrows the scenario's error; the put-back rides along (M7 review)", async () => {
   const { io, db, failWrites } = fakeFlagIo({ [TK_ROLE_FLAG]: false });
@@ -446,6 +450,55 @@ test("nested fixtures that all fail to put back keep the scenario's error and li
   win.fail.re = null;
   await runCleanup();
   assert.equal(flags.db[TK_ROLE_FLAG], false);
+});
+
+/** The friendships T11 and T17 add: the insert answers with the pairs it created. */
+const FRIEND_PAIR: [string, string] = ["1111", "2222"];
+const friendsAnswer = (x: string) => (x.startsWith("with ins as") ? JSON.stringify([{ athlete_a: FRIEND_PAIR[0], athlete_b: FRIEND_PAIR[1] }]) : "DELETE 1");
+
+test("withFriendships adds the missing friendships, removes only the ones it added in the finally, and unhooks", async () => {
+  const { io, sql } = fakeSqlIo(friendsAnswer);
+  const notes: string[] = [];
+  assert.equal(await withFriendships(["2222", "1111"], async () => "ran", (what) => notes.push(what), io), "ran");
+  assert.deepEqual(sql, [addFriendshipsSql([FRIEND_PAIR]), removeFriendshipsSql([FRIEND_PAIR])]);
+  assert.deepEqual(notes, []);
+  await runCleanup();
+  assert.equal(sql.length, 2, "no hook left behind");
+  // A scenario that throws still has them removed.
+  sql.length = 0;
+  await assert.rejects(withFriendships(["1111", "2222"], async () => {
+    throw new Error("scenario failed");
+  }, undefined, io), /scenario failed/);
+  assert.equal(sql[sql.length - 1], removeFriendshipsSql([FRIEND_PAIR]));
+});
+
+test("withFriendships whose removal fails after the scenario failed rethrows the scenario's error, notes the failure and keeps its hook (W3FIX review minor 3)", async () => {
+  const { io, sql, fail } = fakeSqlIo(friendsAnswer);
+  const notes: { what: string; payload: unknown }[] = [];
+  const body = bodyFailure();
+  await assert.rejects(withFriendships(["1111", "2222"], async () => {
+    fail.re = /^delete from public\.athlete_friendships/;
+    throw body;
+  }, (what, payload) => notes.push({ what, payload }), io), (e: unknown) => e === body, "the body's error, unchanged");
+  assert.deepEqual(putBackFailures(body), ["friendships: Error: psql failed"]);
+  assert.deepEqual(notes, [
+    { what: "friendships_remove_failed", payload: { pairs: [FRIEND_PAIR], error: "psql failed" } },
+    { what: "friendships_body_error", payload: { error: errorTextOf(body) } },
+  ]);
+  fail.re = null;
+  await runCleanup();
+  assert.equal(sql.filter((x) => x === removeFriendshipsSql([FRIEND_PAIR])).length, 2, "the kept hook removed them at exit");
+});
+
+test("withFriendships whose removal alone fails throws the removal's error and keeps its hook", async () => {
+  const { io, sql, fail } = fakeSqlIo(friendsAnswer);
+  fail.re = /^delete from public\.athlete_friendships/;
+  const notes: string[] = [];
+  await assert.rejects(withFriendships(["1111", "2222"], async () => "ran", (what) => notes.push(what), io), /psql failed/);
+  assert.deepEqual(notes, ["friendships_remove_failed"]);
+  fail.re = null;
+  await runCleanup();
+  assert.equal(sql.filter((x) => x === removeFriendshipsSql([FRIEND_PAIR])).length, 2, "the kept hook removed them at exit");
 });
 
 test("Red's invite limits are create_invite's; a reached one is an env_error naming its HINT, checked before T17 runs", () => {
@@ -1306,6 +1359,38 @@ test("the weigh-in below the fold that turned disabled while scrolled into view 
   assert.deepEqual(taps, ["weight-confirm"]);
 });
 
+test("Ask is tapped where its row settled: a row that moved between the read and the tap is never missed for its neighbour (W3FIX review minor 3)", async () => {
+  const askRow = (name: string, y: number) => el({ AXLabel: C["TK-P7"].a11y(name), enabled: true, frame: { x: 300, y, width: 80, height: 44 } });
+  // Someone comes online right after the first read and sorts above Gold:
+  // the screen idb taps is `after`, where Green's Ask sits where Gold's was.
+  const before = [askRow("Dana Gold", 300), askRow("Gary Green", 360)];
+  const after = [askRow("Gary Green", 300), askRow("Dana Gold", 360)];
+  let reads = 0;
+  const hits: string[] = [];
+  const idb = {
+    screenH: 874,
+    screenW: 402,
+    async describe() {
+      reads++;
+      return reads === 1 ? before : after;
+    },
+    async tap(e: El) {
+      hits.push(after.find((x) => frameContains(x, tapPoint(e)))?.AXLabel ?? "nothing");
+    },
+    async scrollTo() {
+      throw new Error("the row is on screen");
+    },
+    onScreen() {
+      return true;
+    },
+  } as unknown as Idb;
+  const ui = new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 5, still: FAST_STILL });
+  // A tap at the first read's point would land on Green's row.
+  assert.equal(after.find((x) => frameContains(x, tapPoint(before[0])))?.AXLabel, C["TK-P7"].a11y("Gary Green"));
+  await ui.ask("Dana Gold", 2_000);
+  assert.deepEqual(hits, [C["TK-P7"].a11y("Dana Gold")], "one tap, on Gold's Ask where it settled");
+});
+
 test("weighIn alone stops on ready (T10 waits for TK-F7 there), with no TK-F4 press", async () => {
   const { ui, taps } = tkScripted(({ weigh }) => (weigh === 0 ? [stepMarker("Weights"), weighInBtn] : [stepMarker("Ready"), tkF4()]));
   assert.deepEqual(await ui.weighIn(2_000), { weighedIn: true, step: "ready" });
@@ -1603,6 +1688,51 @@ test("the exit code: fail, harness_error and env_error fail the run; pass, known
   }
 });
 
+test("known only when every failure is filed and no put-back failed: one new failure, or a failed put-back, keeps it fail (W3FIX review minor 3)", () => {
+  const known = new Map([["fp-a", "jits-aaa"], ["fp-b", "jits-bbb"]]);
+  assert.equal(finalStatus("fail", ["fp-a", "fp-b"], known, []), "known");
+  assert.equal(finalStatus("fail", ["fp-a", "fp-new"], known, []), "fail", "one new failure");
+  assert.equal(finalStatus("fail", ["fp-a"], known, ["windows: Error: psql failed"]), "fail", "a failed put-back is never filed");
+  assert.equal(finalStatus("fail", [], known, []), "fail", "nothing to match");
+  for (const other of ["pass", "harness_error", "env_error"] as const) assert.equal(finalStatus(other, ["fp-a"], known, []), other, other);
+});
+
+test("a scenario result: a known failure with a failed put-back stays fail, lists the put-back and fails the run; without it, known (W3FIX review minor 3)", () => {
+  const oracle = { id: "ui:tk-d9", ok: false, status: "fail" as const, expected: "TK-D9 on screen", actual: "absent" };
+  const fp = oracleFingerprint("T7", oracle);
+  const known = new Map([[fp, "jits-o47s.99"]]);
+  const run = (putBacks: string[]): ScenarioRun => ({
+    scenario: { id: "T7", title: "The timekeeper drops out", expectedFailure: undefined },
+    status: "fail",
+    steps: [],
+    oracles: [oracle, { id: "db:ok", ok: true, status: "skipped", expected: 1, actual: null }],
+    artifacts: {},
+    error: "ExpectationTimeout: the app never showed TK-D9",
+    putBacks,
+    ms: 12,
+  });
+  const withPutBack = scenarioResult(run(["windows: Error: psql failed"]), known);
+  assert.equal(withPutBack.status, "fail");
+  assert.deepEqual(withPutBack.putBackFailures, ["windows: Error: psql failed"]);
+  assert.equal(withPutBack.error, "ExpectationTimeout: the app never showed TK-D9", "the error stays the scenario's own");
+  assert.deepEqual(withPutBack.fingerprints, [fp]);
+  assert.equal(withPutBack.fingerprint, fp);
+  assert.deepEqual(withPutBack.knownBeads, [`${fp}=jits-o47s.99`]);
+  assert.deepEqual(withPutBack.skippedOracles, ["db:ok"]);
+  assert.equal(exitCodeFor([withPutBack]), 1);
+  const clean = scenarioResult(run([]), known);
+  assert.equal(clean.status, "known");
+  assert.equal("putBackFailures" in clean, false, "listed only when one failed");
+  assert.equal(exitCodeFor([clean]), 0);
+  // Died with no failed oracle: the error's fingerprint. A pass has none.
+  const died = scenarioResult({ ...run([]), oracles: [] }, known);
+  assert.deepEqual(died.fingerprints, [errorFingerprint("T7", "ExpectationTimeout: the app never showed TK-D9")]);
+  assert.equal(died.status, "fail");
+  assert.deepEqual(scenarioResult({ ...run([]), status: "pass", oracles: [] }, known).fingerprints, []);
+  // The runner builds every result this way, with the put-backs of the scenario's own error.
+  assert.match(src("tools/match-loop/run.ts"), /const putBacks = putBackFailures\(error\);\n\s+const result = scenarioResult\(\n\s+\{ scenario: s, status, [^}]*putBacks[^}]*\},\n\s+known,\n\s+\);/);
+});
+
 test("every runner start repairs a killed run, then refuses to run with timekeeper_role left on", () => {
   const run = src("tools/match-loop/run.ts");
   const recover = run.indexOf("await recoverFixtures()");
@@ -1844,6 +1974,37 @@ test("Blue's timekeeper-mode Confirm is pressed once, only once offered and enab
   assert.match(flows, /\.confirmOnce\(TK\.step\)\);\n\s+ctx\.eq\("ui:tk-confirm-one-press", 1, presses/);
   assert.match(flows, /await blueConfirmsOnce\(ctx, "Blue confirms"\);[^]*?waitStep\("summary", TK\.handshake\)/);
   assert.match(src("tools/match-loop/scenarios/timekeeper/t09-result-edit.ts"), /await blueConfirmsOnce\(ctx, "Blue confirms the \(wrong\) result"\);\n\s+await ctx\.step\("Blue reaches the verdict", \(\) => ctx\.ui\.waitStep\("summary", TK\.handshake\)\);/);
+});
+
+test("a Confirm that settles in the bottom band (the LogBox toast's) is never tapped there: it is scrolled into view first (W3FIX review minor 2)", async () => {
+  const confirmAt = (y: number) => el({ AXUniqueId: "confirm-result", AXLabel: "Confirm result", enabled: true, frame: { x: 16, y, width: 370, height: 56 } });
+  const taps: number[] = [];
+  let reads = 0;
+  let scrolled = false;
+  const idb = {
+    screenH: 874,
+    screenW: 402,
+    async describe() {
+      reads++;
+      // On screen in the first read; an edit landing then pushes it down into the bottom band.
+      return [stepMarker("Confirm"), confirmAt(scrolled ? 400 : reads === 1 ? 500 : 800)];
+    },
+    async tap(e: El) {
+      taps.push(e.frame.y);
+    },
+    async scrollTo() {
+      scrolled = true;
+      return confirmAt(400);
+    },
+    onScreen(e: El) {
+      return Idb.prototype.onScreen.call(this as unknown as Idb, e);
+    },
+  } as unknown as Idb;
+  assert.equal(idb.onScreen(confirmAt(500)), true);
+  assert.equal(idb.onScreen(confirmAt(800)), false, "the bottom band, where the dev build's LogBox toast lies");
+  const ui = new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 2, still: FAST_STILL });
+  assert.equal(await ui.confirmOnce(2_000), 1);
+  assert.deepEqual(taps, [400], "one press, after the scroll, never at 800");
 });
 
 test("the verdict wait after a timekeeper Confirm covers the send ceiling, the advance and a margin (PM29 (5))", () => {

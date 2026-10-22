@@ -13,13 +13,23 @@
  * centred column, content after the element can move it too, so this check
  * would pass while the control moves: do not use it there.
  *
+ * It also ignores the scroll offset. When a ScrollView's content shrinks,
+ * Android clamps the offset to the new end (react-native 0.81
+ * `ReactScrollView.onLayoutChange`; iOS does not), so for a user scrolled
+ * near the end, content AFTER the element that goes away moves the element
+ * down by its height even in a top-anchored layout. An unchanged prefix
+ * therefore says nothing about what goes after the element: also check that
+ * nothing after it shrinks, for example that a notice under the controls
+ * keeps its slot (`HeldNotice` in `faceoff-weight-check.tsx`; `renderedNode`
+ * below finds the slot to compare).
+ *
  * Each entry is one host node, `type` plus its props without callbacks, or
  * one text child, in depth-first reading order. The element itself and
  * everything after it are left out.
  */
 
 /** A host node as `toJSON()` returns it (the test renderer's JSON shape). */
-interface RenderedNode {
+export interface RenderedNode {
   type: string;
   props: Record<string, unknown>;
   children: (RenderedNode | string)[] | null;
@@ -57,6 +67,26 @@ export function renderedAbove(tree: Rendered, testID: string): string[] {
   walk(tree);
   if (!found) throw new Error(`renderedAbove: no element with testID "${testID}" on screen`);
   return out;
+}
+
+/** The host node with `testID` as `toJSON()` returns it, or throws when it is not on screen. */
+export function renderedNode(tree: Rendered, testID: string): RenderedNode {
+  const hits: RenderedNode[] = [];
+  const walk = (node: Rendered): void => {
+    if (hits.length > 0 || node == null || typeof node === "string") return;
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child);
+      return;
+    }
+    if (node.props?.testID === testID) {
+      hits.push(node);
+      return;
+    }
+    for (const child of node.children ?? []) walk(child);
+  };
+  walk(tree);
+  if (hits.length === 0) throw new Error(`renderedNode: no element with testID "${testID}" on screen`);
+  return hits[0];
 }
 
 /** The testIDs on screen, in reading order (for order checks). */

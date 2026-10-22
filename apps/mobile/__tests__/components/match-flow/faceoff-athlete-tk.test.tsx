@@ -94,7 +94,7 @@ import { __resetRecordingOptInForTests } from "@/lib/match-flow/recording-optin"
 import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 import { __resetRecordingIntentForTests } from "@/lib/match-flow/recording-intent";
 import { CH, OP, tkFlow, tkState } from "../../support/timekeeper-faceoff";
-import { renderedAbove, testIDsInOrder } from "../../support/rendered-above";
+import { renderedAbove, renderedNode, testIDsInOrder } from "../../support/rendered-above";
 
 const mockReconcile = jest.fn();
 const mockRefetch = jest.fn();
@@ -361,6 +361,57 @@ describe("the merged ready (TK-F4 to TK-F6)", () => {
     await flush();
     expect(s.queryByText(notice)).toBeNull();
     expect(renderedAbove(s.toJSON(), "weight-check-flag")).toEqual(before);
+  });
+
+  it("once shown, the waiting notice keeps its slot until the merged ready goes, so nothing under TK-F4 shrinks (PM31 (1); Android clamps the scroll)", async () => {
+    const notice = "Waiting for M. Reyes to check your new weight.";
+    const waiting = checksHandle([check(OP, CH, "pending"), check(CH, OP, "recheck")]);
+    const rechecked = checksHandle([check(OP, CH, "pending"), check(CH, OP, "confirmed")]);
+    const s = render(<Harness phase="ready" checks={waiting} />);
+    await flush();
+    const shown = renderedNode(s.toJSON(), "weight-await-recheck");
+    const aboveNotice = renderedAbove(s.toJSON(), "weight-await-recheck");
+    s.rerender(<Harness phase="ready" checks={rechecked} />);
+    await flush();
+    const held = renderedNode(s.toJSON(), "weight-await-recheck-held");
+    expect(held.props.style).toEqual({ opacity: 0 });
+    expect(held.props.accessibilityElementsHidden).toBe(true);
+    expect(held.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(s.queryByText(notice)).toBeNull();
+    // The same notice, so the same height, still between the flag and TK-F6.
+    expect(held.children).toEqual([{ ...shown, props: { ...shown.props, testID: undefined } }]);
+    expect(renderedAbove(s.toJSON(), "weight-await-recheck-held")).toEqual(aboveNotice);
+    s.getByText(C["TK-F6"]("J. Cruz"));
+    // Ready: the merged ready goes, and the slot with it.
+    s.rerender(<Harness phase="ready" state={tkState({ ready: [OP] })} checks={rechecked} />);
+    await flush();
+    s.getByTestId("merged-ready-waiting");
+    expect(s.queryByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeNull();
+    expect(s.queryByText(notice, { includeHiddenElements: true })).toBeNull();
+  });
+
+  it("a waiting notice that first shows while the merged ready is already on screen also keeps its slot (PM31 (1); Android clamps the scroll)", async () => {
+    // The read that says I wait for their re-check lands after the merged
+    // ready mounted (for example after the timekeeper's flag on me cleared).
+    const notice = "Waiting for M. Reyes to check your new weight.";
+    const s = render(<Harness phase="ready" />);
+    await flush();
+    s.getByTestId("merged-ready");
+    expect(s.queryByText(notice, { includeHiddenElements: true })).toBeNull();
+    expect(s.queryByTestId("weight-await-recheck-held", { includeHiddenElements: true })).toBeNull();
+    s.rerender(<Harness phase="ready" checks={checksHandle([check(OP, CH, "pending"), check(CH, OP, "recheck")])} />);
+    await flush();
+    const shown = renderedNode(s.toJSON(), "weight-await-recheck");
+    const aboveNotice = renderedAbove(s.toJSON(), "weight-await-recheck");
+    s.rerender(<Harness phase="ready" checks={checksHandle([check(OP, CH, "pending"), check(CH, OP, "confirmed")])} />);
+    await flush();
+    const held = renderedNode(s.toJSON(), "weight-await-recheck-held");
+    expect(held.props.style).toEqual({ opacity: 0 });
+    expect(held.props.accessibilityElementsHidden).toBe(true);
+    expect(held.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(s.queryByText(notice)).toBeNull();
+    expect(held.children).toEqual([{ ...shown, props: { ...shown.props, testID: undefined } }]);
+    expect(renderedAbove(s.toJSON(), "weight-await-recheck-held")).toEqual(aboveNotice);
   });
 });
 
