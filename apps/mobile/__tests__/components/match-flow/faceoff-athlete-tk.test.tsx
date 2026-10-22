@@ -302,7 +302,7 @@ describe("the merged ready (TK-F4 to TK-F6)", () => {
     }
   });
 
-  it("a weight hold refusal says the shipped Match on hold and re-reads; any other says Couldn't save your check (no server text)", async () => {
+  it("a weight hold refusal says the shipped Match on hold and re-reads; a moved-on refusal the shipped Couldn't save your check alone; any other adds the guidance (no server text; PM29)", async () => {
     mockMarkReady.mockResolvedValueOnce({ ok: false, error: { code: "WEIGHT_FLAGGED", message: "server words" } });
     const s = render(<Harness phase="ready" />);
     await flush();
@@ -311,10 +311,20 @@ describe("the merged ready (TK-F4 to TK-F6)", () => {
     expect(toast.info).toHaveBeenCalledWith({ text1: "Match on hold" });
     expect(mockRefetch).toHaveBeenCalled();
     expect(mockReconcile).toHaveBeenCalled();
-    mockMarkReady.mockResolvedValueOnce({ ok: false, error: { code: "TIMEKEEPER_REQUIRED", message: "server words" } });
+    // Moved on: the timekeeper left, or the match was cancelled. The re-read explains it.
+    for (const code of ["TIMEKEEPER_REQUIRED", "MATCH_NOT_PENDING"]) {
+      mockMarkReady.mockResolvedValueOnce({ ok: false, error: { code, message: "server words" } });
+      fireEvent.press(s.getByTestId("ready-button"));
+      await flush();
+      expect([code, (toast.error as jest.Mock).mock.lastCall]).toEqual([code, [{ text1: "Couldn't save your check" }]]);
+    }
+    // A failure the screen cannot explain.
+    mockMarkReady.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "server words" } });
     fireEvent.press(s.getByTestId("ready-button"));
     await flush();
-    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't save your check" });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't save your check", description: "Check your connection and try again." });
+    expect(toast.error).toHaveBeenCalledTimes(3);
+    expect(mockReconcile).toHaveBeenCalledTimes(4);
     expect(JSON.stringify((toast.error as jest.Mock).mock.calls)).not.toContain("server words");
   });
 
@@ -444,15 +454,34 @@ describe("no server text on this face-off (M-R4, spec 14.9 X1)", () => {
   const mockReweigh = jest.requireMock("@jits/shared/api/match-weight-checks").reweighForMatch as jest.Mock;
   const shown = () => JSON.stringify([(toast.error as jest.Mock).mock.calls, (toast.info as jest.Mock).mock.calls]);
 
-  it("a refused Doesn't look right says the shipped title alone and re-reads", async () => {
+  it("a refused Doesn't look right says the shipped title with the guidance (PM29) and re-reads", async () => {
     mockCheckOpponent.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "server words" } });
     const s = render(<Harness phase="ready" />);
     await flush();
     fireEvent.press(s.getByTestId("weight-check-flag"));
     await flush();
-    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't save your check" });
+    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't save your check", description: "Check your connection and try again." });
     expect(mockRefetch).toHaveBeenCalled();
     expect(mockReconcile).toHaveBeenCalled();
+    expect(shown()).not.toContain("server words");
+  });
+
+  it("a check or re-weigh refused because the match moved on (MATCH_NOT_PENDING: started or cancelled) says the shipped title alone, which is true, and re-reads (PM29)", async () => {
+    mockCheckOpponent.mockResolvedValue({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+    const s = render(<Harness phase="ready" />);
+    await flush();
+    fireEvent.press(s.getByTestId("weight-check-flag"));
+    await flush();
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't save your check" });
+    expect(mockReconcile).toHaveBeenCalled();
+    s.unmount();
+    mockReweigh.mockResolvedValue({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+    const t = render(<Harness phase="ready" state={tkState({ timekeeperChecks: [[OP, "flagged"]] })} />);
+    await flush();
+    fireEvent.changeText(t.getByTestId("weight-reweigh-input"), "171");
+    fireEvent.press(t.getByTestId("weight-reweigh-submit"));
+    await flush();
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't re-weigh" });
     expect(shown()).not.toContain("server words");
   });
 
@@ -466,7 +495,7 @@ describe("no server text on this face-off (M-R4, spec 14.9 X1)", () => {
     expect(shown()).not.toContain("server words");
   });
 
-  it("a refused Withdraw flag says the shipped title alone", async () => {
+  it("a refused Withdraw flag says the shipped title with the guidance (PM29)", async () => {
     mockCheckOpponent.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "server words" } });
     const checks = checksHandle([check(OP, CH, "flagged"), check(CH, OP, "confirmed")]);
     const s = render(<Harness phase="ready" checks={checks} />);
@@ -474,11 +503,11 @@ describe("no server text on this face-off (M-R4, spec 14.9 X1)", () => {
     fireEvent.press(s.getByTestId("weight-check-withdraw"));
     await flush();
     expect(mockCheckOpponent).toHaveBeenCalledWith({ tag: "client" }, "M1", "withdraw", undefined);
-    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't save your check" });
+    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't save your check", description: "Check your connection and try again." });
     expect(shown()).not.toContain("server words");
   });
 
-  it("a refused re-weigh after the timekeeper's flag (TK-F7) says the shipped title alone and re-reads", async () => {
+  it("a refused re-weigh after the timekeeper's flag (TK-F7) says the shipped title with the guidance (PM29) and re-reads", async () => {
     mockReweigh.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "server words" } });
     const s = render(<Harness phase="ready" state={tkState({ timekeeperChecks: [[OP, "flagged"]] })} />);
     await flush();
@@ -486,12 +515,12 @@ describe("no server text on this face-off (M-R4, spec 14.9 X1)", () => {
     fireEvent.press(s.getByTestId("weight-reweigh-submit"));
     await flush();
     expect(mockReweigh).toHaveBeenCalledWith({ tag: "client" }, "M1", 171);
-    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't re-weigh" });
+    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't re-weigh", description: "Check your connection and try again." });
     expect(mockReconcile).toHaveBeenCalled();
     expect(shown()).not.toContain("server words");
   });
 
-  it("a refused profile weight edit says the shipped title alone", async () => {
+  it("a refused profile weight edit says the shipped title with the guidance (PM29)", async () => {
     mockUpdateWeight.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "server words" } });
     const s = render(<Harness phase="weight" />);
     await flush();
@@ -500,7 +529,7 @@ describe("no server text on this face-off (M-R4, spec 14.9 X1)", () => {
     fireEvent.press(s.getByTestId("faceoff-weight-save"));
     await flush();
     expect(mockUpdateWeight).toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't update weight" });
+    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't update weight", description: "Check your connection and try again." });
     expect(shown()).not.toContain("server words");
   });
 });

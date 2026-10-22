@@ -163,7 +163,7 @@ describe("an athlete's Leave (cancel_for_all, the default)", () => {
     ["the crew step (nobody seated, no policy passed)", {}],
     ["the athlete face-off once a timekeeper is seated", { leave: "cancel_for_all", roles: athleteRoles(SEATED) }],
   ] as [string, Policy][])(
-    "timekeeper mode, %s: a refused cancel shows the shipped title alone and re-reads (M-R4)",
+    "timekeeper mode, %s: a cancel refused because the match moved on (it started) shows the shipped title alone, which is true, and re-reads (M-R4, PM29)",
     async (_name, policy) => {
       mockCancel.mockResolvedValue({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "This match has already been started." } });
       const { result, cancelledRef } = setup(policy, false, "a-1");
@@ -174,6 +174,23 @@ describe("an athlete's Leave (cancel_for_all, the default)", () => {
       expect(cancelledRef.current).toBe(false);
       expect(result.current.cancelling).toBe(false);
       expect(mockDismissTo).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["the crew step (nobody seated, no policy passed)", {}],
+    ["the athlete face-off once a timekeeper is seated", { leave: "cancel_for_all", roles: athleteRoles(SEATED) }],
+  ] as [string, Policy][])(
+    "timekeeper mode, %s: a cancel that failed for another reason adds the guidance (PM29), never the server's text",
+    async (_name, policy) => {
+      mockCancel.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "boom" } });
+      const { result, cancelledRef } = setup(policy, false, "a-1");
+      await leaveAndAnswer(result);
+      expect(mockToast.error).toHaveBeenCalledTimes(1);
+      expect(mockToast.error).toHaveBeenCalledWith({ text1: "Could not cancel", description: "Check your connection and try again." });
+      expect(reconcileNow).toHaveBeenCalledTimes(1);
+      expect(cancelledRef.current).toBe(false);
+      expect(result.current.cancelling).toBe(false);
     },
   );
 

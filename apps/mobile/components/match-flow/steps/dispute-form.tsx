@@ -2,16 +2,19 @@ import * as React from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { typeSize } from "@/lib/typography";
 import { AlertTriangle } from "lucide-react-native";
-import { toast } from "@/components/ui/toast";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { useAmber } from "@/components/match-detail/use-amber";
-import { matchHaptics } from "@/lib/match-flow/use-haptics";
+import { useDisputeSubmit, type DisputeTimekeeperMode } from "@/lib/match-flow/use-dispute-submit";
 import { Button } from "@/components/ui/elo-system/button";
-import { supabase } from "@/lib/supabase/client";
-import { disputeMatchResult } from "@jits/shared/api/mutations";
 
 interface DisputeFormProps {
   matchId: string;
+  /**
+   * Timekeeper mode only (PM29; the confirm step passes it): the edit count
+   * of the result on screen, and a re-read of the match. Omitted: the shipped
+   * form, exactly.
+   */
+  timekeeperMode?: DisputeTimekeeperMode;
   onCancel: () => void;
   onSubmitted: () => void;
   /** The 24 h dispute window had already closed (hint dispute_window_closed). */
@@ -29,30 +32,17 @@ interface DisputeFormProps {
  * ELO design system: meta heading + amber warning glyph (a dispute is
  * pressure, not a loss) + textarea with hairline border + Signal Red
  * primary cta and underlined back.
+ *
+ * The submit, and timekeeper mode's honest press (`timekeeperMode`, PM29:
+ * bounded, no DomainError message, moved on closes the form, TK-RC4 once per
+ * edit), live in `useDisputeSubmit`; this file is the view and the typed
+ * reason.
  */
-export function DisputeForm({ matchId, onCancel, onSubmitted, onWindowClosed }: DisputeFormProps) {
+export function DisputeForm({ matchId, timekeeperMode, onCancel, onSubmitted, onWindowClosed }: DisputeFormProps) {
   const tokens = useThemedTokens();
   const amberIcon = useAmber().icon;
   const [reason, setReason] = React.useState("");
-  const [submitting, setSubmitting] = React.useState(false);
-
-  async function handleSubmit() {
-    if (submitting) return;
-    setSubmitting(true);
-    const res = await disputeMatchResult(supabase, matchId, reason || undefined);
-    if (!res.ok) {
-      setSubmitting(false);
-      void matchHaptics.error();
-      if (res.error.code === "DISPUTE_WINDOW_CLOSED") {
-        toast.error({ text1: "Dispute window closed", description: res.error.message });
-        onWindowClosed?.();
-        return;
-      }
-      toast.error({ text1: "Couldn't dispute", description: res.error.message });
-      return;
-    }
-    onSubmitted();
-  }
+  const { submitting, submit } = useDisputeSubmit({ matchId, timekeeperMode, onCancel, onSubmitted, onWindowClosed });
 
   return (
     <View className="gap-4 px-1 py-4">
@@ -86,7 +76,7 @@ export function DisputeForm({ matchId, onCancel, onSubmitted, onWindowClosed }: 
         label={submitting ? "Submitting..." : "Submit Dispute"}
         height={44}
         disabled={submitting}
-        onPress={handleSubmit}
+        onPress={() => void submit(reason)}
       />
 
       <Pressable

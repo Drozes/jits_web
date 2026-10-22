@@ -10,6 +10,7 @@ import type { SubmissionType } from "@jits/shared/types/submission-type";
 import { useMatchSyncContext, useStepMatchSync } from "@/lib/match-flow/match-sync-context";
 import { SHIPPED_COPY, TIMEKEEPER_COPY } from "@/lib/match-flow/timekeeper-copy";
 import { parseFinishTime } from "@/lib/match-flow/parse-finish-time";
+import { useSendCeiling } from "@/lib/match-flow/send-timing";
 import type { MatchAthleteView } from "@/lib/match-flow/match-roles";
 import type { ResultFormInitial, ResultSubmission } from "@/lib/match-flow/use-result-form";
 import { usePalette } from "@/lib/theme/palette";
@@ -224,9 +225,15 @@ export interface ResultEditFormProps {
  * unchanged save as an edit (a new count, both confirmations deleted, TK-N9
  * and TK-RC1 sending both athletes back to confirm) with nothing changed.
  * Saved: TK-ED4 and back to the done screen; the athletes are back on
- * confirm. Refused: TK-ED7, and back when the edit can no longer succeed.
- * Back (the shipped dispute form's, deck Current flow A4) leaves without
- * saving.
+ * confirm. Refused: TK-ED7, and back when the edit can no longer succeed;
+ * a failure that leaves the form open (a network error, an unknown refusal)
+ * adds `Check your connection and try again.` (PM29). The save is bounded
+ * (`SEND_CEILING_MS`, PM29): Back is disabled while it is out, so a dead
+ * socket would strand the timekeeper on the form; at the ceiling it ends as
+ * that failure, with Back and Save back and the form still open (a reply
+ * after that, or after the form closed, is dropped; the done screen's reads
+ * show a late landing). Back (the shipped dispute form's, deck Current flow
+ * A4) leaves without saving.
  *
  * The count is the one the form opened on, never a newer one read while it
  * is open: the form still shows the values it opened with, and saving them
@@ -237,20 +244,23 @@ export function ResultEditForm({ matchId, athletes, clock, submissionTypes, subm
   const { reconcileNow } = useMatchSyncContext();
   const [openedOn] = React.useState(recorded);
   const [busy, setBusy] = React.useState(false);
+  const ceiling = useSendCeiling();
   const pair = { a: athletes[0].shortName, b: athletes[1].shortName };
 
   async function save(v: ResultSubmission) {
     if (busy) return;
     setBusy(true);
     const submission = v.outcome === "submission";
-    const res = await editMatchResult(supabase, {
-      matchId,
-      result: v.outcome,
-      winnerId: submission ? v.winnerId : null,
-      submissionTypeCode: submission ? v.submissionCode : null,
-      finishTimeSeconds: submission ? parseFinishTime(v.finishTimeStr) : null,
-      expectedEditCount: openedOn.editCount,
-    });
+    const res = await ceiling.within(
+      editMatchResult(supabase, {
+        matchId,
+        result: v.outcome,
+        winnerId: submission ? v.winnerId : null,
+        submissionTypeCode: submission ? v.submissionCode : null,
+        finishTimeSeconds: submission ? parseFinishTime(v.finishTimeStr) : null,
+        expectedEditCount: openedOn.editCount,
+      }),
+    );
     setBusy(false);
     reconcileNow();
     if (res.ok) {
@@ -260,8 +270,13 @@ export function ResultEditForm({ matchId, athletes, clock, submissionTypes, subm
       onClose();
       return;
     }
-    toast.error({ text1: TIMEKEEPER_COPY["TK-ED7"] });
-    if (CLOSES_FORM.has(res.error.code)) onClose();
+    // A refusal that closes the form: the done screen says why (TK-ED5, TK-ED6, TK-ED8).
+    if (CLOSES_FORM.has(res.error.code)) {
+      toast.error({ text1: TIMEKEEPER_COPY["TK-ED7"] });
+      onClose();
+      return;
+    }
+    toast.error({ text1: TIMEKEEPER_COPY["TK-ED7"], description: SHIPPED_COPY.checkConnection });
   }
 
   return (

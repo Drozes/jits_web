@@ -60,6 +60,7 @@ import { ResultForm } from "@/components/match-flow/steps/result-form";
 import { MatchFlowProvider } from "@/lib/match-flow/match-flow-context";
 import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
+import { SEND_CEILING_MS } from "@/lib/match-flow/send-timing";
 
 const NOW = Date.parse("2026-10-20T12:10:00Z");
 
@@ -278,6 +279,7 @@ describe("the edit form", () => {
     s.getByTestId("timekeeper-done");
   });
 
+  // A refusal that closes the form keeps TK-ED7 alone: the done screen says why (PM29 leaves these unchanged).
   it.each([
     "EDIT_WINDOW_CLOSED",
     "EDIT_CLOSED_DISPUTED",
@@ -304,28 +306,63 @@ describe("the edit form", () => {
     },
   );
 
-  it("a refusal the timekeeper can fix (INVALID_RESULT, invalid_finish_time): TK-ED7 and the form stays", async () => {
+  it("a refusal the timekeeper can fix (INVALID_RESULT, invalid_finish_time): TK-ED7 with the guidance (PM29) and the form stays", async () => {
     mockEdit.mockResolvedValue({ ok: false, error: { code: "INVALID_RESULT", message: "server words" } });
     const s = openEdit();
     changeFinish(s);
     await act(async () => {
       fireEvent.press(s.getByTestId("result-record"));
     });
-    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't change the result" });
+    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't change the result", description: "Check your connection and try again." });
     s.getByTestId("timekeeper-done-edit");
     expect(s.queryByText("server words")).toBeNull();
   });
 
-  it("a failure that a retry can fix (offline): TK-ED7 and the form stays", async () => {
+  it("a failure that a retry can fix (offline): TK-ED7 with the guidance (PM29) and the form stays", async () => {
     mockEdit.mockResolvedValue({ ok: false, error: { code: "UNKNOWN", message: "Network request failed" } });
     const s = openEdit();
     changeFinish(s);
     await act(async () => {
       fireEvent.press(s.getByTestId("result-record"));
     });
-    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't change the result" });
+    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't change the result", description: "Check your connection and try again." });
     s.getByTestId("timekeeper-done-edit");
     expect(s.queryByText("Network request failed")).toBeNull();
+  });
+
+  it("no reply (PM29): Saving... and Back disabled until the ceiling; then TK-ED7 with the guidance, Save and Back back, the form still open, and a late reply is dropped", async () => {
+    let reply: (v: unknown) => void = () => {};
+    mockEdit.mockReturnValue(new Promise((r) => (reply = r)));
+    const s = openEdit();
+    changeFinish(s);
+    await act(async () => {
+      fireEvent.press(s.getByTestId("result-record"));
+    });
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS - 1);
+    });
+    s.getByText("Saving...");
+    expect(s.getByTestId("result-edit-back").props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(mockToast.error).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(mockToast.error).toHaveBeenCalledTimes(1);
+    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Couldn't change the result", description: "Check your connection and try again." });
+    expect(mockReconcile).toHaveBeenCalledTimes(1);
+    s.getByTestId("timekeeper-done-edit");
+    s.getByText("Save changes");
+    expect(s.getByTestId("result-record").props.accessibilityState).toEqual(expect.objectContaining({ disabled: false, busy: false }));
+    expect(s.getByTestId("result-edit-back").props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
+    // The save lands late: dropped here (the done screen's reads show it).
+    await act(async () => {
+      reply({ ok: true, data: { resultEditCount: 3 } });
+    });
+    expect(mockToast.success).not.toHaveBeenCalled();
+    s.getByTestId("timekeeper-done-edit");
+    // Back works.
+    fireEvent.press(s.getByTestId("result-edit-back"));
+    s.getByTestId("timekeeper-done");
   });
 
   it("a second save while the first is in flight sends nothing more", async () => {

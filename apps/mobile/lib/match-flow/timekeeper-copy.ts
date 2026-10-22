@@ -319,6 +319,13 @@ export const SHIPPED_COPY = {
   disputed: "DISPUTED",
   /** A4: the dispute form's way back (`steps/dispute-form.tsx`), also the timekeeper's edit form (B13). */
   back: "Back",
-  /** A4: the confirm's error toast title (`lib/match-flow/use-confirm-result.ts`); timekeeper mode adds no description (M-R4). */
+  /** A4: the confirm's error toast title (`lib/match-flow/use-confirm-result.ts`); timekeeper mode adds `checkConnection` (PM29), never a DomainError message (M-R4). */
   couldNotConfirm: "Couldn't confirm",
+  /**
+   * PM29 (COPY-DECK Round 9): the description under the shipped failure title of a
+   * timekeeper-mode press that failed for a reason the screen cannot show (a network
+   * error, an unknown refusal, or no reply within `SEND_CEILING_MS`). Shipped on
+   * `app/(app)/friends.tsx` and `components/invite/booked-strip.tsx`.
+   */
+  checkConnection: "Check your connection and try again.",
 } as const;

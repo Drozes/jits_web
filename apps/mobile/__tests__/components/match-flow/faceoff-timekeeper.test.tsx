@@ -70,6 +70,7 @@ import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import { stepSeams } from "@/lib/match-flow/step-seams";
 import { TIMEKEEPER_COPY as C } from "@/lib/match-flow/timekeeper-copy";
 import { CHECK_ECHO_HOLD_MS } from "@/lib/match-flow/use-timekeeper-checks";
+import { SEND_CEILING_MS } from "@/lib/match-flow/send-timing";
 import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 import { CH, OP, TK, timekeeperFaceoffProps, tkFlow, tkState } from "../../support/timekeeper-faceoff";
 
@@ -229,19 +230,28 @@ describe("the timekeeper's weight verdicts (R11; sub-flag on and off, A19)", () 
     }
   });
 
-  it("a refusal says the shipped words only, never the server's, and re-reads", async () => {
+  it("a refusal says the shipped words only (a moved-on refusal the title alone, a failure with the guidance, PM29), never the server's, and re-reads", async () => {
     mockCheck.mockResolvedValueOnce({ ok: false, error: { code: "WEIGHT_CHANGED", message: "server words" } });
     const s = render(<Screen />);
     await flush();
     fireEvent.press(s.getByTestId(`faceoff-athlete-confirm-${CH}`));
     await flush();
     expect(toast.info).toHaveBeenCalledWith({ text1: "Weight changed" });
+    // Moved on: the match started or was cancelled. The re-read explains it.
     mockCheck.mockResolvedValueOnce({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
     fireEvent.press(s.getByTestId(`faceoff-athlete-confirm-${CH}`));
     await flush();
-    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't save your check" });
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't save your check" });
     expect(mockReconcile).toHaveBeenCalledTimes(2);
     expect(s.getByTestId(`faceoff-athlete-confirm-${CH}`).props.accessibilityState).toMatchObject({ busy: false });
+    // A failure the screen cannot explain.
+    mockCheck.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "server words" } });
+    fireEvent.press(s.getByTestId(`faceoff-athlete-confirm-${CH}`));
+    await flush();
+    expect(toast.error).toHaveBeenLastCalledWith({ text1: "Couldn't save your check", description: "Check your connection and try again." });
+    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(mockReconcile).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify([(toast.error as jest.Mock).mock.calls, (toast.info as jest.Mock).mock.calls])).not.toContain("server words");
   });
 });
 
@@ -351,6 +361,165 @@ describe("Start (TK-K6): the server's blocker order, then the camera", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  describe("PM29: an honest Start", () => {
+    const OPEN = { ready: [CH, OP], timekeeperChecks: [[CH, "confirmed"], [OP, "confirmed"]] as [string, "confirmed"][], startBlockers: [] };
+
+    it.each([
+      ["a blocker refusal (the reason line says why)", "WEIGHT_FLAGGED", { text1: "Couldn't start match" }],
+      ["any other failure", "UNKNOWN", { text1: "Couldn't start match", description: "Check your connection and try again." }],
+    ])("%s: the toast, Start back, a re-read", async (_name, code, toastArgs) => {
+      mockStart.mockResolvedValue({ ok: false, error: { code, message: "server words" } });
+      const s = render(<Screen state={tkState(OPEN)} />);
+      await flush();
+      fireEvent.press(s.getByTestId("faceoff-start"));
+      await flush();
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      expect(toast.error).toHaveBeenCalledWith(toastArgs);
+      expect(mockReconcile).toHaveBeenCalled();
+      s.getByTestId("faceoff-start");
+    });
+
+    it("moved on (MATCH_NOT_PENDING: the match already started): no toast, a re-read, and Leave stays hidden until the read moves the screen", async () => {
+      mockStart.mockResolvedValue({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+      const s = render(<Screen state={tkState(OPEN)} />);
+      await flush();
+      s.getByTestId("faceoff-leave");
+      fireEvent.press(s.getByTestId("faceoff-start"));
+      await flush();
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(mockReconcile).toHaveBeenCalled();
+      // A Leave now would make a started match a timekeeper_left no contest.
+      expect(s.queryByTestId("faceoff-leave")).toBeNull();
+      expect(mockLeave).not.toHaveBeenCalled();
+    });
+
+    it("a retry refused as already started while the first call is still out, then the first call's late failure: Leave never comes back", async () => {
+      jest.useFakeTimers();
+      try {
+        let first!: (v: unknown) => void;
+        let second!: (v: unknown) => void;
+        mockStart.mockReturnValueOnce(new Promise((r) => (first = r))).mockReturnValueOnce(new Promise((r) => (second = r)));
+        const s = render(<Screen state={tkState(OPEN)} />);
+        await flush();
+        fireEvent.press(s.getByTestId("faceoff-start"));
+        await flush();
+        await act(async () => {
+          jest.advanceTimersByTime(SEND_CEILING_MS);
+        });
+        fireEvent.press(s.getByTestId("faceoff-start"));
+        await flush();
+        expect(mockStart).toHaveBeenCalledTimes(2);
+        // The retry meets a match that is no longer pending: no toast, a re-read, no Leave.
+        await act(async () => {
+          second({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+        });
+        await flush();
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(s.queryByTestId("faceoff-leave")).toBeNull();
+        // The first call's reply was lost: it fails late. Still no Leave, and nothing more is said.
+        await act(async () => {
+          first({ ok: false, error: { code: "UNKNOWN", message: "network" } });
+        });
+        await flush();
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(s.queryByTestId("faceoff-leave")).toBeNull();
+        expect(mockLeave).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("no reply: Starting just before the ceiling; at it Couldn't start match with the guidance and Start back, while Leave stays hidden until that call answers", async () => {
+      jest.useFakeTimers();
+      try {
+        let answer!: (v: unknown) => void;
+        mockStart.mockReturnValueOnce(new Promise((r) => (answer = r)));
+        const s = render(<Screen state={tkState(OPEN)} />);
+        await flush();
+        fireEvent.press(s.getByTestId("faceoff-start"));
+        await flush();
+        await act(async () => {
+          jest.advanceTimersByTime(SEND_CEILING_MS - 1);
+        });
+        s.getByText("STARTING MATCH...");
+        expect(toast.error).not.toHaveBeenCalled();
+        const reads = mockReconcile.mock.calls.length;
+        await act(async () => {
+          jest.advanceTimersByTime(1);
+        });
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't start match", description: "Check your connection and try again." });
+        expect(mockReconcile.mock.calls.length).toBeGreaterThan(reads);
+        expect(s.getByTestId("faceoff-start").props.accessibilityState.disabled).toBe(false);
+        // That Start might still land: no Leave yet.
+        expect(s.queryByTestId("faceoff-leave")).toBeNull();
+        // It answers (refused): nothing more is said, and Leave is back.
+        await act(async () => {
+          answer({ ok: false, error: { code: "UNKNOWN", message: "server words" } });
+        });
+        await flush();
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        s.getByTestId("faceoff-leave");
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("a retry after the ceiling while the first call is still out: Leave waits for both; a late landing keeps it gone and the retry's refusal is silent", async () => {
+      jest.useFakeTimers();
+      try {
+        let first!: (v: unknown) => void;
+        let second!: (v: unknown) => void;
+        mockStart.mockReturnValueOnce(new Promise((r) => (first = r))).mockReturnValueOnce(new Promise((r) => (second = r)));
+        const s = render(<Screen state={tkState(OPEN)} />);
+        await flush();
+        fireEvent.press(s.getByTestId("faceoff-start"));
+        await flush();
+        await act(async () => {
+          jest.advanceTimersByTime(SEND_CEILING_MS);
+        });
+        fireEvent.press(s.getByTestId("faceoff-start"));
+        await flush();
+        expect(mockStart).toHaveBeenCalledTimes(2);
+        s.getByText("STARTING MATCH...");
+        // The first Start lands late: the match started.
+        await act(async () => {
+          first({ ok: true, data: { startedAt: "2026-10-21T12:06:00.000Z" } });
+        });
+        await flush();
+        expect(mockSend.broadcastTimerStarted).toHaveBeenCalledWith("2026-10-21T12:06:00.000Z", TK);
+        expect(s.queryByTestId("faceoff-leave")).toBeNull();
+        // The retry meets the started match: no toast; Leave stays gone.
+        await act(async () => {
+          second({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+        });
+        await flush();
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(s.queryByTestId("faceoff-leave")).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("unmounted with a Start out: the ceiling timer is cleared and nothing shows", async () => {
+      jest.useFakeTimers();
+      try {
+        mockStart.mockReturnValueOnce(new Promise(() => undefined));
+        const s = render(<Screen state={tkState(OPEN)} />);
+        await flush();
+        fireEvent.press(s.getByTestId("faceoff-start"));
+        await flush();
+        s.unmount();
+        await act(async () => {
+          jest.advanceTimersByTime(SEND_CEILING_MS * 2);
+        });
+        expect(toast.error).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });
 

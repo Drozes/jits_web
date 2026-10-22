@@ -24,6 +24,14 @@ const EXPECTED: Record<TimekeeperWeightVerdict, TimekeeperCheckStatus> = {
   withdraw: "confirmed",
 };
 
+/**
+ * `match_not_pending`: the match started or was cancelled. The shipped
+ * `Couldn't save your check` alone, which is true, and the re-read moves the
+ * screen; only a failure the screen cannot explain adds `Check your
+ * connection and try again.` (PM29, UX spec 5.5).
+ */
+const MOVED_ON = "MATCH_NOT_PENDING";
+
 /** `calling` while the RPC is in flight, then the status the state should show. */
 type Awaiting = Record<string, "calling" | TimekeeperCheckStatus>;
 
@@ -34,7 +42,8 @@ type Awaiting = Record<string, "calling" | TimekeeperCheckStatus>;
  * weight on screen (PM26; the server refuses any other as WEIGHT_CHANGED).
  * The state stays the truth: a row is busy from the tap until the state read
  * shows the verdict (never an optimistic one of its own). A refusal says the
- * shipped `Weight changed` or `Couldn't save your check` once and re-reads
+ * shipped `Weight changed`, or `Couldn't save your check` (with `Check your
+ * connection and try again.` unless the match moved on, PM29), once and re-reads
  * the match (`reconcileNow`); the timekeeper-mode state itself (the rows,
  * the rated weights) follows on its realtime rows or its next poll, since
  * the wizard re-reads it at once only on a step change.
@@ -94,7 +103,8 @@ export function useTimekeeperChecks({ matchId, state }: { matchId: string; state
         if (!res.ok) {
           release(subjectId);
           if (res.error.code === "WEIGHT_CHANGED") toast.info({ text1: SHIPPED_COPY.weightChanged });
-          else toast.error({ text1: SHIPPED_COPY.couldNotSaveCheck });
+          else if (res.error.code === MOVED_ON) toast.error({ text1: SHIPPED_COPY.couldNotSaveCheck });
+          else toast.error({ text1: SHIPPED_COPY.couldNotSaveCheck, description: SHIPPED_COPY.checkConnection });
           reconcileNow();
           return;
         }

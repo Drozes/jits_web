@@ -7,7 +7,9 @@
  * shipped two-athlete file that gained a timekeeper-mode branch in slice M5
  * (the confirm step and its `useConfirmResult`, `useRecordResult`) does
  * neither, so that guard cannot see it, although its timekeeper-mode branch
- * toasts on the same refusal.
+ * toasts on the same refusal. PM29 gave the shipped dispute form, which the
+ * confirm step opens, the same kind of branch (its `timekeeperMode` prop),
+ * and its submit moved into `useDisputeSubmit`, which holds the toasts.
  *
  * The scope is an explicit list of the files M5 owns and changed, never a
  * repo-wide search by identifier: other slices (M1, M3, M4) keep their
@@ -26,11 +28,13 @@ import { join } from "node:path";
 
 const APP = join(__dirname, "..", "..", "..");
 
-/** The shared files slice M5 gave a timekeeper-mode branch. */
+/** The shared files slice M5 (and PM29, the dispute form and its submit hook) gave a timekeeper-mode branch. */
 const M5_SHARED_FILES = [
   join("components/match-flow/steps", "confirm-step.tsx"),
   join("lib/match-flow", "use-confirm-result.ts"),
   join("lib/match-flow", "use-record-result.ts"),
+  join("components/match-flow/steps", "dispute-form.tsx"),
+  join("lib/match-flow", "use-dispute-submit.ts"),
 ];
 
 /** The same patterns as `timekeeper-mode-guard.test.ts` (M-R4). */
@@ -54,7 +58,7 @@ describe("M-R4 in the shared steps M5 gave a timekeeper-mode branch", () => {
     expect(found).toEqual([]);
   });
 
-  it("covers the confirm step, useConfirmResult and useRecordResult: each still branches on timekeeper mode and is not already guarded by import", () => {
+  it("covers the confirm step, useConfirmResult, useRecordResult, the dispute form and useDisputeSubmit: each still branches on timekeeper mode and is not already guarded by import", () => {
     for (const rel of M5_SHARED_FILES) {
       const text = read(rel);
       expect([rel, TK_BRANCH.test(text), TK_SURFACE_IMPORT.test(text)]).toEqual([rel, true, false]);

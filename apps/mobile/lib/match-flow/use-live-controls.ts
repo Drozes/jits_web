@@ -3,12 +3,15 @@ import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
 import { pauseMatch, resumeMatch } from "@jits/shared/api/mutations";
 import { getMatchDetails } from "@jits/shared/api/queries";
+import type { DomainError } from "@jits/shared/api/errors";
 import type { useSessionMatchSync } from "@jits/shared/hooks/use-session-match-sync";
 // From the protocol module, not the hook module: tests mock the hook module.
 import { settleWithin } from "@jits/shared/hooks/session-match-channel";
 import { SEND_GRACE_MS, useMatchSyncContext } from "./match-sync-context";
 import type { MatchCaps } from "./match-roles";
-import { endClockAsTimekeeper } from "./timekeeper-actions";
+import { PRESS_COPY } from "./press-copy";
+import { useSendCeiling } from "./send-timing";
+import { clockMovedOn, endClockAsTimekeeper } from "./timekeeper-actions";
 import { useTimekeeperLiveLeave } from "./use-timekeeper-live-leave";
 import type { useSessionMatchTimer } from "@jits/shared/hooks/use-session-match-timer";
 
@@ -59,6 +62,12 @@ interface UseLiveControlsParams {
  * always did. In timekeeper mode a broadcast is only a hint: the receivers
  * re-read the DB (M-R8), which `end_match_clock`, `pause_match` and
  * `resume_match` have already changed by the time the broadcast goes out.
+ * PM29: on a server-run clock a pause or resume is bounded
+ * (`SEND_CEILING_MS`): a dead call kept every control disabled, End too,
+ * until the server's auto-end at full time. At the ceiling it ends as a
+ * failure and the controls come back; a retry is safe, since the
+ * already-paused and not-paused recoveries below read the DB and apply its
+ * state, and the DB reads resync the clock if the late call landed.
  */
 export function useLiveControls({
   matchId,
@@ -70,6 +79,7 @@ export function useLiveControls({
   onLeftSeat,
 }: UseLiveControlsParams) {
   const { reconcileNow, timekeeperModeSelfId: actorId } = useMatchSyncContext();
+  const ceiling = useSendCeiling();
   const [busy, setBusyState] = React.useState<Action | null>(null);
   // The leave confirmation lands later than the render that showed it.
   const busyRef = React.useRef<Action | null>(null);
@@ -149,30 +159,43 @@ export function useLiveControls({
    * A pause or resume that failed: the shipped toast. On a server-run clock
    * (the timekeeper) the refusal may come from a timekeeper-mode branch whose
    * text is the server's own (the clock already ended at full time), which a
-   * timekeeper-mode screen never shows (M-R4): the shipped title alone, and a
-   * re-read so the DB moves the screen if the match moved on.
+   * timekeeper-mode screen never shows (M-R4), and a re-read so the DB moves
+   * the screen if the match moved on. A refusal that says the clock is no
+   * longer running here (`clockMovedOn`: the clock ended, a no contest, the
+   * seat gone) is the shipped title alone, which is true; anything the screen
+   * cannot explain (a network error, no reply within the ceiling, an unknown
+   * refusal, or an already-state refusal whose recovery read failed,
+   * `unread`) adds `Check your connection and try again.` (PM29).
    */
   const failed = React.useCallback(
-    (title: string, message: string) => {
+    (title: string, error: DomainError, unread: boolean) => {
       if (endVia === "broadcast") {
-        toast.error({ text1: title, description: message });
+        toast.error({ text1: title, description: error.message });
         return;
       }
-      toast.error({ text1: title });
+      toast.error(!unread && clockMovedOn(error) ? { text1: title } : { text1: title, description: PRESS_COPY.checkConnection });
       reconcileNow();
     },
     [endVia, reconcileNow],
+  );
+
+  /** A pause or resume call: on a server-run clock bounded by the ceiling (PM29); the two-athlete clock calls as shipped. */
+  const send = React.useCallback(
+    <T,>(call: Promise<T>) => (endVia === "broadcast" ? call : ceiling.within(call)),
+    [ceiling, endVia],
   );
 
   const handlePauseResume = React.useCallback(async () => {
     if (busy || endedRef.current) return;
     if (timer.paused) {
       setBusy("resume");
-      const res = await resumeMatch(supabase, matchId);
+      const res = await send(resumeMatch(supabase, matchId));
       setBusy(null);
       // The match ended while the RPC was in flight (the opponent's
       // match_ended): apply nothing, broadcast nothing, toast nothing.
       if (endedRef.current) return;
+      // Set when the recovery read below fails: this phone then cannot tell what the clock is doing.
+      let unread = false;
       if (!res.ok && res.error.code === "MATCH_NOT_PAUSED") {
         // The match is already running (a resume we missed, e.g. the
         // opponent's broadcast was lost). Take the running state from the
@@ -186,9 +209,10 @@ export function useLiveControls({
           });
           return;
         }
+        unread = fresh == null;
       }
       if (!res.ok) {
-        failed("Couldn't resume", res.error.message);
+        failed("Couldn't resume", res.error, unread);
         return;
       }
       timer.syncFromBroadcast({ type: "resumed", totalPausedDuration: res.data.total_paused_duration });
@@ -196,9 +220,10 @@ export function useLiveControls({
       else sync.broadcastTimerResumed(res.data.total_paused_duration);
     } else {
       setBusy("pause");
-      const res = await pauseMatch(supabase, matchId);
+      const res = await send(pauseMatch(supabase, matchId));
       setBusy(null);
       if (endedRef.current) return;
+      let unread = false;
       if (!res.ok && res.error.code === "MATCH_NOT_IN_PROGRESS") {
         // pause_match maps "already paused" here (as well as a match that is
         // no longer running). Mirror of the resume recovery above: if the DB
@@ -211,16 +236,17 @@ export function useLiveControls({
           timer.syncFromBroadcast({ type: "paused", pausedAt: fresh.paused_at });
           return;
         }
+        unread = fresh == null;
       }
       if (!res.ok) {
-        failed("Couldn't pause", res.error.message);
+        failed("Couldn't pause", res.error, unread);
         return;
       }
       timer.syncFromBroadcast({ type: "paused", pausedAt: res.data.paused_at });
       if (actorId) sync.broadcastTimerPaused(res.data.paused_at, actorId);
       else sync.broadcastTimerPaused(res.data.paused_at);
     }
-  }, [actorId, busy, endedRef, failed, matchId, setBusy, sync, timer]);
+  }, [actorId, busy, endedRef, failed, matchId, send, setBusy, sync, timer]);
 
   const setLeaving = React.useCallback((leaving: boolean) => setBusy(leaving ? "leave" : null), [setBusy]);
   const handleLeave = useTimekeeperLiveLeave({

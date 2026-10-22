@@ -12,14 +12,23 @@
  *    TK-R5b when an admin did) and, once the timekeeper has edited it, says
  *    so (TK-RC1) with TK-RC2 in place of the helper; a confirm that met a
  *    newer result says TK-RC4.
+ *  - Timekeeper mode, PM29 (COPY-DECK Round 9): a press that failed for a
+ *    reason the screen cannot show (a network error, an unknown refusal, no
+ *    reply within `SEND_CEILING_MS`) adds `checkConnection` under its shipped
+ *    title. The result step's `useRecordResult` and the dispute form's
+ *    `useDisputeSubmit` read that line here too; the other shared hooks
+ *    (the face-off's and the live step's) read it through `press-copy.ts`.
  *
  * Pure. The step itself keeps the two-athlete header it always had.
  *
  * An adapter over `timekeeper-copy.ts`, not a copy module of its own: every
  * string here is a deck id or a `SHIPPED_COPY` entry from that module.
- * Because the confirm step and `useConfirmResult` import this file and not
- * `timekeeper-copy.ts`, the import-based M-R4 surface rule does not see them;
- * `shared-step-message-guard.test.ts` guards them.
+ * Because the shared files above import this file and not
+ * `timekeeper-copy.ts`, the import-based M-R4 surface rule does not see them
+ * (importing it would make their two-athlete arms, which keep the shipped
+ * DomainError message, a timekeeper-mode surface);
+ * `shared-step-message-guard.test.ts` guards the confirm step, its hook,
+ * `useRecordResult`, the dispute form and `useDisputeSubmit`.
  */
 import { SHIPPED_COPY, TIMEKEEPER_COPY, type TimekeeperToast } from "./timekeeper-copy";
 import { shortName } from "./short-name";
@@ -32,6 +41,8 @@ export const CONFIRM_COPY = {
   resultChanged: TIMEKEEPER_COPY["TK-RC4"] as TimekeeperToast,
   /** The toast title when a confirm failed, both modes (the two-athlete toast adds the error's message). */
   couldNotConfirm: SHIPPED_COPY.couldNotConfirm,
+  /** PM29: the description under a timekeeper-mode press's failure title (the two-athlete toasts keep the error's message). */
+  checkConnection: SHIPPED_COPY.checkConnection,
   /** The recorded-result plate (A4), both modes. */
   plate: {
     winner: SHIPPED_COPY.winner,

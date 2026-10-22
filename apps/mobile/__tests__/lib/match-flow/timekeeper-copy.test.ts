@@ -394,6 +394,7 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
         "disputed",
         "back",
         "couldNotConfirm",
+        "checkConnection",
       ].sort(),
     );
   });
@@ -519,10 +520,14 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
       expect(PLATE).not.toMatch(/"WINNER"|"RESULT"|"Draw"|"DRAW"|"Result in"|"--"|"--:--"|\bwon`/);
     });
 
-    it("the confirm's error toast takes its title from here in both modes, through the confirm adapter", () => {
+    it("the confirm's error toast takes its title from here in both modes, and timekeeper mode its guidance (PM29), through the confirm adapter", () => {
       expect(CONFIRM_ADAPTER).toContain("couldNotConfirm: SHIPPED_COPY.couldNotConfirm,");
-      expect(CONFIRM_HOOK).toContain("timekeeperMode ? { text1: CONFIRM_COPY.couldNotConfirm } : { text1: CONFIRM_COPY.couldNotConfirm, description: res.error.message }");
+      expect(CONFIRM_ADAPTER).toContain("checkConnection: SHIPPED_COPY.checkConnection,");
+      expect(CONFIRM_HOOK).toContain(
+        "timekeeperMode ? { text1: CONFIRM_COPY.couldNotConfirm, description: CONFIRM_COPY.checkConnection } : { text1: CONFIRM_COPY.couldNotConfirm, description: res.error.message }",
+      );
       expect(CONFIRM_HOOK).not.toContain(`"Couldn't confirm"`);
+      expect(CONFIRM_HOOK).not.toContain(`"Check your connection and try again."`);
     });
 
     it("the timekeeper-mode kicker with no name takes the shipped RESULT RECORDED from here", () => {
@@ -540,6 +545,54 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
     });
   });
 
+  describe("PM29: the guidance under a timekeeper-mode press's failure title (COPY-DECK Round 9)", () => {
+    it("is the shipped line, as the Friends row and the booked strip write it", () => {
+      expect(S.checkConnection).toBe("Check your connection and try again.");
+      expect(src("app", "(app)", "friends.tsx")).toContain(`"${S.checkConnection}"`);
+      expect(src("components", "invite", "booked-strip.tsx")).toContain(`"${S.checkConnection}"`);
+    });
+
+    it("every timekeeper-mode press takes it from here (directly, or through the confirm or the press adapter), with no literal of its own", () => {
+      const direct = [
+        ["lib", "match-flow", "use-merged-ready.ts"],
+        ["lib", "match-flow", "use-timekeeper-checks.ts"],
+        ["lib", "match-flow", "use-timekeeper-start.ts"],
+        ["components", "match-flow", "steps", "result-edit-entry.tsx"],
+      ];
+      // The confirm and result steps (M5): `confirm-copy.ts`.
+      const confirmAdapted = [
+        ["lib", "match-flow", "use-confirm-result.ts"],
+        ["lib", "match-flow", "use-record-result.ts"],
+        ["lib", "match-flow", "use-dispute-submit.ts"],
+      ];
+      // The other shared hooks that branch on timekeeper mode: `press-copy.ts`.
+      const pressAdapted = [
+        ["lib", "match-flow", "use-weight-check-actions.ts"],
+        ["lib", "match-flow", "use-faceoff.ts"],
+        ["lib", "match-flow", "use-faceoff-leave.ts"],
+        ["lib", "match-flow", "use-live-controls.ts"],
+      ];
+      // The code, without its comments (which may quote the line).
+      const code = (rel: string[]) =>
+        src(...rel)
+          .split("\n")
+          .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
+          .join("\n");
+      expect(src("lib", "match-flow", "confirm-copy.ts")).toContain("checkConnection: SHIPPED_COPY.checkConnection,");
+      expect(src("lib", "match-flow", "press-copy.ts")).toContain("checkConnection: SHIPPED_COPY.checkConnection,");
+      for (const rel of direct) {
+        const text = code(rel);
+        expect([rel.join("/"), text.includes("SHIPPED_COPY.checkConnection"), text.includes(S.checkConnection)]).toEqual([rel.join("/"), true, false]);
+      }
+      for (const [adapter, files] of [["CONFIRM_COPY", confirmAdapted], ["PRESS_COPY", pressAdapted]] as const) {
+        for (const rel of files) {
+          const text = code(rel);
+          expect([rel.join("/"), text.includes(`${adapter}.checkConnection`), text.includes(S.checkConnection)]).toEqual([rel.join("/"), true, false]);
+        }
+      }
+    });
+  });
+
   it("no string has an em dash, an exclamation mark or an emoji", () => {
     const all = [
       ...strings(S),
@@ -554,8 +607,8 @@ describe("SHIPPED_COPY: shipped strings a timekeeper-mode surface reuses (deck '
       S.won(A),
       S.athleteConfirmed("M. REYES"),
     ];
-    // 26 plain strings and the 10 builders, rendered.
-    expect(all).toHaveLength(36);
+    // 27 plain strings and the 10 builders, rendered.
+    expect(all).toHaveLength(37);
     for (const s of all) {
       expect([s, s.includes(EM_DASH) || s.includes("!") || /\p{Extended_Pictographic}/u.test(s)]).toEqual([s, false]);
     }

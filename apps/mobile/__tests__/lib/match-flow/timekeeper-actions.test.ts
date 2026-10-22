@@ -12,9 +12,11 @@ const mockLeave = jest.fn();
 jest.mock("@jits/shared/api/timekeeper", () => ({
   endMatchClock: (...a: unknown[]) => mockEndMatchClock(...a),
   leaveMatchAsTimekeeper: (...a: unknown[]) => mockLeave(...a),
+  mapTimekeeperError: jest.requireActual("@jits/shared/api/timekeeper").mapTimekeeperError,
 }));
 
-import { endClockAsTimekeeper, leaveSeat } from "@/lib/match-flow/timekeeper-actions";
+import { mapPostgrestError } from "@jits/shared/api/errors";
+import { clockMovedOn, endClockAsTimekeeper, leaveSeat } from "@/lib/match-flow/timekeeper-actions";
 
 const refused = (code: string) => ({ ok: false, error: { code, message: "server text" } });
 
@@ -74,5 +76,38 @@ describe("leaveSeat (leave_match_as_timekeeper)", () => {
   it("a wrapper that throws (a network error) is a failure, never a crash", async () => {
     mockLeave.mockRejectedValue(new Error("network"));
     await expect(leaveSeat("M1")).resolves.toBe("failed");
+  });
+});
+
+describe("clockMovedOn (a refused pause or resume of the timekeeper's clock, PM29)", () => {
+  /** What the shipped pauseMatch / resumeMatch return: the shared mapping of the server's PostgrestError. */
+  const fromServer = (hint: string, code = "P0001") => mapPostgrestError({ code, hint, message: "server text", details: "" } as never);
+
+  it.each(["match_not_live", "match_not_in_progress", "not_timekeeper", "not_timekeeper_mode", "already_paused", "match_not_paused"])(
+    "%s (jr_be 20261021100400): the clock moved on, whatever the shared table made of it",
+    (hint) => {
+      expect(clockMovedOn(fromServer(hint))).toBe(true);
+    },
+  );
+
+  it("the timekeeper-mode hints the shared table does not know arrive as UNKNOWN, so the code alone cannot tell", () => {
+    for (const hint of ["match_not_live", "match_not_in_progress", "not_timekeeper"]) {
+      expect([hint, fromServer(hint).code]).toEqual([hint, "UNKNOWN"]);
+    }
+  });
+
+  it.each([
+    ["a network error (no SQLSTATE, no hint)", fromServer("", "")],
+    ["an unknown match", fromServer("not_found")],
+    ["a 5xx", mapPostgrestError({ code: "PGRST000", hint: null, message: "server text", details: "" } as never)],
+    ["no reply within the ceiling", { code: "UNKNOWN" as const, message: "" }],
+  ])("%s: a failure the screen cannot explain", (_name, error) => {
+    expect(clockMovedOn(error)).toBe(false);
+  });
+
+  it("with no server refusal behind it, the mapped code decides", () => {
+    expect(clockMovedOn({ code: "MATCH_NOT_LIVE", message: "" })).toBe(true);
+    expect(clockMovedOn({ code: "MATCH_NOT_PAUSED", message: "" })).toBe(true);
+    expect(clockMovedOn({ code: "RLS_VIOLATION", message: "" })).toBe(false);
   });
 });

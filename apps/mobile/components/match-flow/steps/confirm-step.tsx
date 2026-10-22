@@ -6,6 +6,7 @@ import { formatElapsed } from "@/lib/match-flow/format-elapsed";
 import { LEAVE_COUNTS_AS_CONFIRMING, disputeLockNote, isDisputeWindowClosed } from "@/lib/match-flow/match-extras";
 import { useDisputeLocksAt } from "@/lib/match-flow/use-dispute-locks-at";
 import { useConfirmResult } from "@/lib/match-flow/use-confirm-result";
+import { useMatchSyncContext } from "@/lib/match-flow/match-sync-context";
 import type { TimekeeperResult } from "@/lib/match-flow/result-confirm-inputs";
 import { CONFIRM_COPY, timekeeperConfirmHeader } from "@/lib/match-flow/confirm-copy";
 import { usePalette } from "@/lib/theme/palette";
@@ -86,7 +87,12 @@ export function confirmVerdict(resultData: BroadcastResult | null, meId: string)
  * The confirm itself, the broadcasts and the move to the verdict live in
  * `useConfirmResult` (with timekeeper mode's edit count, stale-confirm
  * handling and TK-RC3); timekeeper mode shows the result as the match in
- * hand has it now, which an edit changes (A8).
+ * hand has it now, which an edit changes (A8). Timekeeper mode's press is
+ * honest (PM29): Confirm is busy and Dispute disabled while the confirm is
+ * out, the you row keeps WAITING ON YOU until the server has it, and after
+ * a RESULT_CHANGED refusal both wait (disabled) until the newer result is on
+ * screen. Flag OFF passes `busy={false}` and `disabled={false}`, which the
+ * kit renders exactly as before.
  */
 export function ConfirmStep(props: ConfirmStepProps) {
   const p = usePalette();
@@ -95,7 +101,8 @@ export function ConfirmStep(props: ConfirmStepProps) {
   const [showDispute, setShowDispute] = React.useState(false);
   const [windowClosed, setWindowClosed] = React.useState(() => isDisputeWindowClosed(disputeLocksAt));
   const editCount = timekeeperResult?.editCount ?? 0;
-  const { myConfirmed, opponentConfirmed, canAdvance, advance, confirm, disputed } = useConfirmResult({
+  const { reconcileNow } = useMatchSyncContext();
+  const { myConfirmed, opponentConfirmed, canAdvance, sending, waitingForNewResult, advance, confirm, disputed } = useConfirmResult({
     matchId,
     me,
     opponent,
@@ -121,6 +128,7 @@ export function ConfirmStep(props: ConfirmStepProps) {
     return (
       <DisputeForm
         matchId={matchId}
+        timekeeperMode={timekeeperResult ? { editCount, reread: reconcileNow } : undefined}
         onCancel={() => setShowDispute(false)}
         onSubmitted={() => void disputed()}
         onWindowClosed={() => {
@@ -187,12 +195,21 @@ export function ConfirmStep(props: ConfirmStepProps) {
 
       {!myConfirmed ? (
         <View style={{ gap: 12 }}>
-          <FightButton testID="confirm-result" label="Confirm result" sheen onPress={() => void confirm()} icon={(c) => <Check size={16} color={c} />} />
+          <FightButton
+            testID="confirm-result"
+            label="Confirm result"
+            sheen
+            busy={sending}
+            disabled={waitingForNewResult}
+            onPress={() => void confirm()}
+            icon={(c) => <Check size={16} color={c} />}
+          />
           {windowClosed ? null : (
             <FightButton
               testID="confirm-dispute"
               variant="secondary"
               label="Dispute result"
+              disabled={sending || waitingForNewResult}
               onPress={() => setShowDispute(true)}
               icon={(c) => <Flag size={16} color={c} />}
             />
