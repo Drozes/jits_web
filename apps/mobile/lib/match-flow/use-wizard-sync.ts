@@ -185,20 +185,26 @@ export function useWizardSync({
    * marks the wizard exiting, so a second trigger neither toasts nor
    * navigates again. */
   const exitCancelled = React.useCallback(
-    (description = "This match was cancelled.", title = "Match cancelled") => {
+    (description = "This match was cancelled.", title = "Match cancelled", pastGuard = false) => {
       if (exitingRef.current) return;
       exitingRef.current = true;
       toast.info({ text1: title, description });
-      exitMatchTo(router, exitHref);
+      if (pastGuard) exitMatchTo(router, exitHref, { pastGuard });
+      else exitMatchTo(router, exitHref);
     },
     [router, exitHref],
   );
 
-  /** A timekeeper-mode exit: its reason's toast (M4's `noContestExit`), else the shipped one. */
+  /**
+   * A timekeeper-mode exit: its reason's toast (M4's `noContestExit`), else
+   * the shipped one. It may come from the live step (the timekeeper left or
+   * went offline, a pause timed out), so it goes past the match screen's
+   * remove guard (`exitMatchTo`'s `pastGuard`).
+   */
   const exitNoContest = React.useCallback(
     (reason: NoContestExitReason | null, r: MatchRoles) => {
       const exit = noContestExit({ reason, roles: r, actorId: cancelActorRef.current });
-      exitCancelled(exit?.description, exit?.title);
+      exitCancelled(exit?.description, exit?.title, true);
     },
     [exitCancelled],
   );

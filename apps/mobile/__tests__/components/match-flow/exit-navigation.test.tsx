@@ -172,6 +172,7 @@ jest.mock("@/lib/match-flow/use-match-details", () => ({
 import { MatchFlowWizard } from "@/components/match-flow/match-flow-wizard";
 import { cancelSessionMatch } from "@jits/shared/api/mutations";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
+import { takeGuardedExit } from "@/lib/match-flow/exit-to";
 
 const mockCancelSessionMatch = cancelSessionMatch as jest.Mock;
 
@@ -478,12 +479,15 @@ describe("face-off exit navigation", () => {
   }
 
   it("leaves through the wizard's exit (once) when the opponent cancels", () => {
+    takeGuardedExit();
     renderOnReady(ARENA_EXIT);
     act(() => {
       mockSyncParams?.onMatchCancelled?.();
       mockSyncParams?.onMatchCancelled?.();
     });
     expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
+    // A two-athlete exit never asks past the match screen's remove guard.
+    expect(takeGuardedExit()).toBe(false);
   });
 
   it.each([
@@ -640,11 +644,14 @@ describe("timekeeper-mode exits (spec 6.2; slice M4)", () => {
     ["pause_timeout", "No contest", "The match was paused for over 10 minutes. It won't count."],
     ["athlete_left", "Match cancelled", "D. Okafor left the match."],
   ])("an athlete, %s: %s / %s, once, through exitMatchTo", async (reason, text1, description) => {
+    takeGuardedExit();
     await mountTk("me-1", cancelled(reason));
     expect(toast.info).toHaveBeenCalledTimes(1);
     expect(toast.info).toHaveBeenCalledWith({ text1, description });
     expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
     expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
+    // Past the match screen's remove guard: a no contest can come from live (T6, T7, T16).
+    expect(takeGuardedExit()).toBe(true);
   });
 
   it.each([
@@ -654,11 +661,13 @@ describe("timekeeper-mode exits (spec 6.2; slice M4)", () => {
     ["faceoff_timeout", "No contest", "The match didn't start within 10 minutes. It won't count."],
     ["pause_timeout", "No contest", "The match was paused for over 10 minutes. It won't count."],
   ])("the timekeeper, %s: %s / %s, once, through exitMatchTo", async (reason, text1, description) => {
+    takeGuardedExit();
     await mountTk(TK, cancelled(reason));
     expect(toast.info).toHaveBeenCalledTimes(1);
     expect(toast.info).toHaveBeenCalledWith({ text1, description });
     expect(mockRouterDismissTo).toHaveBeenCalledTimes(1);
     expect(mockRouterDismissTo).toHaveBeenCalledWith(ARENA_EXIT);
+    expect(takeGuardedExit()).toBe(true);
   });
 
   it("the timekeeper, an athlete's Leave: TK-E1 naming the athlete the cancel broadcast named", async () => {
