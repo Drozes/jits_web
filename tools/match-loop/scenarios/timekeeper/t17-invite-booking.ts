@@ -54,9 +54,15 @@ const scenario: Scenario = {
     }
     const capped = inviteCapProblem(await readInviteCounts(ctx.ids.red), "Demo Red (T17's inviter)");
     if (capped) throw new EnvError(`T17 cannot run: ${capped}`);
-    await withAthleteColumns([ctx.ids.blue], ["date_of_birth"], () => tkScenario(ctx, {}, (cast) => claimAndBook(ctx, cast)), {
-      date_of_birth: "1995-01-01",
-    });
+    const note = (what: string, payload: unknown) => ctx.trace.note("harness", what, payload);
+    await withAthleteColumns(
+      [ctx.ids.blue],
+      ["date_of_birth"],
+      () => tkScenario(ctx, {}, (cast) => claimAndBook(ctx, cast)),
+      { date_of_birth: "1995-01-01" },
+      undefined,
+      note,
+    );
   },
 };
 export default scenario;

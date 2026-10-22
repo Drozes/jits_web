@@ -20,8 +20,8 @@
  */
 import { SHIPPED_COPY, TIMEKEEPER_COPY } from "../../../apps/mobile/lib/match-flow/timekeeper-copy";
 import { shortName } from "../../../apps/mobile/lib/match-flow/short-name";
-import type { AXElement, Idb, Query } from "./idb";
-import { matches, summarise } from "./idb";
+import type { AXElement, Idb, Query, StillTiming } from "./idb";
+import { matches, STILL_TIMING, summarise, tapWhenStill } from "./idb";
 import type { Screens, WizardStep } from "./screens";
 import { ExpectationTimeout } from "../lib/util";
 import { APP_TIMING, TK_TIMING } from "../bot/protocol";
@@ -198,9 +198,11 @@ export interface TkScreenTiming {
   probeMs: number;
   /** For the keyboard to finish closing once its text field has gone. */
   keyboardMs: number;
+  /** How long a control must hold still before a tap (`tapWhenStill`). */
+  still: StillTiming;
 }
 
-const DEFAULT_TIMING: TkScreenTiming = { pollMs: 350, retapMs: TK_READY_RETAP_MS, probeMs: 1_000, keyboardMs: 500 };
+const DEFAULT_TIMING: TkScreenTiming = { pollMs: 350, retapMs: TK_READY_RETAP_MS, probeMs: 1_000, keyboardMs: 500, still: STILL_TIMING };
 
 /** A deck string's exact regex for any name (`{NAME} STARTS THE MATCH` -> `^.+ STARTS THE MATCH$`). */
 export function anyNameRe(render: (name: string) => string): RegExp {
@@ -213,6 +215,20 @@ function labelled(re: RegExp): Query {
   return { label: re };
 }
 
+/**
+ * TK-F4 as a control (`type: "Button"` takes any interactive element, never
+ * its text), only while it is enabled: a busy or disabled TK-F4 is never
+ * pressed, on screen or once scrolled into view (`tapControl`).
+ */
+const READY_CONTROL: Query = { label: TK_UI.readyButton, enabled: true, type: "Button" };
+
+/**
+ * Every `TimekeeperScreens` tap goes through `tapWhenStill` (or
+ * `Idb.scrollTo`, which already waits for the element to settle): never to
+ * a point from one read taken before a bot action could move the screen
+ * (Wave 3 gate, T10). Taps the scenarios make themselves (the crew's Leave,
+ * the T3 and T17 alerts) are outside this class and keep their own reads.
+ */
 export class TimekeeperScreens {
   readonly timing: TkScreenTiming;
 
@@ -233,18 +249,21 @@ export class TimekeeperScreens {
     return !!(await this.idb.find(labelled(re), els));
   }
 
-  /** Blue picks a timekeeper on `crew`: tap the row's `Ask` (TK-P7), scrolling the list if needed. */
+  /**
+   * Blue picks a timekeeper on `crew`: tap the row's `Ask` (TK-P7), scrolling
+   * the list if needed. The rows can reorder as people come online, so the
+   * row is tapped only once it holds still.
+   */
   async ask(displayName: string, timeoutMs = 20_000): Promise<void> {
-    const q: Query = { label: TK_UI.ask(displayName), enabled: true };
+    const q: Query = { label: TK_UI.ask(displayName), enabled: true, type: "Button" };
     const start = Date.now();
     for (;;) {
+      const at = Date.now();
       const els = await this.idb.describe();
-      const btn = els.find((e) => matches(e, q) && e.type !== "StaticText");
+      const btn = els.find((e) => matches(e, q));
       if (btn && this.idb.onScreen(btn)) {
-        await this.idb.tap(btn);
-        return;
-      }
-      if (btn) {
+        if (await tapWhenStill(this.idb, q, { el: btn, at }, this.timing.still)) return;
+      } else if (btn) {
         await this.idb.tap(await this.idb.scrollTo(q, 4));
         return;
       }
@@ -264,16 +283,15 @@ export class TimekeeperScreens {
   async weighIn(timeoutMs = 25_000): Promise<{ weighedIn: boolean; step: WizardStep }> {
     const start = Date.now();
     let weighedIn = false;
+    const q: Query = { ...TK_UI.weighIn, enabled: true };
     for (;;) {
+      const at = Date.now();
       const els = await this.idb.describe();
       const step = await this.ui.currentStep(els);
       if (step && step !== "weight" && step !== "crew") return { weighedIn, step };
       // Only `weight` draws the weigh-in; a null step is a read that missed the marker.
-      const weigh = !weighedIn && step !== "crew" ? els.find((e) => matches(e, { ...TK_UI.weighIn, enabled: true })) : undefined;
-      if (weigh) {
-        await this.idb.tap(this.idb.onScreen(weigh) ? weigh : await this.idb.scrollTo(TK_UI.weighIn));
-        weighedIn = true;
-      }
+      const weigh = !weighedIn && step !== "crew" ? els.find((e) => matches(e, q)) : undefined;
+      if (weigh) weighedIn = await this.tapControl(q, weigh, at, TK_UI.weighIn);
       if (Date.now() - start > timeoutMs) {
         throw new ExpectationTimeout("Blue's weigh-in to move the face-off from weight to ready", timeoutMs, {
           currentStep: step,
@@ -318,6 +336,7 @@ export class TimekeeperScreens {
     let lastTap = 0;
     let lastProbe = 0;
     for (;;) {
+      const at = Date.now();
       const els = await this.idb.describe();
       const step = await this.ui.currentStep(els);
       if (step && AFTER_FACEOFF.has(step)) return presses;
@@ -329,9 +348,10 @@ export class TimekeeperScreens {
         lastProbe = Date.now();
         if (await serverReady()) return presses;
       }
-      const ready = els.find((e) => matches(e, { label: TK_UI.readyButton, enabled: true }) && e.type !== "StaticText");
-      if (ready && (presses === 0 || (retapDue && presses < TK_READY_MAX_PRESSES))) {
-        await this.idb.tap(this.idb.onScreen(ready) ? ready : await this.idb.scrollTo({ label: TK_UI.readyButton }));
+      const ready = els.find((e) => matches(e, READY_CONTROL));
+      // A press counts only when it was made: TK-F4 moving, going or turning
+      // busy under the harness is read again, never tapped where it was.
+      if (ready && (presses === 0 || (retapDue && presses < TK_READY_MAX_PRESSES)) && (await this.tapControl(READY_CONTROL, ready, at, { label: TK_UI.readyButton }))) {
         presses++;
         lastTap = Date.now();
       }
@@ -356,7 +376,8 @@ export class TimekeeperScreens {
   async reweigh(lbs: number, timeoutMs = 10_000, goneMs = 15_000): Promise<void> {
     await this.idb.waitFor({ id: TK_UI.reweigh.input }, timeoutMs);
     await this.ui.fillField(TK_UI.reweigh.input, String(lbs));
-    await this.idb.tapQ({ ...TK_UI.reweigh.submit, enabled: true }, timeoutMs);
+    // The keyboard opening scrolls the prompt: tap Re-weigh where it settles.
+    await this.tapWhenReady({ ...TK_UI.reweigh.submit, enabled: true }, timeoutMs, "Blue's Re-weigh (weight-reweigh-submit) offered and enabled");
     await this.idb.waitGone({ id: TK_UI.reweigh.input }, goneMs);
     await new Promise((r) => setTimeout(r, this.timing.keyboardMs));
   }
@@ -377,12 +398,11 @@ export class TimekeeperScreens {
     const q: Query = { ...TK_UI.confirm, enabled: true };
     const start = Date.now();
     for (;;) {
+      const at = Date.now();
       const els = await this.idb.describe();
       const btn = els.find((e) => matches(e, q));
-      if (btn) {
-        await this.idb.tap(this.idb.onScreen(btn) ? btn : await this.idb.scrollTo(q));
-        return 1;
-      }
+      // An edit landing (TK-RC1) can move Confirm: pressed only where it holds still.
+      if (btn && (await this.tapControl(q, btn, at, q))) return 1;
       if (Date.now() - start > timeoutMs) {
         const seen = els.find((e) => matches(e, TK_UI.confirm));
         throw new ExpectationTimeout("Blue's Confirm (confirm-result) offered and enabled", timeoutMs, {
@@ -410,6 +430,37 @@ export class TimekeeperScreens {
   async deadlineChip(): Promise<string | null> {
     const el = await this.idb.find({ label: DEADLINE_CHIP_RE });
     return el?.AXLabel ?? null;
+  }
+
+  /**
+   * Tap `el`, found by `q` in a read that started at `at`: on screen, once it
+   * holds still (`tapWhenStill`); off screen, brought into view by
+   * `Idb.scrollTo(scrollQ)` (which finds it even while busy, and waits for
+   * it to settle) and tapped only if what it brought into view still matches
+   * `q` (an enabled control). False when nothing was tapped (it moved for
+   * too long, went away or turned busy or disabled): the caller reads again.
+   */
+  private async tapControl(q: Query, el: AXElement, at: number, scrollQ: Query): Promise<boolean> {
+    if (!this.idb.onScreen(el)) {
+      const shown = await this.idb.scrollTo(scrollQ);
+      if (!matches(shown, q)) return false;
+      await this.idb.tap(shown);
+      return true;
+    }
+    return !!(await tapWhenStill(this.idb, q, { el, at }, this.timing.still));
+  }
+
+  /** Wait for `q` and tap it once (`tapControl`); throws `ExpectationTimeout` naming `what`. */
+  private async tapWhenReady(q: Query, timeoutMs: number, what: string): Promise<void> {
+    const start = Date.now();
+    for (;;) {
+      const at = Date.now();
+      const els = await this.idb.describe();
+      const el = els.find((e) => matches(e, q));
+      if (el && (await this.tapControl(q, el, at, q))) return;
+      if (Date.now() - start > timeoutMs) throw new ExpectationTimeout(what, timeoutMs, summarise(els));
+      await this.pause();
+    }
   }
 
   private pause(): Promise<void> {

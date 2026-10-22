@@ -37,8 +37,11 @@ import {
   acceptArenaChallenge,
   createArenaChallenge,
   isBusyRefusal,
+  isRawRefusal,
+  SEND_REFUSED_TOAST,
   startArenaMatch,
 } from "@/lib/arena/challenge-api";
+import type { DomainError } from "@jits/shared/api/errors";
 import { __resetArenaStoreForTests, publishArenaSelfId } from "@/lib/arena/arena-store";
 
 const REFUSED = { ok: false, error: { code: "MAX_PENDING_CHALLENGES", message: "You have 3 pending challenges." } };
@@ -61,6 +64,33 @@ describe("createArenaChallenge", () => {
   it("returns a refusal unchanged", async () => {
     mockCreate.mockResolvedValue(REFUSED);
     await expect(createArenaChallenge({ opponentId: "opp-1" })).resolves.toBe(REFUSED);
+  });
+});
+
+describe("a refused send's words (timekeeper mode PM31 (2)): isRawRefusal and SEND_REFUSED_TOAST", () => {
+  const refusal = (code: string) => ({ code, message: "x" }) as unknown as DomainError;
+
+  it("the send's shipped title over the shipped guidance, written out so a change to either fails here", () => {
+    expect(SEND_REFUSED_TOAST).toEqual({ text1: "Couldn't send that challenge.", description: "Check your connection and try again." });
+    expect(Object.isFrozen(SEND_REFUSED_TOAST)).toBe(true);
+  });
+
+  it.each(["UNKNOWN", "RLS_VIOLATION"])("%s carries raw text (a statement timeout, a dropped connection, an unmapped policy refusal): raw", (code) => {
+    expect(isRawRefusal(refusal(code))).toBe(true);
+  });
+
+  it.each(["BLOCKED", "MATCH_ALREADY_EXISTS", "MAX_PENDING_CHALLENGES"])(
+    "%s carries the shared table's own line: not raw, the handshake shows it",
+    (code) => {
+      expect(isRawRefusal(refusal(code))).toBe(false);
+    },
+  );
+
+  it("decided by the code alone: this timekeeper-mode surface never reads an error's words (M-R4)", () => {
+    const words = jest.fn(() => "canceling statement due to statement timeout");
+    const error = Object.defineProperty({ code: "UNKNOWN" }, "message", { get: words }) as unknown as DomainError;
+    expect(isRawRefusal(error)).toBe(true);
+    expect(words).not.toHaveBeenCalled();
   });
 });
 

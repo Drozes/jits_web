@@ -18,8 +18,13 @@ import { Notice, ReweighPrompt } from "./faceoff-weight-check";
  *  - my own open flag on the opponent: on hold, Withdraw flag;
  *  - ready (the server's row): waiting for the opponent, then TK-F5;
  *  - else the opponent's weigh-in line, `Weight looks right, I'm ready`
- *    (TK-F4, `mark_match_ready`), `Doesn't look right` (the shipped flag)
- *    and the helper TK-F6.
+ *    (TK-F4, `mark_match_ready`), `Doesn't look right` (the shipped flag),
+ *    the shipped "Waiting for {opp} to check your new weight." after my
+ *    re-weigh, and the helper TK-F6. That notice sits under the two buttons,
+ *    never above them (PM31 (1)): it goes when the opponent's ready
+ *    confirms my new weight, and above them its going moved TK-F4 up by its
+ *    height, under a tap that then landed on `Doesn't look right` (Wave 3
+ *    gate, T10).
  * The timekeeper is named through `clockRunnerName`: a read without their
  * name prints the role (TK-F1), never a blank (jits-o47s.27).
  */
@@ -70,7 +75,6 @@ function ReadyPrompt({ opp, timekeeper: tk }: { opp: string; timekeeper: Faceoff
         : SHIPPED_COPY.weighedInAt(OPP, weightText(f.opponentWeight));
   return (
     <View testID="merged-ready" style={{ gap: 12 }}>
-      {w.awaitingTheirRecheck ? <Notice testID="weight-await-recheck" text={SHIPPED_COPY.awaitRecheck(opp)} /> : null}
       <View style={{ alignItems: "center" }}>
         <Mono testID="weight-check-line" size="caption" bold spacing="caps-l" color={p.text}>
           {line}
@@ -94,6 +98,8 @@ function ReadyPrompt({ opp, timekeeper: tk }: { opp: string; timekeeper: Faceoff
           onPress={() => void w.check("flag")}
         />
       ) : null}
+      {/* Under the buttons, so its going moves neither (PM31 (1)). */}
+      {w.awaitingTheirRecheck ? <Notice testID="weight-await-recheck" text={SHIPPED_COPY.awaitRecheck(opp)} /> : null}
       <Text className="font-body" style={[typeStep("body"), { alignSelf: "center", textAlign: "center", color: p.text2 }]}>
         {TIMEKEEPER_COPY["TK-F6"](clockRunnerName(tk.name))}
       </Text>

@@ -35,8 +35,10 @@ const scenario: Scenario = {
         }, { timeoutMs: TK.sweep, intervalMs: 2_000 }),
       );
       ctx.eq("db:request-expired", "expired", expired.status);
+      // A sweep that told them again would add rows: one more before the read (as T0B does).
+      await ctx.step("one more sweep (a lapse is told once)", () => runTimekeeperTick());
       const n = await tkDb.notifications(m.matchId);
-      ctx.eq("db:athletes-told-lapsed-once", [...m.athletes].sort(), recipientsOf(n, "timekeeper_declined"), "TK-N3 once each");
+      ctx.eq("db:athletes-told-lapsed-once", [...m.athletes].sort(), recipientsOf(n, "timekeeper_declined", gold.me.id), "TK-N3 once each, about Gold");
       const row = await tkDb.match(m.matchId);
       ctx.eq("db:still-picking", { status: "pending", timekeeper_id: null }, { status: row?.status, timekeeper_id: row?.timekeeper_id });
       await ctx.expect("ui:lapsed-tk-p22", true, async () => {

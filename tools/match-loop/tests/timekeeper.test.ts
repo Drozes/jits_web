@@ -7,7 +7,7 @@
  * timekeeper's decisions, the selectors built from the app's own copy deck,
  * the pending rule and the scenario registry.
  */
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
@@ -33,6 +33,7 @@ import {
   mergeRestore,
   planFlagWindow,
   PLATFORM_ROLE_COLUMNS,
+  putBackFailures,
   readRestoreRecord,
   recoverFixtures,
   RESTORE_FILE,
@@ -74,7 +75,8 @@ import type { Simctl } from "../sim/simctl";
 import { PRACTICE_PARTNER, PRACTICE_UI, portraitIn } from "../sim/capture-screens";
 import { appleScriptString, deviceNameIn, orientationOf, parseWindowSize, rotateScript } from "../sim/simctl";
 import { acquireRunLock, psProbe, readRunLock, RUN_LOCK_FILE, runLockRefusal, selfStarted, type ProcessIdentity, type RunLock } from "../lib/run-lock";
-import { runCleanup } from "../lib/cleanup";
+import { onInterrupt, runCleanup } from "../lib/cleanup";
+import { errorFingerprint, exitCodeFor, pendingResult } from "../lib/results";
 import { EnvError, ExpectationTimeout, HarnessError } from "../lib/util";
 import { SCENARIOS, NOT_IMPLEMENTED, scenariosForTier } from "../scenarios";
 import { TIMEKEEPER_COPY as C, SHIPPED_COPY } from "../../../apps/mobile/lib/match-flow/timekeeper-copy";
@@ -82,10 +84,26 @@ import { DOB_REQUIRED_COPY } from "../../../packages/shared/src/utils/invite-cop
 import { TK } from "../scenarios/timekeeper/tk-flows";
 import type { Config } from "../config";
 import { Trace } from "../bot/trace";
-import type { AXElement, Idb, Query } from "../sim/idb";
+import { frameContains, tapPoint, type AXElement, type Idb, type Query, type StillTiming } from "../sim/idb";
 
 const ROOT = resolve(__dirname, "../../..");
 const src = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
+
+/**
+ * Every temp folder this file makes (the fake IO's restore records, the
+ * recovery and run-lock tests), removed once the file's tests are done (M7
+ * review minor 5). Only these folders: the shared restore record and run lock
+ * under ~/.cache/elorated-match-loop are never touched.
+ */
+const tempDirs: string[] = [];
+function tempDir(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+after(() => {
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 const cfg = {
   supabaseUrl: "http://127.0.0.1:54321",
@@ -119,6 +137,11 @@ test("MobileOpponent defaults to no capability; the timekeeper option is explici
 
 // --- scoped fixtures -----------------------------------------------------------------------
 
+test("every temp folder this file makes goes through tempDir, so the after hook removes it", () => {
+  const self = readFileSync(__filename, "utf8");
+  assert.equal(self.match(/mkdtempSync\(/g)?.length, 1, "only tempDir calls mkdtempSync");
+});
+
 test("a flag window flips only what differs and restores the original values", () => {
   const plan = planFlagWindow({ [TK_ROLE_FLAG]: true, [TK_WEIGHT_CHECK_FLAG]: true }, { [TK_ROLE_FLAG]: false, [TK_WEIGHT_CHECK_FLAG]: true }, new Map());
   assert.deepEqual(plan, { flip: { [TK_ROLE_FLAG]: true }, restore: { [TK_ROLE_FLAG]: false } });
@@ -145,7 +168,7 @@ function fakeFlagIo(initial: Record<string, boolean>): { io: FlagIo; db: Record<
   const failWrites = { on: false };
   const writes: Record<string, boolean>[] = [];
   const io: FlagIo = {
-    restorePath: join(mkdtempSync(join(tmpdir(), "tk-flags-")), "fixture-restore.json"),
+    restorePath: join(tempDir("tk-flags-"), "fixture-restore.json"),
     read: async (keys) => Object.fromEntries(keys.map((k) => [k, k in db ? db[k] : null])),
     write: async (values) => {
       writes.push(values);
@@ -196,6 +219,33 @@ test("a flag window whose put-back fails stops holding the flag: the leftover ON
   assert.equal(existsSync(io.restorePath), false, "and settled the record");
 });
 
+/**
+ * The scenario's own failure (the error a fixture body throws in the M7
+ * review's reproduction), to check that a failing put-back never replaces it.
+ */
+const bodyFailure = () => new ExpectationTimeout("the app never showed TK-D9", 10, null);
+
+test("a flag window whose put-back fails after the scenario failed rethrows the scenario's error; the put-back rides along (M7 review)", async () => {
+  const { io, db, failWrites } = fakeFlagIo({ [TK_ROLE_FLAG]: false });
+  const notes: { what: string; payload: unknown }[] = [];
+  const body = bodyFailure();
+  await assert.rejects(
+    withFlags({ [TK_ROLE_FLAG]: true }, async () => {
+      failWrites.on = true;
+      throw body;
+    }, (what, payload) => notes.push({ what, payload }), io),
+    (e: unknown) => e === body,
+    "the scenario's error, unchanged: its status, message and fingerprint are the run's",
+  );
+  assert.deepEqual(putBackFailures(body), ["flag_window: Error: psql failed putting the flag back"], "the result lists the failed put-back");
+  assert.deepEqual(notes.map((n) => n.what), ["flag_window_open", "flag_restore_failed", "flag_window_body_error"]);
+  assert.deepEqual(notes[2].payload, { error: `ExpectationTimeout: ${body.message}` }, "the trace names what the put-back would have hidden");
+  assert.deepEqual(putBackFailures(new Error("any other")), [], "none on an error that hid nothing");
+  failWrites.on = false;
+  await runCleanup();
+  assert.equal(db[TK_ROLE_FLAG], false, "the kept hook still puts the flag back at exit");
+});
+
 test("a flag window that puts the flag back stops holding it and unhooks", async () => {
   const { io, db, writes } = fakeFlagIo({ [TK_ROLE_FLAG]: false, [TK_WEIGHT_CHECK_FLAG]: true });
   assert.equal(await withFlags({ [TK_ROLE_FLAG]: true, [TK_WEIGHT_CHECK_FLAG]: true }, async () => "made", undefined, io), "made");
@@ -239,7 +289,7 @@ function fakeSqlIo(answer: (sql: string) => string = () => "1") {
   const recordAt: (RestoreRecord | null)[] = [];
   const fail: { re: RegExp | null } = { re: null };
   const io: SqlIo = {
-    restorePath: join(mkdtempSync(join(tmpdir(), "tk-sql-")), "fixture-restore.json"),
+    restorePath: join(tempDir("tk-sql-"), "fixture-restore.json"),
     exec: async (s) => {
       sql.push(s);
       recordAt.push(readRestoreRecord(io.restorePath));
@@ -288,6 +338,22 @@ test("a window whose removal fails keeps its hook and record: the run's exit rem
   await runCleanup();
   assert.equal(sql.filter((s) => s === clearWindowsSql(["tk_stall_window"])).length, 2, "the kept hook removed it at exit");
   assert.equal(existsSync(io.restorePath), false);
+});
+
+test("a window whose removal fails after the scenario failed rethrows the scenario's error; the removal rides along (M7 review)", async () => {
+  const { io, sql, fail } = fakeSqlIo();
+  const notes: string[] = [];
+  const body = bodyFailure();
+  await assert.rejects(withWindows({ tk_stall_window: 20 }, async () => {
+    fail.re = /^delete from public\.server_settings/;
+    throw body;
+  }, (what) => notes.push(what), io), (e: unknown) => e === body);
+  assert.deepEqual(putBackFailures(body), ["windows: Error: psql failed"]);
+  assert.deepEqual(notes, ["windows_set", "windows_clear_failed", "windows_body_error"]);
+  assert.deepEqual(readRestoreRecord(io.restorePath)?.windows, ["tk_stall_window"], "the record stays for the next run's start");
+  fail.re = null;
+  await runCleanup();
+  assert.equal(sql.filter((x) => x === clearWindowsSql(["tk_stall_window"])).length, 2, "the kept hook removed it at exit");
 });
 
 test("a bad window is refused before anything is recorded or written; none is a no-op", async () => {
@@ -345,6 +411,43 @@ test("withInviteCleanup records the inviter and the database time first, deletes
   assert.equal(existsSync(io.restorePath), false);
 });
 
+test("withInviteCleanup whose delete fails after the scenario failed rethrows the scenario's error; the delete rides along (M7 review)", async () => {
+  const since = "2026-10-21 23:00:00.5+00";
+  const { io, sql, fail } = fakeSqlIo((x) => (x === "select now()::text" ? since : "1"));
+  const notes: string[] = [];
+  const body = bodyFailure();
+  await assert.rejects(withInviteCleanup("red", async () => {
+    fail.re = /^with gone as/;
+    throw body;
+  }, (what) => notes.push(what), io), (e: unknown) => e === body);
+  assert.deepEqual(putBackFailures(body), ["invites: Error: psql failed"]);
+  assert.deepEqual(notes, ["invites_cleanup_failed", "invites_body_error"]);
+  assert.deepEqual(readRestoreRecord(io.restorePath)?.invites, [{ inviter: "red", since }]);
+  fail.re = null;
+  await runCleanup();
+  assert.equal(sql.filter((x) => x.startsWith("with gone as")).length, 2, "the kept hook deleted them at exit");
+});
+
+test("nested fixtures that all fail to put back keep the scenario's error and list every put-back, innermost first", async () => {
+  const flags = fakeFlagIo({ [TK_ROLE_FLAG]: false });
+  const win = fakeSqlIo();
+  const body = bodyFailure();
+  await assert.rejects(
+    withFlags({ [TK_ROLE_FLAG]: true }, () =>
+      withWindows({ tk_pause_window: 30 }, async () => {
+        flags.failWrites.on = true;
+        win.fail.re = /^delete from public\.server_settings/;
+        throw body;
+      }, undefined, win.io), undefined, flags.io),
+    (e: unknown) => e === body,
+  );
+  assert.deepEqual(putBackFailures(body), ["windows: Error: psql failed", "flag_window: Error: psql failed putting the flag back"]);
+  flags.failWrites.on = false;
+  win.fail.re = null;
+  await runCleanup();
+  assert.equal(flags.db[TK_ROLE_FLAG], false);
+});
+
 test("Red's invite limits are create_invite's; a reached one is an env_error naming its HINT, checked before T17 runs", () => {
   assert.deepEqual(INVITE_LIMITS, { weeklyMatches: 3, openInvites: 5, dailyInvites: 20 });
   assert.equal(inviteCapProblem({ weeklyMatches: 2, openInvites: 4, dailyInvites: 19 }), null);
@@ -392,7 +495,7 @@ test("the restore record lives at one path every worktree shares, outside any ch
 });
 
 test("recovering an empty restore record only removes the file", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "tk-restore-"));
+  const dir = tempDir("tk-restore-");
   const path = join(dir, "fixture-restore.json");
   writeFileSync(path, JSON.stringify({ flags: {}, windows: [], pid: 1, at: "x" }));
   assert.deepEqual(await recoverFixtures(path), []);
@@ -429,7 +532,7 @@ test("a record's holder is alive only while its pid is still the process that wr
 });
 
 test("a restore record whose run is still alive is in flight, not left behind: recovery refuses; a recycled pid's record is repaired", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "tk-restore-"));
+  const dir = tempDir("tk-restore-");
   const path = join(dir, "fixture-restore.json");
   const parent = psProbe(process.ppid)!;
   const noSql = async (): Promise<string> => {
@@ -447,7 +550,7 @@ test("a restore record whose run is still alive is in flight, not left behind: r
 });
 
 test("the next run's start undoes every kind of fixture a killed run recorded, T17's invites included", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "tk-restore-"));
+  const dir = tempDir("tk-restore-");
   const path = join(dir, "fixture-restore.json");
   const athletes = [{ id: "b", column: "date_of_birth" as const, value: null }];
   const invites = [{ inviter: "red", since: "2026-10-21 23:00:00.5+00" }];
@@ -461,7 +564,7 @@ test("the next run's start undoes every kind of fixture a killed run recorded, T
 });
 
 test("one run at a time: a live holder refuses, a stale lock is taken over, release removes only my own lock", () => {
-  const dir = mkdtempSync(join(tmpdir(), "run-lock-"));
+  const dir = tempDir("run-lock-");
   const path = join(dir, "run.lock");
   const other: RunLock = { pid: 4242, at: "t", cwd: "/elsewhere", argv: ["--tier", "core"] };
   assert.equal(runLockRefusal(null, () => true), null);
@@ -530,7 +633,7 @@ test("T8's admin is an allowlisted, restorable column: platform_role, set and pu
   assert.deepEqual(again.athletes, [{ id: "gold", column: "platform_role", value: "member" }]);
   // T8 sets it through the scoped fixture, never by hand.
   const t8 = src("tools/match-loop/scenarios/timekeeper/t08-result-stall.ts");
-  assert.match(t8, /withAthleteColumns\(\[gold\], PLATFORM_ROLE_COLUMNS, [^]*\{ platform_role: "admin" \}\)/);
+  assert.match(t8, /withAthleteColumns\(\[gold\], PLATFORM_ROLE_COLUMNS, [^]*\{ platform_role: "admin" \}, undefined, note\)/);
   assert.match(t8, /throw new EnvError\(/, "no admin to tell is an env_error, never a pass on two empty lists");
 });
 
@@ -622,6 +725,24 @@ test("withAthleteColumns whose restore fails keeps its hook and record: the run'
   await runCleanup();
   assert.equal(sql.filter((s) => s === restoreSql).length, 2, "the kept hook restored them at exit");
   assert.equal(existsSync(io.restorePath), false, "and settled the record");
+});
+
+test("withAthleteColumns whose restore fails after the scenario failed rethrows the scenario's error; the restore rides along (M7 review)", async () => {
+  const originals: AthleteRestore[] = [{ id: "gold", column: "platform_role", value: "member" }];
+  const { io, sql, fail } = fakeAthleteIo(originals);
+  const restoreSql = athleteColumnsSql(originals);
+  const notes: string[] = [];
+  const body = bodyFailure();
+  await assert.rejects(withAthleteColumns(["gold"], PLATFORM_ROLE_COLUMNS, async () => {
+    fail.re = /set platform_role = 'member'/;
+    throw body;
+  }, { platform_role: "admin" }, io, (what) => notes.push(what)), (e: unknown) => e === body);
+  assert.deepEqual(putBackFailures(body), ["athlete_columns: Error: psql failed"]);
+  assert.deepEqual(notes, ["athlete_columns_restore_failed", "athlete_columns_body_error"]);
+  assert.deepEqual(readRestoreRecord(io.restorePath)?.athletes, originals);
+  fail.re = null;
+  await runCleanup();
+  assert.equal(sql.filter((x) => x === restoreSql).length, 2, "the kept hook restored them at exit");
 });
 
 test("withAthleteColumns on athletes it cannot read runs the scenario and records nothing", async () => {
@@ -978,6 +1099,8 @@ test("T10 weighs Blue in first and waits for TK-F7 on ready, then re-weighs thro
 // --- Blue's face-off in timekeeper mode (weighInAndReady), on a scripted simulator ---------------
 
 type El = AXElement;
+/** The scripted simulators' screens never move unless a test moves them: one confirming read is enough. */
+const FAST_STILL: StillTiming = { stillMs: 0, gapMs: 1, timeoutMs: 200 };
 const el = (over: Partial<El>): El => ({ AXLabel: null, AXUniqueId: null, AXValue: null, type: "Button", frame: { x: 0, y: 300, width: 100, height: 44 }, ...over });
 const stepMarker = (label: string) => el({ AXLabel: `Step ${label === "Weights" ? 2 : 3} of 8, ${label}`, type: "GenericElement" });
 const weighInBtn = el({ AXUniqueId: "weight-confirm", AXLabel: "Confirm 170 lbs", enabled: true });
@@ -1010,7 +1133,7 @@ function tkScripted(screen: (t: { weigh: number; ready: number }) => El[]) {
       return true;
     },
   } as unknown as Idb;
-  const ui = new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 5, retapMs: 60, probeMs: 10, keyboardMs: 0 });
+  const ui = new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 5, retapMs: 60, probeMs: 10, keyboardMs: 0, still: FAST_STILL });
   return { ui, taps };
 }
 
@@ -1083,6 +1206,106 @@ test("weighInAndReady: a TK-F4 never honoured times out naming TK-F4, after at m
   assert.deepEqual(taps, ["ready-button", "ready-button"], "never a third press");
 });
 
+/**
+ * The Wave 3 gate's T10 race (run 2026-10-22T05-52-40-251Z), replayed: the
+ * notice above TK-F4 ("Waiting for D. Red to check your new weight.") goes
+ * away right after the read that found TK-F4, so both buttons move up 60 pt
+ * before the tap. A tap resolves against the screen as it is WHEN idb taps.
+ */
+function raceScripted() {
+  const marker = stepMarker("Ready");
+  const notice = el({ AXUniqueId: "weight-await-recheck", AXLabel: "Waiting for D. Red to check your new weight.", type: "StaticText", frame: { x: 16, y: 640, width: 370, height: 48 } });
+  const before = [marker, notice, el({ AXUniqueId: "ready-button", AXLabel: C["TK-F4"], enabled: true, frame: { x: 16, y: 700, width: 370, height: 72 } }), el({ AXUniqueId: "weight-check-flag", AXLabel: SHIPPED_COPY.flag, enabled: true, frame: { x: 16, y: 784, width: 370, height: 64 } })];
+  const after = [marker, el({ AXUniqueId: "ready-button", AXLabel: C["TK-F4"], enabled: true, frame: { x: 16, y: 640, width: 370, height: 72 } }), el({ AXUniqueId: "weight-check-flag", AXLabel: SHIPPED_COPY.flag, enabled: true, frame: { x: 16, y: 724, width: 370, height: 64 } })];
+  // weighIn's step read and pressReady's first read see the notice; it goes right after.
+  let reads = 0;
+  let pressed: string | null = null;
+  const now = () => (pressed === "ready-button" ? [marker, waitingLine] : reads >= 2 ? after : before);
+  const hits: string[] = [];
+  const idb = {
+    screenH: 874,
+    screenW: 402,
+    async describe() {
+      reads++;
+      return reads <= 2 ? before : now();
+    },
+    async tap(e: El) {
+      const hit = now().find((x) => x.AXUniqueId && frameContains(x, tapPoint(e)));
+      hits.push(hit?.AXUniqueId ?? "nothing");
+      pressed = hit?.AXUniqueId ?? null;
+    },
+    async scrollTo() {
+      throw new Error("TK-F4 is on screen");
+    },
+    onScreen() {
+      return true;
+    },
+  } as unknown as Idb;
+  const ui = new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 5, retapMs: 60, probeMs: 10, keyboardMs: 0, still: FAST_STILL });
+  return { ui, hits, before, after };
+}
+
+test("TK-F4 is never tapped where one read put it: the T10 race taps TK-F4 where it settled, never Doesn't look right", async () => {
+  const { ui, hits, before, after } = raceScripted();
+  // What the gate's harness did: a tap at the point from the read before the notice went lands on the flag.
+  const stale = tapPoint(before.find((x) => x.AXUniqueId === "ready-button")!);
+  assert.equal(after.find((x) => x.AXUniqueId && frameContains(x, stale))?.AXUniqueId, "weight-check-flag");
+  assert.deepEqual(await ui.weighInAndReady(2_000), { weighedIn: false, readyPresses: 1 });
+  assert.deepEqual(hits, ["ready-button"], "one press, on TK-F4 where it settled");
+});
+
+/**
+ * A control below the fold that turns busy while the harness scrolls it into
+ * view (review W3FIX minor 6a): `scrollTo` brings it back disabled, it is
+ * enabled again only after two more reads, and a tap on it while busy is
+ * dropped by the app (recorded as "dropped"). `after` is the screen once the
+ * press is honoured.
+ */
+function belowFoldScripted(step: string, control: (enabled: boolean) => El, after: El[]) {
+  const marker = stepMarker(step);
+  let scrolled = false;
+  let reads = 0;
+  let honoured = false;
+  const taps: string[] = [];
+  const enabledNow = () => scrolled && reads > 2;
+  const idb = {
+    screenH: 874,
+    screenW: 402,
+    async describe() {
+      if (honoured) return after;
+      if (!scrolled) return [marker, control(true)];
+      reads++;
+      return [marker, control(enabledNow())];
+    },
+    async tap(e: El) {
+      if (honoured || !enabledNow()) return void taps.push("dropped");
+      honoured = true;
+      taps.push(e.AXUniqueId ?? String(e.AXLabel));
+    },
+    async scrollTo() {
+      scrolled = true;
+      return control(false);
+    },
+    onScreen() {
+      return scrolled;
+    },
+  } as unknown as Idb;
+  const ui = new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 5, retapMs: 60, probeMs: 10, keyboardMs: 0, still: FAST_STILL });
+  return { ui, taps };
+}
+
+test("TK-F4 below the fold that turned busy while scrolled into view is never pressed there: one press, once it is enabled", async () => {
+  const { ui, taps } = belowFoldScripted("Ready", tkF4, [stepMarker("Ready"), waitingLine]);
+  assert.deepEqual(await ui.weighInAndReady(2_000), { weighedIn: false, readyPresses: 1 });
+  assert.deepEqual(taps, ["ready-button"], "no press counted on a busy TK-F4");
+});
+
+test("the weigh-in below the fold that turned disabled while scrolled into view is not counted as tapped", async () => {
+  const { ui, taps } = belowFoldScripted("Weights", (enabled) => ({ ...weighInBtn, enabled }), [stepMarker("Ready"), tkF4()]);
+  assert.deepEqual(await ui.weighIn(2_000), { weighedIn: true, step: "ready" });
+  assert.deepEqual(taps, ["weight-confirm"]);
+});
+
 test("weighIn alone stops on ready (T10 waits for TK-F7 there), with no TK-F4 press", async () => {
   const { ui, taps } = tkScripted(({ weigh }) => (weigh === 0 ? [stepMarker("Weights"), weighInBtn] : [stepMarker("Ready"), tkF4()]));
   assert.deepEqual(await ui.weighIn(2_000), { weighedIn: true, step: "ready" });
@@ -1095,9 +1318,16 @@ function reweighScripted(stays = false) {
   let value = "170";
   let submitted = false;
   const input = () => el({ AXUniqueId: TK_UI.reweigh.input, AXValue: value, type: "TextField" });
+  const submit = () => el({ AXUniqueId: TK_UI.reweigh.submit.id, AXLabel: "Re-weigh", enabled: true, frame: { x: 200, y: 600, width: 150, height: 56 } });
   const idb = {
     screenH: 874,
     screenW: 402,
+    async describe() {
+      return submitted ? [] : [input(), submit()];
+    },
+    onScreen() {
+      return true;
+    },
     async waitFor(q: Query) {
       calls.push(`wait:${q.id}`);
       return input();
@@ -1107,6 +1337,7 @@ function reweighScripted(stays = false) {
     },
     async tap(e: El) {
       calls.push(`tap:${e.AXUniqueId}`);
+      if (e.AXUniqueId === TK_UI.reweigh.submit.id) submitted = true;
     },
     async clearFocused() {
       value = "";
@@ -1128,20 +1359,21 @@ function reweighScripted(stays = false) {
       if (!submitted || stays) throw new ExpectationTimeout(`UI element #${q.id} to disappear`, ms, []);
     },
   } as unknown as Idb;
-  const ui = new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 5, keyboardMs: 0 });
+  const ui = new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 5, keyboardMs: 0, still: FAST_STILL });
   return { ui, calls };
 }
 
-test("reweigh types the new weight into the match re-weigh prompt, taps its enabled submit and waits for the prompt to go", async () => {
+test("reweigh types the new weight into the match re-weigh prompt, taps its enabled submit once it holds still and waits for the prompt to go", async () => {
   const { ui, calls } = reweighScripted();
   await ui.reweigh(171, 100, 100);
   assert.deepEqual(calls, [
     `wait:${TK_UI.reweigh.input}`,
     `tap:${TK_UI.reweigh.input}`,
     "type:171",
-    `tapQ:${TK_UI.reweigh.submit.id}:enabled`,
+    `tap:${TK_UI.reweigh.submit.id}`,
     `gone:${TK_UI.reweigh.input}`,
   ]);
+  assert.doesNotMatch(src("tools/match-loop/sim/timekeeper-screens.ts"), /idb\.tapQ\(/, "no tap on Blue's timekeeper-mode screens from a single read");
 });
 
 test("reweigh fails when the prompt never goes (the re-weigh did not clear TK-F7)", async () => {
@@ -1337,9 +1569,38 @@ test("a pending scenario fails the run on a build with M8, or with --no-pending"
   assert.equal(pendingFails(new Set<MobileSlice>(["M2", "M3"]), false), false, "a partial Wave 2 build: pending is not a failure");
   assert.equal(pendingFails(new Set<MobileSlice>(["M2", "M8"]), false), true, "M8 lands after every slice: a missing slice is an integration defect");
   assert.equal(pendingFails(new Set<MobileSlice>(), true), true, "--no-pending (the Wave 3 gate)");
+  // The runner's wiring (the rules themselves are exercised below).
   const run = src("tools/match-loop/run.ts");
   assert.match(run, /pendingResult\(s, pending, failPending\)/);
   assert.match(run, /const failPending = pendingFails\(present, args\.noPending\)/);
+  assert.match(run, /return exitCodeFor\(results\);/);
+});
+
+test("a pending scenario the run may leave is pending and passes the run; one it may not is a fingerprinted fail that fails it (M7 review)", () => {
+  const s = { id: "T4", title: "Nobody accepts" };
+  const reason = "needs M3 (the athlete face-off)";
+  const left = pendingResult(s, reason, false);
+  assert.deepEqual(
+    { status: left.status, attempts: left.attempts, fingerprint: left.fingerprint, fingerprints: left.fingerprints, error: left.error },
+    { status: "pending", attempts: 0, fingerprint: null, fingerprints: [], error: reason },
+  );
+  assert.equal(exitCodeFor([left]), 0, "a partial build's pending scenario never fails the run");
+  const failed = pendingResult(s, reason, true);
+  assert.equal(failed.status, "fail");
+  assert.equal(failed.attempts, 0);
+  assert.ok(failed.error?.startsWith(reason));
+  assert.ok(failed.error?.endsWith("(a build with M8, or --no-pending, must run every timekeeper scenario)"), failed.error);
+  assert.equal(failed.fingerprint, errorFingerprint("T4", failed.error!));
+  assert.deepEqual(failed.fingerprints, [failed.fingerprint]);
+  assert.equal(exitCodeFor([failed]), 1, "--tier timekeeper --no-pending with every scenario pending exits 1");
+});
+
+test("the exit code: fail, harness_error and env_error fail the run; pass, known, flake and an allowed pending do not", () => {
+  assert.equal(exitCodeFor([]), 0);
+  for (const ok of ["pass", "known", "flake", "pending"] as const) assert.equal(exitCodeFor([{ status: ok }]), 0, ok);
+  for (const bad of ["fail", "harness_error", "env_error"] as const) {
+    assert.equal(exitCodeFor([{ status: "pass" }, { status: bad }]), 1, bad);
+  }
 });
 
 test("every runner start repairs a killed run, then refuses to run with timekeeper_role left on", () => {
@@ -1361,7 +1622,12 @@ test("--tier all is the flag-OFF guard (core and extended); the timekeeper tier 
 
 test("T11 holds the flag ON for the whole scenario, with C1's handshake, and relaunches the app around it", () => {
   const t11 = src("tools/match-loop/scenarios/timekeeper/t11-capability-mixed.ts");
-  assert.match(t11, /withFlags\(\{ \[TK_ROLE_FLAG\]: true \}, \(\) => mixedPairC1\(ctx, slices\), note\)/);
+  assert.match(
+    t11,
+    /withFlags\(\s*\{ \[TK_ROLE_FLAG\]: true \},\s*\(\) => \{\s*unhookAppClose = onInterrupt\("t11-app-close", \(\) => ctx\.simctl\.terminate\(\)\);\s*return mixedPairC1\(ctx, slices\);\s*\},\s*note,\s*\)/,
+    "the window holds the flag for C1, and closes the app on an interrupt after the put-back",
+  );
+  assert.match(t11, /await relaunch\(ctx, [^]*?\);\n\s+unhookAppClose\(\);/, "the interrupt close stays until the relaunch");
   assert.match(t11, /ctx\.simctl\.terminate\(\)\);\n\s+await prepare\(ctx\);/, "the app launches with the flag ON");
   assert.match(t11, /await blueChallengesRed\(ctx, red, \{/, "C1's handshake (db:challenge-created)");
   assert.match(t11, /stakesFor\(ctx, red\)/);
@@ -1373,8 +1639,35 @@ test("T11 holds the flag ON for the whole scenario, with C1's handshake, and rel
 
 test("--tk-flag-on closes the app after the flag is set and after it is restored, so the app reads it", () => {
   const run = src("tools/match-loop/run.ts");
+  // And on Ctrl-C or SIGTERM: a hook registered after the hold's own put-back closes the app (M7 review).
+  assert.match(run, /const releaseFlag = args\.tkFlagOn \? await holdFlagForRun\(\) : null;\n[^]*?const unhookAppClose = releaseFlag \? onInterrupt\("tk-flag-run-app-close", \(\) => simctl\.terminate\(\)\) : \(\) => undefined;/);
+  assert.match(run, /await simctl\.terminate\(\);\n\s+unhookAppClose\(\);/, "removed only after the normal path closed the app");
   assert.match(run, /const releaseFlag = args\.tkFlagOn \? await holdFlagForRun\(\) : null;\n[^]*?if \(releaseFlag\) await simctl\.terminate\(\);/);
   assert.match(run, /await releaseFlag\(\);\n[^\n]*\n\s+await simctl\.terminate\(\);/);
+});
+
+test("on an interrupt the flag goes back before the app is closed: hooks run in the order they were registered (M7 review)", async () => {
+  const order: string[] = [];
+  const { io, db } = fakeFlagIo({ [TK_ROLE_FLAG]: false });
+  const release = await holdFlagForRun({ ...io, write: async (v) => (order.push(`flag:${JSON.stringify(v)}`), Object.assign(db, v), undefined) });
+  order.length = 0;
+  const unhook = onInterrupt("test-app-close", () => void order.push("app closed"));
+  await runCleanup();
+  assert.deepEqual(order, [`flag:${JSON.stringify({ [TK_ROLE_FLAG]: false })}`, "app closed"], "the app relaunches onto the flag as it was put back");
+  assert.equal(db[TK_ROLE_FLAG], false);
+  unhook();
+  // What the runner's normal path then does: stop holding the flag (this process would have exited).
+  await release();
+  assert.equal((await timekeeperFlagState(io)).heldByThisRun, false);
+});
+
+test("T3 reads TK-N3 after one more sweep, and only the rows about Gold (M7 review)", () => {
+  const t3 = src("tools/match-loop/scenarios/timekeeper/t03-request-lapses.ts");
+  const expired = t3.indexOf('ctx.eq("db:request-expired"');
+  const tick = t3.indexOf("runTimekeeperTick()", expired);
+  const read = t3.indexOf("tkDb.notifications(m.matchId)", expired);
+  assert.ok(expired > 0 && tick > expired && read > tick, "a sweep that told them again would show: one more runs before the read");
+  assert.match(t3, /recipientsOf\(n, "timekeeper_declined", gold\.me\.id\)/, "TK-N3 with Gold as the subject");
 });
 
 test("the simulator's Metro must serve this checkout: its project root is read from the Metro log", () => {
@@ -1532,14 +1825,14 @@ function confirmScripted(busyReads: number) {
       return true;
     },
   } as unknown as Idb;
-  return { ui: new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 2 }), taps, reads: () => reads };
+  return { ui: new TimekeeperScreens(idb, new Screens(idb, {} as Simctl, 0), { pollMs: 2, still: FAST_STILL }), taps, reads: () => reads };
 }
 
 test("Blue's timekeeper-mode Confirm is pressed once, only once offered and enabled, never while busy (PM29 (5))", async () => {
   const busy = confirmScripted(3);
   assert.equal(await busy.ui.confirmOnce(2_000), 1);
   assert.deepEqual(busy.taps, ["confirm-result"], "one press");
-  assert.equal(busy.reads(), 4, "it waited out the busy reads before the press");
+  assert.equal(busy.reads(), 5, "it waited out the busy reads, then read once more to see Confirm hold still, before the press");
   const stuck = confirmScripted(Number.POSITIVE_INFINITY);
   await assert.rejects(stuck.ui.confirmOnce(30), (e: unknown) => e instanceof ExpectationTimeout && /confirm-result/.test(e.what));
   assert.deepEqual(stuck.taps, [], "a Confirm never enabled is never tapped");

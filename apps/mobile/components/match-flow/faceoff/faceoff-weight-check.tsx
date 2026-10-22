@@ -36,6 +36,12 @@ export function WeightCheckPlate({ opponentName }: { opponentName: string }) {
  * blocking decision): my verdict on the opponent's weight, my open flag
  * (Withdraw), or the opponent's flag on me (re-weigh). Renders nothing when
  * no action or notice is due.
+ *
+ * "Waiting for {opp} to check your new weight." sits BELOW the actions,
+ * never above them (timekeeper mode PM31 (1)): it goes away when the
+ * opponent re-checks, a change this athlete does not make, and above the
+ * verdict its going moved `Confirm` and `Doesn't look right` up by its own
+ * height, so a tap meant for `Confirm` could land on the flag.
  */
 export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName: string }) {
   const f = useFaceoffContext();
@@ -56,10 +62,6 @@ export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName:
 
   if (w.mustReweigh) {
     sections.push(<ReweighPrompt key="reweigh" notice={`${opp} says your weight doesn't look right. Re-weigh to continue.`} />);
-  } else if (w.awaitingTheirRecheck) {
-    sections.push(
-      <Notice key="await-recheck" testID="weight-await-recheck" text={`Waiting for ${opp} to check your new weight.`} />,
-    );
   }
 
   if (w.myFlagOpen) {
@@ -105,6 +107,13 @@ export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName:
           onPress={() => void w.check("flag")}
         />
       </View>,
+    );
+  }
+
+  // Under the actions, so its going moves none of them (PM31 (1)).
+  if (!w.mustReweigh && w.awaitingTheirRecheck) {
+    sections.push(
+      <Notice key="await-recheck" testID="weight-await-recheck" text={`Waiting for ${opp} to check your new weight.`} />,
     );
   }
 
