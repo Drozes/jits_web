@@ -624,7 +624,9 @@ describe("PM29: an honest confirm press", () => {
     expect(s.getByTestId("confirm-dispute").props.accessibilityState).toMatchObject({ disabled: false });
     s.getByTestId("confirm-panel-you-your-call");
 
-    // The late ok of that attempt changes nothing: no haptic, no verdict, no TK-RC3 record.
+    // The ceiling dropped the late ok of that attempt (PM29 (1)): it changes
+    // nothing (no haptic, no verdict, no CONFIRMED, no toast, no re-read) and
+    // makes no TK-RC3 record (the athlete was told it failed; UX spec 3.4).
     await answer({ ok: true, data: {} });
     act(() => {
       jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS * 2);
@@ -632,6 +634,8 @@ describe("PM29: an honest confirm press", () => {
     expect(impact()).not.toHaveBeenCalled();
     expect(mockNoteConfirmed).not.toHaveBeenCalled();
     expect(onCompleted).not.toHaveBeenCalled();
+    expect(mockToast.error).toHaveBeenCalledTimes(1);
+    expect(mockReconcileNow).toHaveBeenCalledTimes(1);
     s.getByTestId("confirm-panel-you-your-call");
 
     // It did land: the reads list the confirmation at the current count, and the step moves on once.
@@ -662,6 +666,119 @@ describe("PM29: an honest confirm press", () => {
       jest.advanceTimersByTime(ADVANCE_AFTER_CONFIRM_MS);
     });
     expect(onCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  describe("the ceiling drops the older confirm's reply (m5r3 regression; PM29 (1)): it moves nothing and makes no TK-RC3 record", () => {
+    /** Confirm replies this test hands back, in send order. */
+    function deferReplies() {
+      const replies: ((v: unknown) => void)[] = [];
+      mockConfirm.mockImplementation(() => new Promise((resolve) => replies.push(resolve)));
+      return (i: number, v: unknown) => act(async () => replies[i](v));
+    }
+
+    /** Confirm #1 at count 0 ends at the ceiling, the edit's read lands (count 1), and confirm #2 goes out at 1 while #1 is still unanswered. */
+    async function twoConfirmsOut(onCompleted: jest.Mock) {
+      const answer = deferReplies();
+      const s = render(<ConfirmStep {...props({ onCompleted })} />);
+      await tapConfirm(s);
+      await act(async () => {
+        jest.advanceTimersByTime(SEND_CEILING_MS);
+      });
+      expect(mockToast.error).toHaveBeenCalledWith(FAILED);
+      s.rerender(<ConfirmStep {...props({ onCompleted, timekeeperResult: edited(1) })} />);
+      await tapConfirm(s);
+      expect(mockConfirm).toHaveBeenCalledTimes(2);
+      expect(mockConfirm).toHaveBeenLastCalledWith({ tag: "client" }, "M1", 1);
+      return { s, answer };
+    }
+
+    it("a stale ok reply that lands after the newer confirm's ok does not stop the move to the verdict", async () => {
+      jest.useFakeTimers();
+      const onCompleted = jest.fn();
+      const { s, answer } = await twoConfirmsOut(onCompleted);
+      // Confirm #2 (count 1) returns first, then the server's ok for #1 (it reached the server before the edit).
+      await answer(1, { ok: true, data: {} });
+      await answer(0, { ok: true, data: {} });
+      s.getByTestId("confirm-panel-you-confirmed");
+      expect(impact()).toHaveBeenCalledTimes(1);
+      // The ceiling dropped #1's ok: only #2's confirm is in the TK-RC3 record.
+      expect(mockNoteConfirmed.mock.calls).toEqual([["M1", "me-1", 1]]);
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+      expect(onCompleted).toHaveBeenCalledTimes(1);
+      expect(mockToast.info).not.toHaveBeenCalled();
+    });
+
+    it("a stale RESULT_CHANGED for the older confirm does not undo the newer one in flight", async () => {
+      jest.useFakeTimers();
+      const onCompleted = jest.fn();
+      const { s, answer } = await twoConfirmsOut(onCompleted);
+      const reads = mockReconcileNow.mock.calls.length;
+      // #1 is refused as stale while #2 is still out: nothing changes.
+      await answer(0, { ok: false, error: { code: "RESULT_CHANGED", message: "The result just changed" } });
+      expect(mockToast.info).not.toHaveBeenCalled();
+      expect(mockToast.error).toHaveBeenCalledTimes(1);
+      expect(mockReconcileNow).toHaveBeenCalledTimes(reads);
+      expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(SENDING);
+      s.getByTestId("confirm-panel-you-your-call");
+      // #2 is taken: CONFIRMED and the verdict, once.
+      await answer(1, { ok: true, data: {} });
+      s.getByTestId("confirm-panel-you-confirmed");
+      expect(s.queryByTestId("confirm-result")).toBeNull();
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+      expect(onCompleted).toHaveBeenCalledTimes(1);
+      expect(mockNoteConfirmed.mock.calls).toEqual([["M1", "me-1", 1]]);
+    });
+
+    it("the older confirm's ok while the newer one is sending: the next read shows no TK-RC3, and Confirm stays busy", async () => {
+      jest.useFakeTimers();
+      const onCompleted = jest.fn();
+      const { s, answer } = await twoConfirmsOut(onCompleted);
+      // #1's late ok, then the step's next poll read (count 1, this athlete not listed).
+      await answer(0, { ok: true, data: {} });
+      s.rerender(<ConfirmStep {...props({ onCompleted, timekeeperResult: edited(1) })} />);
+      expect(mockToast.info).not.toHaveBeenCalled();
+      expect(mockNoteConfirmed).not.toHaveBeenCalled();
+      expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(SENDING);
+      s.getByTestId("confirm-panel-you-your-call");
+      // #2 is taken: CONFIRMED and the verdict, once, and still no TK-RC3.
+      await answer(1, { ok: true, data: {} });
+      s.getByTestId("confirm-panel-you-confirmed");
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+      expect(onCompleted).toHaveBeenCalledTimes(1);
+      expect(mockToast.info).not.toHaveBeenCalled();
+      expect(mockNoteConfirmed.mock.calls).toEqual([["M1", "me-1", 1]]);
+    });
+
+    it("the ok of a confirm the ceiling ended, then an edit: no TK-RC3 (the athlete was told it failed), and Confirm is back", async () => {
+      jest.useFakeTimers();
+      const onCompleted = jest.fn();
+      const answer = deferReplies();
+      const s = render(<ConfirmStep {...props({ onCompleted })} />);
+      await tapConfirm(s);
+      await act(async () => {
+        jest.advanceTimersByTime(SEND_CEILING_MS);
+      });
+      expect(mockToast.error).toHaveBeenCalledWith(FAILED);
+      // The edit's read lands, #1's late ok arrives, then the next read (count 1, not listed).
+      s.rerender(<ConfirmStep {...props({ onCompleted, timekeeperResult: edited(1) })} />);
+      await answer(0, { ok: true, data: {} });
+      s.rerender(<ConfirmStep {...props({ onCompleted, timekeeperResult: edited(1) })} />);
+      expect(mockToast.info).not.toHaveBeenCalled();
+      expect(mockNoteConfirmed).not.toHaveBeenCalled();
+      expect(impact()).not.toHaveBeenCalled();
+      expect(s.getByTestId("confirm-result").props.accessibilityState).toEqual(READY);
+      s.getByTestId("confirm-panel-you-your-call");
+      act(() => {
+        jest.advanceTimersByTime(10_000);
+      });
+      expect(onCompleted).not.toHaveBeenCalled();
+    });
   });
 
   it("moved on (MATCH_NOT_PENDING: disputed or voided): no toast, no haptic, one re-read, the buttons back", async () => {

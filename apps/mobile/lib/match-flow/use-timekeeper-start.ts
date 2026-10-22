@@ -166,7 +166,10 @@ interface TimekeeperStartParams {
  * stays hidden while any Start call sent might still land, that is, until
  * every one has answered: a Leave racing a late Start would make the match a
  * `timekeeper_left` no contest. A late Start that went through keeps Leave
- * gone and re-reads, as any other.
+ * gone and re-reads, as any other. And once any Start call is refused as
+ * already started, Leave never comes back, whatever the other calls answer:
+ * the match is no longer pending, so the re-read moves the screen (to live,
+ * or to the cancelled exit).
  */
 export function useTimekeeperStart(p: TimekeeperStartParams): { starting: boolean; start: () => void } {
   const { reconcileNow } = useMatchSyncContext();
@@ -176,6 +179,8 @@ export function useTimekeeperStart(p: TimekeeperStartParams): { starting: boolea
   const inFlightRef = React.useRef(false);
   /** Start calls sent that have not answered (PM29): Leave stays hidden while any is left. */
   const unansweredRef = React.useRef(0);
+  /** A Start call was refused as already started (MATCH_NOT_PENDING): Leave never comes back (PM29). */
+  const movedOnRef = React.useRef(false);
   const pRef = React.useRef(p);
   pRef.current = p;
   const mountedRef = React.useRef(true);
@@ -222,12 +227,20 @@ export function useTimekeeperStart(p: TimekeeperStartParams): { starting: boolea
       unansweredRef.current -= 1;
       if (!mountedRef.current) return;
       if (!res.ok) {
-        // Leave comes back once no Start call might still land (and none went through).
-        if (unansweredRef.current === 0) s.claim.release(false);
-        // The ceiling already ended this press, and said so.
-        if (!owns()) return;
-        endPress();
         const code = res.error.code;
+        if (code === "MATCH_NOT_PENDING") movedOnRef.current = true;
+        // Leave comes back only once no Start call might still land and none
+        // was refused as already started: a Leave on a started match would
+        // make it a `timekeeper_left` no contest. The re-read moves the screen
+        // instead. A call that went through already marked the face-off
+        // started (`release(true)`), which keeps Leave gone whatever this does.
+        if (unansweredRef.current === 0 && !movedOnRef.current) s.claim.release(false);
+        // The ceiling already ended this press, and said so; a late already-started refusal still re-reads.
+        if (!owns()) {
+          if (code === "MATCH_NOT_PENDING") reconcileNow();
+          return;
+        }
+        endPress();
         // Already started (a lost reply, or a retry after a late landing): the read moves all three phones to live.
         if (code !== "MATCH_NOT_PENDING") {
           toast.error(

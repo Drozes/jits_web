@@ -154,7 +154,11 @@ export interface ConfirmResultState {
  * match is disputed or voided: no toast, the read moves the wizard) and
  * failed (`Couldn't confirm` / `Check your connection and try again.`). A
  * failure for a confirmation the DB already credits shows nothing, and a
- * reply after the step unmounted shows nothing. A broadcast only triggers a read
+ * reply after the step unmounted shows nothing. The ceiling drops the reply
+ * of the attempt it ended: even an ok one changes nothing and goes into no
+ * TK-RC3 record (the athlete was told that confirm failed); if the server
+ * took it late, the reconciler's reads show it, and the TK-RC3 record then
+ * comes from that listing (PM29, UX spec 3.4). A broadcast only triggers a read
  * (M-R8): a confirmation heard by broadcast may be of a result the
  * timekeeper has since edited. And the athlete is told once when an edit
  * resets their confirmation (TK-RC3, `useResultEditNotice`): mounted here,

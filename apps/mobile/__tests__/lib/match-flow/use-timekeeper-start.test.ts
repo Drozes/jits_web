@@ -13,7 +13,8 @@
  *    the guidance, an already-started refusal says nothing; with no reply
  *    after SEND_CEILING_MS the press ends as that failure and Start comes
  *    back, while the claim (no Leave) is held until every Start call sent
- *    has answered.
+ *    has answered, and never given back once any call was refused as
+ *    already started (the re-read moves the screen).
  */
 import * as React from "react";
 import { act, renderHook } from "@testing-library/react-native";
@@ -26,7 +27,7 @@ jest.mock("@jits/shared/api/timekeeper", () => ({
   startMatchAsTimekeeper: (...a: unknown[]) => mockStart(...a),
 }));
 
-import type { TimekeeperStartBlocker } from "@jits/shared/api/timekeeper";
+import { mapTimekeeperError, type TimekeeperStartBlocker } from "@jits/shared/api/timekeeper";
 import { toast } from "@/components/ui/toast";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import {
@@ -302,13 +303,70 @@ describe("useTimekeeperStart, PM29: honest Start", () => {
     expect(result.current.starting).toBe(false);
   });
 
-  it("already started (MATCH_NOT_PENDING): no toast, a re-read", async () => {
+  // Every `_tk_start_blockers` HINT `start_match` refuses with, mapped as the
+  // shared wrapper maps it: the title alone (UX spec 5.6; COPY-DECK Round 9,
+  // "not for blocker refusals"), Leave back and a re-read.
+  it.each([
+    "timekeeper_required",
+    "athletes_not_ready",
+    "weight_flagged",
+    "weight_recheck_pending",
+    "weight_check_pending",
+    "timekeeper_not_recording",
+  ])("the blocker refusal %s: the title alone, the claim given back, a re-read", async (hint) => {
+    const raised = { code: "P0001", hint, message: "server words", details: "" } as Parameters<typeof mapTimekeeperError>[0];
+    const error = mapTimekeeperError(raised);
+    expect(error.code).not.toBe("UNKNOWN");
+    mockStart.mockResolvedValue({ ok: false, error });
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith({ text1: "Couldn't start match" });
+    expect(release.mock.calls).toEqual([[false]]);
+    expect(reconcileNow).toHaveBeenCalledTimes(1);
+  });
+
+  it("already started (MATCH_NOT_PENDING): no toast, a re-read, and the claim is kept (no Leave on a started match)", async () => {
     mockStart.mockResolvedValue({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
     const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
     await tap(result);
     expect(toast.error).not.toHaveBeenCalled();
     expect(reconcileNow).toHaveBeenCalledTimes(1);
     expect(result.current.starting).toBe(false);
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it("a retry refused as already started while the first call is still out, then the first call's late failure: the claim is never given back", async () => {
+    const answer = deferStarts();
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS);
+    });
+    await tap(result);
+    expect(mockStart).toHaveBeenCalledTimes(2);
+    await answer(1, { ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+    expect(result.current.starting).toBe(false);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(release).not.toHaveBeenCalled();
+    // The first call's reply was lost: it fails late, with nothing more said and the claim still held.
+    await answer(0, { ok: false, error: { code: "UNKNOWN", message: "network" } });
+    expect(release).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("the first call's late already-started refusal after the ceiling: the claim is kept, nothing is said, and it re-reads", async () => {
+    const answer = deferStarts();
+    const { result } = renderHook(() => useTimekeeperStart(params), { wrapper });
+    await tap(result);
+    await act(async () => {
+      jest.advanceTimersByTime(SEND_CEILING_MS);
+    });
+    expect(reconcileNow).toHaveBeenCalledTimes(1);
+    await answer(0, { ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+    expect(release).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(reconcileNow).toHaveBeenCalledTimes(2);
   });
 
   it("a thrown call is a failure with the guidance", async () => {

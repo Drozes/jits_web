@@ -139,6 +139,8 @@ describe("timekeeper mode", () => {
     expect(mockToast.error).toHaveBeenCalledWith({ text1: "Dispute window closed" });
     expect(shown()).not.toContain("Results lock");
     expect(p.onWindowClosed).toHaveBeenCalledTimes(1);
+    // The shipped error haptic, once.
+    expect(mockHapticError).toHaveBeenCalledTimes(1);
   });
 
   it.each(["ALREADY_DISPUTED", "MATCH_NOT_PENDING"])("moved on (%s): the form closes with no toast and no haptic, and re-reads", async (code) => {
@@ -252,6 +254,16 @@ describe("timekeeper mode", () => {
 });
 
 describe("without the prop: the shipped form", () => {
+  it("a closed window keeps the shipped error haptic, once, with the error's message", async () => {
+    mockDispute.mockResolvedValue({ ok: false, error: { code: "DISPUTE_WINDOW_CLOSED", message: "Results lock 24 hours after the match." } });
+    const p = form({ timekeeperMode: undefined });
+    const s = render(<DisputeForm {...p} />);
+    await submit(s);
+    expect(mockToast.error).toHaveBeenCalledWith({ text1: "Dispute window closed", description: "Results lock 24 hours after the match." });
+    expect(mockHapticError).toHaveBeenCalledTimes(1);
+    expect(p.onWindowClosed).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the error's message, and is never bounded", async () => {
     jest.useFakeTimers();
     mockDispute.mockResolvedValueOnce({ ok: false, error: { code: "UNKNOWN", message: "boom" } });

@@ -381,14 +381,54 @@ describe("Start (TK-K6): the server's blocker order, then the camera", () => {
       s.getByTestId("faceoff-start");
     });
 
-    it("moved on (MATCH_NOT_PENDING: the match already started): no toast, a re-read", async () => {
+    it("moved on (MATCH_NOT_PENDING: the match already started): no toast, a re-read, and Leave stays hidden until the read moves the screen", async () => {
       mockStart.mockResolvedValue({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
       const s = render(<Screen state={tkState(OPEN)} />);
       await flush();
+      s.getByTestId("faceoff-leave");
       fireEvent.press(s.getByTestId("faceoff-start"));
       await flush();
       expect(toast.error).not.toHaveBeenCalled();
       expect(mockReconcile).toHaveBeenCalled();
+      // A Leave now would make a started match a timekeeper_left no contest.
+      expect(s.queryByTestId("faceoff-leave")).toBeNull();
+      expect(mockLeave).not.toHaveBeenCalled();
+    });
+
+    it("a retry refused as already started while the first call is still out, then the first call's late failure: Leave never comes back", async () => {
+      jest.useFakeTimers();
+      try {
+        let first!: (v: unknown) => void;
+        let second!: (v: unknown) => void;
+        mockStart.mockReturnValueOnce(new Promise((r) => (first = r))).mockReturnValueOnce(new Promise((r) => (second = r)));
+        const s = render(<Screen state={tkState(OPEN)} />);
+        await flush();
+        fireEvent.press(s.getByTestId("faceoff-start"));
+        await flush();
+        await act(async () => {
+          jest.advanceTimersByTime(SEND_CEILING_MS);
+        });
+        fireEvent.press(s.getByTestId("faceoff-start"));
+        await flush();
+        expect(mockStart).toHaveBeenCalledTimes(2);
+        // The retry meets a match that is no longer pending: no toast, a re-read, no Leave.
+        await act(async () => {
+          second({ ok: false, error: { code: "MATCH_NOT_PENDING", message: "server words" } });
+        });
+        await flush();
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(s.queryByTestId("faceoff-leave")).toBeNull();
+        // The first call's reply was lost: it fails late. Still no Leave, and nothing more is said.
+        await act(async () => {
+          first({ ok: false, error: { code: "UNKNOWN", message: "network" } });
+        });
+        await flush();
+        expect(toast.error).toHaveBeenCalledTimes(1);
+        expect(s.queryByTestId("faceoff-leave")).toBeNull();
+        expect(mockLeave).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it("no reply: Starting just before the ceiling; at it Couldn't start match with the guidance and Start back, while Leave stays hidden until that call answers", async () => {
