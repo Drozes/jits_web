@@ -8,10 +8,9 @@
  * steps' defaults, exactly as before. The TK-RC3 notice is the confirm step's
  * own (`confirm-step-tk.test.tsx`), not the renderer's.
  *
- * The verdict's result after an edit (A8) is not M5's: the renderer's
- * verdict branch is M1's (PM27 (a) gives M5 only the result and confirm
- * spreads), so it still reads this phone's first copy of the result type
- * (jits-o47s.34).
+ * The verdict, for an athlete whose result the timekeeper records, reads
+ * the match in hand's result once it has one (`verdictStepInputs`): an edit
+ * (A8) changes it under this phone's first copy, which the wizard keeps.
  */
 import * as React from "react";
 import { render } from "@testing-library/react-native";
@@ -50,6 +49,7 @@ import { MatchStepRenderer } from "@/components/match-flow/match-step-renderer";
 import { MatchFlowProvider } from "@/lib/match-flow/match-flow-context";
 import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
 import type { MatchStep } from "@/lib/match-flow/step-router";
+import { verdictStepInputs } from "@/lib/match-flow/result-confirm-inputs";
 
 const p = (id: string, name: string, outcome: string | null) => ({
   athlete_id: id,
@@ -233,7 +233,23 @@ describe("timekeeper mode", () => {
     }
   });
 
-  it.todo("verdict after an edit reads the match in hand's result type (A8): the renderer's verdict branch is M1's (jits-o47s.34)");
+  it("verdict after a submission-to-draw edit: the match in hand's draw, with no finish name or time from this phone's first copy (A8)", () => {
+    // This phone's first copy: ME won by armbar at 61 s. The timekeeper's edit made it a draw.
+    const edited = matchOf(true, { participants: [p("me", "Mina Park", "draw"), p("opp", "Demo Okafor", "draw")] });
+    render(element(edited, "me", "summary", ["me", "opp"], STATE, undefined, { submissionTypes: [ARMBAR] }));
+    expect(mockProps.verdict).toMatchObject({ submissionName: null, finishTimeSeconds: null, resultType: "draw" });
+  });
+
+  it("verdict after a draw-to-submission edit: the match in hand's submission, named and timed (A8)", () => {
+    const edited = matchOf(true, { participants: [p("me", "Mina Park", "win"), p("opp", "Demo Okafor", "loss")] });
+    render(
+      element(edited, "me", "summary", ["me", "opp"], STATE, undefined, {
+        resultData: { result: "draw" },
+        extras: { submissionName: "Armbar", finishTimeSeconds: 95 },
+      }),
+    );
+    expect(mockProps.verdict).toMatchObject({ submissionName: "Armbar", finishTimeSeconds: 95, resultType: "submission" });
+  });
 
   it("verdict before the match in hand has a result: this phone's copy stands in", () => {
     const unread = matchOf(true, { participants: [p("me", "Mina Park", null), p("opp", "Demo Okafor", null)] });
@@ -241,4 +257,50 @@ describe("timekeeper mode", () => {
     expect(mockProps.verdict).toMatchObject({ submissionName: "Armbar", finishTimeSeconds: 61, resultType: "submission" });
   });
 
+});
+
+describe("verdictStepInputs", () => {
+  const extras = { submissionName: null, finishTimeSeconds: null };
+
+  it("a two-athlete match passes the renderer's name and this phone's copy through unchanged", () => {
+    const roles = deriveMatchRoles(matchOf(false, { participants: [p("me", "Mina Park", "draw"), p("opp", "Demo Okafor", "draw")] }), "me")!;
+    // Even with the match's outcome a draw, flag OFF reads exactly what it read before.
+    expect(verdictStepInputs(roles, FIRST_COPY, extras, "Armbar")).toEqual({ submissionName: "Armbar", finishTimeSeconds: 61, resultType: "submission" });
+    expect(verdictStepInputs(roles, null, extras, null)).toEqual({ submissionName: null, finishTimeSeconds: null, resultType: null });
+  });
+
+  // The renderer's submissionName is the match's recorded name, else the
+  // catalogue's for this phone's code: "Armbar" for FIRST_COPY.
+  it("after a submission-to-draw edit: the draw, with no finish name or time from this phone's first copy (A8)", () => {
+    const roles = deriveMatchRoles(matchOf(true, { participants: [p("me", "Mina Park", "draw"), p("opp", "Demo Okafor", "draw")] }), "me")!;
+    expect(verdictStepInputs(roles, FIRST_COPY, extras, "Armbar")).toEqual({ submissionName: null, finishTimeSeconds: null, resultType: "draw" });
+  });
+
+  it("after a draw-to-submission edit: a submission, named and timed as the match has it (A8)", () => {
+    const roles = deriveMatchRoles(matchOf(true, { participants: [p("me", "Mina Park", "win"), p("opp", "Demo Okafor", "loss")] }), "me")!;
+    expect(verdictStepInputs(roles, { result: "draw" }, { submissionName: "Armbar", finishTimeSeconds: 95 }, "Armbar")).toEqual({
+      submissionName: "Armbar",
+      finishTimeSeconds: 95,
+      resultType: "submission",
+    });
+  });
+
+  it("a timekeeper-mode athlete before the match in hand has a result: this phone's copy stands in", () => {
+    const roles = deriveMatchRoles(matchOf(true, { participants: [p("me", "Mina Park", null), p("opp", "Demo Okafor", null)] }), "me")!;
+    expect(verdictStepInputs(roles, FIRST_COPY, extras, "Armbar")).toEqual({ submissionName: "Armbar", finishTimeSeconds: 61, resultType: "submission" });
+  });
+
+  it("the timekeeper-mode timekeeper is never given the match's result (its summary is the done screen)", () => {
+    const roles = deriveMatchRoles(matchOf(true, { participants: [p("me", "Mina Park", "draw"), p("opp", "Demo Okafor", "draw")] }), "tk")!;
+    expect(verdictStepInputs(roles, FIRST_COPY, extras, "Armbar")).toEqual({ submissionName: "Armbar", finishTimeSeconds: 61, resultType: "submission" });
+  });
+
+  it("a timekeeper-mode athlete reads the match in hand's result once it has one", () => {
+    const roles = deriveMatchRoles(matchOf(true, { participants: [p("me", "Mina Park", "loss"), p("opp", "Demo Okafor", "win")] }), "me")!;
+    expect(verdictStepInputs(roles, FIRST_COPY, { submissionName: "Kimura", finishTimeSeconds: 120 }, "Kimura")).toEqual({
+      submissionName: "Kimura",
+      finishTimeSeconds: 120,
+      resultType: "submission",
+    });
+  });
 });

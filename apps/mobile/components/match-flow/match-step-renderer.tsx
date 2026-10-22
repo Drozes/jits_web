@@ -6,7 +6,7 @@ import type { MatchExtras } from "@/lib/match-flow/match-extras";
 import type { RecordedMeta } from "@/lib/match-flow/use-record-result";
 import { useMatchFlow } from "@/lib/match-flow/match-flow-context";
 import { stepSeams } from "@/lib/match-flow/step-seams";
-import { confirmStepInputs, resultStepInputs } from "@/lib/match-flow/result-confirm-inputs";
+import { confirmStepInputs, resultStepInputs, verdictStepInputs } from "@/lib/match-flow/result-confirm-inputs";
 import { EndStep } from "./steps/end-step";
 import { ResultStep } from "./steps/result-step";
 import { ConfirmStep } from "./steps/confirm-step";
@@ -254,12 +254,10 @@ export function MatchStepRenderer(props: MatchStepRendererProps) {
         outcome={ownOutcome}
         me={me}
         opponent={opponent}
-        submissionName={submissionName}
-        finishTimeSeconds={extras.finishTimeSeconds ?? resultData?.finishTimeSeconds ?? null}
+        {...verdictStepInputs(roles, resultData, extras, submissionName)}
         upload={deriveUploadBannerState(recorder.state, recorder.error, upload)}
         uploadedVideoId={upload?.status === "uploaded" ? (upload.videoId ?? null) : null}
         confirmedAthleteIds={confirmedAthleteIds}
-        resultType={resultData?.result ?? null}
         completedAt={extras.completedAt}
       />
     );

@@ -1,23 +1,19 @@
 /**
- * What the step renderer hands the result and confirm steps beyond the
- * policy seams (`step-seams.ts`), read from the match in hand (timekeeper
- * mode slice M5). Pure, so the renderer only spreads them and the rules live
- * here, tested on their own.
+ * What the step renderer hands the result and confirm steps and the verdict
+ * beyond the policy seams (`step-seams.ts`), read from the match in hand
+ * (timekeeper mode slice M5). Pure, so the renderer only spreads them and the
+ * rules live here, tested on their own.
  *
  * A two-athlete match gets the steps' defaults (no final clock, no stall, no
- * timekeeper result), so its result and confirm steps read exactly as
- * before; the one input both modes get is the confirm's match length (A25:
- * the confirm shows the winner, how it ended and the match length, no
- * rating).
- *
- * Not here: the verdict's result after a timekeeper edit (A8). The
- * renderer's verdict branch is M1's (PM27 (a) gives M5 only the result and
- * confirm spreads), so it still reads this phone's first copy of the result
- * type (jits-o47s.34).
+ * timekeeper result), so its result and confirm steps and its verdict read
+ * exactly as before; the one input both modes get is the confirm's match
+ * length (A25: the confirm shows the winner, how it ended and the match
+ * length, no rating).
  */
 import type { MatchDetails } from "@jits/shared/api/queries";
 import type { TimekeeperMatchState } from "@jits/shared/api/timekeeper";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
+import type { MatchExtras } from "./match-extras";
 import type { MatchRoles } from "./match-roles";
 import { resultFromRoles } from "./reconcile";
 
@@ -85,5 +81,41 @@ export function confirmStepInputs(
         }
       : undefined,
     matchLengthSeconds: match.final_elapsed_s ?? initialFinishSeconds ?? null,
+  };
+}
+
+/** The verdict's result inputs (`VerdictStep`'s `submissionName`, `finishTimeSeconds`, `resultType`). */
+export interface VerdictStepInputs {
+  submissionName: string | null;
+  finishTimeSeconds: number | null;
+  resultType: BroadcastResult["result"] | null;
+}
+
+/**
+ * The result the verdict names. A two-athlete match: the match in hand's
+ * finish, else this phone's copy of the result, exactly as before
+ * (`submissionName` is the renderer's: the match's name, else the
+ * catalogue's for this phone's code).
+ *
+ * An athlete whose result the timekeeper records: the match in hand's
+ * result whenever it has one. A result edit (A8) changes it under this
+ * phone's first copy, which the wizard keeps, so that copy stands in only
+ * before the match has a result (as on the confirm step and the
+ * timekeeper's done screen).
+ */
+export function verdictStepInputs(
+  roles: Pick<MatchRoles, "me" | "opponent" | "athletes" | "caps">,
+  resultData: BroadcastResult | null,
+  extras: Pick<MatchExtras, "submissionName" | "finishTimeSeconds">,
+  submissionName: string | null,
+): VerdictStepInputs {
+  const fromMatch = roles.caps.resultEntry === "wait" ? resultFromRoles(roles) : null;
+  if (fromMatch) {
+    return { submissionName: extras.submissionName, finishTimeSeconds: extras.finishTimeSeconds, resultType: fromMatch.result };
+  }
+  return {
+    submissionName,
+    finishTimeSeconds: extras.finishTimeSeconds ?? resultData?.finishTimeSeconds ?? null,
+    resultType: resultData?.result ?? null,
   };
 }
