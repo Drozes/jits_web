@@ -42,7 +42,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getMatchDetails, getMatchDetailsWithConfirmations } from "@jits/shared/api/queries";
 import { confirmMatchResult, pauseMatch, recordMatchResult, resumeMatch } from "@jits/shared/api/mutations";
-import { getAiProcessingConsent, recordAiProcessingConsent } from "@jits/shared/api/moderation";
+import { composeConsentVersion, getAiProcessingConsent, hasConsentedToText, recordAiProcessingConsent } from "@jits/shared/api/moderation";
 import {
   checkAthleteWeightAsTimekeeper,
   editMatchResult,
@@ -253,13 +253,19 @@ export class TimekeeperBot {
     return ev.row;
   }
 
-  /** The timekeep sheet's consent: record it once when it is missing (TK-T7, TK-T8). */
+  /**
+   * The timekeep sheet's consent: record it once when the timekeeper text's
+   * current version is missing (TK-T7, TK-T8), keeping any athlete consent,
+   * as the app's `giveAiConsent("timekeeper")` does (jits-o47s.46).
+   */
   async consentIfNeeded(): Promise<void> {
     if (this.consented) return;
     const current = await this.trace.rpc(this.actor, "getAiProcessingConsent", {}, () => getAiProcessingConsent(this.client, this.me.id));
     if (!current.ok) throw new Error(`getAiProcessingConsent failed: ${JSON.stringify(current.error)}`);
-    if (!current.data.consentAt) {
-      const r = await this.trace.rpc(this.actor, "recordAiProcessingConsent", {}, () => recordAiProcessingConsent(this.client));
+    const prior = current.data.consentAt ? current.data.version : null;
+    if (!hasConsentedToText(prior, "timekeeper")) {
+      const version = composeConsentVersion(prior, "timekeeper");
+      const r = await this.trace.rpc(this.actor, "recordAiProcessingConsent", { version }, () => recordAiProcessingConsent(this.client, version));
       if (!r.ok) throw new Error(`recordAiProcessingConsent failed: ${JSON.stringify(r.error)}`);
     }
     this.consented = true;

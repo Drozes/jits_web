@@ -14,7 +14,7 @@ import {
   type StartBlockedReason,
   type StartGate,
 } from "@/lib/match-flow/use-timekeeper-start";
-import { useAiConsent } from "@/lib/moderation/ai-consent";
+import { consentedIn, useAiConsent } from "@/lib/moderation/ai-consent";
 import { usePalette } from "@/lib/theme/palette";
 import { TRACKING, typeStep } from "@/lib/typography";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
@@ -23,6 +23,7 @@ import { useMatchRecorder } from "../match-recorder-context";
 import { FaceoffAthleteRow } from "./faceoff-athlete-row";
 import { useFaceoffContext } from "./faceoff-context";
 import { FaceoffTopBar, LeaveButton, useLeaveOnBack } from "./faceoff-top";
+import { TimekeeperConsentGate } from "./timekeeper-consent-gate";
 import { TimeoutChip } from "./timeout-chip";
 
 export interface FaceoffTimekeeperProps {
@@ -126,17 +127,21 @@ export function FaceoffTimekeeper({ matchId, ratedWeights }: FaceoffTimekeeperPr
         />
       ))}
       <LockedRecordRow />
+      <TimekeeperConsentGate timekeeperId={roles.timekeeper?.id ?? null} />
       {camera === "denied" ? <CameraDenied /> : null}
       <StartControl gate={gate} starting={starting} onStart={start} />
     </View>
   );
 }
 
-/** The timekeeper's camera (D12): permission from the recorder, AI processing consent from the cache. */
+/**
+ * The timekeeper's camera (D12): permission from the recorder, consent to
+ * the timekeeper text from the cache (asked by `TimekeeperConsentGate`).
+ */
 function useCameraGate(timekeeperId: string | null) {
   const recorder = useMatchRecorder();
   const consent = useAiConsent();
-  const consented = timekeeperId != null && consent.athleteId === timekeeperId && consent.consentAt !== null;
+  const consented = consentedIn(consent, timekeeperId, "timekeeper");
   return cameraGateOf(recorder.permission, consented);
 }
 

@@ -58,7 +58,7 @@ import {
   trackRunStart,
   trackUploaded,
 } from "./upload-telemetry";
-import { aiConsentGivenAtMs, hasAiConsentFor, isAiConsentKnownFor } from "@/lib/moderation/ai-consent";
+import { aiConsentGivenAtMs, hasAnyAiConsentFor, isAiConsentKnownFor } from "@/lib/moderation/ai-consent";
 
 /**
  * The single retry / resume authority for match-video uploads.
@@ -1459,7 +1459,7 @@ function sweepJob(job: PendingUploadJob): Promise<void> | null {
   // stays on disk and resumes when that athlete signs back in.
   if (!mine) return isJobExpired(job) ? expireJob(job, false) : null;
   // AI processing consent (5.1.2(i), jits-rog5.11), for this owner only.
-  const consented = hasAiConsentFor(owner);
+  const consented = hasAnyAiConsentFor(owner);
   // An otherwise uploadable clip waiting for consent never expires; with
   // consent its window counts from the consent (a clip that waited gets a
   // full week from the OK). A failure that waits for the athlete keeps the
@@ -1642,7 +1642,7 @@ export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "oth
 export async function retryMatchVideoUpload(matchId: string): Promise<RetryResult> {
   if (runners.has(matchId)) return "running";
   if (!owner) return "signed_out";
-  if (!hasAiConsentFor(owner)) return "needs_consent";
+  if (!hasAnyAiConsentFor(owner)) return "needs_consent";
   const job = await loadUploadJob(matchId);
   if (!job) return "no_job";
   if (job.uploaderAthleteId !== owner) return "other_athlete";

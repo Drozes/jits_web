@@ -9,7 +9,7 @@ import { useTimekeeperPresence } from "@/lib/match-flow/use-timekeeper-presence"
 import { useLiveEndHold } from "@/lib/match-flow/use-live-end-hold";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
-import { useAiConsent, useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
+import { consentedIn, useAiConsent, useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
 import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
 import { capturePolicyFor } from "@/lib/match-flow/capture-policy";
 import { MatchFlowProvider } from "@/lib/match-flow/match-flow-context";
@@ -109,8 +109,9 @@ export function MatchFlowWizard({
   // live step arms the recorder. An athlete's own "Record from my phone", as
   // always. The timekeeper always records (D12, `caps.recordingRequired`),
   // whatever the device toggle says, but still only with AI processing
-  // consent (5.1.2(i)): without it the timekeeper's camera gate asks first.
-  const consented = aiConsent.athleteId === currentAthleteId && aiConsent.consentAt !== null;
+  // consent (5.1.2(i)) to the timekeeper text: without it the timekeeper's
+  // camera gate asks first.
+  const consented = consentedIn(aiConsent, currentAthleteId, "timekeeper");
   const recording = recordingOptIn || (roles?.caps.recordingRequired === true && consented);
   // Step state + the DB reconciler that keeps it honest when a broadcast is
   // missed (jits-wfpo, -bh2v, -vh7m, -bmei, -mzfu). See use-wizard-sync.ts.

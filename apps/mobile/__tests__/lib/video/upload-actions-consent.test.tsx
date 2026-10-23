@@ -42,7 +42,8 @@ it("asks Before you upload, with what is shared", async () => {
   await act(async () => result.current.retry());
   const [title, body] = (Alert.alert as jest.Mock).mock.calls[0];
   expect(title).toBe("Before you upload");
-  expect(body).toMatch(/with your display name, rating and weight division, is sent to Google Gemini/);
+  expect(body).toMatch(/with your display name, rating and weight division, may be sent to third-party AI services/);
+  expect(body).not.toMatch(/Gemini|OpenAI|Google/);
   expect(buttons().map((b) => b.text)).toEqual(["Not now", "Read the Privacy Policy", "Delete clip", "Allow and upload"]);
 });
 
