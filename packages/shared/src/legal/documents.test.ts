@@ -153,9 +153,15 @@ describe("no named service providers (jits-o47s.46)", () => {
   // The documents are shown in the app; the owner wants providers described
   // generically. The app stores, sign-in options and Instagram handles are
   // platforms the user deals with directly and are not on this list.
-  const NAMES = /gemini|openai|chatgpt|anthropic|claude|supabase|vercel|sentry|google cloud|vertex/i;
+  const NAMES =
+    /\b(gemini|openai|chatgpt|anthropic|claude|supabase|vercel|sentry|google cloud|vertex|expo|650 industries|amazon|aws|meta|whatsapp|firebase|cloud run)\b/i;
 
   it("none of the four documents names one", () => {
     for (const doc of ALL) expect(doc.markdown).not.toMatch(NAMES);
+  });
+
+  it("matches whole words only, so ordinary words never trip it", () => {
+    for (const w of ["laws", "metadata", "Expos\u00e9", "exposure", "jaws"]) expect(w).not.toMatch(NAMES);
+    for (const w of ["Expo", "AWS", "Meta", "WhatsApp", "Cloud Run"]) expect(w).toMatch(NAMES);
   });
 });
