@@ -1469,7 +1469,10 @@ test("reweigh fails when the prompt never goes (the re-weigh did not clear TK-F7
 test("the honoured-ready evidence is the app's: the shipped waiting line, Blue's ready plate, TK-F5 for any name", () => {
   const body = src("apps/mobile/components/match-flow/faceoff/faceoff-body.tsx");
   assert.match(body, /`WAITING FOR \$\{oppName\}\.\.\.`/, "the shipped waiting line the merged ready reuses");
-  assert.match(body, /accessibilityLabel=\{`You, \$\{f\.myReady \? "ready" : "waiting"\}`\}/, "Blue's ready plate");
+  // In timekeeper mode Blue's ready state is status text in the face-off chip (jits-o47s.45), fed f.myReady.
+  const top = src("apps/mobile/components/match-flow/faceoff/faceoff-top.tsx");
+  assert.match(top, /readiness=\{f\.timekeeper \? \{ me: f\.myReady, opponent: f\.opponentReady \} : undefined\}/, "the chip reads the ready state");
+  assert.match(top, /accessibilityLabel=\{`You, \$\{readiness\.me \? "ready" : "not ready"\}`\}/, "Blue's ready status");
   const any = anyNameRe(C["TK-F5"]);
   assert.ok(any.test(C["TK-F5"]("D. Green")));
   assert.ok(any.test(C["TK-F5"]("Demo Gold")));
