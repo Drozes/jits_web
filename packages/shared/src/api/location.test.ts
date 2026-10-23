@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  closeBandMeters,
+  formatBandLabel,
+  formatBandSpoken,
   getArenaNearby,
   getMatchLocationRequired,
   parseArenaNearby,
@@ -229,7 +232,7 @@ describe("arena presence replies carry no verdict or distance", () => {
 });
 
 describe("getArenaNearby", () => {
-  it("parses nearby mode with both lists", async () => {
+  it("parses a server from before spec 023 exactly as before (no new keys)", async () => {
     const { supabase, rpc } = rpcClient({
       data: {
         ok: true,
@@ -237,6 +240,7 @@ describe("getArenaNearby", () => {
         on_the_mat: [{ athlete_id: "a-1", distance_band: "on_the_mat" }],
         close: [
           { athlete_id: "a-2", distance_band: "under_500m" },
+          { athlete_id: "a-4", distance_band: "under_1km" },
           { athlete_id: "a-3", distance_band: "under_2km" },
         ],
       },
@@ -248,22 +252,127 @@ describe("getArenaNearby", () => {
         mode: "nearby",
         onTheMat: ["a-1"],
         close: [
-          { athleteId: "a-2", band: "under_500m" },
-          { athleteId: "a-3", band: "under_2km" },
+          { athleteId: "a-2", band: "under_500m", bandMaxM: 500, canChallenge: false },
+          { athleteId: "a-4", band: "under_1km", bandMaxM: 1000, canChallenge: false },
+          { athleteId: "a-3", band: "under_2km", bandMaxM: 2000, canChallenge: false },
         ],
+        ranges: null,
       },
     });
     expect(rpc).toHaveBeenCalledWith("get_arena_nearby", {});
   });
 
-  it.each(["flag_off", "no_location"])("parses %s with empty lists", (mode) => {
-    expect(parseArenaNearby({ ok: true, mode, on_the_mat: [], close: [] })).toEqual({ mode, onTheMat: [], close: [] });
+  it("parses the spec 023 payload: band_max_m, can_challenge and ranges", () => {
+    expect(
+      parseArenaNearby({
+        ok: true,
+        mode: "nearby",
+        ranges: { same_mat_m: 600, close_radius_m: 3000, band_edges_m: [1000, 3000] },
+        on_the_mat: [{ athlete_id: "a-1", distance_band: "on_the_mat", band_max_m: null, can_challenge: true }],
+        close: [
+          { athlete_id: "a-2", distance_band: "under_1km", band_max_m: 1000, can_challenge: true },
+          { athlete_id: "a-3", distance_band: "under_3km", band_max_m: 3000, can_challenge: false },
+        ],
+      }),
+    ).toEqual({
+      mode: "nearby",
+      onTheMat: ["a-1"],
+      close: [
+        { athleteId: "a-2", band: "under_1km", bandMaxM: 1000, canChallenge: true },
+        { athleteId: "a-3", band: "under_3km", bandMaxM: 3000, canChallenge: false },
+      ],
+      ranges: { sameMatM: 600, closeRadiusM: 3000, bandEdgesM: [1000, 3000] },
+    });
   });
 
-  it("drops rows with an unknown band and refuses unknown shapes", () => {
+  it.each(["flag_off", "no_location"])("parses %s with empty lists", (mode) => {
+    expect(parseArenaNearby({ ok: true, mode, on_the_mat: [], close: [] })).toEqual({
+      mode,
+      onTheMat: [],
+      close: [],
+      ranges: null,
+    });
     expect(
-      parseArenaNearby({ ok: true, mode: "nearby", on_the_mat: [], close: [{ athlete_id: "a", distance_band: "under_5km" }] }),
-    ).toEqual({ mode: "nearby", onTheMat: [], close: [] });
+      parseArenaNearby({
+        ok: true,
+        mode,
+        ranges: { same_mat_m: 600, close_radius_m: 3000, band_edges_m: [1000, 3000] },
+        on_the_mat: [],
+        close: [],
+      })?.ranges,
+    ).toEqual({ sameMatM: 600, closeRadiusM: 3000, bandEdgesM: [1000, 3000] });
+  });
+
+  it("keeps any under_* band, derives meters from the id, still drops a malformed band", () => {
+    const res = parseArenaNearby({
+      ok: true,
+      mode: "nearby",
+      on_the_mat: [],
+      close: [
+        { athlete_id: "a", distance_band: "under_5km" },
+        { athlete_id: "b", distance_band: "under_1500m" },
+        { athlete_id: "c", distance_band: "under_3km", band_max_m: 3000 },
+        { athlete_id: "d", distance_band: "far" },
+        { athlete_id: "e", distance_band: "under_km" },
+        { athlete_id: "f", distance_band: "under_0km" },
+        { athlete_id: "g", distance_band: "under_2mi" },
+        { athlete_id: "h" },
+        { distance_band: "under_1km" },
+        "nope",
+      ],
+    });
+    expect(res?.close).toEqual([
+      { athleteId: "a", band: "under_5km", bandMaxM: 5000, canChallenge: false },
+      { athleteId: "b", band: "under_1500m", bandMaxM: 1500, canChallenge: false },
+      { athleteId: "c", band: "under_3km", bandMaxM: 3000, canChallenge: false },
+    ]);
+  });
+
+  it("uses band_max_m only when it is a positive integer, else the id's meters", () => {
+    const res = parseArenaNearby({
+      ok: true,
+      mode: "nearby",
+      on_the_mat: [],
+      close: [
+        { athlete_id: "a", distance_band: "under_3km", band_max_m: 2500 },
+        { athlete_id: "b", distance_band: "under_3km", band_max_m: "3000" },
+        { athlete_id: "c", distance_band: "under_3km", band_max_m: 0 },
+        { athlete_id: "d", distance_band: "under_3km", band_max_m: 12.5 },
+        { athlete_id: "e", distance_band: "under_3km", band_max_m: null },
+      ],
+    });
+    expect(res?.close.map((r) => r.bandMaxM)).toEqual([2500, 3000, 3000, 3000, 3000]);
+  });
+
+  it("reads can_challenge as true only when it is exactly true", () => {
+    const res = parseArenaNearby({
+      ok: true,
+      mode: "nearby",
+      on_the_mat: [],
+      close: [
+        { athlete_id: "a", distance_band: "under_1km", can_challenge: true },
+        { athlete_id: "b", distance_band: "under_1km", can_challenge: false },
+        { athlete_id: "c", distance_band: "under_1km", can_challenge: "true" },
+        { athlete_id: "d", distance_band: "under_1km", can_challenge: 1 },
+        { athlete_id: "e", distance_band: "under_1km" },
+      ],
+    });
+    expect(res?.close.map((r) => r.canChallenge)).toEqual([true, false, false, false, false]);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["not an object", [600, 3000]],
+    ["partial", { same_mat_m: 600, close_radius_m: 3000 }],
+    ["a string number", { same_mat_m: "600", close_radius_m: 3000, band_edges_m: [1000, 3000] }],
+    ["an empty edge list", { same_mat_m: 600, close_radius_m: 3000, band_edges_m: [] }],
+    ["a bad edge", { same_mat_m: 600, close_radius_m: 3000, band_edges_m: [1000, "3000"] }],
+    ["a zero radius", { same_mat_m: 600, close_radius_m: 0, band_edges_m: [1000, 3000] }],
+  ])("ranges is null when %s", (_label, ranges) => {
+    expect(parseArenaNearby({ ok: true, mode: "nearby", ranges, on_the_mat: [], close: [] })?.ranges).toBeNull();
+  });
+
+  it("refuses unknown shapes", () => {
     expect(parseArenaNearby({ ok: false, code: "not_active" })).toBeNull();
     expect(parseArenaNearby({ ok: true, mode: "weird" })).toBeNull();
     expect(parseArenaNearby(null)).toBeNull();
@@ -273,6 +382,37 @@ describe("getArenaNearby", () => {
     const { supabase } = rpcClient({ data: null, error: { message: "nope", code: "PGRST202" } });
     const res = await getArenaNearby(supabase);
     expect(res.ok).toBe(false);
+  });
+});
+
+describe("closeBandMeters", () => {
+  it.each([
+    ["under_500m", 500],
+    ["under_1km", 1000],
+    ["under_1500m", 1500],
+    ["under_2km", 2000],
+    ["under_3km", 3000],
+    ["under_25km", 25000],
+    ["under_km", null],
+    ["under_0m", null],
+    ["over_1km", null],
+    ["under_1KM", null],
+  ])("%s is %p", (band, meters) => {
+    expect(closeBandMeters(band)).toBe(meters);
+  });
+});
+
+describe("formatBandLabel / formatBandSpoken", () => {
+  it.each([
+    [500, "< 500 m", "under 500 meters"],
+    [600, "< 600 m", "under 600 meters"],
+    [1000, "< 1 km", "under 1 kilometer"],
+    [1500, "< 1500 m", "under 1500 meters"],
+    [2000, "< 2 km", "under 2 kilometers"],
+    [3000, "< 3 km", "under 3 kilometers"],
+  ])("%p m reads %p and is spoken %p", (m, label, spoken) => {
+    expect(formatBandLabel(m)).toBe(label);
+    expect(formatBandSpoken(m)).toBe(spoken);
   });
 });
 

@@ -26,6 +26,7 @@ import { LIVE_SWITCH_COOLDOWN_MS } from "./constants";
 import type {
   IncomingChallenge,
   OutgoingChallenge,
+  SendChallengeOptions,
 } from "./use-arena-challenge";
 
 export interface ArenaState {
@@ -79,7 +80,7 @@ export interface ArenaController {
    * already said why, so callers stay silent.
    */
   goLive: () => Promise<boolean | LiveSwitchIgnored>;
-  sendChallenge: (opponentId: string, opponentName: string) => Promise<void>;
+  sendChallenge: (opponentId: string, opponentName: string, options?: SendChallengeOptions) => Promise<void>;
   cancelOutgoing: () => Promise<void>;
   clearCap: () => void;
   /** "Later" on the prompt: minimize it into the chip. Sends nothing. */
@@ -482,13 +483,25 @@ export function useLiveMenuOpen(): boolean {
  * `useOnMatCount` prefers this over the whole-lobby count. `count: null`:
  * nearby mode, but the rows are not known yet.
  */
-export type NearbyOnMatCount = { count: number | null } | null;
+export type NearbyOnMatCount = {
+  count: number | null;
+  /**
+   * The Online & close rows the Arena renders (jr_be spec 023 section 8.5),
+   * null while unknown. The chip reads `LIVE · N NEARBY` from it when nobody
+   * else is on the mat.
+   */
+  close?: number | null;
+} | null;
 
 let nearbyOnMat: NearbyOnMatCount = null;
 const nearbyListeners = new Set<() => void>();
 
 export function publishNearbyOnMatCount(next: NearbyOnMatCount): void {
-  if (next === nearbyOnMat || (next && nearbyOnMat && next.count === nearbyOnMat.count)) return;
+  if (
+    next === nearbyOnMat ||
+    (next && nearbyOnMat && next.count === nearbyOnMat.count && (next.close ?? null) === (nearbyOnMat.close ?? null))
+  )
+    return;
   nearbyOnMat = next;
   for (const l of nearbyListeners) l();
 }
@@ -502,6 +515,16 @@ export function subscribeNearbyOnMatCount(callback: () => void): () => void {
   return () => {
     nearbyListeners.delete(callback);
   };
+}
+
+/**
+ * The Arena's Online & close count for the header chip (jr_be spec 023
+ * section 8.5): what the Arena publishes in nearby mode, null otherwise
+ * (fallback mode, the Arena not mounted, or rows not known yet).
+ */
+export function useNearbyCloseCount(): number | null {
+  const get = () => nearbyOnMat?.close ?? null;
+  return useSyncExternalStore(subscribeNearbyOnMatCount, get, get);
 }
 
 // ---------------------------------------------------------------------------
@@ -1130,8 +1153,8 @@ export const arenaActions: ArenaActions = Object.freeze({
   toggle: () => liveSwitch.toggle().then(() => undefined),
   goOffline: liveSwitch.goOffline,
   goLive: liveSwitch.goLive,
-  sendChallenge: (opponentId: string, opponentName: string) =>
-    controller?.sendChallenge(opponentId, opponentName) ?? Promise.resolve(),
+  sendChallenge: (opponentId: string, opponentName: string, options?: SendChallengeOptions) =>
+    controller?.sendChallenge(opponentId, opponentName, options) ?? Promise.resolve(),
   cancelOutgoing: () => controller?.cancelOutgoing() ?? Promise.resolve(),
   clearCap: () => controller?.clearCap(),
   tuckIncoming: () => controller?.tuckIncoming(),

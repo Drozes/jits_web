@@ -303,7 +303,25 @@ describe("sending a challenge", () => {
       opponentName: "Rival",
       expiresAt: FAR_EXPIRY,
       createdAt: null,
+      // Sent from the mat: no Online & close band (jr_be spec 023).
+      closeBand: null,
     });
+  });
+
+  it("records the Online & close band a challenge was sent from (jr_be spec 023)", async () => {
+    const { result } = mount();
+    const closeBand = { maxM: 3000, label: "< 3 km", spoken: "under 3 kilometers" };
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival", { closeBand });
+    });
+
+    // Sent at once, exactly like a challenge from the mat.
+    expect(mockCreateChallenge).toHaveBeenCalledWith(
+      expect.anything(),
+      { opponentId: OPPONENT, challengerWeight: 180 },
+    );
+    expect(result.current.outgoing?.closeBand).toEqual(closeBand);
   });
 
   it("keeps the row's created_at on the plate for the WAITING countdown", async () => {

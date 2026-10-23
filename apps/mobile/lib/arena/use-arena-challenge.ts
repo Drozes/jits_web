@@ -110,10 +110,35 @@ export interface ChallengeTimes {
   expiresAt: string | null;
 }
 
+/**
+ * The Online & close band an outgoing challenge was sent from (jr_be spec 023
+ * section 8.3): the challenger's waiting strip says the opponent is possibly
+ * on a different mat, with this band.
+ */
+export interface OutgoingCloseBand {
+  /** The band's upper edge in meters. */
+  maxM: number;
+  /** As drawn, `< 3 km`. */
+  label: string;
+  /** As spoken, `under 3 kilometers`. */
+  spoken: string;
+}
+
+export interface SendChallengeOptions {
+  /** Sent from an Online & close row: its band. Null or absent: from the mat. */
+  closeBand?: OutgoingCloseBand | null;
+}
+
 export interface OutgoingChallenge {
   challengeId: string;
   opponentId: string;
   opponentName: string;
+  /**
+   * Sent from an Online & close row: its band (jr_be spec 023). `null`: sent
+   * from the mat. Absent (`undefined`): restored from the server after a
+   * relaunch, so the Arena derives it from its current close list.
+   */
+  closeBand?: OutgoingCloseBand | null;
   /**
    * The row's `expires_at`, when known. The challenger clears the waiting
    * plate on its own once this passes, so a sweep whose realtime UPDATE never
@@ -404,7 +429,7 @@ export interface UseArenaChallengeResult {
    * frees up, and the roster has to stop offering an action that cannot work.
    */
   capReached: boolean;
-  sendChallenge: (opponentId: string, opponentName: string) => Promise<void>;
+  sendChallenge: (opponentId: string, opponentName: string, options?: SendChallengeOptions) => Promise<void>;
   accept: () => Promise<void>;
   decline: () => Promise<void>;
   cancelOutgoing: () => Promise<void>;
@@ -1676,7 +1701,7 @@ export function useArenaChallenge({
   );
 
   const sendChallenge = React.useCallback(
-    (opponentId: string, opponentName: string) =>
+    (opponentId: string, opponentName: string, options?: SendChallengeOptions) =>
       runExclusive(async () => {
         // F13: only someone on the mat right now can answer a live prompt.
         // An athlete still flagged "open to challenges" but gone from the
@@ -1737,6 +1762,7 @@ export function useArenaChallenge({
           opponentName,
           expiresAt: result.data.expiresAt ?? null,
           createdAt: result.data.createdAt ?? null,
+          closeBand: options?.closeBand ?? null,
         });
       }),
     [runExclusive, setOutgoingBoth, explainRefusedInsert, settle],

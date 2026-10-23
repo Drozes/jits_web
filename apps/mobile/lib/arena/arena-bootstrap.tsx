@@ -19,7 +19,7 @@ import * as React from "react";
 import { AppState } from "react-native";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { ATHLETE_STATUS } from "@jits/shared/constants";
-import { getMyLookingForRanked } from "@jits/shared/api/location";
+import { formatBandLabel, formatBandSpoken, getMyLookingForRanked } from "@jits/shared/api/location";
 import type { AthleteGuardRow } from "@jits/shared/api/queries";
 import { ChallengePromptSheet } from "@/components/arena/challenge-prompt-sheet";
 import { GoLiveLocationSheet } from "@/components/arena/go-live-location-sheet";
@@ -41,6 +41,7 @@ import {
   registerArenaController,
 } from "./arena-store";
 import { useArenaChallenge } from "./use-arena-challenge";
+import { useNearbyCloseRow } from "./use-arena-nearby";
 import { useArenaLive } from "./use-arena-live";
 import { cancelLocationSheet, useGoLiveLocationSheet, useLegacyGoLiveReadingRefresh } from "./go-live-location";
 import {
@@ -367,6 +368,18 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
   const reconnecting = useTrueAfter(isLive && !lobbyKnown, RECONNECTING_GRACE_MS);
   const { incoming, outgoing, incomingCount, incomingTucked, isBusy, capReached } =
     challenge;
+  // The challenger is in my own Online & close list (jr_be spec 023 8.4):
+  // the prompt says "Maybe a different mat". Memoized on the band so the
+  // prompt's frozen copy only changes when the band does.
+  const incomingClose = useNearbyCloseRow(incoming?.challengerId ?? null, athlete.id);
+  const incomingCloseMaxM = incomingClose?.bandMaxM ?? null;
+  const incomingCloseBand = React.useMemo(
+    () =>
+      incomingCloseMaxM === null
+        ? null
+        : { label: formatBandLabel(incomingCloseMaxM), spoken: formatBandSpoken(incomingCloseMaxM) },
+    [incomingCloseMaxM],
+  );
   useArenaLiveKeepAwake(isLive && !inMatch);
   // Timekeeper mode, the asked person (spec 9.1): never two modals. While the
   // timekeep sheet is open the challenge prompt is held (gated below, as a
@@ -588,6 +601,7 @@ function ArenaOwner({ athlete }: { athlete: AthleteGuardRow }) {
         // The prompt shows the first challenge; the rest are "+N more" (AC-S6).
         moreCount={Math.max(0, incomingCount - 1)}
         viewer={{ elo: athlete.current_elo ?? null, weight: athlete.current_weight ?? null }}
+        closeBand={incomingCloseBand}
       />
       {/* Accepted, but the server says the two are not on one mat yet (flag
           on): the reason, Retry and Cancel. Never over a match. */}

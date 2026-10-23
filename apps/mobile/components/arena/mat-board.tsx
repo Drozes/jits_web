@@ -362,7 +362,8 @@ export function IncomingStrip({
  * (harness contract, exact), and the countdown as its own element
  * (`8 minutes 12 seconds left`), so VoiceOver hears both. `helper` is a line
  * under the strip (timekeeper mode's TK-AR2, only while the flag is known
- * ON; the screen decides).
+ * ON; the screen decides). `closeBand` adds the different-mat line inside
+ * the strip (Arena ranges); the two are independent.
  */
 export function WaitingStrip({
   name,
@@ -371,6 +372,7 @@ export function WaitingStrip({
   onCancel,
   disabled,
   helper = null,
+  closeBand = null,
 }: {
   name: string;
   source: CountdownSource | null;
@@ -378,16 +380,39 @@ export function WaitingStrip({
   onCancel: () => void;
   disabled: boolean;
   helper?: string | null;
+  /**
+   * Sent to someone in Online & close (jr_be spec 023 section 8.4): a gentle
+   * second line, `Possibly on a different mat · < 3 km`. Never blocking.
+   */
+  closeBand?: { label: string; spoken: string } | null;
 }) {
+  const line = (
+    <StripLine
+      head={`Waiting · ${name}`}
+      headAccessibilityLabel={`Waiting for ${name}`}
+      source={source}
+      active={active}
+      countdownTestID="arena-strip-countdown"
+    />
+  );
   const strip = (
     <StripShell rail="neutral" testID="arena-strip-waiting">
-      <StripLine
-        head={`Waiting · ${name}`}
-        headAccessibilityLabel={`Waiting for ${name}`}
-        source={source}
-        active={active}
-        countdownTestID="arena-strip-countdown"
-      />
+      {closeBand ? (
+        <View className="flex-1">
+          <View className="flex-row">{line}</View>
+          <Text
+            testID="arena-strip-waiting-close"
+            numberOfLines={2}
+            accessibilityLabel={`Possibly on a different mat, ${closeBand.spoken} away.`}
+            maxFontSizeMultiplier={MAX_SCALE}
+            className="mt-0.5 font-body text-small text-ink-2"
+          >
+            {`Possibly on a different mat · ${closeBand.label}`}
+          </Text>
+        </View>
+      ) : (
+        line
+      )}
       <OutlineAction
         label="Cancel"
         accessibilityLabel="Cancel challenge"
@@ -720,8 +745,9 @@ export type MatRowAction =
   /** I am at the server's 3 pending outgoing cap. */
   | { kind: "capped" }
   /**
-   * Online & close (within 2 km, not on my mat): no ROLL, a challenge would
-   * fail the proximity gate. A neutral hint instead, never red.
+   * Online & close, not on my mat, and the server does not allow a
+   * challenge (`can_challenge` false or absent): no ROLL. A neutral hint
+   * instead, never red.
    */
   | { kind: "not-on-mat" };
 
