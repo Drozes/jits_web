@@ -1,5 +1,5 @@
 import * as React from "react";
-import { ActivityIndicator, BackHandler, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, BackHandler, Text, TextInput, View, type StyleProp, type ViewStyle } from "react-native";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { ChevronLeft, Pencil } from "lucide-react-native";
 import { isValidAthleteWeight } from "@jits/shared/api/athlete-weight";
@@ -94,7 +94,14 @@ export function FaceoffTop({ phase, me, opponent }: FaceoffTopProps) {
       {phase === "weight" ? (
         <FightCard me={me} opponent={opponent} />
       ) : (
-        <FaceoffChip me={me} opponent={opponent} myWeight={f.myWeight} opponentWeight={f.opponentWeight} />
+        <FaceoffChip
+          me={me}
+          opponent={opponent}
+          myWeight={f.myWeight}
+          opponentWeight={f.opponentWeight}
+          // Timekeeper mode only: a two-athlete match keeps its ready plates in the body (jits-o47s.45).
+          readiness={f.timekeeper ? { me: f.myReady, opponent: f.opponentReady } : undefined}
+        />
       )}
     </View>
   );
@@ -351,7 +358,10 @@ function MyWeight() {
 /**
  * The compressed athlete chip on the ready phase and, with `onMedia`, over
  * the camera on the countdown. On the page it is a themed plate; over the
- * camera it is the fixed light chip of the live athlete bar.
+ * camera it is the fixed light chip of the live athlete bar. With
+ * `readiness` (the ready phase, timekeeper mode) each side also says whether
+ * that athlete is ready, as plain status text under its rating and weight
+ * (jits-o47s.45: the old dashed boxes below read as buttons).
  */
 export function FaceoffChip({
   me,
@@ -360,6 +370,7 @@ export function FaceoffChip({
   opponentWeight,
   height = 64,
   onMedia = false,
+  readiness,
 }: {
   me: FaceoffAthlete;
   opponent: FaceoffAthlete;
@@ -368,6 +379,8 @@ export function FaceoffChip({
   height?: number;
   /** Over the camera (the countdown): the fixed light chip. */
   onMedia?: boolean;
+  /** Each side's ready state, on the page only (the ready phase). The chip grows to fit the status line. */
+  readiness?: { me: boolean; opponent: boolean };
 }) {
   const p = usePalette();
   const c = onMedia
@@ -380,7 +393,14 @@ export function FaceoffChip({
   return (
     <View
       testID="faceoff-chip"
-      style={{ height, flexDirection: "row", backgroundColor: c.bg, borderWidth: 1, borderColor: c.border, borderRadius: FIGHT_RADIUS.button }}
+      style={{
+        ...(readiness ? { minHeight: height, paddingVertical: 10 } : { height }),
+        flexDirection: "row",
+        backgroundColor: c.bg,
+        borderWidth: 1,
+        borderColor: c.border,
+        borderRadius: FIGHT_RADIUS.button,
+      }}
     >
       <View style={{ flex: 1, paddingLeft: 12, justifyContent: "center", gap: 5, minWidth: 0 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
@@ -392,6 +412,14 @@ export function FaceoffChip({
         <Text className="font-mono" style={[typeStep("caption"), { paddingLeft: 11, color: c.ink3 }, TABULAR]}>
           {meta(me, myWeight)}
         </Text>
+        {readiness ? (
+          <ReadyStatus
+            testID="ready-status-you"
+            done={readiness.me}
+            accessibilityLabel={`You, ${readiness.me ? "ready" : "waiting"}`}
+            style={{ paddingLeft: 11 }}
+          />
+        ) : null}
       </View>
       <View style={{ width: 44, alignItems: "center", justifyContent: "center" }}>
         <Text className="font-display" style={[typeStep("title-xl"), { color: c.vs }]}>
@@ -405,7 +433,56 @@ export function FaceoffChip({
         <Text className="font-mono" style={[typeStep("caption"), { color: c.ink3 }, TABULAR]}>
           {meta(opponent, opponentWeight)}
         </Text>
+        {/* The testID and the "Opponent, ready|waiting" label stay fixed: the
+            match-loop harness reads both. */}
+        {readiness ? (
+          <ReadyStatus
+            testID="ready-panel-opponent"
+            done={readiness.opponent}
+            accessibilityLabel={`Opponent, ${readiness.opponent ? "ready" : "waiting"}`}
+            style={{ justifyContent: "flex-end" }}
+          />
+        ) : null}
       </View>
+    </View>
+  );
+}
+
+/**
+ * One side's ready state in the chip: an amber dot and `NOT READY` while
+ * pending (attention), an ink check and `READY` when done (done is not a
+ * gain, so never Gain Green). Plain text, no edge: it is not a control.
+ */
+function ReadyStatus({
+  done,
+  testID,
+  accessibilityLabel,
+  style,
+}: {
+  done: boolean;
+  testID: string;
+  accessibilityLabel: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const p = usePalette();
+  const color = done ? p.text : p.amber;
+  return (
+    <View
+      testID={testID}
+      accessible
+      accessibilityLabel={accessibilityLabel}
+      style={[{ minHeight: 16, flexDirection: "row", alignItems: "center", gap: 6 }, style]}
+    >
+      {done ? (
+        <Text className="font-mono-bold" style={[typeStep("caption"), { color }, TABULAR]}>
+          {"✓"}
+        </Text>
+      ) : (
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+      )}
+      <Mono bold color={color} spacing="caps-l" numberOfLines={1}>
+        {done ? "READY" : "NOT READY"}
+      </Mono>
     </View>
   );
 }

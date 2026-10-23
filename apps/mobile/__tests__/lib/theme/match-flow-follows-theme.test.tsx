@@ -8,7 +8,7 @@
  */
 import * as React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { render } from "@testing-library/react-native";
+import { render, within } from "@testing-library/react-native";
 import { AA_NORMAL_TEXT, composite, contrast } from "../../support/token-contrast";
 import { libItem, libVideo } from "../../support/film-fixtures";
 
@@ -46,7 +46,8 @@ function Probe() {
 }
 
 type Styled = { props: { style?: unknown } };
-const flat = (el: Styled) => (StyleSheet.flatten(el.props.style as never) ?? {}) as { color?: string; backgroundColor?: string };
+const flat = (el: Styled) =>
+  (StyleSheet.flatten(el.props.style as never) ?? {}) as { color?: string; backgroundColor?: string; borderWidth?: number; [k: string]: unknown };
 const color = (el: Styled) => flat(el).color;
 const bgOf = (el: Styled) => flat(el).backgroundColor;
 
@@ -186,6 +187,54 @@ describe("FaceoffChip", () => {
     const s = render(<FaceoffChip {...athletes} onMedia />);
     expect(bgOf(s.getByTestId("faceoff-chip"))).toBe(ON_MEDIA.chip);
     expect(color(s.getByText("K. Reyes"))).toBe(ON_MEDIA.ink);
+  });
+
+  it("with no readiness draws no status line (the countdown, the crew step, a two-athlete match)", () => {
+    const s = render(<FaceoffChip {...athletes} />);
+    expect(s.queryByTestId("ready-status-you")).toBeNull();
+    expect(s.queryByTestId("ready-panel-opponent")).toBeNull();
+    expect(flat(s.getByTestId("faceoff-chip") as Styled)).toMatchObject({ height: 64 });
+  });
+
+  it.each(["light", "dark"] as const)(
+    "readiness, pending: an amber dot and NOT READY on each side, left and right, read as waiting (%s, jits-o47s.45)",
+    (scheme) => {
+      mockScheme = scheme;
+      const p = paletteFor(scheme);
+      const s = render(<FaceoffChip {...athletes} readiness={{ me: false, opponent: false }} />);
+      const you = s.getByTestId("ready-status-you");
+      const opp = s.getByTestId("ready-panel-opponent");
+      expect(you.props.accessible).toBe(true);
+      expect(you.props.accessibilityLabel).toBe("You, waiting");
+      expect(opp.props.accessibilityLabel).toBe("Opponent, waiting");
+      for (const side of [you, opp]) {
+        const label = within(side).getByText("NOT READY");
+        expect(color(label)).toBe(p.amber);
+        expect(within(side).queryByText("✓")).toBeNull();
+        // Plain text: no edge that reads as a control.
+        expect(flat(side).borderWidth).toBeUndefined();
+      }
+      expect(flat(opp)).toMatchObject({ justifyContent: "flex-end" });
+      expect(flat(s.getByTestId("faceoff-chip") as Styled)).toMatchObject({ minHeight: 64 });
+      expect(JSON.stringify(s.toJSON())).not.toMatch(/dashed/);
+    },
+  );
+
+  it.each(["light", "dark"] as const)("readiness, done: an ink check and READY, never green or red (%s)", (scheme) => {
+    mockScheme = scheme;
+    const p = paletteFor(scheme);
+    const s = render(<FaceoffChip {...athletes} readiness={{ me: true, opponent: false }} />);
+    const you = s.getByTestId("ready-status-you");
+    expect(you.props.accessibilityLabel).toBe("You, ready");
+    expect(color(within(you).getByText("READY"))).toBe(p.text);
+    expect(color(within(you).getByText("✓"))).toBe(p.text);
+    expect(color(within(you).getByText("READY"))).not.toBe(p.win);
+    expect(color(within(you).getByText("READY"))).not.toBe(p.cta);
+    const opp = s.getByTestId("ready-panel-opponent");
+    expect(opp.props.accessibilityLabel).toBe("Opponent, waiting");
+    s.rerender(<FaceoffChip {...athletes} readiness={{ me: true, opponent: true }} />);
+    expect(s.getByTestId("ready-panel-opponent").props.accessibilityLabel).toBe("Opponent, ready");
+    expect(color(within(s.getByTestId("ready-panel-opponent")).getByText("READY"))).toBe(p.text);
   });
 });
 

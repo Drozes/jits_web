@@ -127,18 +127,24 @@ function ReadyCheck({ opponent, durationSeconds }: FaceoffBodyProps) {
         </View>
       )}
       <RecordingPanel oppName={oppName} durationSeconds={durationSeconds ?? null} />
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <StatusPlate label={f.myReady ? "YOU · READY" : "YOU · NOT READY"} done={f.myReady} accessibilityLabel={`You, ${f.myReady ? "ready" : "waiting"}`} />
-        {/* The testID and the "Opponent, ready|waiting" label stay fixed: the
-            match-loop harness reads both. */}
-        <StatusPlate
-          testID="ready-panel-opponent"
-          label={`${oppName} · ${f.opponentReady ? "READY" : "NOT READY"}`}
-          done={f.opponentReady}
-          align="right"
-          accessibilityLabel={`Opponent, ${f.opponentReady ? "ready" : "waiting"}`}
-        />
-      </View>
+      {/* In timekeeper mode each athlete's ready state is status text in the
+          face-off chip above (FaceoffChip `readiness`, jits-o47s.45): these
+          dashed plates read as buttons. A two-athlete match keeps them, as
+          the flag-OFF golden snapshot pins. */}
+      {f.timekeeper ? null : (
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <StatusPlate label={f.myReady ? "YOU · READY" : "YOU · NOT READY"} done={f.myReady} accessibilityLabel={`You, ${f.myReady ? "ready" : "waiting"}`} />
+          {/* The testID and the "Opponent, ready|waiting" label stay fixed: the
+              match-loop harness reads both. */}
+          <StatusPlate
+            testID="ready-panel-opponent"
+            label={`${oppName} · ${f.opponentReady ? "READY" : "NOT READY"}`}
+            done={f.opponentReady}
+            align="right"
+            accessibilityLabel={`Opponent, ${f.opponentReady ? "ready" : "waiting"}`}
+          />
+        </View>
+      )}
       {f.timekeeper ? <TimekeeperRow timekeeper={f.timekeeper} /> : null}
       {f.timekeeper ? (
         <MergedReady opponentDisplayName={opponent.displayName} timekeeper={f.timekeeper} />

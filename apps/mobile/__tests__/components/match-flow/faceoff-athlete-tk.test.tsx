@@ -275,10 +275,10 @@ describe("the merged ready (TK-F4 to TK-F6)", () => {
     await flush();
     // Succeeded, not in the state yet: busy, never an optimistic ready.
     expect(s.getByTestId("ready-button").props.accessibilityState).toMatchObject({ busy: true });
-    expect(s.getByText("YOU · NOT READY")).toBeTruthy();
+    expect(s.getByTestId("ready-status-you").props.accessibilityLabel).toBe("You, waiting");
     s.rerender(view(tkState({ ready: [OP] })));
     await flush();
-    expect(s.getByText("YOU · READY")).toBeTruthy();
+    expect(s.getByTestId("ready-status-you").props.accessibilityLabel).toBe("You, ready");
     expect(s.getByTestId("merged-ready-waiting").props.children).toBe("WAITING FOR M. REYES...");
     s.rerender(view(tkState({ ready: [OP, CH] })));
     await flush();
@@ -361,6 +361,29 @@ describe("the merged ready (TK-F4 to TK-F6)", () => {
     await flush();
     expect(s.queryByText(notice)).toBeNull();
     expect(renderedAbove(s.toJSON(), "weight-check-flag")).toEqual(before);
+  });
+});
+
+describe("readiness in the face-off chip (jits-o47s.45)", () => {
+  it("each side's status is text in the chip; the dashed ready plates are gone", async () => {
+    const s = render(<Harness phase="ready" state={tkState({ ready: [CH] })} />);
+    await flush();
+    const chip = s.getByTestId("faceoff-chip");
+    // The viewer (op-1) is not ready; the challenger is.
+    expect(within(chip).getByTestId("ready-status-you").props.accessibilityLabel).toBe("You, waiting");
+    expect(within(chip).getByTestId("ready-panel-opponent").props.accessibilityLabel).toBe("Opponent, ready");
+    within(within(chip).getByTestId("ready-status-you")).getByText("NOT READY");
+    within(within(chip).getByTestId("ready-panel-opponent")).getByText("READY");
+    expect(s.queryByText("YOU · NOT READY")).toBeNull();
+    expect(s.queryByText(/^M\. REYES · (NOT )?READY$/)).toBeNull();
+    expect(s.getAllByTestId("ready-panel-opponent")).toHaveLength(1);
+  });
+
+  it("the weigh-in has no ready status (the full fight card)", async () => {
+    const s = render(<Harness phase="weight" />);
+    await flush();
+    expect(s.queryByTestId("ready-status-you")).toBeNull();
+    expect(s.queryByTestId("ready-panel-opponent")).toBeNull();
   });
 });
 

@@ -149,7 +149,7 @@ export const TK_UI = {
    * server's in timekeeper mode, so each one means the server has Blue's
    * `match_ready` row): the merged ready's waiting line (its testID, the
    * shipped `WAITING FOR {OPP}...`, or TK-F5 once both are ready) and Blue's
-   * own ready plate (`You, ready`, faceoff-body.tsx).
+   * own ready status (`You, ready`, the face-off chip in faceoff-top.tsx).
    */
   readyHonoured: [
     { id: "merged-ready-waiting" },
