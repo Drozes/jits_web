@@ -275,7 +275,7 @@ describe("the merged ready (TK-F4 to TK-F6)", () => {
     await flush();
     // Succeeded, not in the state yet: busy, never an optimistic ready.
     expect(s.getByTestId("ready-button").props.accessibilityState).toMatchObject({ busy: true });
-    expect(s.getByTestId("ready-status-you").props.accessibilityLabel).toBe("You, waiting");
+    expect(s.getByTestId("ready-status-you").props.accessibilityLabel).toBe("You, not ready");
     s.rerender(view(tkState({ ready: [OP] })));
     await flush();
     expect(s.getByTestId("ready-status-you").props.accessibilityLabel).toBe("You, ready");
@@ -370,7 +370,7 @@ describe("readiness in the face-off chip (jits-o47s.45)", () => {
     await flush();
     const chip = s.getByTestId("faceoff-chip");
     // The viewer (op-1) is not ready; the challenger is.
-    expect(within(chip).getByTestId("ready-status-you").props.accessibilityLabel).toBe("You, waiting");
+    expect(within(chip).getByTestId("ready-status-you").props.accessibilityLabel).toBe("You, not ready");
     expect(within(chip).getByTestId("ready-panel-opponent").props.accessibilityLabel).toBe("Opponent, ready");
     within(within(chip).getByTestId("ready-status-you")).getByText("NOT READY");
     within(within(chip).getByTestId("ready-panel-opponent")).getByText("READY");
@@ -450,7 +450,7 @@ describe("no auto-start, no ready broadcast (spec 4.2 Start, Q2)", () => {
     const s = render(<Harness phase="ready" />);
     await flush();
     act(() => mockHandlers.onReadySignal?.(CH));
-    expect(s.getByTestId("ready-panel-opponent").props.accessibilityLabel).toBe("Opponent, waiting");
+    expect(s.getByTestId("ready-panel-opponent").props.accessibilityLabel).toBe("Opponent, not ready");
   });
 
   it("the timekeeper's timer_started only re-reads (M-R8); the reconciler moves to live", async () => {

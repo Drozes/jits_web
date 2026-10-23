@@ -1387,7 +1387,7 @@ test("the honoured-ready evidence is the app's: the shipped waiting line, Blue's
   // In timekeeper mode Blue's ready state is status text in the face-off chip (jits-o47s.45), fed f.myReady.
   const top = src("apps/mobile/components/match-flow/faceoff/faceoff-top.tsx");
   assert.match(top, /readiness=\{f\.timekeeper \? \{ me: f\.myReady, opponent: f\.opponentReady \} : undefined\}/, "the chip reads the ready state");
-  assert.match(top, /accessibilityLabel=\{`You, \$\{readiness\.me \? "ready" : "waiting"\}`\}/, "Blue's ready status");
+  assert.match(top, /accessibilityLabel=\{`You, \$\{readiness\.me \? "ready" : "not ready"\}`\}/, "Blue's ready status");
   const any = anyNameRe(C["TK-F5"]);
   assert.ok(any.test(C["TK-F5"]("D. Green")));
   assert.ok(any.test(C["TK-F5"]("Demo Gold")));

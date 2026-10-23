@@ -728,14 +728,18 @@ export class Screens {
     await this.idb.tapQ({ id: "ready-button" }, 10_000);
   }
 
-  /** The ready step's Opponent panel (testID ready-panel-opponent, label "Opponent, ready"). */
+  /**
+   * The ready step's Opponent panel (testID ready-panel-opponent, label
+   * "Opponent, ready"): the two-athlete plate says "waiting" while pending,
+   * the timekeeper-mode chip "not ready". `/, ready$/` rejects both.
+   */
   async waitOpponentReady(timeoutMs: number): Promise<void> {
     const start = Date.now();
     for (;;) {
       const els = await this.idb.describe();
       const panel =
         els.find((e) => e.AXUniqueId === "ready-panel-opponent") ??
-        els.find((e) => /^opponent, (ready|waiting)$/i.test(e.AXLabel ?? ""));
+        els.find((e) => /^opponent, (ready|waiting|not ready)$/i.test(e.AXLabel ?? ""));
       if (panel && /, ready$/i.test(panel.AXLabel ?? "")) return;
       if (Date.now() - start > timeoutMs) throw new ExpectationTimeout("opponent panel to show Ready", timeoutMs, summarise(els));
       await new Promise((r) => setTimeout(r, 350));

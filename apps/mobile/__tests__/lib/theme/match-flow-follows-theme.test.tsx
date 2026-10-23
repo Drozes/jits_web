@@ -38,7 +38,7 @@ import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { darkTokens, lightTokens } from "@/lib/tokens";
 import { FightButton, drawDeltaColor } from "@/components/match-flow/fight/fight-ui";
 import { FilmBadge } from "@/components/film-room/status-badge";
-import { FaceoffChip } from "@/components/match-flow/faceoff/faceoff-top";
+import { FaceoffChip, TOP_BAR_FONT_CAP } from "@/components/match-flow/faceoff/faceoff-top";
 
 function Probe() {
   const p = usePalette();
@@ -197,7 +197,7 @@ describe("FaceoffChip", () => {
   });
 
   it.each(["light", "dark"] as const)(
-    "readiness, pending: an amber dot and NOT READY on each side, left and right, read as waiting (%s, jits-o47s.45)",
+    "readiness, pending: an amber dot and NOT READY on each side, left and right, read as not ready (%s, jits-o47s.45)",
     (scheme) => {
       mockScheme = scheme;
       const p = paletteFor(scheme);
@@ -205,8 +205,8 @@ describe("FaceoffChip", () => {
       const you = s.getByTestId("ready-status-you");
       const opp = s.getByTestId("ready-panel-opponent");
       expect(you.props.accessible).toBe(true);
-      expect(you.props.accessibilityLabel).toBe("You, waiting");
-      expect(opp.props.accessibilityLabel).toBe("Opponent, waiting");
+      expect(you.props.accessibilityLabel).toBe("You, not ready");
+      expect(opp.props.accessibilityLabel).toBe("Opponent, not ready");
       for (const side of [you, opp]) {
         const label = within(side).getByText("NOT READY");
         expect(color(label)).toBe(p.amber);
@@ -220,6 +220,13 @@ describe("FaceoffChip", () => {
     },
   );
 
+  it("readiness: the status text and the check cap Dynamic Type at the top bar's cap", () => {
+    const s = render(<FaceoffChip {...athletes} readiness={{ me: true, opponent: false }} />);
+    expect(within(s.getByTestId("ready-status-you")).getByText("READY").props.maxFontSizeMultiplier).toBe(TOP_BAR_FONT_CAP);
+    expect(within(s.getByTestId("ready-status-you")).getByText("✓").props.maxFontSizeMultiplier).toBe(TOP_BAR_FONT_CAP);
+    expect(within(s.getByTestId("ready-panel-opponent")).getByText("NOT READY").props.maxFontSizeMultiplier).toBe(TOP_BAR_FONT_CAP);
+  });
+
   it.each(["light", "dark"] as const)("readiness, done: an ink check and READY, never green or red (%s)", (scheme) => {
     mockScheme = scheme;
     const p = paletteFor(scheme);
@@ -231,7 +238,7 @@ describe("FaceoffChip", () => {
     expect(color(within(you).getByText("READY"))).not.toBe(p.win);
     expect(color(within(you).getByText("READY"))).not.toBe(p.cta);
     const opp = s.getByTestId("ready-panel-opponent");
-    expect(opp.props.accessibilityLabel).toBe("Opponent, waiting");
+    expect(opp.props.accessibilityLabel).toBe("Opponent, not ready");
     s.rerender(<FaceoffChip {...athletes} readiness={{ me: true, opponent: true }} />);
     expect(s.getByTestId("ready-panel-opponent").props.accessibilityLabel).toBe("Opponent, ready");
     expect(color(within(s.getByTestId("ready-panel-opponent")).getByText("READY"))).toBe(p.text);

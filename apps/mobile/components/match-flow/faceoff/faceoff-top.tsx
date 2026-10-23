@@ -416,7 +416,7 @@ export function FaceoffChip({
           <ReadyStatus
             testID="ready-status-you"
             done={readiness.me}
-            accessibilityLabel={`You, ${readiness.me ? "ready" : "waiting"}`}
+            accessibilityLabel={`You, ${readiness.me ? "ready" : "not ready"}`}
             style={{ paddingLeft: 11 }}
           />
         ) : null}
@@ -433,13 +433,13 @@ export function FaceoffChip({
         <Text className="font-mono" style={[typeStep("caption"), { color: c.ink3 }, TABULAR]}>
           {meta(opponent, opponentWeight)}
         </Text>
-        {/* The testID and the "Opponent, ready|waiting" label stay fixed: the
-            match-loop harness reads both. */}
+        {/* The testID and the "Opponent, ready|not ready" label are what the
+            match-loop harness reads (waitOpponentReady). */}
         {readiness ? (
           <ReadyStatus
             testID="ready-panel-opponent"
             done={readiness.opponent}
-            accessibilityLabel={`Opponent, ${readiness.opponent ? "ready" : "waiting"}`}
+            accessibilityLabel={`Opponent, ${readiness.opponent ? "ready" : "not ready"}`}
             style={{ justifyContent: "flex-end" }}
           />
         ) : null}
@@ -474,13 +474,14 @@ function ReadyStatus({
       style={[{ minHeight: 16, flexDirection: "row", alignItems: "center", gap: 6 }, style]}
     >
       {done ? (
-        <Text className="font-mono-bold" style={[typeStep("caption"), { color }, TABULAR]}>
+        <Text maxFontSizeMultiplier={TOP_BAR_FONT_CAP} className="font-mono-bold" style={[typeStep("caption"), { color }, TABULAR]}>
           {"✓"}
         </Text>
       ) : (
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
       )}
-      <Mono bold color={color} spacing="caps-l" numberOfLines={1}>
+      {/* Capped like the top bar, so NOT READY never truncates and READY's check never grows its row. */}
+      <Mono bold color={color} spacing="caps-l" numberOfLines={1} maxFontSizeMultiplier={TOP_BAR_FONT_CAP}>
         {done ? "READY" : "NOT READY"}
       </Mono>
     </View>
