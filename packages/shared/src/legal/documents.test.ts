@@ -52,11 +52,11 @@ describe("bundled legal documents", () => {
   it("reads the effective and last-updated dates in both label styles and both languages", () => {
     for (const doc of [TERMS_EN, PRIVACY_EN]) {
       expect(doc.effectiveDate).toBe("October 13, 2026");
-      expect(doc.lastUpdated).toBe("October 13, 2026");
+      expect(doc.lastUpdated).toBe("October 23, 2026");
     }
     for (const doc of [TERMS_FR, PRIVACY_FR]) {
       expect(doc.effectiveDate).toBe("13 octobre 2026");
-      expect(doc.lastUpdated).toBe("13 octobre 2026");
+      expect(doc.lastUpdated).toBe("23 octobre 2026");
     }
     for (const doc of ALL) {
       expect(doc.effectiveDate).not.toMatch(/[*:]/);

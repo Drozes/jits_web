@@ -4,7 +4,7 @@
 
 **Date d'entrée en vigueur :** 13 octobre 2026
 
-**Dernière mise à jour :** 13 octobre 2026
+**Dernière mise à jour :** 23 octobre 2026
 
 Sous réserve de l'article 28.11 et de la loi applicable, la version française et la version anglaise des présentes conditions ont la même valeur. English version: https://elorated.com/terms
 
@@ -210,7 +210,7 @@ La déclaration relative aux exportations et aux sanctions prévue à l'article 
 
 ## 8. Combats classés, cotes, résultats et contestations
 
-8.1 **Fonctionnement des combats.** Les combats organisés au moyen du Service sont classés et ont une incidence sur les cotes (le Service peut aussi offrir un combat d'entraînement unique qui n'en a pas). La façon dont les combats sont lancés, chronométrés, confirmés, notés et cotés est établie par le Service et peut changer. Au moment de la rédaction des présentes : les deux athlètes sont invités à confirmer le résultat; l'un ou l'autre athlète peut le contester pendant la période de contestation (actuellement 24 heures); et si un athlète ne le conteste pas pendant cette période, il est réputé l'avoir confirmé et le résultat est verrouillé. Un chronométreur qui se joint à un combat gère l'horloge de combat et peut enregistrer le combat, mais ne peut pas modifier le résultat.
+8.1 **Fonctionnement des combats.** Les combats organisés au moyen du Service sont classés et ont une incidence sur les cotes (le Service peut aussi offrir un combat d'entraînement unique qui n'en a pas). La façon dont les combats sont lancés, chronométrés, confirmés, notés et cotés est établie par le Service et peut changer. Au moment de la rédaction des présentes : les deux athlètes sont invités à confirmer le résultat; l'un ou l'autre athlète peut le contester pendant la période de contestation (actuellement 24 heures); et si un athlète ne le conteste pas pendant cette période, il est réputé l'avoir confirmé et le résultat est verrouillé. Un chronométreur qui se joint à un combat gère l'horloge de combat et, dans le cadre de ce rôle, filme le combat, mais ne peut pas modifier le résultat.
 
 8.2 **Les cotes relèvent de notre propre système.** Les cotes ELO RATED sont calculées au moyen de notre propre formule, qui s'inspire de la méthode de classement Elo, tient compte du poids et peut changer à tout moment. Les cotes, les classements, les fiches, les tableaux de classement et les statistiques sont fournis à titre récréatif. Ils ne constituent pas un classement, une ceinture, un grade, un titre ou une qualification officiels, et leur **exactitude, leur exhaustivité et leur équité ne sont pas garanties**. Ils dépendent des renseignements fournis par les utilisateurs, qui peuvent être erronés.
 
@@ -269,7 +269,7 @@ La déclaration relative aux exportations et aux sanctions prévue à l'article 
 
 ## 12. Enregistrement des combats et des personnes qui y figurent
 
-12.1 **L'enregistrement est un choix fait sur chaque appareil.** Le Service permet aux athlètes et aux chronométreurs d'enregistrer les combats. L'application indique à chaque athlète, au moment du face-à-face, si son adversaire a choisi d'enregistrer. Un chronométreur qui se joint au combat peut également l'enregistrer. Au moment de la rédaction des présentes, un athlète ne peut pas empêcher l'appareil d'un autre participant d'enregistrer.
+12.1 **L'enregistrement par les athlètes est un choix fait sur chaque appareil.** Le Service permet aux athlètes et aux chronométreurs d'enregistrer les combats. L'application indique à chaque athlète, au moment du face-à-face, si son adversaire a choisi d'enregistrer. Un chronométreur qui se joint au combat le filme dans le cadre de son rôle de chronométreur. Au moment de la rédaction des présentes, un athlète ne peut pas empêcher l'appareil d'un autre participant d'enregistrer.
 
 12.2 **Consentement à être enregistré.** En commençant un combat au moyen du Service, vous consentez à ce que ce combat soit enregistré (vidéo et audio) par votre adversaire ou par un chronométreur qui utilise le Service, et à ce que l'enregistrement soit utilisé de la façon décrite dans les présentes Conditions, y compris à l'article 13 (sous réserve de vos droits de retrait et de demande de retrait de publications). Si vous ne voulez pas être enregistré, dites-le à votre adversaire et à tout chronométreur avant le début du combat, et ne commencez pas le combat à moins qu'ils n'acceptent de ne pas enregistrer.
 

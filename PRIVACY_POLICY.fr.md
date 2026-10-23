@@ -2,7 +2,7 @@
 
 **Date d'entrée en vigueur : 13 octobre 2026**
 
-**Dernière mise à jour : 13 octobre 2026**
+**Dernière mise à jour : 23 octobre 2026**
 
 La version française et la version anglaise de la présente politique ont la même valeur. English version: https://elorated.com/privacy
 
@@ -99,11 +99,11 @@ Nous **n'utilisons pas** de trousses de développement (SDK) publicitaires, d'id
 
 ### 4.1 Enregistrement
 
-L'enregistrement est choisi appareil par appareil au face-à-face. Tout participant à un combat (vous, votre adversaire ou un chronométreur qui se joint au moyen du code du combat) peut l'enregistrer. Votre adversaire ne peut pas s'opposer à un enregistrement, et vous ne pouvez pas vous opposer au sien, mais l'application affiche « RECORDING » (enregistrement en cours) afin que les deux athlètes le sachent. Les enregistrements comprennent le son. Toute personne qui enregistre est responsable d'obtenir le consentement de toutes les personnes enregistrées et l'autorisation du club, et ne doit pas enregistrer de personnes présentes qui n'y ont pas consenti (voir les Conditions d'utilisation).
+Chaque athlète choisit au face-à-face s'il enregistre le combat depuis son propre appareil. Un chronométreur qui se joint à un combat le filme dans le cadre de son rôle de chronométreur. Votre adversaire ne peut pas s'opposer à un enregistrement, et vous ne pouvez pas vous opposer au sien, mais l'application affiche « RECORDING » (enregistrement en cours) afin que les deux athlètes le sachent. Les enregistrements comprennent le son. Toute personne qui enregistre est responsable d'obtenir le consentement de toutes les personnes enregistrées et l'autorisation du club, et ne doit pas enregistrer de personnes présentes qui n'y ont pas consenti (voir les Conditions d'utilisation).
 
 ### 4.2 Traitement et analyse par IA
 
-Les vidéos téléversées sont stockées et traitées sur notre infrastructure au Canada (par exemple, pour créer des copies lisibles, des images fixes et des montages de faits saillants). Nous faisons appel à deux fournisseurs d'IA :
+Les vidéos téléversées sont stockées et traitées sur notre infrastructure au Canada (par exemple, pour créer des copies lisibles, des images fixes et des montages de faits saillants). Nous utilisons aussi les vidéos de combat pour vérifier les résultats, examiner les contestations, et détecter et prévenir la fraude et les combats faux ou manipulés, afin de protéger l'intégrité de la plateforme et de garder le classement équitable. Nous faisons appel à deux fournisseurs d'IA :
 
 - **Google (API Gemini)** reçoit les vidéos de combat, les images fixes ainsi que les noms d'affichage, les cotes et les catégories de poids des athlètes. Nous l'utilisons pour repérer les moments marquants, les techniques et les positions, rédiger des notes d'entraînement attribuées à chaque athlète, sélectionner les faits saillants et distinguer les deux athlètes dans les séquences (par exemple, en comparant des images fixes de chaque athlète avec la vidéo) afin que les analyses et les faits saillants soient attribués à la bonne personne. Gemini sert aussi de solution de rechange pour générer des avatars; il reçoit alors des séquences de combat, qui peuvent aussi montrer votre adversaire.
 - **OpenAI** reçoit votre photo de profil ou des images fixes de vous, et sert uniquement à générer votre avatar stylisé (par exemple, en reflétant la forme de votre visage, votre coiffure et votre teint).

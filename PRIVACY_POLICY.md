@@ -2,7 +2,7 @@
 
 **Effective date: October 13, 2026**
 
-**Last updated: October 13, 2026**
+**Last updated: October 23, 2026**
 
 This Privacy Policy explains how ELO RATED collects, uses, shares, keeps and protects personal information when you use the ELO RATED mobile app, the ELO RATED web app and website, and related services (together, the "Service"). Please read it together with our Terms of Service at https://elorated.com/terms, which contain the licence you give us for your content and the limits on our liability.
 
@@ -97,11 +97,11 @@ We **do not** use advertising SDKs, advertising identifiers (such as Apple's IDF
 
 ### 4.1 Recording
 
-Recording is chosen per device at the face-off. Any participant in a match (you, your opponent, or a timekeeper who joins with the match code) may record it. Your opponent cannot veto a recording, and you cannot veto theirs, but the app shows "RECORDING" so both athletes know. Recordings include audio. Anyone who records is responsible for having the consent of everyone recorded and the permission of the gym, and must not record bystanders who have not agreed (see the Terms of Service).
+Each athlete chooses at the face-off whether to record from their own device. A timekeeper who joins a match films it as part of the timekeeper role. Your opponent cannot veto a recording, and you cannot veto theirs, but the app shows "RECORDING" so both athletes know. Recordings include audio. Anyone who records is responsible for having the consent of everyone recorded and the permission of the gym, and must not record bystanders who have not agreed (see the Terms of Service).
 
 ### 4.2 Processing and AI analysis
 
-Uploaded videos are stored and processed on our infrastructure in Canada (for example, to create playable copies, still frames and highlight reels). We use two AI providers:
+Uploaded videos are stored and processed on our infrastructure in Canada (for example, to create playable copies, still frames and highlight reels). We also use match video to verify results, review disputes, and detect and prevent fraud and fake or manipulated matches, to protect the integrity of the platform and keep the rankings fair. We use two AI providers:
 
 - **Google (Gemini API)** receives match video, still frames, and the athletes' display names, ratings and weight divisions. We use it to identify scoring moments, techniques and positions, write coaching notes attributed to each athlete, select highlights, and tell the two athletes apart in the footage (for example, by comparing still frames of each athlete with the video) so that analysis and highlights are attributed to the right person. Gemini is also used as a fallback to generate avatars; in that case it receives match footage, which can also show your opponent.
 - **OpenAI** receives your profile photo or still frames of you, and is used only to generate your stylized avatar (for example, reflecting your face shape, hairstyle and skin tone).

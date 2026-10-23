@@ -4,7 +4,7 @@
 
 **Effective date:** October 13, 2026
 
-**Last updated:** October 13, 2026
+**Last updated:** October 23, 2026
 
 ## Key points (please read)
 
@@ -208,7 +208,7 @@ The export and sanctions representation in Section 17.2 also applies to every us
 
 ## 8. Ranked matches, ratings, results and disputes
 
-8.1 **How matches work.** Matches arranged through the Service are ranked and affect ratings (the Service may also offer a one-time practice match that does not). The way matches are started, timed, confirmed, scored and rated is set by the Service and may change. At the time of writing: both athletes are asked to confirm the result; either athlete can dispute it within the dispute period (currently 24 hours); and if an athlete does not dispute within that period, the athlete is treated as having confirmed it and the result locks. A timekeeper who joins a match runs the match clock and may record the match, but cannot change the result.
+8.1 **How matches work.** Matches arranged through the Service are ranked and affect ratings (the Service may also offer a one-time practice match that does not). The way matches are started, timed, confirmed, scored and rated is set by the Service and may change. At the time of writing: both athletes are asked to confirm the result; either athlete can dispute it within the dispute period (currently 24 hours); and if an athlete does not dispute within that period, the athlete is treated as having confirmed it and the result locks. A timekeeper who joins a match runs the match clock and, as part of that role, films the match, but cannot change the result.
 
 8.2 **Ratings are our own system.** ELO RATED ratings are calculated by our own formula, which is based on the Elo rating method, takes weight into account, and may change at any time. Ratings, rankings, records, leaderboards and statistics are provided for recreational interest. They are not an official grading, belt, rank, title or qualification, and they are **not guaranteed to be accurate, complete or fair**. They depend on information users provide, which may be wrong.
 
@@ -267,7 +267,7 @@ The export and sanctions representation in Section 17.2 also applies to every us
 
 ## 12. Recording matches and the people in them
 
-12.1 **Recording is a choice made on each device.** The Service lets athletes and timekeepers record matches. The app shows each athlete whether the opponent has chosen to record at the face-off. A timekeeper who joins the match may also record it. At the time of writing, an athlete cannot stop another participant's device from recording.
+12.1 **Recording by athletes is a choice made on each device.** The Service lets athletes and timekeepers record matches. The app shows each athlete whether the opponent has chosen to record at the face-off. A timekeeper who joins the match films it as part of the timekeeper role. At the time of writing, an athlete cannot stop another participant's device from recording.
 
 12.2 **Consent to being recorded.** By starting a match through the Service, you consent to that match being recorded (video and audio) by your opponent or a timekeeper using the Service, and to the recording being used as described in these Terms, including Section 13 (subject to your opt-out and takedown rights). If you do not want to be recorded, tell your opponent and any timekeeper before the match starts, and do not start the match unless they agree not to record.
 
