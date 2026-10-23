@@ -10,7 +10,9 @@
  * every number on the screen and the chip's `· N` comes from those rows (D2).
  * With `match_location_required` on and a usable location (jr_be 016
  * addendum, `get_arena_nearby`), those rows split further: On the mat is only
- * the athletes on my mat, "Online & close" the live ones within 2 km.
+ * the athletes on my mat, "Online & close" the live ones within the server's
+ * close radius (3 km since jr_be spec 023), challengeable when the server
+ * says so (`can_challenge`).
  *
  * This screen owns nothing realtime: the live state, the lobby channel and
  * the incoming prompt are mounted once by `<ArenaBootstrap />` and read here
@@ -45,6 +47,7 @@ import {
 import { useArenaNearby } from "@/lib/arena/use-arena-nearby";
 import { OnlineCloseSection } from "@/components/arena/online-close-section";
 import { useMatchToConfirm } from "@/lib/match-flow/active-match-store";
+import { useArenaTimekeeper } from "@/lib/arena/use-arena-timekeeper";
 import { useFreshIncomingCount } from "@/lib/notifications/bell-store";
 import {
   arenaActions,
@@ -86,6 +89,9 @@ import { useInvitesEnabled } from "@/lib/invites/use-invites-enabled";
 import { useBookings } from "@/lib/invites/use-bookings";
 import { loadMatchLocationRequired, useMatchLocationFlag } from "@/lib/arena/match-location-flag";
 import { arenaMatchHref } from "@/lib/arena/constants";
+import { formatBandLabel, formatBandSpoken, type ArenaCloseRow } from "@jits/shared/api/location";
+import type { OutgoingCloseBand } from "@/lib/arena/use-arena-challenge";
+import type { ArenaNearbyView } from "@/lib/arena/use-arena-nearby";
 
 /**
  * The tab bar sits below the screen and pads its own inset, so the shared
@@ -129,8 +135,10 @@ export default function ArenaScreen() {
   // (round 5): the bar and the chip never read different frames.
   const surface = useLiveSurface();
   const displayLive = surface.drawnLive;
-  // Both choices are always open with an owner mounted (review round 3).
-  const canGoLive = useCanGoLive();
+  // Both choices are always open with an owner mounted (review round 3),
+  // except going live while on duty as a timekeeper (A20).
+  const timekeeper = useArenaTimekeeper(athlete?.id);
+  const canGoLive = useCanGoLive() && !timekeeper.onDuty;
   const canGoOffline = useCanGoOffline();
   const switchLocked = !canGoLive;
   // The athlete chose live and it is on its way (QA 4): LIVE shows pending,
@@ -231,9 +239,15 @@ export default function ArenaScreen() {
   }, [isFocused]);
   // On the mat by proximity (jr_be 016 addendum): with the flag on and a
   // usable location, On the mat is only the athletes on my mat, and the live
-  // ones within 2 km are "Online & close". Otherwise today's list.
+  // ones within the close radius are "Online & close". Otherwise today's list.
   const lobbyKey = React.useMemo(() => [...lobbyIds].sort().join(","), [lobbyIds]);
-  const nearbyView = useArenaNearby({ focused: isFocused, isLive, locationRequired, lobbyKey });
+  const nearbyView = useArenaNearby({
+    focused: isFocused,
+    isLive,
+    locationRequired,
+    lobbyKey,
+    athleteId: selfId,
+  });
   const nearby = React.useMemo(
     () => partitionNearby(lobbyRows, nearbyView, friendIds),
     [lobbyRows, nearbyView, friendIds],
@@ -263,8 +277,11 @@ export default function ArenaScreen() {
     hasRoster && lobbyKnown ? onTheMat : null,
     selfElo !== null,
   );
+  // Online & close as the section renders it (jr_be spec 023 8.5), unknown
+  // exactly when the On the mat count is.
+  const closeCount = onMat === null ? null : nearby.close.length;
   // The chip's `· N` is these same rows (D2): in nearby mode only my mat.
-  useNearbyOnMatCountPublisher(nearby.mode === "nearby", onMat);
+  useNearbyOnMatCountPublisher(nearby.mode === "nearby", onMat, closeCount);
   // Never suggest someone a challenge is already pending with, either way.
   const outgoingOpponentId = outgoing?.opponentId ?? null;
   const closest = React.useMemo(
@@ -309,6 +326,21 @@ export default function ArenaScreen() {
     return { kind: "roll" };
   };
 
+  // A row's go-live is the live switch too; ROLL is not. One rule for On the
+  // mat and the challengeable Online & close rows.
+  const rowDisabled = (action: MatRowAction): boolean =>
+    action.kind === "go-live" ? actionsLocked || switchLocked : actionsLocked || liveSaving;
+
+  // ROLL from Online & close (jr_be spec 023 8.3): sent at once, no extra
+  // step; the band rides along for the waiting strip's gentle line.
+  const rollClose = (c: { id: string; displayName: string }, near: ArenaCloseRow) =>
+    void sendChallenge(c.id, c.displayName, { closeBand: closeBandOf(near) });
+
+  // My waiting strip's "Possibly on a different mat" line: the band it was
+  // sent with, or (restored after a relaunch, band unknown) the opponent's
+  // band in my current close list.
+  const outgoingCloseBand = outgoing ? waitingCloseBand(outgoing, nearbyView) : null;
+
   // Guarded and non-reversing, never a toggle.
   const goLive = () => void goLiveWithFeedback();
   const openProfile = (id: string) => router.push(`/athlete/${id}`);
@@ -336,7 +368,7 @@ export default function ArenaScreen() {
         saving={isSaving || liveSaving}
         goingLive={goingLive && liveDisplay !== "hold"}
         pending={livePending}
-        counts={formatMatCounts(onMat, inBand)}
+        counts={formatMatCounts(onMat, inBand, closeCount)}
         onGoLive={goLive}
         onGoOffline={() => void goOfflineWithFeedback()}
       />
@@ -385,6 +417,8 @@ export default function ArenaScreen() {
             active={ticking}
             onCancel={() => void cancelOutgoing()}
             disabled={isBusy}
+            helper={timekeeper.waitingHelper}
+            closeBand={outgoingCloseBand}
           />
         ) : null}
         {/* Fresh challenges the Arena cannot raise yet (challenger off the
@@ -451,7 +485,7 @@ export default function ArenaScreen() {
                     ? actionsLocked || liveSaving || capReached
                     : switchLocked
                 }
-                viewer={{ elo: selfElo, weight: athlete.current_weight ?? null }}
+                viewerElo={selfElo}
                 onChallenge={() => {
                   if (closest) void sendChallenge(closest.id, closest.displayName);
                 }}
@@ -478,12 +512,7 @@ export default function ArenaScreen() {
                       <MatRow
                         competitor={c}
                         action={action}
-                        // A row's go-live is the live switch too; ROLL is not.
-                        disabled={
-                          action.kind === "go-live"
-                            ? actionsLocked || switchLocked
-                            : actionsLocked || liveSaving
-                        }
+                        disabled={rowDisabled(action)}
                         onRoll={() => void sendChallenge(c.id, c.displayName)}
                         onGoLive={goLive}
                         onOpenProfile={() => openProfile(c.id)}
@@ -495,13 +524,18 @@ export default function ArenaScreen() {
               </View>
             ) : null}
 
-            {/* Live within 2 km but not on my mat: collapsed with a count,
-                no ROLL (nearby mode only; hidden at zero). */}
+            {/* Live within the close radius but not on my mat: collapsed
+                with a count, ROLL only where the server allows it (nearby
+                mode only; hidden at zero). */}
             {!hasError ? (
               <OnlineCloseSection
                 rows={nearby.close}
+                ranges={nearby.ranges}
                 friendIds={friendIds}
                 actionFor={actionFor}
+                disabledFor={rowDisabled}
+                onRoll={rollClose}
+                onGoLive={goLive}
                 onOpenProfile={openProfile}
               />
             ) : null}
@@ -540,11 +574,36 @@ export default function ArenaScreen() {
  * is in nearby mode (`null` count: rows not known yet); fallback mode, or
  * the Arena going away, hands the chip back to the lobby count.
  */
-function useNearbyOnMatCountPublisher(nearbyMode: boolean, onMat: number | null): void {
+function useNearbyOnMatCountPublisher(
+  nearbyMode: boolean,
+  onMat: number | null,
+  close: number | null,
+): void {
   React.useEffect(() => {
-    publishNearbyOnMatCount(nearbyMode ? { count: onMat } : null);
-  }, [nearbyMode, onMat]);
+    publishNearbyOnMatCount(nearbyMode ? { count: onMat, close } : null);
+  }, [nearbyMode, onMat, close]);
   React.useEffect(() => () => publishNearbyOnMatCount(null), []);
+}
+
+/** A close row's band as the waiting strip draws and speaks it. */
+function closeBandOf(near: ArenaCloseRow): OutgoingCloseBand {
+  return { maxM: near.bandMaxM, label: formatBandLabel(near.bandMaxM), spoken: formatBandSpoken(near.bandMaxM) };
+}
+
+/**
+ * The waiting strip's close band (jr_be spec 023 8.3): what the challenge
+ * was sent with (`null`: from the mat, no line), else, for a challenge
+ * restored after a relaunch (`undefined`), the opponent's band in my
+ * current Online & close list.
+ */
+function waitingCloseBand(
+  outgoing: { opponentId: string; closeBand?: OutgoingCloseBand | null },
+  view: ArenaNearbyView,
+): OutgoingCloseBand | null {
+  if (outgoing.closeBand !== undefined) return outgoing.closeBand;
+  if (view.mode !== "nearby" || view.onTheMat.has(outgoing.opponentId)) return null;
+  const near = view.close.get(outgoing.opponentId);
+  return near ? closeBandOf(near) : null;
 }
 
 /**

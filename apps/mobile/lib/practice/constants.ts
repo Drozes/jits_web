@@ -50,6 +50,34 @@ export type PracticePhase =
   | "confirm"
   | "summary";
 
+/**
+ * The practice header's steps ("STEP N / 8"): the wait for the bot's accept,
+ * then the match steps practice walks through. Practice's own list, not the
+ * match wizard's `MATCH_STEPS`, so a change to the real wizard's steps never
+ * moves this header.
+ */
+export const PRACTICE_STEPS = ["wait", "weight", "ready", "live", "end", "result", "confirm", "summary"] as const;
+
+export type PracticeStep = (typeof PRACTICE_STEPS)[number];
+
+/** The step name beside "STEP N / 8" (and in its accessibility label). */
+export const PRACTICE_STEP_LABELS: Record<PracticeStep, string> = {
+  wait: "Waiting",
+  weight: "Weights",
+  ready: "Ready",
+  live: "Live",
+  end: "Ended",
+  result: "Result",
+  confirm: "Confirm",
+  summary: "Summary",
+};
+
+/** The header step for a phase; null for the phases before the challenge (no header). */
+export function practiceStepFor(phase: PracticePhase): PracticeStep | null {
+  if (phase === "waiting") return "wait";
+  return (PRACTICE_STEPS as readonly string[]).includes(phase) ? (phase as PracticeStep) : null;
+}
+
 /** One coach line per phase, 20 words or fewer. `end` is too brief for one. */
 export const PRACTICE_TIPS: Record<PracticePhase, string | null> = {
   offline: "In the Arena, go live so athletes on the mat can see you.",

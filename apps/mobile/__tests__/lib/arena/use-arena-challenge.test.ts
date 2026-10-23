@@ -172,6 +172,19 @@ const ME = "me-1";
 const OPPONENT = "opp-1";
 const CHALLENGE = "ch-1";
 const MATCH = "match-1";
+/** A refused send the app cannot word: the shipped title and guidance (PM31 (2)). */
+const SEND_FAILED = { text1: "Couldn't send that challenge.", description: "Check your connection and try again." };
+/** The same for a refused accept and a refused start (W3FIX review minor 4). */
+const ACCEPT_FAILED = { text1: "Couldn't accept that challenge.", description: "Check your connection and try again." };
+const START_FAILED = { text1: "Couldn't start the match.", description: "Check your connection and try again." };
+/** Raw refusals, as the shared wrappers pass them on (`mapPostgrestError`). */
+const RAW_REFUSALS = [
+  // What the Wave 3 gate saw on the send: the statement timeout, as PostgREST words it.
+  ["a statement timeout", { code: "UNKNOWN", message: "canceling statement due to statement timeout" }],
+  ["a dropped connection", { code: "UNKNOWN", message: "TypeError: Network request failed" }],
+  ["an unmapped RLS refusal", { code: "RLS_VIOLATION", message: "new row violates row-level security policy for table \"challenges\"" }],
+  ["a mapped code with no words", { code: "MATCH_ALREADY_EXISTS", message: "" }],
+] as const;
 /** A normal 7-day `expires_at`, well past anything a test waits for. */
 const FAR_EXPIRY = new Date(Date.now() + 7 * 86_400_000).toISOString();
 
@@ -290,7 +303,25 @@ describe("sending a challenge", () => {
       opponentName: "Rival",
       expiresAt: FAR_EXPIRY,
       createdAt: null,
+      // Sent from the mat: no Online & close band (jr_be spec 023).
+      closeBand: null,
     });
+  });
+
+  it("records the Online & close band a challenge was sent from (jr_be spec 023)", async () => {
+    const { result } = mount();
+    const closeBand = { maxM: 3000, label: "< 3 km", spoken: "under 3 kilometers" };
+
+    await act(async () => {
+      await result.current.sendChallenge(OPPONENT, "Rival", { closeBand });
+    });
+
+    // Sent at once, exactly like a challenge from the mat.
+    expect(mockCreateChallenge).toHaveBeenCalledWith(
+      expect.anything(),
+      { opponentId: OPPONENT, challengerWeight: 180 },
+    );
+    expect(result.current.outgoing?.closeBand).toEqual(closeBand);
   });
 
   it("keeps the row's created_at on the plate for the WAITING countdown", async () => {
@@ -399,7 +430,7 @@ describe("sending a challenge", () => {
     expect(mockToastError).toHaveBeenCalled();
   });
 
-  it("toasts other failures and leaves the row challengeable", async () => {
+  it("toasts other failures with the shipped guidance and leaves the row challengeable", async () => {
     mockCreateChallenge.mockResolvedValue({
       ok: false,
       error: { code: "UNKNOWN", message: "network is down" },
@@ -410,9 +441,43 @@ describe("sending a challenge", () => {
       await result.current.sendChallenge(OPPONENT, "Rival");
     });
 
-    expect(mockToastError).toHaveBeenCalledWith("network is down");
+    expect(mockToastError).toHaveBeenCalledWith(SEND_FAILED);
     expect(result.current.capReached).toBe(false);
     expect(result.current.outgoing).toBeNull();
+  });
+
+  describe("a refused send never shows the server's raw text (timekeeper mode PM31 (2))", () => {
+    it.each([
+      // What the Wave 3 gate saw: the statement timeout, as PostgREST words it.
+      ["a statement timeout", { code: "UNKNOWN", message: "canceling statement due to statement timeout" }],
+      ["a dropped connection", { code: "UNKNOWN", message: "TypeError: Network request failed" }],
+      ["an unmapped RLS refusal", { code: "RLS_VIOLATION", message: "new row violates row-level security policy for table \"challenges\"" }],
+      ["the wrapper's own lookup", { code: "UNKNOWN", message: "Could not identify current athlete" }],
+      ["a mapped code with no words", { code: "BLOCKED", message: "" }],
+    ])("%s: the shipped title and guidance, nothing of the server's", async (_name, error) => {
+      mockCreateChallenge.mockResolvedValue({ ok: false, error });
+      const { result } = mount();
+      await act(async () => {
+        await result.current.sendChallenge(OPPONENT, "Rival");
+      });
+      expect(mockToastError).toHaveBeenCalledTimes(1);
+      expect(mockToastError).toHaveBeenCalledWith(SEND_FAILED);
+      if (error.message) expect(JSON.stringify(mockToastError.mock.calls)).not.toContain(JSON.stringify(error.message).slice(1, -1));
+      expect(result.current.outgoing).toBeNull();
+    });
+
+    it("a refusal the shared table maps keeps its own line", async () => {
+      mockCreateChallenge.mockResolvedValue({
+        ok: false,
+        error: { code: "BLOCKED", message: "You can't challenge this athlete." },
+      });
+      const { result } = mount();
+      await act(async () => {
+        await result.current.sendChallenge(OPPONENT, "Rival");
+      });
+      expect(mockToastError).toHaveBeenCalledWith("You can't challenge this athlete.");
+      expect(result.current.outgoing).toBeNull();
+    });
   });
 
   it("clears the cap once a challenge is cancelled", async () => {
@@ -669,6 +734,62 @@ describe("accepting", () => {
     );
     expect(result.current.incoming).toBeNull();
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  describe("a refused accept or start never shows the server's raw text (PM31 (2), W3FIX review minor 4)", () => {
+    const noRawText = (message: string) => {
+      if (message) expect(JSON.stringify(mockToastError.mock.calls)).not.toContain(JSON.stringify(message).slice(1, -1));
+    };
+
+    it.each(RAW_REFUSALS)("accept, %s: the shipped title and guidance, and the prompt goes", async (_name, error) => {
+      mockAcceptChallenge.mockResolvedValue({ ok: false, error });
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockToastError).toHaveBeenCalledTimes(1);
+      expect(mockToastError).toHaveBeenCalledWith(ACCEPT_FAILED);
+      noRawText(error.message);
+      expect(mockStartMatch).not.toHaveBeenCalled();
+      expect(result.current.incoming).toBeNull();
+    });
+
+    it("accept: a refusal the shared table maps keeps its own line", async () => {
+      mockAcceptChallenge.mockResolvedValue({ ok: false, error: { code: "OPPONENT_INACTIVE", message: "That athlete is no longer active." } });
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockToastError).toHaveBeenCalledWith("That athlete is no longer active.");
+    });
+
+    it.each(RAW_REFUSALS)("start, %s: the shipped title and guidance after the retry and the withdraw", async (_name, error) => {
+      mockStartMatch.mockResolvedValue({ ok: false, error });
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockStartMatch).toHaveBeenCalledTimes(2);
+      expect(mockCancelChallenge).toHaveBeenCalledWith(expect.anything(), CHALLENGE);
+      expect(mockToastError).toHaveBeenCalledTimes(1);
+      expect(mockToastError).toHaveBeenCalledWith(START_FAILED);
+      noRawText(error.message);
+      expect(result.current.incoming).toBeNull();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("start: a refusal the shared table maps keeps its own line", async () => {
+      mockStartMatch.mockResolvedValue({ ok: false, error: { code: "MATCH_ALREADY_EXISTS", message: "A match already exists for this challenge." } });
+      const { result } = mount();
+      await raiseIncoming(result);
+      await act(async () => {
+        await result.current.accept();
+      });
+      expect(mockToastError).toHaveBeenCalledWith("A match already exists for this challenge.");
+    });
   });
 
   it("produces exactly one match for a double tap on Accept", async () => {

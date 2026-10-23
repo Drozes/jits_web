@@ -6,7 +6,14 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const KEY = "elo-rated:last-elo";
+/**
+ * Versioned by rating model: the Rating V9 cutover (jr_be spec 019) replays
+ * every rating onto the 1500 scale, so a pre-V9 value ("elo-rated:last-elo",
+ * on the old 1000 scale) must never be rolled to on the first launch after
+ * the OTA. The old key is simply never read again.
+ */
+export const ELO_CACHE_KEY = "elo-rated:last-elo:v9";
+const KEY = ELO_CACHE_KEY;
 
 /** Last ELO persisted after login, or null if none / unreadable. */
 export async function getCachedElo(): Promise<number | null> {

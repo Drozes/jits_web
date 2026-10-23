@@ -55,6 +55,10 @@ jest.mock("@/lib/location/device-location-store", () => ({
   clearAllDeviceLocations: () => mockClearLocations(),
   loadDeviceLocation: (id: string) => mockLoadLocation(id),
 }));
+const mockResetNearby = jest.fn();
+jest.mock("@/lib/arena/nearby-snapshot", () => ({
+  resetLatestNearby: () => mockResetNearby(),
+}));
 const mockReadPermission = jest.fn(() => Promise.resolve({ granted: true, canAskAgain: true }));
 jest.mock("@/lib/location/permission-cache", () => ({
   readLocationPermission: () => mockReadPermission(),
@@ -261,6 +265,17 @@ describe("cold-start athlete load", () => {
     expect(mockResetLocationFlags).toHaveBeenCalledTimes(1);
   });
 
+  it("forgets the last Arena nearby read on sign-out (jr_be spec 023, review: account switch)", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    mockResetNearby.mockClear();
+    await act(async () => {
+      await signOut!();
+    });
+    expect(mockResetNearby).toHaveBeenCalled();
+  });
+
   it("S4: an involuntary sign-out (SIGNED_OUT from the auth listener) clears the stored location too", async () => {
     mockRead.mockResolvedValue(OK(ACTIVE));
     render(<App />);
@@ -271,6 +286,8 @@ describe("cold-start athlete load", () => {
     });
     expect(mockClearLocations).toHaveBeenCalledTimes(1);
     expect(mockResetLocationFlags).toHaveBeenCalledTimes(1);
+    // The last Arena nearby read goes too (jr_be spec 023, review: account switch).
+    expect(mockResetNearby).toHaveBeenCalled();
   });
 
   it("S1: the stored tag is read as soon as the athlete row loads", async () => {

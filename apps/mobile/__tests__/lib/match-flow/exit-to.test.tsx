@@ -1,17 +1,19 @@
 /**
  * Match exits dismiss back to the existing tabs (jits-tlk3).
  *
- * `router.replace` from `match/[matchId]` swapped the match route in the
- * `(app)` Stack for a SECOND `(tabs)` route, so every match stacked another
- * tab navigator with its screens still mounted. `exitMatchTo` uses
- * `router.dismissTo`, which pops to the existing `(tabs)`.
+ * `router.replace` from the match route swapped it in the `(app)` Stack for a
+ * SECOND `(tabs)` route, so every match stacked another tab navigator with
+ * its screens still mounted. `exitMatchTo` uses `router.dismissTo`, which
+ * pops to the existing `(tabs)`.
  *
  * The first block pins the helper itself. The second drives the REAL
  * expo-router (6.0.23) on an in-memory route tree that mirrors the app's
  * navigator shape: root Stack, `(app)` Stack anchored on `(tabs)` via
  * `unstable_settings`, the tab navigator, the Home and Arena tab stacks, and
- * `match/[matchId]` pushed over the tabs. Nothing about routing is mocked,
- * so these tests are what proves:
+ * `match/[matchId]/index` (the match route since timekeeper mode M1 moved it
+ * into a folder; `__tests__/app/match-route-move.test.tsx` adds its sibling
+ * `timekeep` and the URL rewrites) pushed over the tabs. Nothing about
+ * routing is mocked, so these tests are what proves:
  *  - the `(app)` Stack keeps exactly one `(tabs)` route after any exit,
  *    however many matches are played;
  *  - the match screen unmounts (useArenaMatchScreen restores live on unmount);
@@ -117,7 +119,7 @@ function appTree({ anchorTabs = true } = {}) {
       unstable_settings: { initialRouteName: "index" },
     },
     "(app)/(tabs)/arena/index": ArenaIndex,
-    "(app)/match/[matchId]": MatchScreen,
+    "(app)/match/[matchId]/index": MatchScreen,
     "(app)/athlete/[id]": AthleteScreen,
   };
 }
@@ -228,7 +230,7 @@ describe("match exits on the real router", () => {
   it("still lands on the Arena from a cold deep link into the match", () => {
     // The (tabs) anchor exists in state but was never rendered.
     const r = renderRouter(appTree(), { initialUrl: "/match/M1" });
-    expect(appStackNames(r.getRouterState())).toEqual(["(tabs)", "match/[matchId]"]);
+    expect(appStackNames(r.getRouterState())).toEqual(["(tabs)", "match/[matchId]/index"]);
 
     act(() => exitMatchTo(router, ARENA_HREF));
 
@@ -239,7 +241,7 @@ describe("match exits on the real router", () => {
 
   it("replaces the match when no (tabs) route is beneath it at all", () => {
     const r = renderRouter(appTree({ anchorTabs: false }), { initialUrl: "/match/M1" });
-    expect(appStackNames(r.getRouterState())).toEqual(["match/[matchId]"]);
+    expect(appStackNames(r.getRouterState())).toEqual(["match/[matchId]/index"]);
 
     act(() => exitMatchTo(router, ARENA_HREF));
 
@@ -253,7 +255,7 @@ describe("match exits on the real router", () => {
     const r = renderRouter(appTree(), { initialUrl: ARENA_HREF });
     act(() => router.push("/athlete/A1"));
     act(() => router.push("/match/M1"));
-    expect(appStackNames(r.getRouterState())).toEqual(["(tabs)", "athlete/[id]", "match/[matchId]"]);
+    expect(appStackNames(r.getRouterState())).toEqual(["(tabs)", "athlete/[id]", "match/[matchId]/index"]);
 
     act(() => exitMatchTo(router, ARENA_HREF));
 

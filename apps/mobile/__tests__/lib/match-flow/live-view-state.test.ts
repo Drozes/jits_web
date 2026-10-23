@@ -149,11 +149,11 @@ describe("camera treatment", () => {
 
 describe("toLiveAthlete", () => {
   it("maps a participant to the athlete bar's name and meta", () => {
-    expect(toLiveAthlete({ display_name: "K. Reyes", current_elo: 1512, current_weight: 77 })).toEqual({
+    expect(toLiveAthlete({ displayName: "K. Reyes", currentElo: 1512, weightLbs: 77 })).toEqual({
       name: "K. Reyes",
       meta: "1512 · 77 LBS",
     });
-    expect(toLiveAthlete({ display_name: "Bot", current_elo: null, current_weight: null }).meta).toBeNull();
+    expect(toLiveAthlete({ displayName: "Bot", currentElo: null, weightLbs: null }).meta).toBeNull();
   });
 });
 

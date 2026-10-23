@@ -20,6 +20,12 @@
  * share one read. A read writes only if nothing newer has written yet, so a
  * slower older read never overwrites a newer one, but an older good read
  * still lands when a newer one fails.
+ *
+ * Every read also refreshes the `myTimekeepingMatch` slot (timekeeper mode
+ * A20, spec 9.1; `timekeeping-match-store.ts`): the match this athlete
+ * TIMEKEEPS, which `getMyActiveMatch()` never returns. The owner also
+ * re-reads on that match's realtime row. The athlete slot and its readers
+ * are unchanged.
  */
 import * as React from "react";
 import { useSyncExternalStore } from "react";
@@ -28,6 +34,7 @@ import { getMyActiveMatch, type MyActiveMatch } from "@jits/shared/api/queries";
 import { supabase } from "@/lib/supabase/client";
 import { superviseChannel, type SupervisedChannel } from "@/lib/supabase/supervise-channel";
 import { getLeftMatchIds, useIsArenaLive, useMatchExitCount } from "@/lib/arena/arena-store";
+import { refreshMyTimekeepingMatch, useMyTimekeepingMatch } from "./timekeeping-match-store";
 
 interface Snapshot {
   /** Whose match this is; a read for another athlete never shows. */
@@ -90,6 +97,7 @@ export function refreshMyActiveMatch(athleteId: string | null | undefined): void
     latestAthleteId = null;
     queuedFor = null;
     write(EMPTY);
+    refreshMyTimekeepingMatch(supabase, null);
     return;
   }
   if (queuedFor === athleteId) return;
@@ -110,6 +118,7 @@ export function refreshMyActiveMatch(athleteId: string | null | undefined): void
     },
     () => {},
   );
+  refreshMyTimekeepingMatch(supabase, athleteId);
 }
 
 /** The open match for `athleteId`, or null (none, or not read yet). */
@@ -201,16 +210,29 @@ export function useActiveMatchOwner(athleteId: string): void {
   // realtime (jr_be 0840658) and RLS limits the feed to participants. One
   // channel, and only while a match is held; a re-read, never a local patch,
   // so the read stays the single definition of "open".
-  //
-  // Supervised like the challenge channels (jits-fa9x): a server close
-  // rebuilds it, and every SUBSCRIBED after the first (a rebuild or a phoenix
-  // rejoin) re-reads, because an UPDATE may have landed while it was down and
-  // `▪ CONFIRM` would otherwise stay up until the next foreground.
-  //
-  // A live phone is held awake, so no foreground would ever restart a channel
-  // that gave up: while live it keeps rebuilding, and going live restarts one
-  // that gave up while offline.
   const heldMatchId = useActiveMatch(athleteId)?.matchId ?? null;
+  useHeldMatchChannel("open match", "active-match", heldMatchId, athleteId);
+  // The match this athlete timekeeps (A20), on its own channel: the
+  // `matches` SELECT policy admits the seated timekeeper, so its UPDATEs
+  // (seated, started, clock ended, recorded, cancelled) reach this phone.
+  const heldTimekeepingId = useMyTimekeepingMatch(athleteId)?.matchId ?? null;
+  useHeldMatchChannel("timekeeping match", "timekeeping-match", heldTimekeepingId, athleteId);
+}
+
+/**
+ * One realtime channel on the `matches` row `matchId` while it is held: any
+ * UPDATE re-reads the store.
+ *
+ * Supervised like the challenge channels (jits-fa9x): a server close
+ * rebuilds it, and every SUBSCRIBED after the first (a rebuild or a phoenix
+ * rejoin) re-reads, because an UPDATE may have landed while it was down and
+ * `▪ CONFIRM` would otherwise stay up until the next foreground.
+ *
+ * A live phone is held awake, so no foreground would ever restart a channel
+ * that gave up: while live it keeps rebuilding, and going live restarts one
+ * that gave up while offline.
+ */
+function useHeldMatchChannel(label: string, topic: string, matchId: string | null, athleteId: string): void {
   const isLive = useIsArenaLive();
   const isLiveRef = React.useRef(isLive);
   isLiveRef.current = isLive;
@@ -219,20 +241,20 @@ export function useActiveMatchOwner(athleteId: string): void {
     if (isLive) supervisorRef.current?.resume();
   }, [isLive]);
   React.useEffect(() => {
-    if (!heldMatchId) return;
+    if (!matchId) return;
     let joined = false;
     const supervised = superviseChannel(
-      "open match",
+      label,
       () =>
         supabase
-          .channel(`active-match:${heldMatchId}:${++channelSeq}`)
+          .channel(`${topic}:${matchId}:${++channelSeq}`)
           .on(
             "postgres_changes",
             {
               event: "UPDATE",
               schema: "public",
               table: "matches",
-              filter: `id=eq.${heldMatchId}`,
+              filter: `id=eq.${matchId}`,
             },
             () => refreshMyActiveMatch(athleteId),
           ),
@@ -249,7 +271,7 @@ export function useActiveMatchOwner(athleteId: string): void {
       if (supervisorRef.current === supervised) supervisorRef.current = null;
       supervised();
     };
-  }, [heldMatchId, athleteId]);
+  }, [label, topic, matchId, athleteId]);
 }
 
 /** Test-only: drop all module state between suites. */

@@ -2,7 +2,7 @@
 
 **Effective date: October 13, 2026**
 
-**Last updated: October 13, 2026**
+**Last updated: October 23, 2026**
 
 This Privacy Policy explains how ELO RATED collects, uses, shares, keeps and protects personal information when you use the ELO RATED mobile app, the ELO RATED web app and website, and related services (together, the "Service"). Please read it together with our Terms of Service at https://elorated.com/terms, which contain the licence you give us for your content and the limits on our liability.
 
@@ -12,8 +12,8 @@ This Privacy Policy explains our practices; it is not a contract and does not cr
 
 - **Adults only.** ELO RATED is only for people who are 18 or older, and at least the age of majority where you live (for example, 19 in British Columbia, New Brunswick, Nova Scotia, Newfoundland and Labrador and the three territories). If we learn that someone under that age has an account, we deactivate it and delete their information after notice, except shared match records, which are de-identified (see sections 12 and 19).
 - **Much of your profile is public by design.** ELO RATED is a ranked competition platform. Your display name, photo or avatar, gym, weight, gender, Elo rating, rank, record and leaderboard placement are visible to other users, and some of it (such as your profile photo and the information on your invite links) can be seen by anyone who has the link. We do not display your date of birth on your profile.
-- **Match video and AI.** If you, your opponent or a timekeeper records a match, the video (with audio) is uploaded, processed and analyzed by artificial intelligence (AI) to find key moments, describe techniques, make highlight reels and tell the athletes apart. AI is also used to create a cartoon-style avatar that resembles you. **We do not create, store or keep facial recognition templates, faceprints or other biometric identifiers, and we do not use facial recognition to identify people by comparing them against a database of faces.** Our AI providers do look at photos, still frames and footage showing your face and body, to tell the athletes apart and to draw avatars.
-- **Promotion and AI training, with an opt-out.** We may post match reels featuring you on our own social media accounts (for example, Instagram) and may use match footage to improve and train our own features. You can opt out of either, and ask us to take down a specific post, by emailing info@elorated.com (or in the app's settings where available).
+- **Match video and AI.** If you, your opponent or a timekeeper records a match, the video (with audio) is uploaded, processed and analyzed by artificial intelligence (AI) to find key moments, describe techniques, make highlight reels and tell the athletes apart. We also use match video to verify results, review disputes and detect fraud and fake or manipulated matches. AI is also used to create a cartoon-style avatar that resembles you. **We do not create, store or keep facial recognition templates, faceprints or other biometric identifiers, and we do not use facial recognition to identify people by comparing them against a database of faces.** Our AI providers do look at photos, still frames and footage showing your face and body, to tell the athletes apart and to draw avatars.
+- **Promotion and AI training, with an opt-out.** We may post match reels featuring you on our own social media accounts and may use match footage to improve and train our own features. You can opt out of either, and ask us to take down a specific post, by emailing info@elorated.com (or in the app's settings where available).
 - **Location.** With your permission, the app uses your **precise location while the app is in use** (never in the background) to confirm that you and your opponent are on the same mat and to show nearby athletes. Precise coordinates are scrubbed within a few minutes, or within about 4 hours for a go-live tag; a rounded, approximate location (about 110 metres) is kept longer for ranking integrity and fraud prevention. The app does not show your coordinates to other users.
 - **No ads, no sale.** We do not sell your personal information, we do not share it for targeted or cross-context behavioural advertising, we do not show ads, and we do not use advertising IDs or track you across other companies' apps and websites.
 - **Where your data lives.** We store your data primarily in Canada (Montreal). Some service providers, including our AI, crash-reporting, push-notification and web-hosting providers, process data in the United States and elsewhere.
@@ -35,7 +35,7 @@ This policy applies to personal information we handle through:
 - our communications with you (for example, support emails and push notifications); and
 - our use of match footage, reels, names, likenesses and ratings on our own social media accounts.
 
-It does not apply to third-party websites, apps or platforms (such as Instagram, WhatsApp, Google or your gym's own systems), even if you reach them from the Service. Their own privacy policies apply (see section 20).
+It does not apply to third-party websites, apps or platforms (such as social networks, messaging apps, sign-in providers or your gym's own systems), even if you reach them from the Service. Their own privacy policies apply (see section 20).
 
 ## 3. Information we collect
 
@@ -43,7 +43,7 @@ We collect personal information in four ways: information you give us, informati
 
 ### 3.1 Information you give us
 
-- **Account information:** your email address and password. Passwords are handled by our authentication provider and stored only in hashed form; we cannot see them. If you sign in with Google, see section 3.4.
+- **Account information:** your email address and password. Passwords are handled by our authentication provider and stored only in hashed form; we cannot see them. If you sign in with an account from another provider, see section 3.4.
 - **Profile information:** first name, last name, display name (unique and public), date of birth, gender (used for competition divisions and brackets), current weight, city, primary gym (or "free agent"), optional Instagram handle, and an optional profile photo. A still frame from a match video may also be used as your profile image (see section 4).
 - **Photos you provide:** a profile photo you take or choose from your photo library. We only access the photos you select.
 - **Disputes and reports:** the free text you write when you dispute a match result, report an issue, or contact us.
@@ -60,22 +60,22 @@ Because ELO RATED is a two-person competition platform, some information about y
 - **Match video and audio:** recordings of matches you take part in, captured by you, your opponent or a timekeeper, including audio. A participant who records does not need your separate approval in the app, although you will see a "RECORDING" indicator. See section 4.
 - **Derived content:** processed copies of videos, still frames, highlight reels (which can include names and ratings), and AI analysis (scoring moments, techniques, and coaching notes attributed to each athlete). Highlight reels made for your opponent can also show you.
 - **AI avatar:** a stylized, cartoon-like avatar generated to resemble you.
-- **Social activity:** invites you send and claim, how you shared them (for example, the share channel you picked, such as WhatsApp), friendships (joining through someone's invite makes you friends), going live in the Arena, and when you share a reel (for example, to Instagram or the share sheet).
+- **Social activity:** invites you send and claim, how you shared them (for example, the share channel you picked, such as a messaging app), friendships (joining through someone's invite makes you friends), going live in the Arena, and when you share a reel (for example, to a social network or the share sheet).
 - **Integrity and moderation information:** dispute history, flags, and notes our administrators create when reviewing disputes, possible abuse or repeated disputes.
 
 ### 3.3 Information collected automatically
 
 - **Location:** precise location from your device, only while you are using the app and only with your permission. See section 5.
 - **Device and app information:** push notification token, device operating system and model, app version, and a general device memory class (used to choose a suitable video quality).
-- **Diagnostics and performance:** crash reports, error reports and performance traces collected through our crash-reporting provider (Sentry). These reports are **linked to your account** (your user ID, email address and username, and your IP address where collected) so we can fix problems you run into, and **an error report may include a screenshot of the screen you were on when the error happened.** We also record reliability events, such as whether a video upload or playback succeeded; these carry only your user ID.
+- **Diagnostics and performance:** crash reports, error reports and performance traces collected through our crash-reporting provider. These reports are **linked to your account** (your user ID, email address and username, and your IP address where collected) so we can fix problems you run into, and **an error report may include a screenshot of the screen you were on when the error happened.** We also record reliability events, such as whether a video upload or playback succeeded; these carry only your user ID.
 - **Technical logs:** our hosting and infrastructure providers automatically log technical information such as IP address, request times and errors, for security and operations.
 - **Web cookies:** see section 17.
 
-We **do not** use advertising SDKs, advertising identifiers (such as Apple's IDFA or Google's advertising ID), marketing or advertising analytics, or cross-app tracking.
+We **do not** use advertising SDKs, advertising identifiers (such as your device's advertising identifier), marketing or advertising analytics, or cross-app tracking.
 
 ### 3.4 Information from sign-in services you choose and other sources
 
-- **Sign-in services you choose:** if you choose to sign in with Google, Google shares your name, email address and a unique account identifier with us (and may share your profile picture). We do not receive your Google password. If we add other sign-in options (such as Sign in with Apple), the same principle will apply.
+- **Sign-in services you choose:** if you choose to sign in with an account from another provider, that provider shares your name, email address and a unique account identifier with us (and may share your profile picture). We do not receive the password for that account.
 - **Other users:** as described in section 3.2 (match results, confirmations, disputes, weight checks, footage, and invites).
 - **Service providers:** for example, the results of AI analysis that our AI providers return to us.
 
@@ -83,10 +83,10 @@ We **do not** use advertising SDKs, advertising identifiers (such as Apple's IDF
 
 | Category | Examples | Main purposes | How long we keep it |
 |---|---|---|---|
-| Account and login | Email, hashed password, Google account ID | Create and secure your account, sign-in, service emails | Until you delete your account |
+| Account and login | Email, hashed password, account ID from a sign-in provider you choose | Create and secure your account, sign-in, service emails | Until you delete your account |
 | Profile | Names, display name, date of birth, gender, weight, city, gym, Instagram handle, photo, avatar | Run your profile, divisions and brackets, leaderboards, matchmaking | Until you delete your account |
 | Match records and ratings | Results, submissions, confirmations, disputes, weight checks, rating history | Run ranked matches, calculate ratings, resolve disputes, prevent abuse | For as long as the Service operates; de-identified as "Deleted athlete" after account deletion |
-| Match video and derived content | Recordings with audio, stills, highlight reels, AI analysis | Record and review matches, highlights, analysis, promotion (opt-out), product improvement and training (opt-out) | See section 11; shared records remain after account deletion unless removal is requested and granted |
+| Match video and derived content | Recordings with audio, stills, highlight reels, AI analysis | Record and review matches, verify results and review disputes, detect fraud and manipulated matches, highlights, analysis, promotion (opt-out), product improvement and training (opt-out) | See section 11; shared records remain after account deletion unless removal is requested and granted |
 | Precise location | Device coordinates while the app is in use | Same-mat check, nearby athletes, go live | Scrubbed within a few minutes, or within about 4 hours for a go-live tag; records deleted after 3 days |
 | Approximate location | Coordinates rounded to about 110 m, distance between participants, result of the proximity check | Ranking integrity, fraud prevention | See section 5.3 |
 | Social activity | Invites, share channel, friends, live sessions, reel shares | Invites, friends, notifications | Until you delete your account (some invite history is kept in de-identified form) |
@@ -97,14 +97,14 @@ We **do not** use advertising SDKs, advertising identifiers (such as Apple's IDF
 
 ### 4.1 Recording
 
-Recording is chosen per device at the face-off. Any participant in a match (you, your opponent, or a timekeeper who joins with the match code) may record it. Your opponent cannot veto a recording, and you cannot veto theirs, but the app shows "RECORDING" so both athletes know. Recordings include audio. Anyone who records is responsible for having the consent of everyone recorded and the permission of the gym, and must not record bystanders who have not agreed (see the Terms of Service).
+Each athlete chooses at the face-off whether to record from their own device. A timekeeper who joins a match films it as part of the timekeeper role. Your opponent cannot veto a recording, and you cannot veto theirs, but the app shows "RECORDING" so both athletes know. Recordings include audio. Anyone who records is responsible for having the consent of everyone recorded and the permission of the gym, and must not record bystanders who have not agreed (see the Terms of Service).
 
 ### 4.2 Processing and AI analysis
 
-Uploaded videos are stored and processed on our infrastructure in Canada (for example, to create playable copies, still frames and highlight reels). We use two AI providers:
+Uploaded videos are stored and processed on our infrastructure in Canada (for example, to create playable copies, still frames and highlight reels). We also use match video to verify results, review disputes, and detect and prevent fraud and fake or manipulated matches, to protect the integrity of the platform and keep the rankings fair. We use two third-party AI service providers:
 
-- **Google (Gemini API)** receives match video, still frames, and the athletes' display names, ratings and weight divisions. We use it to identify scoring moments, techniques and positions, write coaching notes attributed to each athlete, select highlights, and tell the two athletes apart in the footage (for example, by comparing still frames of each athlete with the video) so that analysis and highlights are attributed to the right person. Gemini is also used as a fallback to generate avatars; in that case it receives match footage, which can also show your opponent.
-- **OpenAI** receives your profile photo or still frames of you, and is used only to generate your stylized avatar (for example, reflecting your face shape, hairstyle and skin tone).
+- **A third-party AI analysis provider** receives match video, still frames, and the athletes' display names, ratings and weight divisions. We use it to identify scoring moments, techniques and positions, write coaching notes attributed to each athlete, select highlights, and tell the two athletes apart in the footage (for example, by comparing still frames of each athlete with the video) so that analysis and highlights are attributed to the right person. This provider is also used as a fallback to generate avatars; in that case it receives match footage, which can also show your opponent.
+- **A third-party AI image generation provider** receives your profile photo or still frames of you, and is used only to generate your stylized avatar (for example, reflecting your face shape, hairstyle and skin tone).
 
 AI output can be wrong. It is informational only and is not medical, coaching or safety advice. We may hide some AI output from users while we improve its accuracy, and our administrators may review it.
 
@@ -114,11 +114,11 @@ AI output can be wrong. It is informational only and is not medical, coaching or
 
 ### 4.4 Who can see match video
 
-In the app, the match film (the recorded video) is available to the match participants and to the timekeeper for that match, and to our authorized administrators. Highlight reels are made for and shown to the athletes in the match, not to the timekeeper. Participants may save, download or share videos and reels outside the Service (for example, to their photo library, Instagram or messaging apps). Once someone shares a video outside the Service, its handling is controlled by them and by the platform they used, not by us.
+In the app, the match film (the recorded video) is available to the match participants and to the timekeeper for that match, and to our authorized administrators. Highlight reels are made for and shown to the athletes in the match, not to the timekeeper. Participants may save, download or share videos and reels outside the Service (for example, to their photo library, social networks or messaging apps). Once someone shares a video outside the Service, its handling is controlled by them and by the platform they used, not by us.
 
 ### 4.5 Promotional and social media use (opt-out)
 
-As described in our Terms of Service, we may edit and publicly post match footage, highlight reels, names, likenesses and ratings to operate and promote ELO RATED, including on our own social media accounts (for example, Instagram). This can include footage that someone else recorded of you.
+As described in our Terms of Service, we may edit and publicly post match footage, highlight reels, names, likenesses and ratings to operate and promote ELO RATED, including on our own social media accounts. This can include footage that someone else recorded of you.
 
 - **Opt out:** you can opt out of promotional and social use at any time by emailing info@elorated.com (or in the app's settings where available). The opt-out applies going forward.
 - **Takedown:** you can ask us to remove a specific post that features you. We act on requests within a reasonable time and aim to do so within a few business days.
@@ -202,7 +202,7 @@ ELO RATED is **public by design.** Please think before you share.
 - **Match participants and timekeepers:** can see the match details, results, weight checks and match film for that match, and the athletes can see their highlight reels and analysis (see section 4.4).
 - **Not displayed on your profile:** we do not display your date of birth on your profile.
 
-**You are responsible for what you choose to share**, including your Instagram handle, the content you post, and any video, reel or information you share outside the Service (for example, to Instagram, messaging apps or your camera roll). We are not responsible for how other users or third parties use, copy or re-share information you or others have made public or shared off the Service. If someone has shared content about you that you think breaks our Terms, email info@elorated.com.
+**You are responsible for what you choose to share**, including your Instagram handle, the content you post, and any video, reel or information you share outside the Service (for example, to social networks, messaging apps or your camera roll). We are not responsible for how other users or third parties use, copy or re-share information you or others have made public or shared off the Service. If someone has shared content about you that you think breaks our Terms, email info@elorated.com.
 
 ## 9. How we share personal information
 
@@ -214,14 +214,14 @@ We use service providers that process personal information on our behalf to run 
 
 | Provider | What they do for us | Data involved | Where data is processed |
 |---|---|---|---|
-| Supabase (hosted on Amazon Web Services) | Database, authentication, file and video storage, serverless functions, service emails | Essentially all Service data | Canada (Montreal) for stored data; some serverless functions and service emails may run in or pass through the United States |
-| Google Cloud | Video processing (Cloud Run) and, where used, archive storage | Match video, stills, derived content | Video processing: Canada (Montreal) |
-| Google (Gemini API) | AI analysis of match video, athlete attribution, highlight selection, avatar generation fallback | Match video (which shows both athletes), still frames, display names, ratings, weight divisions | United States and elsewhere |
-| OpenAI | AI avatar generation only | Profile photo or still frames of you | United States |
-| Sentry (Functional Software, Inc.) | Crash and error reporting, performance monitoring, bug-report and feedback forms | User ID, email, username, IP address where collected, device and app information, error details, screenshots | United States |
-| Expo (650 Industries, Inc.), with Apple Push Notification service and Google Firebase Cloud Messaging | App updates and delivery of push notifications | Push token, notification content, device information | United States and elsewhere |
-| Vercel | Hosting of the web app and invite pages | Web requests, IP address, cookies | United States and global edge locations |
-| Google (Sign-In) | Sign-in, if you choose it | Google account identifier, name, email | United States and elsewhere |
+| Our cloud database and backend provider (hosted by a major cloud infrastructure provider) | Database, authentication, file and video storage, serverless functions, service emails | Essentially all Service data | Canada (Montreal) for stored data; some serverless functions and service emails may run in or pass through the United States |
+| Our cloud computing provider | Video processing and, where used, archive storage | Match video, stills, derived content | Video processing: Canada (Montreal) |
+| A third-party AI analysis provider | AI analysis of match video, athlete attribution, highlight selection, avatar generation fallback | Match video (which shows both athletes), still frames, display names, ratings, weight divisions | United States and elsewhere |
+| A third-party AI image generation provider | AI avatar generation only | Profile photo or still frames of you | United States |
+| Our error-monitoring provider | Crash and error reporting, performance monitoring, bug-report and feedback forms | User ID, email, username, IP address where collected, device and app information, error details, screenshots | United States |
+| Our app update and push delivery provider, with the push notification services of your device's platform | App updates and delivery of push notifications | Push token, notification content, device information | United States and elsewhere |
+| Our web hosting provider | Hosting of the web app and invite pages | Web requests, IP address, cookies | United States and global edge locations |
+| The sign-in provider you choose, if any | Sign-in, if you choose it | Account identifier from that provider, name, email | United States and elsewhere |
 
 ### 9.2 Other users
 
@@ -229,8 +229,8 @@ Information is shared with other users as described in section 8, as a core part
 
 ### 9.3 Social platforms and sharing you choose
 
-- **When you share:** if you share a reel or invite to Instagram, WhatsApp, the share sheet or another app, the content goes to that platform at your direction, under its own terms and privacy policy.
-- **Our own social accounts:** if we post a reel featuring you on our own accounts (for example, Instagram, operated by Meta), that content becomes public on that platform, subject to your opt-out and takedown rights in section 4.5.
+- **When you share:** if you share a reel or invite to a social network, a messaging app, the share sheet or another app, the content goes to that platform at your direction, under its own terms and privacy policy.
+- **Our own social accounts:** if we post a reel featuring you on our own social media accounts, that content becomes public on that platform, subject to your opt-out and takedown rights in section 4.5.
 
 ### 9.4 Legal requirements and protection of rights and safety
 
@@ -261,7 +261,7 @@ We keep personal information only as long as needed for the purposes described i
 - **Your opponents' highlight reels:** reels made for your opponent can show you and the display name you had at the time. They stay with your opponent's record, including after you delete your account, unless you ask us to remove or re-render them.
 - **Location:** as described in section 5.3.
 - **Terms acceptance records:** kept as proof of your agreement, including after account deletion.
-- **Crash reports, error reports and bug reports in Sentry:** generally up to about 90 days.
+- **Crash reports, error reports and bug reports held by our error-monitoring provider:** generally up to about 90 days.
 - **Operational and security logs:** short-term, according to our providers' standard log retention.
 - **Backups:** our providers keep rolling backups for disaster recovery; deleted information can remain in backups until they are overwritten in the normal cycle.
 - **Support emails:** as long as needed to handle your request and keep a reasonable record of it.
@@ -294,7 +294,7 @@ We treat account deletion as an opt-out of promotional use (section 4.5) and of 
 
 The "Deleted athlete" record is de-identified, not anonymous: it keeps the same internal ID, rating and match history, your face can remain visible in match video, and it may still be recognizable to people who were at the match or who see the footage. **To ask us to remove specific footage** in which you appear, email info@elorated.com. We will consider each request and honour it where reasonable, balancing the interests of the other participant(s) in their own match record. Reels posted on our social media accounts are removed on request.
 
-Information that you or others have already shared outside the Service (for example, saved videos or posts on Instagram) is not affected by account deletion. Crash reports in Sentry and backups expire on their normal cycle (section 11).
+Information that you or others have already shared outside the Service (for example, saved videos or posts on social networks) is not affected by account deletion. Crash reports held by our error-monitoring provider and backups expire on their normal cycle (section 11).
 
 ## 13. How we protect information
 
@@ -337,12 +337,12 @@ This section applies to residents of US states with consumer privacy laws, inclu
 
 | Category (California terms) | Examples | Sources | Business purposes | Disclosed to (for business purposes) | Retention |
 |---|---|---|---|---|---|
-| Identifiers | Name, display name, email, account ID, Google account ID, Instagram handle, push token, IP address | You, your device, sign-in services you choose | Provide the Service, security, communication | Service providers; other users (display name, handle) | Section 11 |
+| Identifiers | Name, display name, email, account ID, account ID from a sign-in provider you choose, Instagram handle, push token, IP address | You, your device, sign-in services you choose | Provide the Service, security, communication | Service providers; other users (display name, handle) | Section 11 |
 | Customer records | Name, email, date of birth, photo | You | Provide the Service | Service providers | Until account deletion |
 | Characteristics of protected classifications | Gender, age (from date of birth) | You | Competition divisions and brackets, age eligibility | Service providers; other users (gender) | Until account deletion |
 | Internet or other electronic activity | App activity, invites, shares, crash and error data, logs | Your device, the Service | Provide, secure and improve the Service | Service providers | Section 11 |
 | Geolocation data | Precise location (foreground only), approximate location | Your device | Same-mat check, nearby athletes, integrity | Service providers | Section 5.3 |
-| Audio, electronic, visual or similar information | Match video and audio, photos, stills, avatars, screenshots attached to error or bug reports | You, other users, your device | Match recording, analysis, highlights, promotion (opt-out), training (opt-out), support | Service providers (including AI providers); other match participants; the public through our social accounts (opt-out) | Section 11 |
+| Audio, electronic, visual or similar information | Match video and audio, photos, stills, avatars, screenshots attached to error or bug reports | You, other users, your device | Match recording, result verification, dispute review and fraud detection, analysis, highlights, promotion (opt-out), training (opt-out), support | Service providers (including AI providers); other match participants; the public through our social accounts (opt-out) | Section 11 |
 | Physical characteristics | Weight, weight checks | You, other users | Weight-aware ratings, integrity | Service providers; other users | Until account deletion (weight checks stay with match records) |
 | Inferences | Elo rating, rank, AI technique analysis and coaching notes | Created by the Service | Ratings, rankings, analysis | Service providers; other users (rating, rank) | Section 11 |
 | Sensitive personal information | Account login (email and password), precise geolocation | You, your device | Only for permitted purposes (see section 16.3) | Service providers | Section 11 and 5.3 |
@@ -397,7 +397,7 @@ We do **not** use advertising cookies, third-party tracking pixels, or cross-sit
 
 ## 18. Push notifications
 
-If you allow notifications, we send push notifications through Expo, Apple and Google about activity in the Service, for example when a friend goes live, an invite is claimed, a match result needs your confirmation, or a highlight reel is ready. You can turn notifications off at any time in your device settings (and in the app's notification preferences where available). Turning them off may mean you miss time-sensitive events, such as a result that locks automatically after 24 hours.
+If you allow notifications, we send push notifications through our push delivery provider and the push notification services of your device's platform about activity in the Service, for example when a friend goes live, an invite is claimed, a match result needs your confirmation, or a highlight reel is ready. You can turn notifications off at any time in your device settings (and in the app's notification preferences where available). Turning them off may mean you miss time-sensitive events, such as a result that locks automatically after 24 hours.
 
 ## 19. Age requirement
 
@@ -405,7 +405,7 @@ If you allow notifications, we send push notifications through Expo, Apple and G
 
 ## 20. Third-party links, platforms and services
 
-The Service links to or works with third-party platforms, such as Instagram, WhatsApp, Google, Apple and the share features of your device. When you use them, including when you share content to them or sign in with them, **their own terms and privacy policies apply**, and we are not responsible for their content, privacy practices or security. Please review their policies before you share.
+The Service links to or works with third-party platforms, such as social networks, messaging apps, sign-in providers, app stores and the share features of your device. When you use them, including when you share content to them or sign in with them, **their own terms and privacy policies apply**, and we are not responsible for their content, privacy practices or security. Please review their policies before you share.
 
 ## 21. Changes to this policy
 

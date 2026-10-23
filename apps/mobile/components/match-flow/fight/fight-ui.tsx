@@ -22,6 +22,15 @@ export function deltaColor(delta: number, p: Palette): string {
   return delta > 0 ? p.win : delta < 0 ? p.loss : p.text;
 }
 
+/**
+ * A draw's rating change, by its sign (Rating V9): the underdog GAINS in a
+ * draw (gain colour), the favourite gives a little up (amber, never loss
+ * red: a draw is not a loss), and equals move 0 (neutral ink).
+ */
+export function drawDeltaColor(delta: number, p: Palette): string {
+  return delta > 0 ? p.win : delta < 0 ? p.amber : p.text;
+}
+
 /** First letters of the first and last word: "Mina Park" -> "MP". */
 export function initialsOf(name: string | null | undefined): string {
   const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -31,13 +40,8 @@ export function initialsOf(name: string | null | undefined): string {
   return `${first}${last}`.toUpperCase();
 }
 
-/** "Mina Park" -> "M. Park"; a single word stays as is. */
-export function shortName(name: string | null | undefined): string {
-  const words = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return "Opponent";
-  if (words.length === 1) return words[0];
-  return `${words[0][0]}. ${words.slice(1).join(" ")}`;
-}
+/** "Mina Park" -> "M. Park". Lives in a pure module so `match-roles.ts` can use it too. */
+export { shortName } from "@/lib/match-flow/short-name";
 
 interface MonoProps {
   children: React.ReactNode;
@@ -149,79 +153,6 @@ export function InitialsBlock({
       >
         {initialsOf(name)}
       </Text>
-    </View>
-  );
-}
-
-/** Win / Draw / Loss rating stakes, the viewer's side. */
-export function StakesStrip({
-  win,
-  draw,
-  loss,
-  height = 56,
-  background,
-  testID,
-  maxFontSizeMultiplier,
-}: {
-  win: number;
-  draw: number;
-  loss: number;
-  height?: number;
-  /** Defaults to the plate. */
-  background?: string;
-  testID?: string;
-  /**
-   * Dynamic Type cap for the cell text (the strip is a fixed height). Passing
-   * one also keeps each cell to one line; without it (the face-off) the text
-   * scales and wraps freely, as before.
-   */
-  maxFontSizeMultiplier?: number;
-}) {
-  const p = usePalette();
-  const lines = maxFontSizeMultiplier != null ? 1 : undefined;
-  const cells = [
-    { key: "win", label: "WIN", value: win },
-    { key: "draw", label: "DRAW", value: draw },
-    { key: "loss", label: "LOSS", value: loss },
-  ];
-  return (
-    <View
-      testID={testID}
-      style={{
-        height,
-        flexDirection: "row",
-        backgroundColor: background ?? p.plate,
-        borderWidth: 1,
-        borderColor: p.hairline,
-        borderRadius: FIGHT_RADIUS.button,
-      }}
-    >
-      {cells.map((c, i) => (
-        <View
-          key={c.key}
-          accessible
-          accessibilityLabel={`${c.label} ${c.value > 0 ? "+" : ""}${c.value}`}
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 5,
-            borderLeftWidth: i === 0 ? 0 : 1,
-            borderColor: p.hairline,
-          }}
-        >
-          <Mono color={p.text3} numberOfLines={lines} maxFontSizeMultiplier={maxFontSizeMultiplier}>{c.label}</Mono>
-          <Text
-            testID={testID ? `${testID}-${c.key}` : undefined}
-            numberOfLines={lines}
-            maxFontSizeMultiplier={maxFontSizeMultiplier}
-            className="font-mono-bold"
-            style={[typeStep("subhead"), { color: c.key === "draw" ? (c.value < 0 ? p.amber : p.text) : deltaColor(c.value, p) }, TABULAR]}
-          >
-            {formatSignedDelta(c.value)}
-          </Text>
-        </View>
-      ))}
     </View>
   );
 }

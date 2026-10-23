@@ -60,19 +60,20 @@ import {
   spokenCountdown,
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
-import { useViewerStakes, viewerStakesKey } from "@/lib/match-flow/use-viewer-stakes";
+import { useTimekeeperEnabled } from "@/lib/match-flow/use-timekeeper-enabled";
+import { TIMEKEEPER_COPY } from "@/lib/match-flow/timekeeper-copy";
 import { useModalPresentWatchdog } from "@/lib/updates/use-modal-present-watchdog";
-import type { EloStakes } from "@jits/shared/types/composites";
 import { FIGHT_RADIUS } from "@/components/match-flow/fight/fight-tokens";
 import { ON_MEDIA, usePalette } from "@/lib/theme/palette";
 import { TABULAR, TYPE_SCALE, typeStep } from "@/lib/typography";
-import { InitialsBlock, Mono, StakesStrip, shortName } from "@/components/match-flow/fight/fight-ui";
+import { InitialsBlock, Mono, shortName } from "@/components/match-flow/fight/fight-ui";
 import { StatePressable } from "@/components/ui/state-pressable";
 import { PressableScale } from "@/components/ui/pressable-scale";
 import { SteelSheen } from "@/components/ui/steel-sheen";
 import { duration, easing, haptics, useModalAnimation, useReduceMotion } from "@/lib/motion";
 import { ModalToaster } from "@/components/ui/toast";
 import { OfflineBanner } from "@/components/offline-banner";
+import { InfoPlate } from "@/components/arena/arena-plates";
 
 /**
  * No text on the prompt grows past this Dynamic Type multiple. The card has a
@@ -81,6 +82,11 @@ import { OfflineBanner } from "@/components/offline-banner";
  * fixed-height buttons. Every label is also one line.
  */
 const MAX_FONT_SCALE = 1.3;
+/** The prompt's vertical rhythm, and the tighter one with the different-mat plate. */
+const PROMPT_GAP = 28;
+const PROMPT_GAP_WITH_PLATE = 20;
+/** The different-mat body's visible lines; VoiceOver reads all of it. */
+const DIFFERENT_MAT_BODY_LINES = 3;
 
 /** The card's share of the window height: 633 of 844 on the board. */
 export const PROMPT_HEIGHT_RATIO = 0.75;
@@ -180,18 +186,24 @@ interface ChallengePromptSheetProps {
    */
   moreCount?: number;
   /**
-   * The viewer's own rating and weight, for the stakes strip. Omitted (or a
-   * missing rating): no strip. Arena challenges are ranked-only.
+   * Not read any more: the stakes strip it keyed is gone in both modes (A11,
+   * O1; timekeeper mode spec 2.3 item 1). Accepted so `<ArenaBootstrap />`
+   * (slice M2's file) keeps compiling until it stops passing it.
    */
   viewer?: { elo: number | null; weight: number | null };
+  /**
+   * The challenger is in the viewer's own Online & close list (jr_be spec 023
+   * section 8.4): their band, for the "Maybe a different mat" plate. Null or
+   * omitted: no plate (on the mat, not listed, or no nearby reading).
+   */
+  closeBand?: { label: string; spoken: string } | null;
 }
 
 /** What the card shows: frozen while the modal fades out after a null. */
 interface Shown {
   challenge: IncomingChallenge;
-  stakes: EloStakes | null;
   moreCount: number;
-  viewerElo: number | null;
+  closeBand: { label: string; spoken: string } | null;
 }
 
 export function ChallengePromptSheet({
@@ -201,7 +213,7 @@ export function ChallengePromptSheet({
   onDecline,
   onLater,
   moreCount = 0,
-  viewer,
+  closeBand = null,
 }: ChallengePromptSheetProps) {
   const p = usePalette();
   // "Sheet / modal present": fades in, appears in place under Reduce Motion.
@@ -212,74 +224,37 @@ export function ChallengePromptSheet({
   const insets = React.useContext(SafeAreaInsetsContext) ?? NO_INSETS;
   const cardHeight = promptCardHeight(windowHeight, insets);
 
-  // Later passes challenge=null, which resets the stakes read below. Keep the
-  // last stakes read so reopening from the chip shows the strip at once
-  // instead of the fallback line followed by the strip. The cache is keyed on
-  // the four inputs the stakes were computed from, never on the challenge id:
-  // useViewerStakes only returns stakes for its current inputs, and reuse
-  // here requires the viewer's and the challenger's rating and weight to
-  // match exactly, so one challenger's stakes can never show for another.
-  const stakesKey = viewerStakesKey(
-    viewer?.elo,
-    challenge?.challengerElo,
-    viewer?.weight,
-    challenge?.challengerWeight,
-  );
-  // Held in state and written from an effect, never from render: a render
-  // React throws away (concurrent rendering, StrictMode) must not leave its
-  // value behind. The live read is used directly while it exists, so the
-  // cache is only consulted after it has been committed.
-  const [cached, setCached] = React.useState<{
-    key: string;
-    stakes: EloStakes;
-  } | null>(null);
-  const cacheHit = cached !== null && cached.key === stakesKey;
-  // One calculate_elo_stakes read per set of inputs, viewer as "challenger"
-  // (see useViewerStakes). Fails quietly: no strip. Skipped while a committed
-  // read for the same inputs is cached: stakes are a pure function of those
-  // four inputs, so a Later then reopen (or the same challenger again) does
-  // not hit the network for numbers that cannot have changed.
-  const liveStakes = useViewerStakes(
-    !!challenge && viewer?.elo != null && !cacheHit,
-    viewer?.elo,
-    challenge?.challengerElo,
-    viewer?.weight,
-    challenge?.challengerWeight,
-  );
-  const hasChallenge = challenge !== null;
-  React.useEffect(() => {
-    if (!hasChallenge || !liveStakes) return;
-    setCached((prev) =>
-      prev && prev.key === stakesKey && prev.stakes === liveStakes
-        ? prev
-        : { key: stakesKey, stakes: liveStakes },
-    );
-  }, [hasChallenge, liveStakes, stakesKey]);
-  const stakes =
-    liveStakes ??
-    (challenge && viewer?.elo != null && cacheHit ? cached.stakes : null);
+  // The helper line is timekeeper mode's TK-AR1 only once the flag is known
+  // ON; unknown or off keeps the shipped line (spec 4.2 Arena).
+  const timekeeper = useTimekeeperEnabled();
 
   // React Native keeps rendering a Modal's children while it fades out after
   // visible turns false. The last committed content is kept for that fade so
-  // the card does not go blank (or swap its strip for the fallback line) on
-  // its way out. Written from an effect, like the stakes cache, and only
-  // read while there is no challenge.
+  // the card does not go blank on its way out. Written from an effect, never
+  // from render, and only read while there is no challenge.
   const [lastShown, setLastShown] = React.useState<Shown | null>(null);
-  const viewerElo = viewer?.elo ?? null;
+  // The different-mat plate is decided once per challenge, on its first
+  // show (jr_be spec 023 8.4): a nearby read landing while the prompt is up
+  // must not add or remove it and shift Accept / Decline under a thumb. A
+  // new challenge id takes the band anew; Later and reopen keep it.
+  const frozenBand = React.useRef<{ id: string; band: { label: string; spoken: string } | null } | null>(null);
+  if (challenge && frozenBand.current?.id !== challenge.challengeId) {
+    frozenBand.current = { id: challenge.challengeId, band: closeBand };
+  }
+  const shownBand = challenge ? (frozenBand.current?.band ?? null) : null;
   React.useEffect(() => {
     if (!challenge) return;
     setLastShown((prev) =>
       prev &&
       prev.challenge === challenge &&
-      prev.stakes === stakes &&
       prev.moreCount === moreCount &&
-      prev.viewerElo === viewerElo
+      prev.closeBand === shownBand
         ? prev
-        : { challenge, stakes, moreCount, viewerElo },
+        : { challenge, moreCount, closeBand: shownBand },
     );
-  }, [challenge, stakes, moreCount, viewerElo]);
+  }, [challenge, moreCount, shownBand]);
   const shown: Shown | null = challenge
-    ? { challenge, stakes, moreCount, viewerElo }
+    ? { challenge, moreCount, closeBand: shownBand }
     : lastShown;
 
   const visible = challenge !== null;
@@ -431,8 +406,7 @@ export function ChallengePromptSheet({
               borderRadius: PROMPT_RADIUS,
               borderWidth: 1,
               borderColor: p.strong,
-              // Follows the app theme: the theme's plate, with the stakes
-              // strip inside on the page color.
+              // Follows the app theme: the theme's plate.
               backgroundColor: p.plate,
               overflow: "hidden",
             }}
@@ -452,7 +426,9 @@ export function ChallengePromptSheet({
             >
               <View
                 testID="challenge-prompt"
-                style={{ gap: 28 }}
+                // Tighter with the different-mat plate, so Accept stays in
+                // view on a small phone at a large text size.
+                style={{ gap: shown.closeBand ? PROMPT_GAP_WITH_PLATE : PROMPT_GAP }}
                 // The prompt demands an answer: keep VoiceOver focus inside
                 // it rather than wandering to the screen behind the modal.
                 accessibilityViewIsModal
@@ -460,30 +436,27 @@ export function ChallengePromptSheet({
                 <PromptHeader challenge={shown.challenge} />
                 <PromptChallenger challenge={shown.challenge} />
 
-                {shown.stakes ? (
-                  <View style={{ gap: 8 }}>
-                    <Mono color={p.text3} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>{`YOUR STAKES${shown.viewerElo != null ? ` · ${shown.viewerElo}` : ""}`}</Mono>
-                    <StakesStrip
-                      testID="challenge-prompt-stakes"
-                      win={shown.stakes.challenger_win}
-                      draw={shown.stakes.challenger_draw}
-                      loss={shown.stakes.challenger_loss}
-                      height={64}
-                      background={p.bg}
-                      maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    />
-                  </View>
-                ) : (
-                  <Text
-                    testID="challenge-prompt-fallback"
-                    numberOfLines={2}
-                    maxFontSizeMultiplier={MAX_FONT_SCALE}
-                    className="font-body"
-                    style={[typeStep("body"), { color: p.text2 }]}
-                  >
-                    Accept and you both drop straight into the match.
-                  </Text>
-                )}
+                {/* No rating stakes before a match, in either mode (A11,
+                    O1). The testID predates the stakes removal: the line was
+                    the no-stakes fallback and is now always the card's helper. */}
+                <Text
+                  testID="challenge-prompt-fallback"
+                  numberOfLines={2}
+                  maxFontSizeMultiplier={MAX_FONT_SCALE}
+                  className="font-body"
+                  style={[typeStep("body"), { color: timekeeper.enabled ? p.text : p.text2 }]}
+                >
+                  {timekeeper.enabled
+                    ? TIMEKEEPER_COPY["TK-AR1"]
+                    : "Accept and you both drop straight into the match."}
+                </Text>
+
+                {shown.closeBand ? (
+                  <DifferentMatPlate
+                    name={shortName(shown.challenge.challengerName)}
+                    band={shown.closeBand}
+                  />
+                ) : null}
 
                 {shown.moreCount > 0 ? (
                   <Text
@@ -816,5 +789,25 @@ function AcceptSweep({ accepted, fill }: { accepted: boolean; fill: string }) {
         />
       )}
     </View>
+  );
+}
+
+/**
+ * "Maybe a different mat" (jr_be spec 023 section 8.4): the challenger shows
+ * up in the viewer's Online & close list, not on their mat. Indoor GPS is
+ * often far off, so it is a gentle check, never a block: no button, neutral
+ * rail, and Accept / Decline are unchanged.
+ */
+function DifferentMatPlate({ name, band }: { name: string; band: { label: string; spoken: string } }) {
+  const tail = "GPS can be off indoors, so check you're at the same gym.";
+  return (
+    <InfoPlate
+      testID="challenge-prompt-different-mat"
+      title="Maybe a different mat"
+      body={`${name} shows up ${band.label} away. ${tail}`}
+      accessibilityLabel={`Maybe a different mat. ${name} shows up ${band.spoken} away. ${tail}`}
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
+      bodyNumberOfLines={DIFFERENT_MAT_BODY_LINES}
+    />
   );
 }

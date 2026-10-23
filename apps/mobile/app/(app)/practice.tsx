@@ -22,7 +22,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { MetaTag } from "@/components/ui/elo-system";
 import { Button } from "@/components/ui/elo-system/button";
 import { PracticeTip } from "@/components/practice/practice-steps";
-import { STEP_LABELS, WizardStepHeader } from "@/components/match-flow/match-flow-wizard";
+import { WizardStepHeader } from "@/components/match-flow/match-flow-wizard";
 import { MatchRecorderProvider, useMatchRecorder } from "@/components/match-flow/match-recorder-context";
 import { MatchRecorderCamera } from "@/components/match-flow/match-recorder-surface";
 import {
@@ -34,26 +34,17 @@ import { usePracticeMatch } from "@/lib/practice/use-practice-match";
 import {
   PRACTICE_DURATION_SECONDS,
   PRACTICE_RECORDER_ID,
+  PRACTICE_STEP_LABELS,
+  PRACTICE_STEPS,
   PRACTICE_TIPS,
-  type PracticePhase,
+  practiceStepFor,
 } from "@/lib/practice/constants";
-import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
 import { useArenaMatchScreen } from "@/lib/arena/arena-store";
 import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
+import { PRACTICE_CAPTURE } from "@/lib/match-flow/capture-policy";
 import { exitMatchTo } from "@/lib/match-flow/exit-to";
 import { ARENA_HREF } from "@/lib/arena/constants";
 import { discardLocalClip } from "@/lib/video/recording-file";
-
-/**
- * Waiting and every phase from weight on share the real wizard step's name
- * and header, so the count starts at Step 1 / 8.
- */
-function stepFor(phase: PracticePhase): MatchStep | null {
-  if (phase === "waiting") return "wait";
-  return (MATCH_STEPS as readonly string[]).includes(phase)
-    ? (phase as MatchStep)
-    : null;
-}
 
 /** Deletes the run's clip when the recorder goes away (exit, back, Practice again). */
 function PracticeClipCustodian() {
@@ -143,7 +134,7 @@ export default function PracticeScreen() {
     );
   }
 
-  const step = stepFor(phase);
+  const step = practiceStepFor(phase);
   const tip = PRACTICE_TIPS[phase];
   // Live is full screen over the camera, like a real match. Hidden slots
   // render null in place so the camera keeps its position in the tree and
@@ -187,7 +178,7 @@ export default function PracticeScreen() {
           >
             <PracticeClipCustodian />
             {/* Before the phase view so the live lock lands before recording starts. */}
-            <MatchOrientationController mode={orientationModeFor(phase)} />
+            <MatchOrientationController mode={orientationModeFor(phase)} recordingOrientation={PRACTICE_CAPTURE.recordingOrientation} />
             {live ? null : (
               <MetaTag accessibilityLabel="Practice match" testID="practice-tag">
                 Practice
@@ -196,12 +187,14 @@ export default function PracticeScreen() {
             {step && !live ? (
               <WizardStepHeader
                 step={step}
-                currentIdx={MATCH_STEPS.indexOf(step)}
-                label={STEP_LABELS[step]}
+                currentIdx={PRACTICE_STEPS.indexOf(step)}
+                total={PRACTICE_STEPS.length}
+                label={PRACTICE_STEP_LABELS[step]}
               />
             ) : null}
             {tip && !live ? <PracticeTip text={tip} /> : null}
-            <MatchRecorderCamera step={step ?? "wait"} />
+            {/* The camera only acts on ready and live; the lobby and the wait are not match steps. */}
+            <MatchRecorderCamera step={step === "wait" ? null : step} capture={PRACTICE_CAPTURE} />
             <PracticePhaseView
               state={state}
               dispatch={dispatch}

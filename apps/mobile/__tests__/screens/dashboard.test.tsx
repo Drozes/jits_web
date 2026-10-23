@@ -190,6 +190,21 @@ jest.mock("@jits/shared/api/queries", () => ({
 
 jest.mock("@jits/shared/types/composites", () => ({}), { virtual: true });
 
+// Home's invite fallback card reads `invites_enabled`: off (fail-closed, as an
+// unmocked read here resolves) unless a test turns it on.
+let mockInvitesOn = false;
+jest.mock("@/lib/invites/use-invites-enabled", () => ({
+  ...jest.requireActual("@/lib/invites/use-invites-enabled"),
+  useInvitesEnabled: () => mockInvitesOn,
+}));
+
+// The match this athlete timekeeps (timekeeper mode A20): none unless a test says so.
+const mockGetMyTimekeepingMatch = jest.fn((..._a: unknown[]) => Promise.resolve({ ok: true, data: null as unknown }));
+jest.mock("@jits/shared/api/timekeeper", () => ({
+  ...jest.requireActual("@jits/shared/api/timekeeper"),
+  getMyTimekeepingMatch: (...a: unknown[]) => mockGetMyTimekeepingMatch(...a),
+}));
+
 // The Highlights carousel's source (specs/matches-tab 7, via useReelLane), and
 // cold-start push routing armed by Home.
 const mockGetMyHighlights = jest.fn();
@@ -221,6 +236,7 @@ jest.mock("expo-image", () => {
 });
 
 import DashboardScreen from "@/app/(app)/(tabs)/(home)/index";
+import { duration } from "@/lib/motion";
 import { __setHighlightReadThrottleForTests, resetHighlightStore } from "@/lib/highlight/highlight-store";
 import { __resetSessionPulses } from "@/lib/highlight/reel-lane";
 
@@ -641,6 +657,164 @@ describe("DashboardScreen resume-match card", () => {
   });
 });
 
+// Timekeeper mode A20, A24, PM20 (spec 9.1): the match this athlete TIMEKEEPS.
+describe("DashboardScreen timekeeper card (A20)", () => {
+  const ATHLETES = [
+    { athleteId: "c-1", displayName: "Mina Reyes" },
+    { athleteId: "o-1", displayName: "Dan Okafor" },
+  ];
+  const tk = (over: Record<string, unknown> = {}) => ({
+    ok: true,
+    data: {
+      matchId: "tk-match-1",
+      status: "in_progress",
+      startedAt: "2026-10-20T12:00:00Z",
+      endedAt: null,
+      athletes: ATHLETES,
+      reviewPending: false,
+      editOpen: false,
+      editClosesAt: null,
+      ...over,
+    },
+  });
+  const athleteOpen = {
+    ok: true,
+    data: { matchId: "99999999-9999-4999-8999-999999999999", status: "in_progress", opponentName: "Demo Red" },
+  };
+
+  afterEach(() => {
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve({ ok: true, data: null }));
+    mockInvitesOn = false;
+    mockHasEverPlayed = false;
+    // A test that drives the device clock with fake timers hands it back.
+    jest.useRealTimers();
+  });
+
+  it("on duty: the TIMEKEEPER card with the matchup, TK-H3 and the one red CTA; a tap opens the match, nothing auto-navigates", async () => {
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve(tk()));
+    const utils = render(React.createElement(DashboardScreen));
+    const card = await utils.findByTestId("timekeeping-resume-card");
+    expect(utils.getByTestId("timekeeping-resume-role")).toHaveTextContent("TIMEKEEPER");
+    expect(utils.getByTestId("timekeeping-resume-title")).toHaveTextContent("M. Reyes vs D. Okafor");
+    expect(utils.getByTestId("timekeeping-resume-line")).toHaveTextContent("You run the clock and record the result.");
+    expect(card).toBeTruthy();
+    // Not the athlete card.
+    expect(utils.queryByLabelText("Resume your match")).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
+    const cta = utils.getByLabelText("Back to the match");
+    expect(redCtas(utils)).toHaveLength(1);
+    fireEvent.press(cta);
+    expect(mockPush).toHaveBeenCalledWith("/match/tk-match-1");
+  });
+
+  it("after the clock ended: TK-H4", async () => {
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve(tk({ endedAt: "2026-10-20T12:06:00Z" })));
+    const utils = render(React.createElement(DashboardScreen));
+    expect(await utils.findByText("The result is waiting on you.")).toBeTruthy();
+    expect(utils.getByLabelText("Back to the match")).toBeTruthy();
+  });
+
+  it("in the edit window: Review result BELOW the athlete's Resume card, which keeps the one red CTA (PM20)", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(athleteOpen);
+    mockGetMyTimekeepingMatch.mockImplementation(() =>
+      Promise.resolve(tk({ status: "completed", endedAt: "2026-10-20T12:06:00Z", editOpen: true, editClosesAt: new Date(mockNow + 20 * 60_000).toISOString() })),
+    );
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("timekeeping-resume-card");
+    await utils.findByLabelText("Resume your match");
+    expect(utils.getByTestId("timekeeping-resume-line").props.children).toMatch(/^Result recorded\. You can fix it until .+\.$/);
+    const review = utils.getByLabelText("Review result");
+    expect(review.props.className ?? "").not.toMatch(/(^|\s)bg-cta(\s|$)/);
+    expect(redCtas(utils)).toHaveLength(1);
+    // The athlete card first, the timekeeper card below it.
+    type Node = { props: { testID?: unknown; accessibilityLabel?: unknown } };
+    const all: Node[] = utils.UNSAFE_root.findAll((n: Node) => n.props.testID === "timekeeping-resume-card" || n.props.accessibilityLabel === "Resume your match");
+    const athleteAt = all.findIndex((n) => n.props.accessibilityLabel === "Resume your match");
+    const tkAt = all.findIndex((n) => n.props.testID === "timekeeping-resume-card");
+    expect(athleteAt).toBeGreaterThanOrEqual(0);
+    expect(tkAt).toBeGreaterThan(athleteAt);
+  });
+
+  it("on duty, a never-played athlete gets no practice offer: the timekeeper card keeps the one red CTA", async () => {
+    // Practice-eligible but for the duty: no matches, never played, never offered.
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getDashboardSummary.mockResolvedValue({
+      ...mockSummary,
+      stats: { wins: 0, losses: 0, draws: 0, win_streak: 0, best_win_streak: 0 },
+    });
+    mockHasEverPlayed = false;
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve(tk()));
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("timekeeping-resume-card");
+    await utils.findByText(LOADED);
+    expect(utils.queryByTestId("practice-offer-card")).toBeNull();
+    expect(utils.getByLabelText("Back to the match").props.className).toMatch(/(^|\s)bg-cta(\s|$)/);
+    expect(redCtas(utils)).toHaveLength(1);
+  });
+
+  it("on duty with an athlete Resume card too (defensive, R2 forbids it): Resume keeps the one red CTA", async () => {
+    const queries = require("@jits/shared/api/queries") as QueryMocks;
+    queries.getMyActiveMatch.mockResolvedValue(athleteOpen);
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve(tk()));
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("timekeeping-resume-card");
+    const resume = await utils.findByLabelText("Resume your match");
+    expect(resume.props.className).toMatch(/(^|\s)bg-cta(\s|$)/);
+    expect(utils.getByLabelText("Back to the match").props.className ?? "").not.toMatch(/(^|\s)bg-cta(\s|$)/);
+    expect(redCtas(utils)).toHaveLength(1);
+  });
+
+  it("hides the invite card while it shows; the invite card comes back once the edit window closes, with no new read", async () => {
+    // Fake timers own the device clock (Date.now) and the card's own deadline
+    // timer, so the window closes exactly when the test advances the clock,
+    // inside act, never on the wall clock of a loaded runner.
+    jest.useFakeTimers({ now: mockNow });
+    mockInvitesOn = true;
+    const closesAt = Date.now() + 20 * 60_000;
+    mockGetMyTimekeepingMatch.mockImplementation(() =>
+      Promise.resolve(tk({ status: "completed", endedAt: "2026-10-20T12:06:00Z", editOpen: true, editClosesAt: new Date(closesAt).toISOString() })),
+    );
+    const utils = render(React.createElement(DashboardScreen));
+    await utils.findByTestId("timekeeping-resume-card");
+    await utils.findByText(LOADED);
+    expect(utils.queryByTestId("home-invite-card")).toBeNull();
+    const reads = mockGetMyTimekeepingMatch.mock.calls.length;
+
+    // One ms before the window closes on this device's clock: still the timekeeper's card.
+    act(() => {
+      jest.advanceTimersByTime(closesAt - 1 - Date.now());
+    });
+    expect(utils.getByTestId("timekeeping-resume-card")).toBeTruthy();
+    expect(utils.queryByTestId("home-invite-card")).toBeNull();
+
+    // The window closes: the card's own timer re-renders Home.
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(utils.getByTestId("home-invite-card")).toBeTruthy();
+    expect(utils.queryByTestId("timekeeping-resume-card")).toBeNull();
+    expect(mockGetMyTimekeepingMatch.mock.calls.length).toBe(reads);
+  });
+
+  it("no card once the edit window has closed, or with nothing to timekeep", async () => {
+    mockGetMyTimekeepingMatch.mockImplementation(() =>
+      Promise.resolve(tk({ status: "completed", editOpen: true, editClosesAt: new Date(mockNow - 1000).toISOString() })),
+    );
+    const closed = render(React.createElement(DashboardScreen));
+    await closed.findByText(LOADED);
+    await act(async () => {});
+    expect(closed.queryByTestId("timekeeping-resume-card")).toBeNull();
+    closed.unmount();
+
+    mockGetMyTimekeepingMatch.mockImplementation(() => Promise.resolve({ ok: true, data: null }));
+    const none = render(React.createElement(DashboardScreen));
+    await none.findByText(LOADED);
+    await act(async () => {});
+    expect(none.queryByTestId("timekeeping-resume-card")).toBeNull();
+  });
+});
+
 // specs/matches-tab section 7 (owner round 2): ONE carousel titled
 // Highlights replaces the "Your new highlight" card. Own reels in phase 1.
 describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
@@ -668,6 +842,8 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
 
   afterEach(() => {
     store.__resetArenaStoreForTests();
+    // A test that drives the banner's timers with fake timers hands them back.
+    jest.useRealTimers();
   });
 
   it("arms notification routing once Home is up", async () => {
@@ -740,6 +916,10 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
   });
 
   it("the first highlight celebrates over the carousel (C-C3), once, and logs matches.milestone_shown", async () => {
+    // Fake timers own the banner's 4 s hold, its fade and the reel motions:
+    // the tap's dismissal lands when the test advances the clock, never on a
+    // real-time window that a loaded runner can miss.
+    jest.useFakeTimers({ now: mockNow });
     (require("@/lib/milestones/milestone-store") as { __resetMilestonesForTests: () => void }).__resetMilestonesForTests();
     mockGetMyHighlights.mockResolvedValue(highlightsPage([reel("h1", { unseen: true, readyAt: new Date(mockNow - 60_000).toISOString() })]));
     const utils = render(React.createElement(DashboardScreen));
@@ -747,12 +927,18 @@ describe("DashboardScreen Highlights carousel (specs/matches-tab 7)", () => {
     const banner = await utils.findByTestId("milestone-banner-first_highlight");
     expect(banner.props.accessibilityLabel).toBe("Your first highlight is ready");
     expect(mockCapture).toHaveBeenCalledWith("matches.milestone_shown", { level: "info", tags: { milestone: "first_highlight" } });
+    // The tap starts the fade; the banner leaves once the fade has run.
     fireEvent.press(banner);
-    await waitFor(() => expect(utils.queryByTestId("milestone-banner-first_highlight")).toBeNull());
-    // A later visit (remount) does not celebrate again.
+    act(() => {
+      jest.advanceTimersByTime(duration.fast);
+    });
+    expect(utils.queryByTestId("milestone-banner-first_highlight")).toBeNull();
+    // A later visit (remount) does not celebrate again: let its milestone
+    // decision (the marks load) land before asserting there is no banner.
     utils.unmount();
     const again = render(React.createElement(DashboardScreen));
     await again.findByTestId("reel-tile-ready:h1");
+    await act(async () => {});
     expect(again.queryByTestId("milestone-banner-first_highlight")).toBeNull();
     expect(mockCapture.mock.calls.filter((c) => c[0] === "matches.milestone_shown")).toHaveLength(1);
   });

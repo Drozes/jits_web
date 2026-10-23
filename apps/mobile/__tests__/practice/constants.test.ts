@@ -1,6 +1,8 @@
 /**
- * Practice copy and the one-time Home offer rule (lib/practice/constants.ts).
+ * Practice copy, header steps and the one-time Home offer rule
+ * (lib/practice/constants.ts).
  */
+import { MATCH_STEPS } from "@/lib/match-flow/step-router";
 import {
   PRACTICE_OFFER_BODY,
   PRACTICE_OFFER_TITLE,
@@ -8,9 +10,14 @@ import {
   PRACTICE_LOBBY_BODY,
   PRACTICE_SUMMARY_TIP_NO_CLIP,
   PRACTICE_SUMMARY_TIP_NO_CLIP_GRANTED,
+  PRACTICE_STEP_LABELS,
+  PRACTICE_STEPS,
   PRACTICE_TIPS,
   practiceBot,
+  practiceStepFor,
   shouldOfferPracticeMatch,
+  type PracticePhase,
+  type PracticeStep,
 } from "@/lib/practice/constants";
 
 const COACH_LINES = [
@@ -37,6 +44,45 @@ describe("practice copy", () => {
       expect(line).not.toMatch(/\bpoints?\b|\bgyms?\b|\bsessions?\b/i);
     },
   );
+});
+
+describe("practice header steps (its own list, not the match wizard's)", () => {
+  it("keeps the eight header steps, the wait first, so the header reads STEP N / 8", () => {
+    expect(PRACTICE_STEPS).toEqual(["wait", "weight", "ready", "live", "end", "result", "confirm", "summary"]);
+  });
+
+  it("keeps the wait step the match wizard no longer has", () => {
+    expect(PRACTICE_STEPS).toContain("wait");
+    expect(MATCH_STEPS as readonly string[]).not.toContain("wait");
+  });
+
+  it("labels every step with the header's name", () => {
+    expect(PRACTICE_STEP_LABELS).toEqual({
+      wait: "Waiting",
+      weight: "Weights",
+      ready: "Ready",
+      live: "Live",
+      end: "Ended",
+      result: "Result",
+      confirm: "Confirm",
+      summary: "Summary",
+    });
+  });
+
+  it.each<[PracticePhase, PracticeStep | null]>([
+    ["offline", null],
+    ["lobby", null],
+    ["waiting", "wait"],
+    ["weight", "weight"],
+    ["ready", "ready"],
+    ["live", "live"],
+    ["end", "end"],
+    ["result", "result"],
+    ["confirm", "confirm"],
+    ["summary", "summary"],
+  ])("phase %s shows header step %s", (phase, step) => {
+    expect(practiceStepFor(phase)).toBe(step);
+  });
 });
 
 describe("practiceBot", () => {

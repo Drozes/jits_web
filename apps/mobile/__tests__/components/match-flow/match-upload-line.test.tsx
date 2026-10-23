@@ -15,10 +15,13 @@ jest.mock("@/components/match-flow/match-recorder-context", () => ({
 jest.mock("@/components/match-flow/steps/end-step", () => ({ EndStep: () => null }));
 jest.mock("@/components/match-flow/steps/result-step", () => ({ ResultStep: () => null }));
 jest.mock("@/components/match-flow/steps/confirm-step", () => ({ ConfirmStep: () => null }));
-jest.mock("@/components/match-flow/steps/wait-step", () => ({ WaitStep: () => null }));
 jest.mock("@/components/match-flow/faceoff/faceoff-body", () => ({ FaceoffBody: () => null }));
 jest.mock("@/components/match-flow/countdown/live-stage", () => ({ LiveStage: () => null }));
 jest.mock("@/components/match-flow/verdict/verdict-step", () => ({ VerdictStep: () => null }));
+// The timekeeper-mode steps the renderer also places (never reached here), mocked like the rest.
+jest.mock("@/components/match-flow/crew/crew-step", () => ({ CrewStep: () => null }));
+jest.mock("@/components/match-flow/faceoff/faceoff-timekeeper", () => ({ FaceoffTimekeeper: () => null }));
+jest.mock("@/components/match-flow/steps/timekeeper-done", () => ({ TimekeeperDone: () => null }));
 
 import * as React from "react";
 import { StyleSheet } from "react-native";
@@ -28,6 +31,7 @@ import { MatchStepRenderer } from "@/components/match-flow/match-step-renderer";
 import { resetMatchUploadStore, setMatchUpload } from "@/lib/video/match-upload-store";
 import { __resetStripSuppressionsForTests, getStripSuppressions } from "@/lib/video/upload-strip-visibility";
 import type { MatchStep } from "@/lib/match-flow/step-router";
+import { matchFlowWrapper } from "../../support/match-flow-wrapper";
 
 beforeEach(() => {
   mockRetry.mockReset();
@@ -72,7 +76,6 @@ describe("MatchUploadLine", () => {
 });
 
 describe("MatchStepRenderer and the upload status", () => {
-  const participant = { athlete_id: "a", display_name: "A", current_elo: 1, current_weight: 1, outcome: null, elo_before: null, elo_after: null, elo_delta: null, weight_division_gap: null };
   const props = (step: MatchStep) =>
     ({
       step,
@@ -84,8 +87,6 @@ describe("MatchStepRenderer and the upload status", () => {
       startedAt: new Date().toISOString(),
       pausedAt: null,
       totalPausedDuration: 0,
-      me: participant,
-      opponent: { ...participant, athlete_id: "b" },
       submissionTypes: [],
       resultData: null,
       ownOutcome: null,
@@ -106,13 +107,13 @@ describe("MatchStepRenderer and the upload status", () => {
   });
 
   it.each(["end", "result", "confirm"] as const)("%s shows the compact line and hides the strip for this match only", (step) => {
-    const s = render(<MatchStepRenderer {...props(step)} />);
+    const s = render(<MatchStepRenderer {...props(step)} />, { wrapper: matchFlowWrapper() });
     expect(s.getByTestId("match-upload-line")).toBeTruthy();
     expect(getStripSuppressions()).toEqual([{ kind: "match", matchId: "m1" }]);
   });
 
   it("live (countdown and the live screen): no line, and the strip hides for every job", () => {
-    const s = render(<MatchStepRenderer {...props("live")} />);
+    const s = render(<MatchStepRenderer {...props("live")} />, { wrapper: matchFlowWrapper() });
     expect(s.queryByTestId("match-upload-line")).toBeNull();
     expect(getStripSuppressions()).toEqual([{ kind: "all" }]);
   });

@@ -146,7 +146,7 @@ export function PracticeConfirm({
 }) {
   return (
     <View className="gap-4">
-      {/* Practice is unrated: the subtitle overrides "Your rating is already updated". */}
+      {/* Practice has no dispute: the subtitle overrides the default helper, "...or dispute it and an admin will review." (TK-R8). */}
       <ResultBanner
         resultData={result}
         currentAthleteId={athleteId}

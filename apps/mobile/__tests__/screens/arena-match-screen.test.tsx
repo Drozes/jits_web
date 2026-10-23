@@ -34,6 +34,7 @@ jest.mock("expo-router", () => {
 const mockUsePreventRemove = jest.fn();
 jest.mock("@react-navigation/native", () => ({
   usePreventRemove: (...args: unknown[]) => mockUsePreventRemove(...args),
+  useNavigation: () => ({ dispatch: jest.fn() }),
 }));
 
 jest.mock("@/lib/theme/use-theme", () => ({

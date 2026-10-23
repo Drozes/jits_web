@@ -50,7 +50,7 @@ import {
 import { LiveStage, clockStartFor } from "@/components/match-flow/countdown/live-stage";
 
 const NOW = Date.parse("2026-09-27T12:00:00.000Z");
-const who = (name: string) => ({ display_name: name, current_elo: 1500, current_weight: 170 });
+const who = (name: string) => ({ displayName: name, currentElo: 1500, weightLbs: 170 });
 
 function renderStage(startedAtMs: number, recording = true) {
   return render(

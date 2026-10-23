@@ -1817,6 +1817,34 @@ describe("reserve before bytes (jits-n2im.11)", () => {
     expect(seen).toMatchObject({ protocol: 2, videoId: "VID-1", phase: "bytes" });
   });
 
+  it("saves the clip's capture with the job and reserves with it (timekeeper mode spec 13.4)", async () => {
+    let seen: PendingUploadJob | null = null;
+    mockUploadFileResumable.mockImplementation(async () => {
+      seen = await loadUploadJob("M1");
+    });
+    await startMatchVideoUpload({ ...START, captureQuality: "1080p", captureLens: "ultrawide" });
+    expect(mockReserveRow).toHaveBeenCalledWith(
+      expect.objectContaining({ captureQuality: "1080p", captureLens: "ultrawide" }),
+    );
+    expect(seen).toMatchObject({ captureQuality: "1080p", captureLens: "ultrawide" });
+  });
+
+  it("a relaunch reserves with the capture the job was saved with", async () => {
+    seedReservedJob({ captureQuality: "720p", captureLens: "default" });
+    await resumeMatchVideoUploads();
+    await waitForSettled("M1");
+    expect(mockReserveRow).toHaveBeenCalledWith(expect.objectContaining({ captureQuality: "720p", captureLens: "default" }));
+  });
+
+  it("a job saved before the capture existed reserves without it (the row keeps NULL)", async () => {
+    seedReservedJob();
+    await resumeMatchVideoUploads();
+    await waitForSettled("M1");
+    const params = mockReserveRow.mock.calls[0][0] as Record<string, unknown>;
+    expect(params).not.toHaveProperty("captureQuality");
+    expect(params).not.toHaveProperty("captureLens");
+  });
+
   it("a gate HINT at the reservation sends no bytes and parks with the gate's copy", async () => {
     mockReserveRow.mockRejectedValue(
       dbError("Daily video limit reached.", { gate: "rate_limited", code: "P0001", hint: "upload_rate_limited" }),

@@ -1,58 +1,53 @@
 /**
  * Match-loop runner.
  *
- *   npm run match-loop -- [--tier core|extended|all] [--only C1,C3] [--repeat N]
+ *   npm run match-loop -- [--tier core|extended|timekeeper|all] [--only C1,C3] [--repeat N]
  *                         [--fidelity strict|lenient] [--timing human|fast]
  *                         [--rerun-failures N] [--preflight | --preflight-only]
- *                         [--signin-blue] [--no-typecheck]
+ *                         [--signin-blue] [--no-typecheck] [--tk-flag-on] [--no-pending]
+ *
+ * `--tier all` is core plus extended (the flag-OFF guard); the timekeeper
+ * tier runs only with `--tier timekeeper` or `--only`.
+ *
+ * `--tk-flag-on` holds `timekeeper_role` ON for the whole run (restored at
+ * the end, on Ctrl-C, and by the next run's start if this one is killed):
+ * the flag-OFF tiers once more with the flag on and the bots sending no
+ * capability header (TEST-PLAN 4.1, PLAN 5 Wave 3 step 3). The app is
+ * closed after the flag is set and again after it is restored, so it reads
+ * the flag at its next launch. A timekeeper
+ * scenario whose slices are not yet in the build (read from the app source,
+ * scenarios/timekeeper/integration.ts) is recorded `pending` and not run;
+ * that fails the run on a build with M8 (every slice must be in by then)
+ * and always with `--no-pending` (the Wave 3 gate).
  *
  * Writes tools/match-loop/.runs/<iso>/result.json (plus per-scenario folders
  * with screenshots, trace.jsonl, device.log) and appends a line to
  * .runs/history.jsonl. Exits non-zero when any scenario is fail,
  * harness_error or env_error (`known` and `flake` do not fail the run).
  */
-import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig, loadPassword, resolveAthleteIds, RUNS_DIR, REPO_ROOT, type Config, type AthleteIds } from "./config";
-import { EnvError, HarnessError, ExpectationTimeout, isoStamp, log, normaliseError, run } from "./lib/util";
+import { EnvError, HarnessError, ExpectationTimeout, isoStamp, log, run } from "./lib/util";
 import { redact, redactJson } from "./lib/redact";
-import { installSignalHandlers, runCleanup } from "./lib/cleanup";
+import { installSignalHandlers, onInterrupt, runCleanup } from "./lib/cleanup";
 import { Idb } from "./sim/idb";
 import { Simctl } from "./sim/simctl";
 import { Screens } from "./sim/screens";
-import { MetroLog } from "./oracle/logs";
+import { MetroLog, metroTreeProblem, readMetroProjectRoot } from "./oracle/logs";
 import { readRealtimeLog, scanRealtimeLog } from "./oracle/realtime";
 import { preflight, signInBlue } from "./preflight";
-import { ScenarioCtx, type OracleRecord, type Scenario, type StepRecord, type RunOptions } from "./scenarios/context";
-import { SCENARIOS, NOT_IMPLEMENTED } from "./scenarios";
+import { ScenarioCtx, type Scenario, type RunOptions } from "./scenarios/context";
+import { SCENARIOS, NOT_IMPLEMENTED, scenariosForTier } from "./scenarios";
 import { validatePayload } from "./bot/protocol";
 import type { Fidelity, Timing } from "./bot/match-side";
-
-type Status = "pass" | "fail" | "flake" | "harness_error" | "env_error" | "known";
-
-interface ScenarioResult {
-  id: string;
-  title: string;
-  status: Status;
-  attempts: number;
-  expectedFailure?: string;
-  steps: StepRecord[];
-  oracles: OracleRecord[];
-  artifacts: Record<string, string>;
-  /** First failure's fingerprint (the one used for bead external refs). */
-  fingerprint: string | null;
-  /** Every failed oracle's fingerprint. */
-  fingerprints: string[];
-  knownBeads: string[];
-  skippedOracles: string[];
-  error?: string;
-  ms: number;
-  previousAttempts?: { status: Status; fingerprint: string | null; dir: string }[];
-}
+import { holdFlagForRun, putBackFailures, recoverFixtures, timekeeperRoleOffProblem } from "./fixtures/timekeeper";
+import { acquireRunLock } from "./lib/run-lock";
+import { integratedSlices, pendingFails, pendingReason } from "./scenarios/timekeeper/integration";
+import { exitCodeFor, pendingResult, scenarioResult, type ScenarioResult, type Status } from "./lib/results";
 
 interface Args {
-  tier: "core" | "extended" | "all";
+  tier: "core" | "extended" | "timekeeper" | "all";
   only: string[] | null;
   repeat: number;
   fidelity: Fidelity;
@@ -62,6 +57,8 @@ interface Args {
   preflightOnly: boolean;
   signinBlue: boolean;
   typecheck: boolean;
+  tkFlagOn: boolean;
+  noPending: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -76,6 +73,8 @@ function parseArgs(argv: string[]): Args {
     preflightOnly: false,
     signinBlue: false,
     typecheck: true,
+    tkFlagOn: false,
+    noPending: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
@@ -94,9 +93,11 @@ function parseArgs(argv: string[]): Args {
     else if (k === "--preflight-only") a.preflightOnly = true;
     else if (k === "--signin-blue") a.signinBlue = true;
     else if (k === "--no-typecheck") a.typecheck = false;
+    else if (k === "--tk-flag-on") a.tkFlagOn = true;
+    else if (k === "--no-pending") a.noPending = true;
     else throw new Error(`unknown flag ${k}`);
   }
-  if (!["core", "extended", "all"].includes(a.tier)) throw new Error(`bad --tier ${a.tier}`);
+  if (!["core", "extended", "timekeeper", "all"].includes(a.tier)) throw new Error(`bad --tier ${a.tier}`);
   if (!["strict", "lenient"].includes(a.fidelity)) throw new Error(`bad --fidelity ${a.fidelity}`);
   if (!["human", "fast"].includes(a.timing)) throw new Error(`bad --timing ${a.timing}`);
   return a;
@@ -118,28 +119,6 @@ async function knownFingerprints(): Promise<Map<string, string>> {
     }
   }
   return out;
-}
-
-function sha12(basis: string): string {
-  return createHash("sha1").update(basis).digest("hex").slice(0, 12);
-}
-
-/**
- * Fingerprint of one failed oracle. Stable across runs: scenario + oracle id
- * + what it EXPECTED (the actual value carries screen dumps and timings).
- * The generic "error" oracle expects nothing useful, so it hashes the
- * normalised actual (the error message) instead.
- * NOTE: this formula backs the external refs on filed beads
- * (match-loop:<fp>). Changing it orphans them.
- */
-export function oracleFingerprint(scenarioId: string, o: OracleRecord): string {
-  const detail = o.id === "error" ? JSON.stringify(o.actual ?? "") : JSON.stringify(o.expected ?? "");
-  return sha12([scenarioId, o.id, normaliseError(detail)].join("|"));
-}
-
-/** Fingerprint of a scenario that died with no failed oracle. */
-export function errorFingerprint(scenarioId: string, error: string): string {
-  return sha12([scenarioId, "error", normaliseError(error)].join("|"));
 }
 
 /** Protocol oracle over the bot trace: shapes, unknown events, send status. */
@@ -270,34 +249,22 @@ async function runOne(env: Env, s: Scenario, dir: string, known: Map<string, str
     logOracles(ctx);
     status = ctx.oracles.every((o) => o.ok) && !error ? "pass" : "fail";
   }
-  let fingerprints: string[] = [];
-  if (status !== "pass") {
-    fingerprints = ctx.oracles.filter((o) => !o.ok).map((o) => oracleFingerprint(s.id, o));
-    if (fingerprints.length === 0 && errMsg) fingerprints = [errorFingerprint(s.id, errMsg)];
-  }
-  const fp = fingerprints[0] ?? null;
-  // `known` only when EVERY failure is already filed; one new failure keeps it `fail`.
-  if (status === "fail" && fingerprints.length > 0 && fingerprints.every((f) => known.has(f))) status = "known";
-  const result: ScenarioResult = {
-    id: s.id,
-    title: s.title,
-    status,
-    attempts: 1,
-    expectedFailure: s.expectedFailure,
-    steps: ctx.steps,
-    oracles: ctx.oracles,
-    artifacts: ctx.artifacts,
-    fingerprint: fp,
-    fingerprints,
-    knownBeads: fingerprints.filter((f) => known.has(f)).map((f) => `${f}=${known.get(f)}`),
-    skippedOracles: ctx.oracles.filter((o) => o.status === "skipped").map((o) => o.id),
-    error: errMsg,
-    ms: Date.now() - t0,
-  };
+  // A fixture put-back that failed after the scenario had failed: the error
+  // above stays the scenario's own, and the put-back rides alongside it. The
+  // fingerprints and the `known` rule are `scenarioResult`'s (lib/results.ts).
+  const putBacks = putBackFailures(error);
+  const result = scenarioResult(
+    { scenario: s, status, steps: ctx.steps, oracles: ctx.oracles, artifacts: ctx.artifacts, error: errMsg, putBacks, ms: Date.now() - t0 },
+    known,
+  );
+  const fp = result.fingerprint;
   writeFileSync(join(dir, "scenario.json"), redactJson(result, 2));
-  log(`== ${s.id}: ${status.toUpperCase()}${fp ? ` (${fp})` : ""} in ${Math.round(result.ms / 1000)}s${errMsg ? ` - ${errMsg}` : ""}`);
+  log(`== ${s.id}: ${result.status.toUpperCase()}${fp ? ` (${fp})` : ""} in ${Math.round(result.ms / 1000)}s${errMsg ? ` - ${errMsg}` : ""}`);
+  for (const p of putBacks) log(`   and a put-back failed after it: ${p}`);
   return result;
 }
+
+let releaseRunLock: () => void = () => undefined;
 
 async function main(): Promise<number> {
   installSignalHandlers();
@@ -309,12 +276,33 @@ async function main(): Promise<number> {
   });
   const args = parseArgs(process.argv.slice(2));
   const cfg = loadConfig();
+  // One run at a time on this machine, from any worktree (lib/run-lock.ts):
+  // taken before anything touches the simulator or the stack, released
+  // after every cleanup hook has run (a run killed by a signal leaves a
+  // lock whose pid is gone, which the next run takes over).
+  releaseRunLock = acquireRunLock();
   // A previous run killed mid-E8 could have left realtime paused. Always
   // unpause at start (a no-op error when it is not paused).
   await run("docker", ["unpause", cfg.realtimeContainer]).then(
     () => log(`unpaused ${cfg.realtimeContainer} (it was paused)`),
     () => undefined,
   );
+  // A previous run killed inside a timekeeper fixture may have left a flag
+  // on or a test window set: put them back before anything else runs.
+  for (const line of await recoverFixtures()) log(`recovered from an interrupted run: ${line}`);
+  // Every run, gate or not (preflight is optional): the flag-OFF tiers must
+  // never run with the shared flag left on by hand or by a run whose restore
+  // record is gone. The harness never turns off a flag it did not set.
+  const flagProblem = await timekeeperRoleOffProblem();
+  if (flagProblem) throw new EnvError(flagProblem);
+  // The harness reads the app under test from its own tree (the timekeeper
+  // slices, the copy deck, the app's .env), so the simulator's Metro must
+  // serve this checkout (oracle/logs.ts). A log that names no project
+  // cannot tell, and the run goes on.
+  const metroRoot = readMetroProjectRoot(cfg.metroLog);
+  const treeProblem = metroTreeProblem(metroRoot, REPO_ROOT);
+  if (treeProblem) throw new EnvError(treeProblem);
+  if (!metroRoot) log("the Metro log names no project root: cannot confirm that Metro serves this checkout");
   const password = await loadPassword(cfg);
   const ids = await resolveAthleteIds(cfg);
   const runId = isoStamp();
@@ -328,10 +316,7 @@ async function main(): Promise<number> {
 
   if (args.signinBlue) await signInBlue({ cfg, ui, idb, simctl, password, ids });
 
-  const selected = SCENARIOS.filter((s) => {
-    if (args.only) return args.only.includes(s.id);
-    return args.tier === "all" || s.tier === args.tier;
-  });
+  const selected = args.only ? SCENARIOS.filter((s) => args.only!.includes(s.id)) : scenariosForTier(args.tier);
 
   if (args.preflight || args.preflightOnly) {
     const wantsCamera = selected.some((s) => s.id === "E13") && selected.length === 1;
@@ -359,30 +344,58 @@ async function main(): Promise<number> {
     /* ignore */
   }
 
+  const present = integratedSlices();
+  const failPending = pendingFails(present, args.noPending);
   const results: ScenarioResult[] = [];
-  for (let rep = 0; rep < args.repeat; rep++) {
-    for (const s of selected) {
-      const tag = args.repeat > 1 ? `${s.id}-r${rep + 1}` : s.id;
-      let res = await runOne(env, s, join(runDir, tag), known);
-      if (res.status === "env_error") {
-        results.push(res);
-        continue;
-      }
-      const history: ScenarioResult["previousAttempts"] = [];
-      let attempts = 1;
-      while ((res.status === "fail" || res.status === "harness_error") && attempts <= args.rerunFailures) {
-        history.push({ status: res.status, fingerprint: res.fingerprint, dir: join(runDir, attempts === 1 ? tag : `${tag}-a${attempts}`) });
-        attempts++;
-        const again = await runOne(env, s, join(runDir, `${tag}-a${attempts}`), known);
-        if (again.status === "pass") {
-          res = { ...again, status: "flake" };
-          break;
+  const releaseFlag = args.tkFlagOn ? await holdFlagForRun() : null;
+  // On Ctrl-C or SIGTERM the cleanup hooks run in the order they were
+  // registered: holdFlagForRun's put-back first, then this one, which closes
+  // the app so it does not keep the ON it read (M7 review). Removed only
+  // after the normal path below has closed it.
+  const unhookAppClose = releaseFlag ? onInterrupt("tk-flag-run-app-close", () => simctl.terminate()) : () => undefined;
+  // The app reads timekeeper_role on mount and on foreground only (slice
+  // M6's use-timekeeper-enabled.ts): close it, so the first scenario's
+  // normaliseApp launches it with the flag ON and the Arena copy follows it.
+  if (releaseFlag) await simctl.terminate();
+  try {
+    for (let rep = 0; rep < args.repeat; rep++) {
+      for (const s of selected) {
+        const tag = args.repeat > 1 ? `${s.id}-r${rep + 1}` : s.id;
+        const pending = pendingReason(s.needs, present);
+        if (pending) {
+          const res = pendingResult(s, pending, failPending);
+          log(`== ${s.id}: ${res.status.toUpperCase()} (${res.error})`);
+          results.push(res);
+          continue;
         }
-        res = again;
+        let res = await runOne(env, s, join(runDir, tag), known);
+        if (res.status === "env_error") {
+          results.push(res);
+          continue;
+        }
+        const history: ScenarioResult["previousAttempts"] = [];
+        let attempts = 1;
+        while ((res.status === "fail" || res.status === "harness_error") && attempts <= args.rerunFailures) {
+          history.push({ status: res.status, fingerprint: res.fingerprint, dir: join(runDir, attempts === 1 ? tag : `${tag}-a${attempts}`) });
+          attempts++;
+          const again = await runOne(env, s, join(runDir, `${tag}-a${attempts}`), known);
+          if (again.status === "pass") {
+            res = { ...again, status: "flake" };
+            break;
+          }
+          res = again;
+        }
+        res.attempts = attempts;
+        if (history.length) res.previousAttempts = history;
+        results.push(res);
       }
-      res.attempts = attempts;
-      if (history.length) res.previousAttempts = history;
-      results.push(res);
+    }
+  } finally {
+    if (releaseFlag) {
+      await releaseFlag();
+      // And again, so the next run's app does not keep the ON it read here.
+      await simctl.terminate();
+      unhookAppClose();
     }
   }
 
@@ -394,6 +407,7 @@ async function main(): Promise<number> {
     runId,
     gitSha,
     args,
+    integratedSlices: [...present].sort(),
     startedAt: runId,
     finishedAt: new Date().toISOString(),
     summary,
@@ -408,17 +422,18 @@ async function main(): Promise<number> {
   );
   log(`result: ${resultPath}`);
   log(`summary: ${JSON.stringify(summary)}`);
-  const bad = results.some((r) => r.status === "fail" || r.status === "harness_error" || r.status === "env_error");
-  return bad ? 1 : 0;
+  return exitCodeFor(results);
 }
 
 main()
   .then(async (code) => {
     await runCleanup();
+    releaseRunLock();
     process.exit(code);
   })
   .catch(async (e) => {
     log(`fatal: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`);
     await runCleanup();
+    releaseRunLock();
     process.exit(e instanceof EnvError ? 2 : 3);
   });

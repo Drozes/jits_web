@@ -26,6 +26,7 @@ import { LIVE_SWITCH_COOLDOWN_MS } from "./constants";
 import type {
   IncomingChallenge,
   OutgoingChallenge,
+  SendChallengeOptions,
 } from "./use-arena-challenge";
 
 export interface ArenaState {
@@ -79,7 +80,7 @@ export interface ArenaController {
    * already said why, so callers stay silent.
    */
   goLive: () => Promise<boolean | LiveSwitchIgnored>;
-  sendChallenge: (opponentId: string, opponentName: string) => Promise<void>;
+  sendChallenge: (opponentId: string, opponentName: string, options?: SendChallengeOptions) => Promise<void>;
   cancelOutgoing: () => Promise<void>;
   clearCap: () => void;
   /** "Later" on the prompt: minimize it into the chip. Sends nothing. */
@@ -482,13 +483,25 @@ export function useLiveMenuOpen(): boolean {
  * `useOnMatCount` prefers this over the whole-lobby count. `count: null`:
  * nearby mode, but the rows are not known yet.
  */
-export type NearbyOnMatCount = { count: number | null } | null;
+export type NearbyOnMatCount = {
+  count: number | null;
+  /**
+   * The Online & close rows the Arena renders (jr_be spec 023 section 8.5),
+   * null while unknown. The chip reads `LIVE · N NEARBY` from it when nobody
+   * else is on the mat.
+   */
+  close?: number | null;
+} | null;
 
 let nearbyOnMat: NearbyOnMatCount = null;
 const nearbyListeners = new Set<() => void>();
 
 export function publishNearbyOnMatCount(next: NearbyOnMatCount): void {
-  if (next === nearbyOnMat || (next && nearbyOnMat && next.count === nearbyOnMat.count)) return;
+  if (
+    next === nearbyOnMat ||
+    (next && nearbyOnMat && next.count === nearbyOnMat.count && (next.close ?? null) === (nearbyOnMat.close ?? null))
+  )
+    return;
   nearbyOnMat = next;
   for (const l of nearbyListeners) l();
 }
@@ -502,6 +515,16 @@ export function subscribeNearbyOnMatCount(callback: () => void): () => void {
   return () => {
     nearbyListeners.delete(callback);
   };
+}
+
+/**
+ * The Arena's Online & close count for the header chip (jr_be spec 023
+ * section 8.5): what the Arena publishes in nearby mode, null otherwise
+ * (fallback mode, the Arena not mounted, or rows not known yet).
+ */
+export function useNearbyCloseCount(): number | null {
+  const get = () => nearbyOnMat?.close ?? null;
+  return useSyncExternalStore(subscribeNearbyOnMatCount, get, get);
 }
 
 // ---------------------------------------------------------------------------
@@ -529,6 +552,11 @@ export function publishArenaSelfId(next: string | null): void {
 /** The signed-in athlete the Arena belongs to, or null (none mounted). */
 export function useArenaSelfId(): string | null {
   return useSyncExternalStore(subscribe, getSelfId, getSelfId);
+}
+
+/** The same, outside React (the Arena chokepoint, `challenge-api.ts`). */
+export function getArenaSelfId(): string | null {
+  return getSelfId();
 }
 
 // ---------------------------------------------------------------------------
@@ -1125,8 +1153,8 @@ export const arenaActions: ArenaActions = Object.freeze({
   toggle: () => liveSwitch.toggle().then(() => undefined),
   goOffline: liveSwitch.goOffline,
   goLive: liveSwitch.goLive,
-  sendChallenge: (opponentId: string, opponentName: string) =>
-    controller?.sendChallenge(opponentId, opponentName) ?? Promise.resolve(),
+  sendChallenge: (opponentId: string, opponentName: string, options?: SendChallengeOptions) =>
+    controller?.sendChallenge(opponentId, opponentName, options) ?? Promise.resolve(),
   cancelOutgoing: () => controller?.cancelOutgoing() ?? Promise.resolve(),
   clearCap: () => controller?.clearCap(),
   tuckIncoming: () => controller?.tuckIncoming(),
@@ -1268,8 +1296,15 @@ export function useMatchExitCount(): number {
 export function useArenaMatchScreen(matchId?: string): void {
   React.useEffect(() => {
     matchScreens += 1;
+    const id = matchId && isUuid(matchId) ? matchId : null;
+    if (id) mountedMatchIds.set(id, (mountedMatchIds.get(id) ?? 0) + 1);
     for (const l of matchListeners) l();
     return () => {
+      if (id) {
+        const n = (mountedMatchIds.get(id) ?? 1) - 1;
+        if (n > 0) mountedMatchIds.set(id, n);
+        else mountedMatchIds.delete(id);
+      }
       // Before the listeners run, so a refresh keyed off the exit sees it.
       // Only real ids: a malformed route param must never reach a filter.
       if (matchId && isUuid(matchId)) leftMatchIds.add(matchId);
@@ -1283,6 +1318,32 @@ export function useArenaMatchScreen(matchId?: string): void {
 
 /** Match ids whose screen unmounted during this app process. */
 const leftMatchIds = new Set<string>();
+
+/**
+ * Match ids whose screen is mounted right now, each with its count (a match
+ * pushed over the same match never clears it early). Timekeeper mode M2: a
+ * timekeeper-mode push about a match the viewer is in shows no foreground
+ * banner, and its tap does not stack a second screen of it (spec 8).
+ */
+const mountedMatchIds = new Map<string, number>();
+
+/** Non-hook read: is a screen of this match mounted? */
+export function isInArenaMatchFor(matchId: string): boolean {
+  return (mountedMatchIds.get(matchId) ?? 0) > 0;
+}
+
+/**
+ * Non-hook read: a match screen is mounted, but no screen of a real match
+ * (the practice run mounts `useArenaMatchScreen()` with no id; a match route
+ * with a malformed id, which shows only an error, counts the same).
+ * Timekeeper mode M2: a TK-N1 tap waits for the practice run to end, since
+ * the server cannot refuse an Accept there (practice writes nothing) and the
+ * match opened over it would leave practice's camera mounted under the
+ * timekeeper's.
+ */
+export function isInPracticeOnly(): boolean {
+  return matchScreens > 0 && mountedMatchIds.size === 0;
+}
 
 /** The matches the athlete has left (not a snapshot: read it when needed). */
 export function getLeftMatchIds(): ReadonlySet<string> {
@@ -1427,6 +1488,7 @@ export function __resetArenaStoreForTests(): void {
   matchExits = 0;
   matchListeners.clear();
   leftMatchIds.clear();
+  mountedMatchIds.clear();
   reopenSurfaces = 0;
   reopenListeners.clear();
   incomingEndedListeners.clear();

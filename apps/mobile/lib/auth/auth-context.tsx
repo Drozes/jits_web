@@ -23,6 +23,7 @@ import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
 import { resetMatchLocationRequired } from "../arena/match-location-flag";
 import { resetLocationFlags } from "../arena/location-flags";
 import { clearAllDeviceLocations, loadDeviceLocation } from "../location/device-location-store";
+import { resetLatestNearby } from "../arena/nearby-snapshot";
 import { readLocationPermission } from "../location/permission-cache";
 import { cancelLocationSheet } from "../arena/go-live-location";
 import { stopMatchUploadsForSignOut } from "../video/upload-control";
@@ -161,6 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // flags never outlive the session either (review round 1, S4), nor
         // does any go-live overlay (a stale OFFLINE · RETRY, review round 3).
         clearAllDeviceLocations();
+        // Nor does the last Arena nearby read (jr_be spec 023 8.4).
+        resetLatestNearby();
         resetLocationFlags();
         resetLiveOverlayState();
       } else if (needsAthleteLoad(nextUser.id, loadedAthleteForUserId.current)) {
@@ -375,6 +378,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // The athlete's last accepted location never outlives the session
     // (instant go-live 4.1): the next account on this device starts clean.
     clearAllDeviceLocations();
+    // Nor does the last Arena nearby read: the next account must never see
+    // a "Maybe a different mat" plate from this one's proximity.
+    resetLatestNearby();
     // A Go Live waiting on the location sheet answers "cancel" (the live
     // switch must not stay locked for the next account).
     cancelLocationSheet();

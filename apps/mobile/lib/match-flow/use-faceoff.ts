@@ -1,32 +1,33 @@
 import * as React from "react";
-import { Alert } from "react-native";
-import { useRouter } from "expo-router";
 import { toast } from "@/components/ui/toast";
 import { supabase } from "@/lib/supabase/client";
-import { cancelSessionMatch, startMatch } from "@jits/shared/api/mutations";
 import { updateAthleteWeight } from "@jits/shared/api/athlete-weight";
-import { getMatchDetails } from "@jits/shared/api/queries";
-import {
-  checkOpponentWeight,
-  checksFor,
-  reweighForMatch,
-  reweighedSinceFlag,
-  type WeightCheck,
-  type WeightVerdict,
-} from "@jits/shared/api/match-weight-checks";
-import type { DomainErrorCode } from "@jits/shared/api/errors";
 import { NO_WEIGHT_CHECKS, type WeightChecksHandle } from "./use-match-weight-checks";
-import { settleWithin } from "@jits/shared/hooks/session-match-channel";
-import { exitMatchTo } from "./exit-to";
-import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
+import { useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
+import type { MatchFlowValue } from "./match-flow-context";
 import { useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
 import { useRecordingIntent } from "./recording-intent";
 import { useFaceoffLocationLog } from "./use-faceoff-location-log";
+import { deriveWeightCheckView, type WeightCheckView } from "./weight-check-view";
+import { useWeightCheckActions } from "./use-weight-check-actions";
+import { useFaceoffAnnounce } from "./use-faceoff-announce";
+import { useDualAutoStart } from "./use-dual-auto-start";
+import { useFaceoffLeave } from "./use-faceoff-leave";
+import { useMergedReady, type FaceoffTimekeeperView } from "./use-merged-ready";
+import { useStartClaim, type StartClaim } from "./use-timekeeper-start";
+import { PRESS_COPY } from "./press-copy";
+
+export type { WeightCheckView } from "./weight-check-view";
+export type { FaceoffTimekeeperView } from "./use-merged-ready";
+export { isValidReweigh } from "./use-weight-check-actions";
 
 /** How often face-off state is repeated until the match starts. A broadcast
  * sent before the other side's channel joined is simply gone, and none of
  * this state lives in the DB. */
 export const FACEOFF_REPEAT_MS = 3_000;
+
+/** What the face-off reads of the viewer's match flow (`MatchFlowProvider`'s value). */
+export type FaceoffFlow = Pick<MatchFlowValue, "match" | "roles" | "tkState">;
 
 export interface FaceoffParams {
   /** True on the weight and ready steps: the channel is open only then. */
@@ -50,6 +51,14 @@ export interface FaceoffParams {
   onStarted: (startedAt: string) => void;
   /** The opponent cancelled: the wizard's single exit. */
   onCancelledRemotely: (description?: string) => void;
+  /**
+   * The viewer's match flow: its `roles.caps` choose the face-off's policies
+   * (start, announce, ready, weight verdicts) and, in timekeeper mode, the
+   * merged ready reads the timekeeper-mode state (ARCHITECTURE 2.3).
+   * Omitted (the shipped flow's unit tests): the two-athlete policies, which
+   * are also what a two-athlete match's caps choose.
+   */
+  flow?: FaceoffFlow | null;
 }
 
 export interface Faceoff {
@@ -72,73 +81,68 @@ export interface Faceoff {
   starting: boolean;
   cancelling: boolean;
   savingWeight: boolean;
-  /** Leave is offered until the match starts. */
+  /** Leave is offered until the match starts (and, for the timekeeper, not while their Start is in flight). */
   canLeave: boolean;
   confirmWeight: () => Promise<void>;
   /** Save a new PROFILE weight (future matches); false when refused. */
   editWeight: (lbs: number) => Promise<boolean>;
   tapReady: () => void;
-  /** The Leave control: confirm, then cancel the match for both. */
+  /**
+   * The Leave control: confirm, then act on the viewer's `roles.caps.leave`
+   * (`useFaceoffLeave`): an athlete cancels the match for everyone (TK-E4
+   * names the opponent once a timekeeper is seated); the timekeeper leaves
+   * the seat before the start (TK-K14).
+   */
   leave: () => void;
+  /**
+   * The timekeeper's Start (`faceoff-timekeeper.tsx`) claims the face-off
+   * here, so their Start and their Leave exclude each other.
+   */
+  timekeeperStart: StartClaim;
   /** The opponent weight check (jr_be-ahn.4). */
   weightCheck: WeightCheckView;
+  /**
+   * Timekeeper mode, for an athlete: the seated timekeeper and the server's
+   * face-off (ready rows, the timekeeper's checks, the face-off timeout),
+   * plus the merged ready's busy state. Null in a two-athlete match.
+   */
+  timekeeper: FaceoffTimekeeperView | null;
 }
 
-/**
- * What the face-off shows for the weight checks. `active` is false when the
- * match has none (no challenge, older backend): everything else is then
- * inert and the start is never gated here.
- */
-export interface WeightCheckView {
-  active: boolean;
-  /** The first read is still in flight. */
-  loading: boolean;
-  /** My check of the opponent, and the opponent's check of me. */
-  mine: WeightCheck | null;
-  theirs: WeightCheck | null;
-  /** A check is flagged or awaiting a recheck: the match is on hold. */
-  blocked: boolean;
-  /** The weight gate lets the match start (always true when inactive). */
-  canStart: boolean;
-  /** I still owe a verdict on the opponent's (current) weight. */
-  needsMyVerdict: boolean;
-  /** The opponent re-weighed since I flagged, or since I confirmed. */
-  opponentReweighed: boolean;
-  /** I flagged, and they have not re-weighed since: offer Withdraw. */
-  myFlagOpen: boolean;
-  /** The opponent flagged me and I have not re-weighed since. */
-  mustReweigh: boolean;
-  /** I re-weighed; the opponent has yet to check the new weight. */
-  awaitingTheirRecheck: boolean;
-  /** Pending checks block the start (rollout flag on) and theirs is pending. */
-  awaitingTheirCheck: boolean;
-  busy: boolean;
-  check: (verdict: WeightVerdict) => Promise<void>;
-  /** Re-weigh for this match; false when refused. */
-  reweigh: (lbs: number) => Promise<boolean>;
+/** The face-off's policy inputs from the viewer's caps; without them, the two-athlete flow's. */
+function policyOf(flow: FaceoffFlow | null | undefined) {
+  const caps = flow?.roles.caps;
+  return {
+    autoStart: caps?.autoStart ?? true,
+    readyPolicy: caps?.readyPolicy ?? "broadcast",
+    weightVerdicts: caps?.weightVerdicts ?? "opponent",
+  } as const;
 }
-
-/** reweigh_for_match accepts 0 < w < 500 lbs (stored to 0.01). */
-export function isValidReweigh(lbs: number): boolean {
-  return Number.isFinite(lbs) && Math.round(lbs * 100) / 100 > 0 && Math.round(lbs * 100) / 100 < 500;
-}
-
-/** start_match refusals from the weight gate. */
-const WEIGHT_GATE_CODES: readonly DomainErrorCode[] = ["WEIGHT_FLAGGED", "WEIGHT_CHECK_PENDING", "WEIGHT_RECHECK_PENDING"];
 
 /**
  * The face-off (weight + ready merged into one screen, two phases): the
  * weigh-in, the ready handshake, recording opt-in and Leave, all on one
  * match channel that stays open across both phases.
  *
- * The ready handshake is the old ready step's, unchanged: both tap ready,
- * both race `start_match`, the loser of the race reads the DB. The DB stays
- * the truth for everything that has a column (the wizard's reconciler);
- * weighed-in, ready and recording are broadcast-only and repeated.
+ * Composed from policies (timekeeper mode ARCHITECTURE 2.3), chosen by the
+ * viewer's caps (`flow.roles.caps`): the announce (`useFaceoffAnnounce`),
+ * the pure weight-check view (`deriveWeightCheckView`) with its actions, the
+ * start policy and Leave (`useFaceoffLeave`).
+ *  - Two-athlete flow (`autoStart`, `readyPolicy` "broadcast"): both tap
+ *    ready and both race `start_match` (`useDualAutoStart`, with the bounded
+ *    retry of A29); weighed-in, ready and recording are broadcast-only and
+ *    repeated, and the DB stays the truth for everything that has a column
+ *    (the wizard's reconciler).
+ *  - Timekeeper mode, an athlete (`readyPolicy` "server_merged"): no
+ *    auto-start (the timekeeper's Start, `faceoff-timekeeper.tsx`); ready is
+ *    the server's, merged with the opponent check (`useMergedReady`); only
+ *    the recording choice is broadcast; a received `timer_started` only
+ *    re-reads (M-R8).
+ * The timekeeper's own face-off is `faceoff-timekeeper.tsx`: this provider
+ * stays mounted for them, inactive, and gives them only Leave (the seat's
+ * drop-out, `roles.caps.leave`) and the claim their Start takes against it.
  */
 export function useFaceoff(p: FaceoffParams): Faceoff {
-  const router = useRouter();
-  const { markExiting } = useMatchSyncContext();
   // Off until the athlete allowed AI processing (5.1.2(i)), whatever was remembered.
   const recording = useEffectiveRecordingOptIn(p.meId);
   // Record only (live location fixes 4.6): one silent reading logged as
@@ -151,34 +155,45 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
   const [myReady, setMyReady] = React.useState(false);
   const [opponentReady, setOpponentReady] = React.useState(false);
   const [opponentRecording, setOpponentRecording] = React.useState<boolean | null>(null);
-  const [starting, setStarting] = React.useState(false);
-  const [cancelling, setCancelling] = React.useState(false);
   const [savingWeight, setSavingWeight] = React.useState(false);
   const startedRef = React.useRef(false);
   const cancelledRef = React.useRef(false);
-  const myWeight = p.myWeight;
-  const opponentWeight = p.opponentWeight;
   const checks = p.weightChecks ?? NO_WEIGHT_CHECKS;
-  const checksRef = React.useRef(checks);
-  checksRef.current = checks;
-  const [checkBusy, setCheckBusy] = React.useState(false);
-  const checksActive = checks.status === "ready" || checks.status === "loading";
-  const { mine: myCheck, theirs: theirCheck } = checksFor(checks.state, p.meId);
-  const blocked = checks.status === "ready" && !!checks.state?.blocked;
-  const canStart = checks.status === "ready" ? !!checks.state?.canStart : checks.status !== "loading";
-  const canStartRef = React.useRef(canStart);
-  canStartRef.current = canStart;
+  const policy = policyOf(p.flow);
+  const checkState = deriveWeightCheckView(checks, p.meId, policy.weightVerdicts);
+  const { reconcileNow, timekeeperModeSelfId } = useMatchSyncContext();
+  const timekeeperModeRef = React.useRef(false);
+  timekeeperModeRef.current = timekeeperModeSelfId != null;
+  // Timekeeper mode: ready is server state, merged with the opponent check.
+  const merged = useMergedReady({
+    flow: p.flow,
+    matchId: p.matchId,
+    onRefused: () => {
+      checks.refetch();
+      reconcileNow();
+    },
+  });
+  const tk = merged.view;
+  const serverReadyRef = React.useRef(tk != null);
+  serverReadyRef.current = tk != null;
+  const markReadyRef = React.useRef(merged.markReady);
+  markReadyRef.current = merged.markReady;
+  // What this athlete is shown: the server's ready rows in timekeeper mode
+  // (ready implies weighed in there too), the broadcasts otherwise.
+  const myReadyNow = tk ? tk.meReady : myReady;
+  const opponentReadyNow = tk ? tk.opponentReady : opponentReady;
+  const canStartRef = React.useRef(checkState.canStart);
+  canStartRef.current = checkState.canStart;
 
   const weightEditorOpenRef = React.useRef(weightEditorOpen);
   weightEditorOpenRef.current = weightEditorOpen;
   const pRef = React.useRef(p);
   pRef.current = p;
-  const stateRef = React.useRef({ myWeighed, myReady, myWeight, recording });
-  stateRef.current = { myWeighed, myReady, myWeight, recording };
+  const myReadyRef = React.useRef(myReadyNow);
+  myReadyRef.current = myReadyNow;
   // The toggle, persisted for the server too (jits-n2im.14). Fire and
   // forget: ready never waits on it.
-  useRecordingIntent(p.meId, p.matchId, recording, p.active, myReady);
-
+  useRecordingIntent(p.meId, p.matchId, recording, p.active, myReadyNow);
 
   const sync = useStepMatchSync({
     matchId: p.matchId,
@@ -198,6 +213,12 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
       setOpponentReady(true);
     },
     onTimerStarted: (startedAt) => {
+      // Timekeeper mode: the timekeeper's start is a hint to re-read (M-R8);
+      // the reconciler moves to live on the DB's status.
+      if (serverReadyRef.current) {
+        reconcileNow();
+        return;
+      }
       if (startedRef.current) return;
       startedRef.current = true;
       pRef.current.onStarted(startedAt);
@@ -210,82 +231,49 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
       );
     },
   });
-  const { broadcastWeighedIn, broadcastRecordingOptIn, broadcastReady, broadcastTimerStarted, broadcastMatchCancelled } =
-    sync;
 
-  // Say where this side stands: on joining, on every change, and on a
-  // repeat until the match starts.
-  const announce = React.useCallback(() => {
-    if (!pRef.current.active || startedRef.current || cancelledRef.current) return;
-    const s = stateRef.current;
-    const me = pRef.current.meId;
-    void broadcastRecordingOptIn(me, s.recording);
-    if (s.myWeighed) void broadcastWeighedIn(me, s.myWeight);
-    if (s.myReady) void broadcastReady(me);
-  }, [broadcastRecordingOptIn, broadcastWeighedIn, broadcastReady]);
+  useFaceoffAnnounce({
+    active: p.active,
+    meId: p.meId,
+    recording,
+    myWeighed,
+    myReady,
+    myWeight: p.myWeight,
+    startedRef,
+    cancelledRef,
+    repeatMs: FACEOFF_REPEAT_MS,
+    readyPolicy: policy.readyPolicy,
+    broadcastRecordingOptIn: sync.broadcastRecordingOptIn,
+    broadcastWeighedIn: sync.broadcastWeighedIn,
+    broadcastReady: sync.broadcastReady,
+  });
 
-  React.useEffect(() => {
-    announce();
-  }, [announce, recording, myWeighed, myReady, p.active]);
-
-  React.useEffect(() => {
-    if (!p.active) return;
-    const id = setInterval(announce, FACEOFF_REPEAT_MS);
-    return () => clearInterval(id);
-  }, [p.active, announce]);
-
-  const handleStart = React.useCallback(async () => {
-    // Never start a match this athlete is cancelling (Leave in flight).
-    if (startedRef.current || cancelledRef.current) return;
-    startedRef.current = true;
-    setStarting(true);
-    const result = await startMatch(supabase, pRef.current.matchId);
-    // Left while start_match was in flight: the cancel owns the exit now.
-    // Reset the spinner so a failed cancel (which re-arms Leave) is not left
-    // stuck on "Starting match...".
-    if (cancelledRef.current) {
-      startedRef.current = false;
-      setStarting(false);
-      return;
-    }
-    if (!result.ok && WEIGHT_GATE_CODES.includes(result.error.code)) {
-      // The weight gate refused (a flag, or a check still owed): back to the
-      // checks. Clear ready so a retry needs a fresh tap, not a loop.
-      startedRef.current = false;
-      setStarting(false);
+  const { starting, stop: stopStartRun } = useDualAutoStart({
+    matchId: p.matchId,
+    // Timekeeper mode: no auto-start; only the timekeeper starts the match.
+    enabled: policy.autoStart,
+    myReady,
+    opponentReady,
+    canStart: checkState.canStart,
+    startedRef,
+    cancelledRef,
+    broadcastTimerStarted: sync.broadcastTimerStarted,
+    onStarted: p.onStarted,
+    onWeightGate: () => {
       setMyReady(false);
-      checksRef.current.refetch();
-      toast.info({ text1: "Match on hold", description: result.error.message });
-      return;
-    }
-    if (!result.ok) {
-      // Both devices race start_match; losing the race is not an error.
-      const match = await getMatchDetails(supabase, pRef.current.matchId);
-      if (match?.status === "in_progress" && match.started_at) {
-        pRef.current.onStarted(match.started_at);
-        return;
-      }
-      startedRef.current = false;
-      setStarting(false);
-      toast.error({ text1: "Couldn't start match", description: result.error.message });
-      return;
-    }
-    const startedAt = result.data.started_at ?? new Date().toISOString();
-    // Let timer_started leave the device before the step unmounts (jits-mzfu).
-    await settleWithin(broadcastTimerStarted(startedAt), SEND_GRACE_MS);
-    pRef.current.onStarted(startedAt);
-  }, [broadcastTimerStarted]);
-
-  React.useEffect(() => {
-    if (myReady && opponentReady && canStart && !startedRef.current && !starting) void handleStart();
-  }, [myReady, opponentReady, canStart, starting, handleStart]);
+      checks.refetch();
+    },
+    onGaveUp: () => setMyReady(false),
+  });
 
   const editWeight = React.useCallback(async (lbs: number) => {
     setSavingWeight(true);
     const res = await updateAthleteWeight(supabase, pRef.current.meId, lbs);
     setSavingWeight(false);
     if (!res.ok) {
-      toast.error({ text1: "Couldn't update weight", description: res.error.message });
+      // A timekeeper-mode surface never shows the server's text (M-R4, spec 14.9 X1), only the guidance (PM29).
+      if (timekeeperModeRef.current) toast.error({ text1: "Couldn't update weight", description: PRESS_COPY.checkConnection });
+      else toast.error({ text1: "Couldn't update weight", description: res.error.message });
       return false;
     }
     setProfileWeightSaved(res.data.weight);
@@ -294,122 +282,83 @@ export function useFaceoff(p: FaceoffParams): Faceoff {
 
   // Ready once my weight is in and my check of theirs is confirmed; with no
   // checks for this match, once my weight is in (the pre-check flow).
-  const myCheckDone = myCheck?.status === "confirmed";
+  const myCheckDone = checkState.mine?.status === "confirmed";
+  const mergedCheck = tk != null;
   React.useEffect(() => {
     if (p.phase !== "weight" || !myWeighed) return;
+    // Timekeeper mode: the check is merged into ready (TK-F4), so at once.
+    if (mergedCheck) {
+      pRef.current.onWeighedIn();
+      return;
+    }
     if (checks.status === "unavailable" || checks.status === "idle" || myCheckDone) pRef.current.onWeighedIn();
-  }, [p.phase, myWeighed, checks.status, myCheckDone]);
+  }, [p.phase, myWeighed, checks.status, myCheckDone, mergedCheck]);
 
   const confirmWeight = React.useCallback(async () => {
     if (weightEditorOpenRef.current) return;
     setMyWeighed(true);
   }, []);
 
-  const check = React.useCallback(async (verdict: WeightVerdict) => {
-    const handle = checksRef.current;
-    if (handle.status !== "ready") return;
-    setCheckBusy(true);
-    // The opponent weight on screen is the one being judged.
-    const seen = verdict === "withdraw" ? undefined : pRef.current.opponentWeight;
-    const res = await checkOpponentWeight(supabase, pRef.current.matchId, verdict, seen);
-    setCheckBusy(false);
-    if (res.ok) {
-      handle.apply(res.data);
-      return;
-    }
-    handle.refetch();
-    if (res.error.code === "WEIGHT_CHANGED") {
-      toast.info({ text1: "Weight changed", description: res.error.message });
-      return;
-    }
-    toast.error({ text1: "Couldn't save your check", description: res.error.message });
-  }, []);
-
-  const reweigh = React.useCallback(async (lbs: number) => {
-    const handle = checksRef.current;
-    if (!isValidReweigh(lbs)) {
-      toast.error({ text1: "Couldn't re-weigh", description: "Enter a weight between 0 and 500 lbs." });
-      return false;
-    }
-    setCheckBusy(true);
-    const res = await reweighForMatch(supabase, pRef.current.matchId, Math.round(lbs * 100) / 100);
-    setCheckBusy(false);
-    if (res.ok) {
-      handle.apply(res.data);
-      return true;
-    }
-    handle.refetch();
-    toast.error({ text1: "Couldn't re-weigh", description: res.error.message });
-    return false;
-  }, []);
+  const actions = useWeightCheckActions({ matchId: p.matchId, opponentWeight: p.opponentWeight, checks });
 
   const tapReady = React.useCallback(() => {
-    if (stateRef.current.myReady || !canStartRef.current) return;
+    if (myReadyRef.current) return;
+    // Timekeeper mode: the merged ready (the server holds the weight gate).
+    if (serverReadyRef.current) {
+      markReadyRef.current();
+      return;
+    }
+    if (!canStartRef.current) return;
     setMyReady(true);
   }, []);
 
-  const doCancel = React.useCallback(async () => {
-    if (cancelledRef.current || startedRef.current) return;
-    cancelledRef.current = true;
-    setCancelling(true);
-    const result = await cancelSessionMatch(supabase, pRef.current.matchId);
-    if (!result.ok) {
-      cancelledRef.current = false;
-      setCancelling(false);
-      toast.error({ text1: "Could not cancel", description: result.error.message });
-      return;
-    }
-    markExiting();
-    await settleWithin(broadcastMatchCancelled(), SEND_GRACE_MS);
-    exitMatchTo(router, pRef.current.exitHref);
-  }, [broadcastMatchCancelled, markExiting, router]);
-
+  // Leave acts on the viewer's policy (`roles.caps.leave`) and its alert
+  // names them (`roles`): the shipped cancel and alert in a two-athlete match
+  // and while no timekeeper is seated, TK-E4 for a seated timekeeper's
+  // athletes, the seat's drop-out (TK-K14) for the timekeeper.
+  const leaveBase = {
+    matchId: p.matchId,
+    exitHref: p.exitHref,
+    startedRef,
+    cancelledRef,
+    broadcastMatchCancelled: sync.broadcastMatchCancelled,
+  };
+  const { cancelling, leave: askToLeave } = useFaceoffLeave(
+    p.flow ? { ...leaveBase, leave: p.flow.roles.caps.leave, roles: p.flow.roles } : leaveBase,
+  );
+  // A Leave during a failed start run (A29) ends the run before its alert
+  // opens: a retry firing under the open alert would claim the face-off and
+  // turn Cancel Match into a no-op. No failure: the shipped Leave, unchanged.
   const leave = React.useCallback(() => {
-    if (cancelledRef.current || startedRef.current) return;
-    Alert.alert("Cancel match?", "Your opponent will be returned to the lobby.", [
-      { text: "Keep Waiting", style: "cancel" },
-      { text: "Cancel Match", style: "destructive", onPress: () => void doCancel() },
-    ]);
-  }, [doCancel]);
+    stopStartRun();
+    askToLeave();
+  }, [stopStartRun, askToLeave]);
+  // The timekeeper's Start and Leave exclude each other.
+  const seat = useStartClaim(startedRef, cancelledRef);
 
   return {
-    myWeight,
-    opponentWeight,
+    myWeight: p.myWeight,
+    opponentWeight: p.opponentWeight,
     weightsRated: p.weightsRated,
     profileWeightSaved,
     weightEditorOpen,
     setWeightEditorOpen,
     myWeighed,
-    opponentWeighed,
-    myReady,
-    opponentReady,
+    opponentWeighed: tk ? tk.opponentReady : opponentWeighed,
+    myReady: myReadyNow,
+    opponentReady: opponentReadyNow,
     opponentRecording,
     recording,
     starting,
     cancelling,
     savingWeight,
-    canLeave: !starting && !startedRef.current,
+    canLeave: !starting && !seat.claimed && !startedRef.current,
     confirmWeight,
     editWeight,
     tapReady,
     leave,
-    weightCheck: {
-      active: checksActive,
-      loading: checks.status === "loading",
-      mine: myCheck,
-      theirs: theirCheck,
-      blocked,
-      canStart,
-      needsMyVerdict:
-        myCheck?.status === "pending" || myCheck?.status === "recheck" || reweighedSinceFlag(myCheck),
-      opponentReweighed: myCheck?.status === "recheck" || reweighedSinceFlag(myCheck),
-      myFlagOpen: myCheck?.status === "flagged" && !reweighedSinceFlag(myCheck),
-      mustReweigh: theirCheck?.status === "flagged" && !reweighedSinceFlag(theirCheck),
-      awaitingTheirRecheck: theirCheck?.status === "recheck" || reweighedSinceFlag(theirCheck),
-      awaitingTheirCheck: !!checks.state?.required && theirCheck?.status === "pending",
-      busy: checkBusy,
-      check,
-      reweigh,
-    },
+    timekeeperStart: seat.claim,
+    weightCheck: { ...checkState, busy: actions.busy, check: actions.check, reweigh: actions.reweigh },
+    timekeeper: tk,
   };
 }

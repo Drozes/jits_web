@@ -34,26 +34,37 @@ export function HudTag({ label, testID }: { label: string; testID?: string }) {
   );
 }
 
-/** The same glass tag as a button (the practice EXIT pill). */
+/**
+ * The same glass tag as a button (the practice EXIT pill, the timekeeper's
+ * Leave). `disabled` dims it like the live controls (the timekeeper's Leave
+ * while a control is in flight); absent, the pill is exactly as it was.
+ */
 export function HudTagButton({
   label,
   onPress,
   testID,
   accessibilityLabel,
+  disabled,
 }: {
   label: string;
   onPress: () => void;
   testID?: string;
   accessibilityLabel: string;
+  disabled?: boolean;
 }) {
   return (
     <StatePressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      {...(disabled == null ? {} : { disabled, accessibilityState: { disabled } })}
       onPress={onPress}
       hitSlop={10}
-      style={({ pressed }) => [TAG_STYLE, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+      style={({ pressed }) =>
+        disabled
+          ? [TAG_STYLE, { opacity: 0.5 }]
+          : [TAG_STYLE, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]
+      }
     >
       <TagLabel>{label}</TagLabel>
     </StatePressable>

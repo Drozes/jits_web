@@ -50,6 +50,9 @@ async function fetchLeaderboard(
       "id, display_name, current_elo, primary_gym_id, profile_photo_url, gender, gyms!fk_athletes_primary_gym(name)",
     )
     .eq("status", "active")
+    // Rating V9 ranks everyone who has played: a never-rated athlete sits at
+    // the 1500 start, mid-ladder, so they stay off it until their first match.
+    .gt("rated_match_count", 0)
     .order("current_elo", { ascending: false })
     .limit(50);
   if (error) throw error;

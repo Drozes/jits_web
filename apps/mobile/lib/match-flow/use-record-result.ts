@@ -9,6 +9,8 @@ import { mutationQueue, isQueuedResult } from "@/lib/network/mutation-queue";
 import { parseFinishTime } from "./parse-finish-time";
 import { matchHaptics } from "./use-haptics";
 import { SEND_GRACE_MS, useMatchSyncContext, useStepMatchSync } from "./match-sync-context";
+import { CONFIRM_COPY } from "./confirm-copy";
+import { useSendCeiling } from "./send-timing";
 
 export interface RecordedMeta {
   /**
@@ -39,22 +41,43 @@ interface SubmitParams {
 /**
  * Wraps `recordMatchResult` with debounce, broadcast, error toasts, and
  * the broadcast listener for the opponent's submission. Pulled out of
- * the result step to keep the visual component below 100 lines.
+ * the result step so the step keeps only its form and its claim handling.
  *
  * The mutation runs through `mutationQueue` so a flaky-network record
  * isn't lost: when offline, the call is queued under a stable per-match
  * key and the wizard advances optimistically; the queue auto-flushes on
  * reconnect (see `lib/network/mutation-queue.ts`).
+ *
+ * Timekeeper mode (the step channels carry `timekeeperModeSelfId`; spec 10,
+ * ARCHITECTURE M-R8): the timekeeper's `result_submitted` names them
+ * (`actor_id`), and a received one only re-reads the match, never moves this
+ * phone by itself: the completed match the read brings moves the athletes to
+ * confirm. A refused record toasts the shipped title with no DomainError
+ * message (M-R4), and with `Check your connection and try again.` (PM29).
+ * The record is bounded (`SEND_CEILING_MS`, PM29: the result step has no
+ * exit and the timekeeper's Leave is refused once the clock ended), so a
+ * dead socket ends as that failure instead of a busy button forever; a reply
+ * after the ceiling, or after the step unmounted, is dropped (the reads show
+ * a late landing). A refusal that means the match moved on (MATCH_NOT_PENDING:
+ * this phone's own earlier send landed, or an admin recorded or voided the
+ * stalled match) shows no toast: the re-read moves the screen to the done
+ * screen or the exit. A two-athlete match sends and handles it exactly as
+ * before.
  */
 export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResultClaimed }: UseRecordResultParams) {
   const [loading, setLoading] = React.useState(false);
   const recordedRef = React.useRef(false);
+  const ceiling = useSendCeiling();
 
-  const { reconcileNow } = useMatchSyncContext();
+  const { reconcileNow, timekeeperModeSelfId } = useMatchSyncContext();
   const sync = useStepMatchSync({
     matchId,
     onResultSubmitted: (r) => {
       if (recordedRef.current) return;
+      if (timekeeperModeSelfId) {
+        reconcileNow();
+        return;
+      }
       recordedRef.current = true;
       onRecorded(r, { recorderConfirmed: false });
     },
@@ -69,7 +92,7 @@ export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResul
       // Route through the offline-tolerant queue. When online this runs
       // immediately and returns the real `Result`; when offline, the queue
       // resolves with a `QueuedResult` sentinel and replays on reconnect.
-      const res = await mutationQueue.enqueue(`record-result:${matchId}`, () =>
+      const call = mutationQueue.enqueue(`record-result:${matchId}`, () =>
         recordMatchResult(supabase, {
           matchId,
           result: outcome,
@@ -79,10 +102,20 @@ export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResul
             outcome === "submission" && finishSeconds != null ? finishSeconds : undefined,
         }),
       );
+      // Timekeeper mode: bounded by the ceiling, and silent once the step has gone (PM29).
+      const res = timekeeperModeSelfId ? await ceiling.within(call) : await call;
       if (!res.ok) {
         setLoading(false);
+        if (timekeeperModeSelfId && res.error.code === "MATCH_NOT_PENDING") {
+          // Moved on: the match is no longer in progress. The read shows why.
+          reconcileNow();
+          return;
+        }
         void matchHaptics.error();
-        toast.error({ text1: "Couldn't record result", description: res.error.message });
+        // Timekeeper mode shows no DomainError message (M-R4, spec 14.9 X1): the
+        // shared table maps its refusals to two-athlete words; it shows the
+        // guidance instead (PM29). The two-athlete toast keeps its shipped description.
+        toast.error(timekeeperModeSelfId ? { text1: "Couldn't record result", description: CONFIRM_COPY.checkConnection } : { text1: "Couldn't record result", description: res.error.message });
         // The usual cause is that the opponent recorded first and their
         // result_submitted never arrived: re-read the match now so the
         // wizard moves on instead of offering a form that cannot succeed.
@@ -111,7 +144,10 @@ export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResul
       // opponent's wizard picks the result up from the DB (reconciler) once
       // the queued write lands.
       const recorderConfirmed = !queued && (res.data as { recorder_confirmed?: boolean }).recorder_confirmed === true;
-      const sent = sync.broadcastResultSubmitted(broadcast);
+      // Timekeeper mode names its actor (spec 10); a two-athlete send is unchanged.
+      const sent = timekeeperModeSelfId
+        ? sync.broadcastResultSubmitted(broadcast, timekeeperModeSelfId)
+        : sync.broadcastResultSubmitted(broadcast);
       // The server confirmed this side too: tell the opponent's confirm step
       // now, so it shows this athlete confirmed without waiting on a poll.
       const confirmedSent =
@@ -125,7 +161,7 @@ export function useRecordResult({ matchId, onRecorded, currentAthleteId, onResul
       }
       onRecorded(broadcast, { recorderConfirmed });
     },
-    [matchId, onRecorded, sync, reconcileNow, currentAthleteId],
+    [matchId, onRecorded, sync, reconcileNow, currentAthleteId, timekeeperModeSelfId, ceiling],
   );
 
   return { loading, submit, broadcastResultClaimed: sync.broadcastResultClaimed };

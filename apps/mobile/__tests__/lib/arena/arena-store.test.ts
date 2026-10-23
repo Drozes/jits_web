@@ -175,9 +175,13 @@ describe("actions", () => {
     // The toggle is a choice now (review round 3): offline, so it goes live.
     await arenaActions.toggle();
     await arenaActions.sendChallenge("a-1", "Alpha");
+    const closeBand = { maxM: 3000, label: "< 3 km", spoken: "under 3 kilometers" };
+    await arenaActions.sendChallenge("a-2", "Bravo", { closeBand });
 
     expect(c.goLive).toHaveBeenCalledTimes(1);
-    expect(c.sendChallenge).toHaveBeenCalledWith("a-1", "Alpha");
+    expect(c.sendChallenge).toHaveBeenCalledWith("a-1", "Alpha", undefined);
+    // The Online & close band rides through to the owner (jr_be spec 023).
+    expect(c.sendChallenge).toHaveBeenCalledWith("a-2", "Bravo", { closeBand });
   });
 
   it("isIncomingChallengeDismissed asks the owner, and is false without one", () => {

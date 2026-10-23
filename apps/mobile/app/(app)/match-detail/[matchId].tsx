@@ -118,8 +118,11 @@ export default function MatchDetailScreen() {
     return v ? watchLabel(v.angle_label) : `Watch ${row.label.toLowerCase()}`;
   };
 
-  // The timekeeper: get_match_details refuses them, the status admits them.
-  // While the status read is still out, keep the skeleton (no error flash).
+  // The timekeeper (jits-d9j1): get_match_details admits them (jr_be
+  // 20261008100100), but they have no participant row, so getMatchDetailView
+  // answers NOT_PARTICIPANT for them as for a stranger; the Film status
+  // (role "timekeeper") tells the two apart. While the status read is still
+  // out, keep the skeleton (no error flash).
   const awaitingRole = state === "error" && error?.code === "NOT_PARTICIPANT" && filmStatus.loading;
   if (state === "error" && error?.code === "NOT_PARTICIPANT" && fsView?.role === "timekeeper" && filmStatus.status && matchId) {
     return (

@@ -333,18 +333,22 @@ MC = "components/matches/"
 SETTINGS = APP + ["app/(app)/settings/_layout.tsx"]
 MF = "components/match-flow/"
 # Every step body of the match wizard; each match board keeps only the steps it draws.
+# The timekeeper-mode steps (the crew picker, the timekeeper's face-off and done screen) are
+# listed so that no board keeps them: no "Current app" board draws timekeeper mode yet (the
+# flag is off), so a timekeeper-only commit must not tag the two-athlete boards.
 ALLSTEPS = [MF + x for x in [
     "faceoff/faceoff-body.tsx", "countdown/live-stage.tsx", "countdown/countdown.tsx",
     "steps/live-step.tsx", "steps/result-step.tsx", "steps/result-waiting.tsx",
     "steps/result-form.tsx", "steps/confirm-step.tsx", "steps/dispute-form.tsx",
-    "verdict/verdict-step.tsx", "steps/end-step.tsx", "steps/wait-step.tsx",
+    "verdict/verdict-step.tsx", "steps/end-step.tsx",
     "match-recorder-surface.tsx", "camera-overlay.tsx",
+    "crew/crew-step.tsx", "faceoff/faceoff-timekeeper.tsx", "steps/timekeeper-done.tsx",
 ]]
 
 
 def match(*keep):
     kept = [MF + k for k in keep]
-    return dict(seeds=APP + ["app/(app)/match/[matchId].tsx"] + kept,
+    return dict(seeds=APP + ["app/(app)/match/[matchId]/index.tsx"] + kept,
                 exclude=[s for s in ALLSTEPS if s not in kept])
 
 

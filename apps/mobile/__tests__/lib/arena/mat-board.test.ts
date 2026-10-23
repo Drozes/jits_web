@@ -10,6 +10,7 @@ import {
   closestCta,
   countOnTheMat,
   formatMatCounts,
+  partitionNearby,
   isOnTheMat,
   matCounts,
   onTheMatRows,
@@ -160,6 +161,73 @@ describe("formatMatCounts (AC-A1)", () => {
     // One count known and the other not: never a false `0 IN BAND`.
     expect(formatMatCounts(12, null)).toBe("CONNECTING");
     expect(formatMatCounts(null, 3)).toBe("CONNECTING");
+  });
+  it("nobody else on my mat but some close reads N NEARBY (jr_be spec 023 8.2)", () => {
+    expect(formatMatCounts(0, 0, 3)).toBe("3 NEARBY");
+    expect(formatMatCounts(0, 0, 1)).toBe("1 NEARBY");
+    // Nobody close either, or the close count unknown: unchanged.
+    expect(formatMatCounts(0, 0, 0)).toBe("NOBODY ELSE ON MAT");
+    expect(formatMatCounts(0, 0, null)).toBe("NOBODY ELSE ON MAT");
+    // Someone on my mat: the mat counts, never NEARBY.
+    expect(formatMatCounts(2, 1, 5)).toBe("2 ON MAT · 1 IN BAND");
+    // Unknown stays unknown.
+    expect(formatMatCounts(null, null, 4)).toBe("CONNECTING");
+    expect(formatMatCounts(0, null, 4)).toBe("CONNECTING");
+  });
+});
+
+describe("partitionNearby (jr_be spec 023 8.2)", () => {
+  const row = (id: string, displayName: string) => ({ id, displayName });
+  const near = (athleteId: string, bandMaxM: number, canChallenge = false) => ({
+    athleteId,
+    band: `under_${bandMaxM}m` as const,
+    bandMaxM,
+    canChallenge,
+  });
+  const rows = [row("a", "Zed"), row("b", "Amy"), row("c", "Bo"), row("d", "Cy"), row("m", "Mat")];
+
+  it("fallback: every row on the mat, nothing close, no ranges", () => {
+    expect(partitionNearby(rows, { mode: "fallback" }, new Set())).toEqual({
+      mode: "fallback",
+      onTheMat: rows,
+      close: [],
+      ranges: null,
+    });
+  });
+
+  it("orders close rows by the band's meters, then friends, then name; passes ranges through", () => {
+    const ranges = { sameMatM: 600, closeRadiusM: 3000, bandEdgesM: [1000, 3000] };
+    const view = {
+      mode: "nearby" as const,
+      onTheMat: new Set(["m"]),
+      close: new Map([
+        ["a", near("a", 3000)],
+        ["b", near("b", 3000)],
+        ["c", near("c", 1000)],
+        ["d", near("d", 3000, true)],
+      ]),
+      ranges,
+    };
+    const res = partitionNearby(rows, view, new Set(["d"]));
+    expect(res.onTheMat.map((r) => r.id)).toEqual(["m"]);
+    // 1 km first; within 3 km the friend (Cy) leads, then Amy, then Zed.
+    expect(res.close.map((c) => c.row.id)).toEqual(["c", "d", "b", "a"]);
+    expect(res.close[1].near.canChallenge).toBe(true);
+    expect(res.ranges).toBe(ranges);
+  });
+
+  it("orders a server from before 023 exactly as before: 500 m, 1 km, 2 km", () => {
+    const view = {
+      mode: "nearby" as const,
+      onTheMat: new Set<string>(),
+      close: new Map([
+        ["a", { athleteId: "a", band: "under_2km" as const, bandMaxM: 2000, canChallenge: false }],
+        ["b", { athleteId: "b", band: "under_1km" as const, bandMaxM: 1000, canChallenge: false }],
+        ["c", { athleteId: "c", band: "under_500m" as const, bandMaxM: 500, canChallenge: false }],
+      ]),
+      ranges: null,
+    };
+    expect(partitionNearby(rows, view, new Set()).close.map((c) => c.row.id)).toEqual(["c", "b", "a"]);
   });
 });
 

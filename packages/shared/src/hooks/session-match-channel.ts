@@ -67,15 +67,32 @@ export interface BroadcastResult {
   finishTimeSeconds?: number;
 }
 
+/**
+ * Timekeeper mode (spec 10, PM1): the clock events, the cancel and the
+ * result may carry `actor_id`, the athlete (or timekeeper) whose action it
+ * was, so a receiver can name who ended the match. Additive: a sender that
+ * leaves it out sends exactly the payload it always did, a receiver that
+ * ignores it is unchanged, and the handlers below get the extra `actorId`
+ * argument only when the payload carries one. In timekeeper mode a
+ * broadcast only triggers a re-read; it never changes state by itself.
+ */
+export const BROADCAST_ACTOR_KEY = "actor_id";
+
+/** `{ actor_id }` when there is an actor, else nothing (the payload as before). */
+export function actorPayload(actorId?: string | null): Record<string, string> {
+  return actorId ? { [BROADCAST_ACTOR_KEY]: actorId } : {};
+}
+
 export interface SessionMatchHandlers {
-  onTimerStarted?: (startedAt: string) => void;
-  onTimerPaused?: (pausedAt: string) => void;
-  onTimerResumed?: (totalPausedDuration: number) => void;
-  onMatchEnded?: () => void;
+  /** `actorId`: who started it, when the sender said (timekeeper mode). */
+  onTimerStarted?: (startedAt: string, actorId?: string) => void;
+  onTimerPaused?: (pausedAt: string, actorId?: string) => void;
+  onTimerResumed?: (totalPausedDuration: number, actorId?: string) => void;
+  onMatchEnded?: (actorId?: string) => void;
   onReadySignal?: (athleteId: string) => void;
-  onResultSubmitted?: (result: BroadcastResult) => void;
+  onResultSubmitted?: (result: BroadcastResult, actorId?: string) => void;
   onResultConfirmed?: (athleteId: string) => void;
-  onMatchCancelled?: () => void;
+  onMatchCancelled?: (actorId?: string) => void;
   /** `athleteId` is the athlete who raised the dispute. */
   onMatchDisputed?: (athleteId: string) => void;
   /** Face-off: `weight` is lbs, or null when the athlete has none on file. */
@@ -136,28 +153,38 @@ export function createSessionMatchChannel(
   const channel = supabase
     .channel(sessionMatchTopic(matchId), { config: { broadcast: { ack: true } } })
     .on("broadcast", { event: E.TIMER_STARTED }, ({ payload }) => {
-      h().onTimerStarted?.(payload.started_at as string);
+      const started = payload.started_at as string;
+      withActor(payload, (a) => h().onTimerStarted?.(started, a), () => h().onTimerStarted?.(started));
     })
     .on("broadcast", { event: E.TIMER_PAUSED }, ({ payload }) => {
-      h().onTimerPaused?.(payload.paused_at as string);
+      const paused = payload.paused_at as string;
+      withActor(payload, (a) => h().onTimerPaused?.(paused, a), () => h().onTimerPaused?.(paused));
     })
     .on("broadcast", { event: E.TIMER_RESUMED }, ({ payload }) => {
-      h().onTimerResumed?.(payload.total_paused_duration as number);
+      const total = payload.total_paused_duration as number;
+      withActor(payload, (a) => h().onTimerResumed?.(total, a), () => h().onTimerResumed?.(total));
     })
-    .on("broadcast", { event: E.MATCH_ENDED }, () => {
-      h().onMatchEnded?.();
+    .on("broadcast", { event: E.MATCH_ENDED }, ({ payload }) => {
+      withActor(payload, (a) => h().onMatchEnded?.(a), () => h().onMatchEnded?.());
     })
     .on("broadcast", { event: E.READY_SIGNAL }, ({ payload }) => {
       h().onReadySignal?.(payload.athlete_id as string);
     })
     .on("broadcast", { event: E.RESULT_SUBMITTED }, ({ payload }) => {
-      h().onResultSubmitted?.(payload as BroadcastResult);
+      withActor(
+        payload,
+        (a) => {
+          const { [BROADCAST_ACTOR_KEY]: _actor, ...result } = payload ?? {};
+          h().onResultSubmitted?.(result as BroadcastResult, a);
+        },
+        () => h().onResultSubmitted?.(payload as BroadcastResult),
+      );
     })
     .on("broadcast", { event: E.RESULT_CONFIRMED }, ({ payload }) => {
       h().onResultConfirmed?.(payload.athlete_id as string);
     })
-    .on("broadcast", { event: E.MATCH_CANCELLED }, () => {
-      h().onMatchCancelled?.();
+    .on("broadcast", { event: E.MATCH_CANCELLED }, ({ payload }) => {
+      withActor(payload, (a) => h().onMatchCancelled?.(a), () => h().onMatchCancelled?.());
     })
     .on("broadcast", { event: E.MATCH_DISPUTED }, ({ payload }) => {
       h().onMatchDisputed?.(payload.athlete_id as string);
@@ -227,4 +254,19 @@ export function settleWithin<T>(
       },
     );
   });
+}
+
+/**
+ * Call `withId` with the payload's `actor_id` when it carries a non-empty
+ * one, else `without`, so a payload with no actor reaches its handler with
+ * exactly the arguments it always had.
+ */
+function withActor(
+  payload: Record<string, unknown> | undefined,
+  withId: (actorId: string) => void,
+  without: () => void,
+): void {
+  const actor = payload?.[BROADCAST_ACTOR_KEY];
+  if (typeof actor === "string" && actor) withId(actor);
+  else without();
 }

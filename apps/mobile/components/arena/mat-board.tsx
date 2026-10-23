@@ -30,7 +30,6 @@ import {
   spokenCountdown,
   useFreshCountdown,
 } from "@/lib/arena/fresh-countdown";
-import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
 import { TABULAR } from "@/lib/typography";
 
 /** What a countdown counts down to: a challenge's live window. */
@@ -361,7 +360,10 @@ export function IncomingStrip({
 /**
  * `WAITING · ALEX · 8:12` + Cancel. The head is read as `Waiting for Alex`
  * (harness contract, exact), and the countdown as its own element
- * (`8 minutes 12 seconds left`), so VoiceOver hears both.
+ * (`8 minutes 12 seconds left`), so VoiceOver hears both. `helper` is a line
+ * under the strip (timekeeper mode's TK-AR2, only while the flag is known
+ * ON; the screen decides). `closeBand` adds the different-mat line inside
+ * the strip (Arena ranges); the two are independent.
  */
 export function WaitingStrip({
   name,
@@ -369,22 +371,48 @@ export function WaitingStrip({
   active,
   onCancel,
   disabled,
+  helper = null,
+  closeBand = null,
 }: {
   name: string;
   source: CountdownSource | null;
   active: boolean;
   onCancel: () => void;
   disabled: boolean;
+  helper?: string | null;
+  /**
+   * Sent to someone in Online & close (jr_be spec 023 section 8.4): a gentle
+   * second line, `Possibly on a different mat · < 3 km`. Never blocking.
+   */
+  closeBand?: { label: string; spoken: string } | null;
 }) {
-  return (
+  const line = (
+    <StripLine
+      head={`Waiting · ${name}`}
+      headAccessibilityLabel={`Waiting for ${name}`}
+      source={source}
+      active={active}
+      countdownTestID="arena-strip-countdown"
+    />
+  );
+  const strip = (
     <StripShell rail="neutral" testID="arena-strip-waiting">
-      <StripLine
-        head={`Waiting · ${name}`}
-        headAccessibilityLabel={`Waiting for ${name}`}
-        source={source}
-        active={active}
-        countdownTestID="arena-strip-countdown"
-      />
+      {closeBand ? (
+        <View className="flex-1">
+          <View className="flex-row">{line}</View>
+          <Text
+            testID="arena-strip-waiting-close"
+            numberOfLines={2}
+            accessibilityLabel={`Possibly on a different mat, ${closeBand.spoken} away.`}
+            maxFontSizeMultiplier={MAX_SCALE}
+            className="mt-0.5 font-body text-small text-ink-2"
+          >
+            {`Possibly on a different mat · ${closeBand.label}`}
+          </Text>
+        </View>
+      ) : (
+        line
+      )}
       <OutlineAction
         label="Cancel"
         accessibilityLabel="Cancel challenge"
@@ -392,6 +420,19 @@ export function WaitingStrip({
         disabled={disabled}
       />
     </StripShell>
+  );
+  if (!helper) return strip;
+  return (
+    <View>
+      {strip}
+      <Text
+        testID="arena-strip-waiting-helper"
+        maxFontSizeMultiplier={MAX_SCALE}
+        className="mt-1.5 pl-1 font-body text-body text-ink-2"
+      >
+        {helper}
+      </Text>
+    </View>
   );
 }
 
@@ -532,15 +573,17 @@ interface ClosestMatchProps {
   kind: "challenge" | "go-live" | "none";
   red: boolean;
   disabled: boolean;
-  viewer: { elo: number | null; weight: number | null };
+  /** The viewer's current rating (`You 1512`); never a stake (A11, O1). */
+  viewerElo: number | null;
   onChallenge: () => void;
   onGoLive: () => void;
 }
 
 /**
- * The live athlete nearest the viewer's rating, their stakes, and the
- * surface's single red CTA (AC-A3). Nobody to suggest shows an empty state,
- * with `GO LIVE TO ROLL` under it while offline.
+ * The live athlete nearest the viewer's rating and the surface's single red
+ * CTA (AC-A3). Nobody to suggest shows an empty state, with `GO LIVE TO ROLL`
+ * under it while offline. No rating stakes, in either mode (timekeeper mode
+ * spec 2.3 item 1).
  */
 export function ClosestMatchCard({
   athlete,
@@ -548,18 +591,10 @@ export function ClosestMatchCard({
   kind,
   red,
   disabled,
-  viewer,
+  viewerElo,
   onChallenge,
   onGoLive,
 }: ClosestMatchProps) {
-  const stakes = useViewerStakes(
-    !!athlete,
-    viewer.elo,
-    athlete?.currentElo ?? null,
-    viewer.weight,
-    athlete?.weight ?? null,
-  );
-
   if (!athlete || kind === "none") {
     return (
       <View
@@ -605,7 +640,7 @@ export function ClosestMatchCard({
     >
       <MatSectionLabel
         label="Closest match"
-        right={viewer.elo != null ? `You ${viewer.elo}` : undefined}
+        right={viewerElo != null ? `You ${viewerElo}` : undefined}
       />
       <View className="flex-row items-center gap-3">
         <Avatar32 name={name} photoUrl={athlete.profilePhotoUrl ?? null} />
@@ -625,17 +660,6 @@ export function ClosestMatchCard({
           >
             {facts}
           </Text>
-          {stakes ? (
-            <Text
-              testID="arena-closest-stakes"
-              numberOfLines={1}
-              maxFontSizeMultiplier={MAX_SCALE}
-              className="mt-0.5 font-mono-bold text-caption text-ink-2 uppercase"
-              style={TABULAR}
-            >
-              {`Win ${formatGap(stakes.challenger_win)} · Loss ${formatGap(stakes.challenger_loss)}`}
-            </Text>
-          ) : null}
         </View>
       </View>
       <ClosestCtaButton
@@ -721,8 +745,9 @@ export type MatRowAction =
   /** I am at the server's 3 pending outgoing cap. */
   | { kind: "capped" }
   /**
-   * Online & close (within 2 km, not on my mat): no ROLL, a challenge would
-   * fail the proximity gate. A neutral hint instead, never red.
+   * Online & close, not on my mat, and the server does not allow a
+   * challenge (`can_challenge` false or absent): no ROLL. A neutral hint
+   * instead, never red.
    */
   | { kind: "not-on-mat" };
 

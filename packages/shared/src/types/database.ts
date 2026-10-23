@@ -330,6 +330,7 @@ export type Database = {
           id: number
           lat: number | null
           lng: number | null
+          location_captured_at: string | null
           platform: string | null
           went_live_at: string
           went_offline_at: string | null
@@ -341,6 +342,7 @@ export type Database = {
           id?: never
           lat?: number | null
           lng?: number | null
+          location_captured_at?: string | null
           platform?: string | null
           went_live_at?: string
           went_offline_at?: string | null
@@ -352,6 +354,7 @@ export type Database = {
           id?: never
           lat?: number | null
           lng?: number | null
+          location_captured_at?: string | null
           platform?: string | null
           went_live_at?: string
           went_offline_at?: string | null
@@ -381,6 +384,7 @@ export type Database = {
           occurred_at: string | null
           outcome: string
           platform: string | null
+          source: string | null
         }
         Insert: {
           accuracy_m?: number | null
@@ -396,6 +400,7 @@ export type Database = {
           occurred_at?: string | null
           outcome: string
           platform?: string | null
+          source?: string | null
         }
         Update: {
           accuracy_m?: number | null
@@ -411,6 +416,7 @@ export type Database = {
           occurred_at?: string | null
           outcome?: string
           platform?: string | null
+          source?: string | null
         }
         Relationships: [
           {
@@ -459,6 +465,11 @@ export type Database = {
           practice_match_offered_at: string | null
           primary_gym_id: string | null
           profile_photo_url: string | null
+          rated_match_count: number
+          rating: number
+          rating_last_rated_at: string | null
+          rating_rd: number
+          rating_volatility: number
           role: Database["public"]["Enums"]["athlete_role"]
           status: string
         }
@@ -491,6 +502,11 @@ export type Database = {
           practice_match_offered_at?: string | null
           primary_gym_id?: string | null
           profile_photo_url?: string | null
+          rated_match_count?: number
+          rating?: number
+          rating_last_rated_at?: string | null
+          rating_rd?: number
+          rating_volatility?: number
           role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
@@ -523,6 +539,11 @@ export type Database = {
           practice_match_offered_at?: string | null
           primary_gym_id?: string | null
           profile_photo_url?: string | null
+          rated_match_count?: number
+          rating?: number
+          rating_last_rated_at?: string | null
+          rating_rd?: number
+          rating_volatility?: number
           role?: Database["public"]["Enums"]["athlete_role"]
           status?: string
         }
@@ -539,6 +560,7 @@ export type Database = {
       challenges: {
         Row: {
           challenger_id: string
+          challenger_tk_capable: boolean
           challenger_weight: number | null
           created_at: string
           expires_at: string
@@ -547,6 +569,7 @@ export type Database = {
           invite_id: string | null
           match_type: Database["public"]["Enums"]["match_type_enum"]
           opponent_id: string
+          opponent_tk_capable: boolean
           opponent_weight: number | null
           proposed_gym_id: string | null
           status: string
@@ -554,6 +577,7 @@ export type Database = {
         }
         Insert: {
           challenger_id: string
+          challenger_tk_capable?: boolean
           challenger_weight?: number | null
           created_at?: string
           expires_at?: string
@@ -562,6 +586,7 @@ export type Database = {
           invite_id?: string | null
           match_type: Database["public"]["Enums"]["match_type_enum"]
           opponent_id: string
+          opponent_tk_capable?: boolean
           opponent_weight?: number | null
           proposed_gym_id?: string | null
           status?: string
@@ -569,6 +594,7 @@ export type Database = {
         }
         Update: {
           challenger_id?: string
+          challenger_tk_capable?: boolean
           challenger_weight?: number | null
           created_at?: string
           expires_at?: string
@@ -577,6 +603,7 @@ export type Database = {
           invite_id?: string | null
           match_type?: Database["public"]["Enums"]["match_type_enum"]
           opponent_id?: string
+          opponent_tk_capable?: boolean
           opponent_weight?: number | null
           proposed_gym_id?: string | null
           status?: string
@@ -1004,6 +1031,189 @@ export type Database = {
         }
         Relationships: []
       }
+      highlight_rebuild_items: {
+        Row: {
+          armed_at: string | null
+          athlete_id: string
+          bell_moved_id: string | null
+          bell_moved_version: number | null
+          created_at: string
+          detail: string | null
+          ended_at: string | null
+          promoted_at: string | null
+          rebuild_id: string
+          replaced_highlight_id: string | null
+          replaced_live_render_total: number | null
+          selection: Json | null
+          status: string
+          updated_at: string
+          vessel_case: string | null
+          vessel_id: string | null
+          vessel_stash: Json | null
+        }
+        Insert: {
+          armed_at?: string | null
+          athlete_id: string
+          bell_moved_id?: string | null
+          bell_moved_version?: number | null
+          created_at?: string
+          detail?: string | null
+          ended_at?: string | null
+          promoted_at?: string | null
+          rebuild_id: string
+          replaced_highlight_id?: string | null
+          replaced_live_render_total?: number | null
+          selection?: Json | null
+          status?: string
+          updated_at?: string
+          vessel_case?: string | null
+          vessel_id?: string | null
+          vessel_stash?: Json | null
+        }
+        Update: {
+          armed_at?: string | null
+          athlete_id?: string
+          bell_moved_id?: string | null
+          bell_moved_version?: number | null
+          created_at?: string
+          detail?: string | null
+          ended_at?: string | null
+          promoted_at?: string | null
+          rebuild_id?: string
+          replaced_highlight_id?: string | null
+          replaced_live_render_total?: number | null
+          selection?: Json | null
+          status?: string
+          updated_at?: string
+          vessel_case?: string | null
+          vessel_id?: string | null
+          vessel_stash?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "highlight_rebuild_items_rebuild_id_fkey"
+            columns: ["rebuild_id"]
+            isOneToOne: false
+            referencedRelation: "highlight_rebuilds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "highlight_rebuild_items_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "video_highlights"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      highlight_rebuilds: {
+        Row: {
+          abort_detail: string | null
+          abort_reason: string | null
+          allow_single_angle: boolean
+          angles_used: string[] | null
+          attempt: number
+          completed_at: string | null
+          created_at: string
+          ended_at: string | null
+          gate_written: boolean
+          id: string
+          match_id: string
+          note: string | null
+          plan_id: string | null
+          plan_version: number | null
+          planned_at: string | null
+          primary_video_id: string | null
+          request_snapshot: Json | null
+          requested_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          abort_detail?: string | null
+          abort_reason?: string | null
+          allow_single_angle?: boolean
+          angles_used?: string[] | null
+          attempt?: number
+          completed_at?: string | null
+          created_at?: string
+          ended_at?: string | null
+          gate_written?: boolean
+          id?: string
+          match_id: string
+          note?: string | null
+          plan_id?: string | null
+          plan_version?: number | null
+          planned_at?: string | null
+          primary_video_id?: string | null
+          request_snapshot?: Json | null
+          requested_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          abort_detail?: string | null
+          abort_reason?: string | null
+          allow_single_angle?: boolean
+          angles_used?: string[] | null
+          attempt?: number
+          completed_at?: string | null
+          created_at?: string
+          ended_at?: string | null
+          gate_written?: boolean
+          id?: string
+          match_id?: string
+          note?: string | null
+          plan_id?: string | null
+          plan_version?: number | null
+          planned_at?: string | null
+          primary_video_id?: string | null
+          request_snapshot?: Json | null
+          requested_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "highlight_rebuilds_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "highlight_rebuilds_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "match_highlight_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      highlight_result_rerender_queue: {
+        Row: {
+          attempts: number
+          last_result: Json | null
+          last_run_at: string | null
+          match_id: string
+          requested_at: string
+        }
+        Insert: {
+          attempts?: number
+          last_result?: Json | null
+          last_run_at?: string | null
+          match_id: string
+          requested_at?: string
+        }
+        Update: {
+          attempts?: number
+          last_result?: Json | null
+          last_run_at?: string | null
+          match_id?: string
+          requested_at?: string
+        }
+        Relationships: []
+      }
       invite_attributions: {
         Row: {
           attributed_at: string
@@ -1152,6 +1362,7 @@ export type Database = {
           entry_point: string | null
           id: string
           inviter_id: string
+          inviter_tk_capable: boolean
           kind: string
           link_expires_at: string | null
           public_token: string | null
@@ -1170,6 +1381,7 @@ export type Database = {
           entry_point?: string | null
           id?: string
           inviter_id: string
+          inviter_tk_capable?: boolean
           kind: string
           link_expires_at?: string | null
           public_token?: string | null
@@ -1188,6 +1400,7 @@ export type Database = {
           entry_point?: string | null
           id?: string
           inviter_id?: string
+          inviter_tk_capable?: boolean
           kind?: string
           link_expires_at?: string | null
           public_token?: string | null
@@ -1392,6 +1605,56 @@ export type Database = {
             columns: ["resolved_by"]
             isOneToOne: false
             referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_footage_verdicts: {
+        Row: {
+          angles_false: number
+          angles_total: number
+          angles_true: number
+          angles_unknown: number
+          cleared_at: string | null
+          first_flagged_at: string | null
+          flag_count: number
+          flagged_at: string | null
+          match_id: string
+          no_jiujitsu: boolean
+          updated_at: string
+        }
+        Insert: {
+          angles_false?: number
+          angles_total?: number
+          angles_true?: number
+          angles_unknown?: number
+          cleared_at?: string | null
+          first_flagged_at?: string | null
+          flag_count?: number
+          flagged_at?: string | null
+          match_id: string
+          no_jiujitsu?: boolean
+          updated_at?: string
+        }
+        Update: {
+          angles_false?: number
+          angles_total?: number
+          angles_true?: number
+          angles_unknown?: number
+          cleared_at?: string | null
+          first_flagged_at?: string | null
+          flag_count?: number
+          flagged_at?: string | null
+          match_id?: string
+          no_jiujitsu?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_footage_verdicts_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
             referencedColumns: ["id"]
           },
         ]
@@ -1601,42 +1864,93 @@ export type Database = {
           elo_after: number | null
           elo_before: number | null
           elo_delta: number
+          expected_score: number | null
           id: string
+          last_rated_at_before: string | null
           match_id: string
           outcome:
             | Database["public"]["Enums"]["participant_outcome_enum"]
             | null
+          prior_meetings: number | null
+          rating_after: number | null
+          rating_before: number | null
+          rating_delta: number | null
+          rating_floor_hit: boolean | null
+          rating_model: string | null
+          rating_weight_lbs: number | null
+          rd_after: number | null
+          rd_aged: number | null
+          rd_before: number | null
+          rematch_weight: number | null
           role: Database["public"]["Enums"]["participant_role_enum"]
           status: string
+          volatility_after: number | null
+          volatility_before: number | null
           weight_division_gap: number | null
+          weight_offset_points: number | null
+          win_probability: number | null
         }
         Insert: {
           athlete_id: string
           elo_after?: number | null
           elo_before?: number | null
           elo_delta?: number
+          expected_score?: number | null
           id?: string
+          last_rated_at_before?: string | null
           match_id: string
           outcome?:
             | Database["public"]["Enums"]["participant_outcome_enum"]
             | null
+          prior_meetings?: number | null
+          rating_after?: number | null
+          rating_before?: number | null
+          rating_delta?: number | null
+          rating_floor_hit?: boolean | null
+          rating_model?: string | null
+          rating_weight_lbs?: number | null
+          rd_after?: number | null
+          rd_aged?: number | null
+          rd_before?: number | null
+          rematch_weight?: number | null
           role?: Database["public"]["Enums"]["participant_role_enum"]
           status?: string
+          volatility_after?: number | null
+          volatility_before?: number | null
           weight_division_gap?: number | null
+          weight_offset_points?: number | null
+          win_probability?: number | null
         }
         Update: {
           athlete_id?: string
           elo_after?: number | null
           elo_before?: number | null
           elo_delta?: number
+          expected_score?: number | null
           id?: string
+          last_rated_at_before?: string | null
           match_id?: string
           outcome?:
             | Database["public"]["Enums"]["participant_outcome_enum"]
             | null
+          prior_meetings?: number | null
+          rating_after?: number | null
+          rating_before?: number | null
+          rating_delta?: number | null
+          rating_floor_hit?: boolean | null
+          rating_model?: string | null
+          rating_weight_lbs?: number | null
+          rd_after?: number | null
+          rd_aged?: number | null
+          rd_before?: number | null
+          rematch_weight?: number | null
           role?: Database["public"]["Enums"]["participant_role_enum"]
           status?: string
+          volatility_after?: number | null
+          volatility_before?: number | null
           weight_division_gap?: number | null
+          weight_offset_points?: number | null
+          win_probability?: number | null
         }
         Relationships: [
           {
@@ -1659,6 +1973,7 @@ export type Database = {
         Row: {
           accuracy_m: number
           athlete_id: string
+          captured_at: string
           challenge_id: string | null
           context: string
           id: number
@@ -1670,6 +1985,7 @@ export type Database = {
         Insert: {
           accuracy_m: number
           athlete_id: string
+          captured_at?: string
           challenge_id?: string | null
           context: string
           id?: never
@@ -1681,6 +1997,7 @@ export type Database = {
         Update: {
           accuracy_m?: number
           athlete_id?: string
+          captured_at?: string
           challenge_id?: string | null
           context?: string
           id?: never
@@ -1763,6 +2080,39 @@ export type Database = {
           },
         ]
       }
+      match_ready: {
+        Row: {
+          athlete_id: string
+          match_id: string
+          ready_at: string
+        }
+        Insert: {
+          athlete_id: string
+          match_id: string
+          ready_at?: string
+        }
+        Update: {
+          athlete_id?: string
+          match_id?: string
+          ready_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_ready_athlete_id_fkey"
+            columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_ready_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_recording_intents: {
         Row: {
           athlete_id: string
@@ -1800,6 +2150,65 @@ export type Database = {
             foreignKeyName: "match_recording_intents_match_id_fkey"
             columns: ["match_id"]
             isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_sync_requests: {
+        Row: {
+          angles_seen: string[]
+          attempts: number
+          config_sig: string | null
+          created_at: string
+          detail: string | null
+          elected_by_sync: boolean
+          last_error: string | null
+          last_request_id: number | null
+          last_requested_at: string | null
+          match_id: string
+          primary_video_id: string | null
+          request_sig: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          angles_seen?: string[]
+          attempts?: number
+          config_sig?: string | null
+          created_at?: string
+          detail?: string | null
+          elected_by_sync?: boolean
+          last_error?: string | null
+          last_request_id?: number | null
+          last_requested_at?: string | null
+          match_id: string
+          primary_video_id?: string | null
+          request_sig?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          angles_seen?: string[]
+          attempts?: number
+          config_sig?: string | null
+          created_at?: string
+          detail?: string | null
+          elected_by_sync?: boolean
+          last_error?: string | null
+          last_request_id?: number | null
+          last_requested_at?: string | null
+          match_id?: string
+          primary_video_id?: string | null
+          request_sig?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_sync_requests_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
             referencedRelation: "matches"
             referencedColumns: ["id"]
           },
@@ -1885,6 +2294,236 @@ export type Database = {
             columns: ["match_id"]
             isOneToOne: true
             referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_timekeeper_flags: {
+        Row: {
+          created_at: string
+          id: number
+          kind: string
+          match_id: string
+          note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          kind: string
+          match_id: string
+          note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          kind?: string
+          match_id?: string
+          note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_timekeeper_flags_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_timekeeper_flags_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_timekeeper_history: {
+        Row: {
+          id: number
+          left_at: string | null
+          left_reason: string | null
+          match_id: string
+          seated_at: string
+          timekeeper_id: string
+        }
+        Insert: {
+          id?: never
+          left_at?: string | null
+          left_reason?: string | null
+          match_id: string
+          seated_at: string
+          timekeeper_id: string
+        }
+        Update: {
+          id?: never
+          left_at?: string | null
+          left_reason?: string | null
+          match_id?: string
+          seated_at?: string
+          timekeeper_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_timekeeper_history_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_timekeeper_history_timekeeper_id_fkey"
+            columns: ["timekeeper_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_timekeeper_presence: {
+        Row: {
+          match_id: string
+          seen_at: string
+          timekeeper_id: string
+        }
+        Insert: {
+          match_id: string
+          seen_at: string
+          timekeeper_id: string
+        }
+        Update: {
+          match_id?: string
+          seen_at?: string
+          timekeeper_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_timekeeper_presence_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: true
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_timekeeper_presence_timekeeper_id_fkey"
+            columns: ["timekeeper_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_timekeeper_requests: {
+        Row: {
+          channel: string
+          created_at: string
+          expires_at: string
+          id: string
+          invitee_id: string
+          match_id: string
+          requested_by: string
+          responded_at: string | null
+          status: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          invitee_id: string
+          match_id: string
+          requested_by: string
+          responded_at?: string | null
+          status: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invitee_id?: string
+          match_id?: string
+          requested_by?: string
+          responded_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_timekeeper_requests_invitee_id_fkey"
+            columns: ["invitee_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_timekeeper_requests_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_timekeeper_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_timekeeper_weight_checks: {
+        Row: {
+          created_at: string
+          match_id: string
+          status: string
+          subject_id: string
+          timekeeper_id: string
+          updated_at: string
+          weight_seen: number | null
+        }
+        Insert: {
+          created_at?: string
+          match_id: string
+          status: string
+          subject_id: string
+          timekeeper_id: string
+          updated_at?: string
+          weight_seen?: number | null
+        }
+        Update: {
+          created_at?: string
+          match_id?: string
+          status?: string
+          subject_id?: string
+          timekeeper_id?: string
+          updated_at?: string
+          weight_seen?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_timekeeper_weight_checks_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_timekeeper_weight_checks_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_timekeeper_weight_checks_timekeeper_id_fkey"
+            columns: ["timekeeper_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
             referencedColumns: ["id"]
           },
         ]
@@ -2028,6 +2667,8 @@ export type Database = {
           angle_quality: number | null
           athlete_left_id: string | null
           camera_angle: string | null
+          capture_lens: string | null
+          capture_quality: string | null
           chunk_count: number | null
           chunks_completed: number
           created_at: string
@@ -2076,6 +2717,8 @@ export type Database = {
           angle_quality?: number | null
           athlete_left_id?: string | null
           camera_angle?: string | null
+          capture_lens?: string | null
+          capture_quality?: string | null
           chunk_count?: number | null
           chunks_completed?: number
           created_at?: string
@@ -2124,6 +2767,8 @@ export type Database = {
           angle_quality?: number | null
           athlete_left_id?: string | null
           camera_angle?: string | null
+          capture_lens?: string | null
+          capture_quality?: string | null
           chunk_count?: number | null
           chunks_completed?: number
           created_at?: string
@@ -2272,6 +2917,7 @@ export type Database = {
       }
       matches: {
         Row: {
+          cancel_reason: string | null
           challenge_id: string | null
           completed_at: string | null
           created_at: string
@@ -2280,19 +2926,29 @@ export type Database = {
           dispute_resolution: string | null
           dispute_resolved_at: string | null
           duration_seconds: number
+          ended_at: string | null
+          final_elapsed_s: number | null
           gym_id: string | null
           id: string
           initiated_by_athlete_id: string | null
           match_type: Database["public"]["Enums"]["match_type_enum"]
           paused_at: string | null
+          rating_seq: number | null
+          requires_timekeeper: boolean
           result: Database["public"]["Enums"]["match_result_enum"] | null
+          result_edit_count: number
+          result_edited_at: string | null
+          result_recorded_by_admin: boolean
           session_id: string | null
           started_at: string | null
           status: string
+          timekeeper_deadline_at: string | null
           timekeeper_id: string | null
+          tk_weight_check_required: boolean
           total_paused_duration: number
         }
         Insert: {
+          cancel_reason?: string | null
           challenge_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -2301,19 +2957,29 @@ export type Database = {
           dispute_resolution?: string | null
           dispute_resolved_at?: string | null
           duration_seconds?: number
+          ended_at?: string | null
+          final_elapsed_s?: number | null
           gym_id?: string | null
           id?: string
           initiated_by_athlete_id?: string | null
           match_type: Database["public"]["Enums"]["match_type_enum"]
           paused_at?: string | null
+          rating_seq?: number | null
+          requires_timekeeper?: boolean
           result?: Database["public"]["Enums"]["match_result_enum"] | null
+          result_edit_count?: number
+          result_edited_at?: string | null
+          result_recorded_by_admin?: boolean
           session_id?: string | null
           started_at?: string | null
           status?: string
+          timekeeper_deadline_at?: string | null
           timekeeper_id?: string | null
+          tk_weight_check_required?: boolean
           total_paused_duration?: number
         }
         Update: {
+          cancel_reason?: string | null
           challenge_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -2322,16 +2988,25 @@ export type Database = {
           dispute_resolution?: string | null
           dispute_resolved_at?: string | null
           duration_seconds?: number
+          ended_at?: string | null
+          final_elapsed_s?: number | null
           gym_id?: string | null
           id?: string
           initiated_by_athlete_id?: string | null
           match_type?: Database["public"]["Enums"]["match_type_enum"]
           paused_at?: string | null
+          rating_seq?: number | null
+          requires_timekeeper?: boolean
           result?: Database["public"]["Enums"]["match_result_enum"] | null
+          result_edit_count?: number
+          result_edited_at?: string | null
+          result_recorded_by_admin?: boolean
           session_id?: string | null
           started_at?: string | null
           status?: string
+          timekeeper_deadline_at?: string | null
           timekeeper_id?: string | null
+          tk_weight_check_required?: boolean
           total_paused_duration?: number
         }
         Relationships: [
@@ -2470,6 +3145,116 @@ export type Database = {
           },
         ]
       }
+      ops_rerender_runs: {
+        Row: {
+          armed_total: number
+          batch: number
+          ended_at: string | null
+          id: string
+          last_result: Json | null
+          last_tick_at: string | null
+          rendered_before: string
+          started_at: string
+          status: string
+          ticks: number
+        }
+        Insert: {
+          armed_total?: number
+          batch: number
+          ended_at?: string | null
+          id?: string
+          last_result?: Json | null
+          last_tick_at?: string | null
+          rendered_before: string
+          started_at?: string
+          status?: string
+          ticks?: number
+        }
+        Update: {
+          armed_total?: number
+          batch?: number
+          ended_at?: string | null
+          id?: string
+          last_result?: Json | null
+          last_tick_at?: string | null
+          rendered_before?: string
+          started_at?: string
+          status?: string
+          ticks?: number
+        }
+        Relationships: []
+      }
+      playback_backfill_jobs: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          completed_at: string | null
+          created_at: string
+          finished_at: string | null
+          last_error: string | null
+          profile: string
+          requested_at: string | null
+          updated_at: string
+          video_id: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          finished_at?: string | null
+          last_error?: string | null
+          profile: string
+          requested_at?: string | null
+          updated_at?: string
+          video_id: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          finished_at?: string | null
+          last_error?: string | null
+          profile?: string
+          requested_at?: string | null
+          updated_at?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playback_backfill_jobs_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: true
+            referencedRelation: "match_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playback_url_cache: {
+        Row: {
+          created_at: string
+          expires_at: string
+          object_key: string
+          signed_url: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          object_key: string
+          signed_url: string
+          window_start: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          object_key?: string
+          signed_url?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           athlete_id: string
@@ -2502,6 +3287,65 @@ export type Database = {
           {
             foreignKeyName: "push_subscriptions_athlete_id_fkey"
             columns: ["athlete_id"]
+            isOneToOne: false
+            referencedRelation: "athletes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rating_system: {
+        Row: {
+          activated_at: string | null
+          id: number
+          last_replay_at: string | null
+          last_replay_matches: number | null
+          last_replay_reason: string | null
+          model: string
+          params: Json
+        }
+        Insert: {
+          activated_at?: string | null
+          id?: number
+          last_replay_at?: string | null
+          last_replay_matches?: number | null
+          last_replay_reason?: string | null
+          model: string
+          params: Json
+        }
+        Update: {
+          activated_at?: string | null
+          id?: number
+          last_replay_at?: string | null
+          last_replay_matches?: number | null
+          last_replay_reason?: string | null
+          model?: string
+          params?: Json
+        }
+        Relationships: []
+      }
+      server_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_settings_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "athletes"
             referencedColumns: ["id"]
@@ -3319,6 +4163,44 @@ export type Database = {
           },
         ]
       }
+      video_highlight_ops: {
+        Row: {
+          highlight_id: string
+          last_error: string | null
+          last_error_at: string | null
+          skip_detail: string | null
+          skip_reason: string | null
+          skipped_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          highlight_id: string
+          last_error?: string | null
+          last_error_at?: string | null
+          skip_detail?: string | null
+          skip_reason?: string | null
+          skipped_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          highlight_id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          skip_detail?: string | null
+          skip_reason?: string | null
+          skipped_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_highlight_ops_highlight_id_fkey"
+            columns: ["highlight_id"]
+            isOneToOne: true
+            referencedRelation: "video_highlights"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_highlight_plans: {
         Row: {
           claimed_at: string | null
@@ -3514,14 +4396,17 @@ export type Database = {
           first_live_at: string | null
           id: string
           late_angle_renders: number
+          live_context_at: string | null
           live_duration_s: number | null
           live_poster_path: string | null
           live_ready_at: string | null
           live_render_total: number | null
+          live_rendered_at: string | null
           live_segments: Json | null
           live_storage_path: string | null
           match_id: string | null
           match_video_id: string
+          ops_renders: number
           origin: string
           pending_since: string | null
           poster_path: string | null
@@ -3529,6 +4414,7 @@ export type Database = {
           redispatched_at: string | null
           render_attempts: number
           render_total: number
+          result_rerenders: number
           scope: string
           segments: Json
           source_video_ids: string[] | null
@@ -3549,14 +4435,17 @@ export type Database = {
           first_live_at?: string | null
           id?: string
           late_angle_renders?: number
+          live_context_at?: string | null
           live_duration_s?: number | null
           live_poster_path?: string | null
           live_ready_at?: string | null
           live_render_total?: number | null
+          live_rendered_at?: string | null
           live_segments?: Json | null
           live_storage_path?: string | null
           match_id?: string | null
           match_video_id: string
+          ops_renders?: number
           origin?: string
           pending_since?: string | null
           poster_path?: string | null
@@ -3564,6 +4453,7 @@ export type Database = {
           redispatched_at?: string | null
           render_attempts?: number
           render_total?: number
+          result_rerenders?: number
           scope?: string
           segments: Json
           source_video_ids?: string[] | null
@@ -3584,14 +4474,17 @@ export type Database = {
           first_live_at?: string | null
           id?: string
           late_angle_renders?: number
+          live_context_at?: string | null
           live_duration_s?: number | null
           live_poster_path?: string | null
           live_ready_at?: string | null
           live_render_total?: number | null
+          live_rendered_at?: string | null
           live_segments?: Json | null
           live_storage_path?: string | null
           match_id?: string | null
           match_video_id?: string
+          ops_renders?: number
           origin?: string
           pending_since?: string | null
           poster_path?: string | null
@@ -3599,6 +4492,7 @@ export type Database = {
           redispatched_at?: string | null
           render_attempts?: number
           render_total?: number
+          result_rerenders?: number
           scope?: string
           segments?: Json
           source_video_ids?: string[] | null
@@ -3784,6 +4678,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _ai_labels_visible: { Args: never; Returns: boolean }
+      _annotate_key_moments_clarity: {
+        Args: { p_clarity: Json; p_key_moments: Json }
+        Returns: Json
+      }
+      _arena_band_id: { Args: { p_edge_m: number }; Returns: string }
+      _arena_ranges: { Args: never; Returns: Json }
+      _arena_ranges_defaults: { Args: never; Returns: Json }
       _arm_highlight_plan: {
         Args: { p_match_video_id: string; p_storage_path: string }
         Returns: string
@@ -3809,11 +4711,27 @@ export type Database = {
           p_late_angle: boolean
           p_match_id: string
           p_now?: string
+          p_ops?: boolean
           p_primary_id: string
           p_segments: Json
           p_source_ids: string[]
         }
         Returns: Json
+      }
+      _arm_match_highlight_result_rerender: {
+        Args: {
+          p_athlete_id: string
+          p_audio_bed?: string
+          p_match_id: string
+          p_primary_id: string
+          p_segments: Json
+          p_source_ids: string[]
+        }
+        Returns: Json
+      }
+      _arm_rebuild_render: {
+        Args: { p_prep: Json; p_primary_id: string; p_rebuild_id: string }
+        Returns: string
       }
       _athlete_busy: {
         Args: { p_athlete: string; p_except_challenge: string }
@@ -3835,6 +4753,14 @@ export type Database = {
       _can_read_match_media_object: {
         Args: { p_name: string }
         Returns: boolean
+      }
+      _can_read_match_media_object_as_former_timekeeper: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      _cancel_match_highlight_plans: {
+        Args: { p_match_id: string }
+        Returns: number
       }
       _claim_failure: {
         Args: {
@@ -3914,6 +4840,13 @@ export type Database = {
         Returns: boolean
       }
       _go_live_location_ok: { Args: { p_athlete: string }; Returns: boolean }
+      _go_live_params: {
+        Args: never
+        Returns: {
+          captured_future_skew: string
+          tag_max_age: string
+        }[]
+      }
       _gym_range_cutoff: { Args: { p_range: string }; Returns: string }
       _haversine_m: {
         Args: { p_lat1: number; p_lat2: number; p_lng1: number; p_lng2: number }
@@ -3927,11 +4860,89 @@ export type Database = {
       }
       _highlight_max_seconds: { Args: never; Returns: number }
       _highlight_plan_max: { Args: never; Returns: number }
+      _highlight_rebuild_hides: {
+        Args: { p_highlight_id: string }
+        Returns: boolean
+      }
+      _highlight_rebuild_identity_view: {
+        Args: {
+          p_i: Database["public"]["Tables"]["video_highlight_identity"]["Row"]
+        }
+        Returns: {
+          highlight_id: string
+          identity_disputed_at: string | null
+          identity_side: string
+          live_identity_side: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "video_highlight_identity"
+          to: "video_highlight_identity"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _highlight_rebuild_shadowed: {
+        Args: { p_match_id: string }
+        Returns: boolean
+      }
+      _highlight_rebuild_view: {
+        Args: { p_h: Database["public"]["Tables"]["video_highlights"]["Row"] }
+        Returns: {
+          athlete_id: string
+          audio_bed_video_id: string | null
+          audio_mode: string
+          claimed_at: string | null
+          created_at: string
+          duration_s: number | null
+          error_message: string | null
+          first_live_at: string | null
+          id: string
+          late_angle_renders: number
+          live_context_at: string | null
+          live_duration_s: number | null
+          live_poster_path: string | null
+          live_ready_at: string | null
+          live_render_total: number | null
+          live_rendered_at: string | null
+          live_segments: Json | null
+          live_storage_path: string | null
+          match_id: string | null
+          match_video_id: string
+          ops_renders: number
+          origin: string
+          pending_since: string | null
+          poster_path: string | null
+          redispatch_count: number
+          redispatched_at: string | null
+          render_attempts: number
+          render_total: number
+          result_rerenders: number
+          scope: string
+          segments: Json
+          source_video_ids: string[] | null
+          status: string
+          storage_path: string | null
+          superseded_at: string | null
+          superseded_by: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "video_highlights"
+          to: "video_highlights"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       _highlight_reel_touched: {
         Args: { p_highlight_id: string }
         Returns: string
       }
       _highlight_render_max: { Args: never; Returns: number }
+      _highlight_result_stale: {
+        Args: { p_h: Database["public"]["Tables"]["video_highlights"]["Row"] }
+        Returns: boolean
+      }
       _highlight_segments_v1_to_v2: {
         Args: {
           p_allowed: string[]
@@ -3947,6 +4958,15 @@ export type Database = {
         Returns: Json
       }
       _highlight_v2_sources: { Args: { p_video_ids: string[] }; Returns: Json }
+      _highlight_visible_reel: {
+        Args: {
+          p_athlete_id: string
+          p_exclude_id?: string
+          p_match_id: string
+        }
+        Returns: string
+      }
+      _highlights_service_busy: { Args: { p_now?: string }; Returns: number }
       _invite_booking_block: {
         Args: { p_challenge_id: string }
         Returns: string
@@ -3997,6 +5017,7 @@ export type Database = {
         Returns: {
           accuracy_m: number
           athlete_id: string
+          captured_at: string
           challenge_id: string | null
           context: string
           id: number
@@ -4046,7 +5067,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      _match_actor_role: {
+        Args: { p_athlete_id: string; p_match_id: string }
+        Returns: string
+      }
+      _match_clarity_moments: { Args: { p_match_id: string }; Returns: Json }
+      _match_countdown_seconds: { Args: never; Returns: number }
       _match_current_primary: { Args: { p_match_id: string }; Returns: string }
+      _match_footage_angle_counts: {
+        Args: {
+          p_completed_at: string
+          p_failure_code: string
+          p_status: string
+        }
+        Returns: boolean
+      }
+      _match_footage_settle_window: { Args: never; Returns: string }
       _match_media_backing_off: {
         Args: { p_failures: number; p_last: string; p_now: string }
         Returns: boolean
@@ -4063,7 +5099,35 @@ export type Database = {
       }
       _match_plan_candidates_v1: { Args: { p_result: Json }; Returns: Json }
       _match_reel_states: { Args: { p_match_id: string }; Returns: Json }
+      _match_requires_timekeeper: {
+        Args: { p_match_id: string }
+        Returns: boolean
+      }
       _match_scouting_video: { Args: { p_match_id: string }; Returns: string }
+      _match_sync_backoff: { Args: { p_attempts: number }; Returns: string }
+      _match_sync_deferred_to_highlights: {
+        Args: { p_match_id: string; p_now?: string }
+        Returns: boolean
+      }
+      _match_sync_failed: {
+        Args: { p_err: string; p_match_id: string; p_now: string }
+        Returns: undefined
+      }
+      _match_sync_save: {
+        Args: {
+          p_angles: string[]
+          p_attempts: number
+          p_detail: string
+          p_elected: boolean
+          p_error?: string
+          p_match_id: string
+          p_primary: string
+          p_sig: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      _match_sync_signature: { Args: { p_match_id: string }; Returns: string }
       _match_usable_angles: { Args: { p_match_id: string }; Returns: string[] }
       _match_video_insert_context: {
         Args: { p_match_id: string }
@@ -4083,12 +5147,16 @@ export type Database = {
         Returns: boolean
       }
       _match_weight_check_state: { Args: { p_match_id: string }; Returns: Json }
+      _merge_client_settings: {
+        Args: { p_defaults: Json; p_stored: Json }
+        Returns: Json
+      }
       _multi_angle_highlights_active: { Args: never; Returns: boolean }
       _nearby_params: {
         Args: never
         Returns: {
-          band_1km_m: number
-          band_500_m: number
+          band_edges_m: number[]
+          close_can_challenge: boolean
           max_rows: number
           radius_m: number
           rate_window: string
@@ -4098,6 +5166,60 @@ export type Database = {
       _new_short_code: { Args: never; Returns: string }
       _new_timekeeper_code: { Args: never; Returns: string }
       _normalize_invite_code: { Args: { p_code: string }; Returns: string }
+      _ops_rebuild_audit: {
+        Args: { p_action: string; p_match_id: string; p_payload: Json }
+        Returns: string
+      }
+      _ops_rebuild_replaced_touched: {
+        Args: {
+          p_athlete: string
+          p_match_id: string
+          p_replaced_id: string
+          p_replaced_live: number
+          p_since: string
+          p_vessel_id: string
+        }
+        Returns: string
+      }
+      _ops_rebuild_restore_vessel: {
+        Args: {
+          p_can_delete: boolean
+          p_case: string
+          p_stash: Json
+          p_vessel_id: string
+        }
+        Returns: undefined
+      }
+      _ops_rebuild_settle: { Args: { p_rebuild_id: string }; Returns: string }
+      _ops_reprocess_eval: {
+        Args: { p_allow_single_angle?: boolean; p_match_id: string }
+        Returns: Json
+      }
+      _ops_reprocess_planner_url: { Args: never; Returns: string }
+      _ops_reprocess_slicer_secret_set: { Args: never; Returns: boolean }
+      _ops_rerender_candidates: {
+        Args: { p_highlight_ids: string[]; p_rendered_before: string }
+        Returns: {
+          deferred_reason: string
+          highlight_id: string
+          live_ready_at: string
+          rendered_at: string
+          scope: string
+        }[]
+      }
+      _ops_rerender_mark_skip: {
+        Args: { p_detail: string; p_highlight_id: string; p_reason: string }
+        Returns: undefined
+      }
+      _playback_backfill_in_flight: {
+        Args: { p_lease_minutes?: number }
+        Returns: number
+      }
+      _playback_backfill_lease_minutes: { Args: never; Returns: number }
+      _playback_backfill_max_attempts: { Args: never; Returns: number }
+      _playback_settings_defaults: { Args: never; Returns: Json }
+      _playback_url_window_seconds: { Args: never; Returns: number }
+      _post_match_sync: { Args: { p_match_id: string }; Returns: number }
       _presence_guard_params: {
         Args: never
         Returns: {
@@ -4110,10 +5232,15 @@ export type Database = {
         Args: {
           p_accuracy_m: number
           p_athlete: string
+          p_captured_at: string
           p_lat: number
           p_lng: number
         }
         Returns: boolean
+      }
+      _process_match_sync: {
+        Args: { p_force?: boolean; p_match_id: string; p_now?: string }
+        Returns: Json
       }
       _proximity_params: {
         Args: never
@@ -4123,6 +5250,65 @@ export type Database = {
           base_m: number
           freshness: string
         }[]
+      }
+      _rating_v9_aged_rd: {
+        Args: { p_at: string; p_last: string; p_rd: number; p_sigma: number }
+        Returns: number
+      }
+      _rating_v9_apply_match: { Args: { p_match_id: string }; Returns: Json }
+      _rating_v9_cutover: { Args: { p_reason: string }; Returns: number }
+      _rating_v9_g: { Args: { p_phi: number }; Returns: number }
+      _rating_v9_logistic: { Args: { p_x: number }; Returns: number }
+      _rating_v9_params: { Args: never; Returns: Json }
+      _rating_v9_preflight: { Args: never; Returns: number }
+      _rating_v9_rated_matches: {
+        Args: never
+        Returns: {
+          match_id: string
+          ord: number
+        }[]
+      }
+      _rating_v9_replay_all: { Args: { p_reason: string }; Returns: number }
+      _rating_v9_replay_summary: { Args: { p_matches: number }; Returns: Json }
+      _rating_v9_update: {
+        Args: {
+          p_at: string
+          p_last_a: string
+          p_last_b: string
+          p_outcome: string
+          p_prior: number
+          p_rating_a: number
+          p_rating_b: number
+          p_rd_a: number
+          p_rd_b: number
+          p_vol_a: number
+          p_vol_b: number
+          p_weight_a: number
+          p_weight_b: number
+        }
+        Returns: {
+          delta_a: number
+          delta_b: number
+          expected_a: number
+          expected_b: number
+          floor_hit_a: boolean
+          floor_hit_b: boolean
+          rating_a_after: number
+          rating_b_after: number
+          rd_a_after: number
+          rd_a_aged: number
+          rd_b_after: number
+          rd_b_aged: number
+          rematch_weight: number
+          vol_a_after: number
+          vol_b_after: number
+          weight_offset: number
+          win_prob_a: number
+        }[]
+      }
+      _rating_v9_volatility: {
+        Args: { p_dl: number; p_phi: number; p_sigma: number; p_v: number }
+        Returns: number
       }
       _reap_stale_highlight_claim: {
         Args: { p_expected_claimed_at: string; p_highlight_id: string }
@@ -4148,6 +5334,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      _refresh_match_footage_verdict: {
+        Args: { p_match_id: string }
+        Returns: undefined
+      }
+      _request_client_caps: { Args: never; Returns: string[] }
+      _request_has_cap: { Args: { p_cap: string }; Returns: boolean }
       _request_platform: { Args: never; Returns: string }
       _resolve_invite: {
         Args: { p_code: string; p_kind?: string; p_token: string }
@@ -4160,6 +5352,7 @@ export type Database = {
           entry_point: string | null
           id: string
           inviter_id: string
+          inviter_tk_capable: boolean
           kind: string
           link_expires_at: string | null
           public_token: string | null
@@ -4176,11 +5369,32 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      _result_edit_rerender_match: {
+        Args: { p_match_id: string }
+        Returns: Json
+      }
       _scrub_highlight_message: {
         Args: { p_max?: number; p_text: string }
         Returns: string
       }
+      _set_match_highlight_plan_ready_ops: {
+        Args: {
+          p_analysis: Json
+          p_invalid_moment_count: number
+          p_latency_ms: number
+          p_model: string
+          p_plan_id: string
+          p_prompt_version: string
+          p_rebuild_id: string
+          p_result: Json
+          p_selections: Json
+          p_timeline_duration_ms: number
+          p_usage: Json
+        }
+        Returns: Json
+      }
       _single_angle_breakdown: { Args: { p_match_id: string }; Returns: Json }
+      _slicer_queue_snapshot: { Args: never; Returns: Json }
       _start_blocked_reason: {
         Args: {
           p_challenge_id: string
@@ -4194,6 +5408,8 @@ export type Database = {
         Returns: string
       }
       _storage_object_size: { Args: { p_metadata: Json }; Returns: number }
+      _sync_source_rank: { Args: { p_source: string }; Returns: number }
+      _timekeeper_busy: { Args: { p_athlete: string }; Returns: boolean }
       _timekeeper_sheet: {
         Args: {
           p_match_id: string
@@ -4202,11 +5418,119 @@ export type Database = {
         }
         Returns: Json
       }
+      _tk_busy_as: {
+        Args: {
+          p_athlete: string
+          p_count_requests: boolean
+          p_match_id: string
+        }
+        Returns: string
+      }
+      _tk_cancel: {
+        Args: { p_left_reason?: string; p_match_id: string; p_reason: string }
+        Returns: undefined
+      }
+      _tk_cancel_before_start: { Args: { p_match_id: string }; Returns: Json }
+      _tk_check_opponent_weight: {
+        Args: { p_match_id: string; p_verdict: string; p_weight_seen?: number }
+        Returns: Json
+      }
+      _tk_code_path_refusal: { Args: { p_match_id: string }; Returns: Json }
+      _tk_confirm_match_result: {
+        Args: { p_expected_edit_count?: number; p_match_id: string }
+        Returns: Json
+      }
+      _tk_due_step: { Args: { p_match_id: string }; Returns: string }
+      _tk_edit_guard: {
+        Args: {
+          p_caller: string
+          p_expected_edit_count: number
+          p_finish_time_seconds: number
+          p_match_id: string
+        }
+        Returns: undefined
+      }
+      _tk_flag: {
+        Args: { p_kind: string; p_match_id: string }
+        Returns: boolean
+      }
+      _tk_invitee_refusal: {
+        Args: { p_athlete: string; p_match_id: string }
+        Returns: string
+      }
+      _tk_lapse_request: { Args: { p_request_id: string }; Returns: boolean }
+      _tk_leave_as_timekeeper: { Args: { p_match_id: string }; Returns: Json }
+      _tk_match_athletes: { Args: { p_match_id: string }; Returns: string[] }
+      _tk_notify: {
+        Args: {
+          p_kind: string
+          p_match_id: string
+          p_recipients: string[]
+          p_subject_id: string
+        }
+        Returns: number
+      }
+      _tk_offline_since: { Args: { p_match_id: string }; Returns: string }
+      _tk_pause_match: { Args: { p_match_id: string }; Returns: Json }
+      _tk_record_match_result: {
+        Args: {
+          p_finish_time_seconds?: number
+          p_match_id: string
+          p_result: string
+          p_submission_type_code?: string
+          p_winner_id?: string
+        }
+        Returns: Json
+      }
+      _tk_resume_match: { Args: { p_match_id: string }; Returns: Json }
+      _tk_reweigh_for_match: {
+        Args: { p_match_id: string; p_weight: number }
+        Returns: Json
+      }
+      _tk_seat_timekeeper: {
+        Args: { p_athlete_id: string; p_match_id: string }
+        Returns: undefined
+      }
+      _tk_set_match_recording_intent: {
+        Args: { p_intends: boolean; p_match_id: string }
+        Returns: Json
+      }
+      _tk_start_blockers: { Args: { p_match_id: string }; Returns: string[] }
+      _tk_start_match: { Args: { p_match_id: string }; Returns: Json }
+      _tk_tick_match: { Args: { p_match_id: string }; Returns: string }
+      _tk_unseat_before_start: {
+        Args: { p_match_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      _tk_weight_check_payload: { Args: { p_match_id: string }; Returns: Json }
+      _tk_window: { Args: { p_name: string }; Returns: string }
+      _tk_write_opponent_check: {
+        Args: {
+          p_checker_id: string
+          p_match_id: string
+          p_verdict: string
+          p_weight_seen: number
+        }
+        Returns: undefined
+      }
+      _tk_write_result: {
+        Args: {
+          p_actor: string
+          p_finish_time_seconds?: number
+          p_match_id: string
+          p_result: string
+          p_submission_type_code?: string
+          p_winner_id?: string
+        }
+        Returns: Json
+      }
       _valid_invite_token: { Args: { p_token: string }; Returns: boolean }
+      _validate_arena_ranges: { Args: { p_merged: Json }; Returns: string }
       _validate_highlight_feedback: {
         Args: { p_chips: string[]; p_free_text: string; p_rating: number }
         Returns: string
       }
+      _validate_playback_settings: { Args: { p_merged: Json }; Returns: string }
       _video_repath_is_free: {
         Args: { p_failure_code: string; p_status: string }
         Returns: boolean
@@ -4221,6 +5545,10 @@ export type Database = {
         Args: { p_athlete_id: string }
         Returns: string
       }
+      _weaker_sync_source: {
+        Args: { p_a: string; p_b: string }
+        Returns: string
+      }
       abandon_match_video_upload: {
         Args: { p_video_id: string }
         Returns: Json
@@ -4233,6 +5561,7 @@ export type Database = {
         Args: { p_athlete_id: string; p_gym_id: string }
         Returns: undefined
       }
+      admin_get_server_setting: { Args: { p_key: string }; Returns: Json }
       admin_invite_funnel: {
         Args: { p_channel?: string; p_since: string }
         Returns: Json
@@ -4286,6 +5615,28 @@ export type Database = {
           gym_name: string
         }[]
       }
+      admin_list_no_jiujitsu_matches: {
+        Args: { p_limit?: number; p_since?: string }
+        Returns: {
+          angles_false: number
+          angles_total: number
+          angles_true: number
+          angles_unknown: number
+          cleared_at: string
+          currently_flagged: boolean
+          first_flagged_at: string
+          flag_count: number
+          flagged_at: string
+          latest_verdict_at: string
+          match_completed_at: string
+          match_id: string
+          match_result: string
+          match_status: string
+          match_type: string
+          participants: Json
+          videos: Json
+        }[]
+      }
       admin_list_no_match_videos: {
         Args: { p_limit?: number; p_since?: string }
         Returns: {
@@ -4322,13 +5673,27 @@ export type Database = {
           total_disputes_30d: number
         }[]
       }
+      admin_list_timekeeper_reviews: { Args: never; Returns: Json }
       admin_remove_gym_manager: {
         Args: { p_athlete_id: string; p_gym_id: string }
         Returns: undefined
       }
+      admin_replay_ratings: { Args: { p_dry_run?: boolean }; Returns: Json }
       admin_resolve_content_report: {
         Args: { p_note?: string; p_report_id: string; p_status: string }
         Returns: undefined
+      }
+      admin_resolve_timekeeper_review: {
+        Args: {
+          p_action: string
+          p_finish_time_seconds?: number
+          p_match_id: string
+          p_note?: string
+          p_result?: string
+          p_submission_type_code?: string
+          p_winner_id?: string
+        }
+        Returns: Json
       }
       admin_search_athletes: {
         Args: { p_query: string }
@@ -4352,6 +5717,10 @@ export type Database = {
           p_role: Database["public"]["Enums"]["platform_role"]
         }
         Returns: undefined
+      }
+      admin_set_server_setting: {
+        Args: { p_key: string; p_value: Json }
+        Returns: Json
       }
       app_setting: { Args: { p_name: string }; Returns: string }
       apply_highlight_regeneration: {
@@ -4409,6 +5778,19 @@ export type Database = {
         Returns: Json
       }
       cancel_session_match: { Args: { p_match_id: string }; Returns: Json }
+      cancel_timekeeper_request: {
+        Args: { p_request_id: string }
+        Returns: Json
+      }
+      check_athlete_weight_as_timekeeper: {
+        Args: {
+          p_match_id: string
+          p_subject_id: string
+          p_verdict: string
+          p_weight_seen?: number
+        }
+        Returns: Json
+      }
       check_opponent_weight: {
         Args: { p_match_id: string; p_verdict: string; p_weight_seen?: number }
         Returns: Json
@@ -4483,6 +5865,14 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      claim_playback_backfill: {
+        Args: {
+          p_lease_minutes?: number
+          p_profile: string
+          p_video_id: string
+        }
+        Returns: Json
+      }
       claim_video_for_merging: {
         Args: { p_stale_minutes?: number; p_video_id: string }
         Returns: {
@@ -4502,7 +5892,10 @@ export type Database = {
       }
       cleanup_orphaned_chunk_objects: { Args: never; Returns: number }
       clear_active_avatar: { Args: never; Returns: Json }
-      confirm_match_result: { Args: { p_match_id: string }; Returns: Json }
+      confirm_match_result: {
+        Args: { p_expected_edit_count?: number; p_match_id: string }
+        Returns: Json
+      }
       create_direct_conversation: {
         Args: { p_other_athlete_id: string }
         Returns: Json
@@ -4539,12 +5932,27 @@ export type Database = {
         Args: { p_match_id: string; p_reason?: string }
         Returns: Json
       }
+      edit_match_result: {
+        Args: {
+          p_expected_edit_count?: number
+          p_finish_time_seconds?: number
+          p_match_id: string
+          p_result: string
+          p_submission_type_code?: string
+          p_winner_id?: string
+        }
+        Returns: Json
+      }
       elect_match_primary_video: {
         Args: { p_match_id: string }
         Returns: string
       }
       enable_multi_angle_highlights: { Args: never; Returns: Json }
       end_match: { Args: { p_match_id: string }; Returns: Json }
+      end_match_clock: {
+        Args: { p_final_elapsed_s: number; p_match_id: string }
+        Returns: Json
+      }
       enqueue_highlight_plan: {
         Args: { p_match_video_id: string }
         Returns: string
@@ -4565,6 +5973,10 @@ export type Database = {
       finish_orphaned_storage_sweep: {
         Args: { p_error?: string; p_removed: number; p_run_id: number }
         Returns: boolean
+      }
+      finish_playback_backfill: {
+        Args: { p_error?: string; p_video_id: string }
+        Returns: undefined
       }
       flip_landed_video_reservations: { Args: never; Returns: number }
       get_admin_metrics: { Args: never; Returns: Json }
@@ -4724,7 +6136,12 @@ export type Database = {
       get_my_bookings: { Args: never; Returns: Json }
       get_my_friends: { Args: never; Returns: Json }
       get_my_highlights: {
-        Args: { p_before?: string; p_limit?: number; p_unseen_only?: boolean }
+        Args: {
+          p_before?: string
+          p_before_id?: string
+          p_limit?: number
+          p_unseen_only?: boolean
+        }
         Returns: Json
       }
       get_my_invite_stats: { Args: never; Returns: Json }
@@ -4732,8 +6149,17 @@ export type Database = {
         Args: { p_before?: string; p_before_id?: string; p_limit?: number }
         Returns: Json
       }
+      get_my_timekeeping_match: { Args: never; Returns: Json }
       get_or_create_personal_invite: { Args: never; Returns: Json }
       get_playback_settings: { Args: never; Returns: Json }
+      get_playback_url_target: {
+        Args: { p_rendition?: string; p_video_id: string }
+        Returns: Json
+      }
+      get_rating_stakes: {
+        Args: { p_match_id?: string; p_opponent_id: string }
+        Returns: Json
+      }
       get_recent_activity: {
         Args: { p_limit?: number }
         Returns: {
@@ -4756,6 +6182,12 @@ export type Database = {
           submission_type_display_name: string
         }[]
       }
+      get_timekeeper_candidates: { Args: { p_match_id: string }; Returns: Json }
+      get_timekeeper_match_state: {
+        Args: { p_match_id: string }
+        Returns: Json
+      }
+      get_timekeeper_request: { Args: { p_request_id: string }; Returns: Json }
       get_unread_counts: {
         Args: never
         Returns: {
@@ -4787,12 +6219,16 @@ export type Database = {
       is_highlight_share_enabled: { Args: never; Returns: boolean }
       is_invites_enabled: { Args: never; Returns: boolean }
       is_match_location_required: { Args: never; Returns: boolean }
+      is_match_proximity_required: { Args: never; Returns: boolean }
       is_match_video_participant: {
         Args: { p_video_id: string }
         Returns: boolean
       }
       is_multi_angle_highlights_enabled: { Args: never; Returns: boolean }
+      is_multi_angle_sync_enabled: { Args: never; Returns: boolean }
       is_opponent_weight_check_required: { Args: never; Returns: boolean }
+      is_timekeeper_mode_enabled: { Args: never; Returns: boolean }
+      is_timekeeper_weight_check_enabled: { Args: never; Returns: boolean }
       is_valid_instagram_handle: { Args: { p: string }; Returns: boolean }
       is_video_upload_allowed: {
         Args: { p_athlete_id: string }
@@ -4828,6 +6264,7 @@ export type Database = {
           p_match_id?: string
           p_occurred_at?: string
           p_outcome: string
+          p_source?: string
         }
         Returns: Json
       }
@@ -4838,6 +6275,10 @@ export type Database = {
       mark_highlight_seen: {
         Args: { p_highlight_id: string; p_version: number }
         Returns: undefined
+      }
+      mark_match_ready: {
+        Args: { p_confirm_opponent_weight?: boolean; p_match_id: string }
+        Returns: Json
       }
       mark_practice_match: {
         Args: { p_event: string }
@@ -4858,6 +6299,10 @@ export type Database = {
       }
       match_media_tick: { Args: { p_now?: string }; Returns: number }
       match_result_lock_seconds: { Args: never; Returns: number }
+      match_sync_tick: {
+        Args: { p_limit?: number; p_now?: string }
+        Returns: number
+      }
       match_video_upload_grace: {
         Args: { p_transport: string }
         Returns: string
@@ -4879,6 +6324,42 @@ export type Database = {
         }
         Returns: boolean
       }
+      ops_reprocess_abort: {
+        Args: { p_match_id: string; p_reason?: string }
+        Returns: Json
+      }
+      ops_reprocess_highlights: {
+        Args: {
+          p_allow_single_angle?: boolean
+          p_dry_run?: boolean
+          p_highlight_ids?: string[]
+          p_match_ids?: string[]
+          p_mode: string
+          p_note?: string
+        }
+        Returns: Json
+      }
+      ops_reprocess_revert: { Args: { p_match_id: string }; Returns: Json }
+      ops_reprocess_status: { Args: { p_match_ids?: string[] }; Returns: Json }
+      ops_rerender_highlights: {
+        Args: {
+          p_dry_run?: boolean
+          p_highlight_ids?: string[]
+          p_limit?: number
+          p_rendered_before: string
+        }
+        Returns: Json
+      }
+      ops_rerender_highlights_status: {
+        Args: { p_rendered_before?: string }
+        Returns: Json
+      }
+      ops_rerender_start: {
+        Args: { p_batch?: number; p_rendered_before: string }
+        Returns: Json
+      }
+      ops_rerender_stop: { Args: never; Returns: Json }
+      ops_rerender_tick: { Args: never; Returns: Json }
       orphan_sweep_function_url: { Args: never; Returns: string }
       orphaned_storage_object_candidates: {
         Args: { p_claimable?: boolean; p_limit?: number }
@@ -4891,6 +6372,17 @@ export type Database = {
         Args: { p_chunks: Json; p_video_id: string }
         Returns: Json
       }
+      playback_backfill_candidates: {
+        Args: { p_lease_minutes?: number; p_limit?: number; p_profile?: string }
+        Returns: {
+          attempts: number
+          created_at: string
+          match_id: string
+          playback_profile: string
+          video_id: string
+        }[]
+      }
+      playback_current_profile: { Args: never; Returns: string }
       prepare_highlight_share: {
         Args: { p_highlight_id: string }
         Returns: Json
@@ -4899,12 +6391,29 @@ export type Database = {
       prune_match_media_events: { Args: never; Returns: number }
       prune_match_timekeeper_codes: { Args: never; Returns: number }
       purge_old_location_events: { Args: never; Returns: number }
+      put_playback_url_cache: {
+        Args: {
+          p_expires_at: string
+          p_object_key: string
+          p_signed_url: string
+          p_window_start: string
+        }
+        Returns: string
+      }
       random_match: { Args: { p_session_id: string }; Returns: Json }
       reap_stale_video_reservations: { Args: never; Returns: number }
       reap_stuck_analyzing_chunks: { Args: never; Returns: number }
       reap_stuck_highlights: { Args: never; Returns: number }
       reap_stuck_match_plans: { Args: { p_now?: string }; Returns: number }
       reap_stuck_slicing_videos: { Args: never; Returns: number }
+      reconcile_match_footage_verdicts: {
+        Args: { p_match_ids?: string[] }
+        Returns: number
+      }
+      reconcile_recent_match_footage_verdicts: {
+        Args: { p_limit?: number; p_window?: string }
+        Returns: number
+      }
       record_ai_processing_consent: {
         Args: { p_version?: string }
         Returns: string
@@ -4944,6 +6453,7 @@ export type Database = {
       report_match_presence: {
         Args: {
           p_accuracy_m: number
+          p_captured_at?: string
           p_challenge_id?: string
           p_context: string
           p_invite_id?: string
@@ -4968,7 +6478,16 @@ export type Database = {
         Args: { p_plan_id: string }
         Returns: undefined
       }
+      request_match_sync: { Args: { p_match_id: string }; Returns: Json }
+      request_match_timekeeper: {
+        Args: { p_invitee_id: string; p_match_id: string }
+        Returns: Json
+      }
       request_pending_video_slices: { Args: never; Returns: number }
+      request_playback_backfill: {
+        Args: { p_dry_run?: boolean; p_limit?: number; p_profile?: string }
+        Returns: Json
+      }
       request_video_slice: { Args: { p_video_id: string }; Returns: undefined }
       resolve_dispute: {
         Args: {
@@ -4978,6 +6497,11 @@ export type Database = {
         }
         Returns: Json
       }
+      respond_timekeeper_request: {
+        Args: { p_accept: boolean; p_request_id: string }
+        Returns: Json
+      }
+      result_edit_rerender_tick: { Args: never; Returns: Json }
       resume_match: { Args: { p_match_id: string }; Returns: Json }
       retry_failed_chunks: { Args: never; Returns: number }
       retry_highlight_render: {
@@ -5095,6 +6619,16 @@ export type Database = {
         Args: { p_normalized_path: string; p_video_id: string }
         Returns: undefined
       }
+      set_match_video_playback_renditions: {
+        Args: {
+          p_expected_storage_path: string
+          p_normalized_path: string
+          p_playback_360_path: string
+          p_profile: string
+          p_video_id: string
+        }
+        Returns: Json
+      }
       set_match_video_sync: {
         Args: {
           p_confidence: number
@@ -5136,7 +6670,9 @@ export type Database = {
         Args: { p_limit?: number; p_now?: string }
         Returns: number
       }
+      timekeeper_mode_tick: { Args: never; Returns: Json }
       toggle_scoutable: { Args: { p_scoutable: boolean }; Returns: boolean }
+      touch_match_timekeeper: { Args: { p_match_id: string }; Returns: Json }
       touch_match_video_upload: {
         Args: {
           p_bytes_confirmed: number

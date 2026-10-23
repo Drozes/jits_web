@@ -5,7 +5,9 @@
  * and overlays": a blocking prompt that must be answered); the hardware back
  * answers "Not now". "Read the Privacy Policy" closes the prompt (unanswered,
  * so recording stays off) and opens the policy at section 4, Match video and
- * AI analysis; the athlete turns the toggle on again after reading.
+ * AI analysis; the athlete turns the toggle on again after reading. `body`
+ * swaps the text for one role (the timekeeper's, jits-o47s.46); the title,
+ * link and buttons never change.
  */
 import * as React from "react";
 import { Modal, Pressable, Text, View } from "react-native";
@@ -23,9 +25,11 @@ export interface AiConsentSheetProps {
   onNotNow: () => void;
   /** The privacy link was tapped: the host closes the prompt without an answer. */
   onDismiss: () => void;
+  /** The body text; defaults to the athlete's `AI_CONSENT_COPY.body`. */
+  body?: string;
 }
 
-export function AiConsentSheet({ visible, busy, error, onAllow, onNotNow, onDismiss }: AiConsentSheetProps) {
+export function AiConsentSheet({ visible, busy, error, onAllow, onNotNow, onDismiss, body = AI_CONSENT_COPY.body }: AiConsentSheetProps) {
   const router = useRouter();
   const animationType = useModalAnimation("fade");
   const openPrivacy = () => {
@@ -40,7 +44,7 @@ export function AiConsentSheet({ visible, busy, error, onAllow, onNotNow, onDism
             {AI_CONSENT_COPY.title}
           </Text>
           <Text testID="ai-consent-body" className="font-body text-callout leading-6 text-ink">
-            {AI_CONSENT_COPY.body}
+            {body}
           </Text>
           <Pressable testID="ai-consent-privacy" accessibilityRole="link" disabled={busy} onPress={openPrivacy} hitSlop={8} className="self-start">
             <Text className="font-body text-body text-ink underline">{AI_CONSENT_COPY.privacyLink}</Text>

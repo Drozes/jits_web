@@ -14,7 +14,21 @@ const scenario: Scenario = {
     const challengeId = await redChallengesBlue(ctx, red);
     await ctx.step("Blue declines", () => ctx.ui.declinePrompt());
     const outcome = await ctx.step("Red is told", () => red.waitOutgoingOutcome(T.prompt));
-    ctx.eq("bot:declined-via-broadcast", { kind: "declined", via: "broadcast" }, outcome);
+    ctx.eq("bot:red-told-declined", "declined", outcome.kind);
+    // The app declines with the RPC first and broadcasts `declined` after
+    // it (use-arena-challenge.ts `decline`), so the challenger's status
+    // UPDATE and the broadcast race; whichever lands first only ends the
+    // waiting plate. What must hold is that the broadcast was delivered too.
+    ctx.oracle("bot:declined-first-signal", true, "informational", outcome.kind === "declined" ? outcome.via : null);
+    await ctx.expect("bot:declined-broadcast-received", true, async () => {
+      await red.events.waitFor(
+        "the declined broadcast on the challenge topic",
+        (e) => e.kind === "declined" && e.challengeId === challengeId,
+        T.broadcast,
+        0, // filtered by the challenge id
+      );
+      return true;
+    });
     await ctx.step("prompt dismissed", () => ctx.ui.waitPromptGone(8_000));
     const ch = await db.challenge(challengeId);
     ctx.eq("db:challenge-declined", "declined", ch?.status);

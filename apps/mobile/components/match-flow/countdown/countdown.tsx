@@ -15,6 +15,8 @@ import { FaceoffChip, type FaceoffAthlete } from "../faceoff/faceoff-top";
 
 /** 3, 2, 1: the countdown runs this long from the server's `started_at`. */
 export const COUNTDOWN_MS = 3_000;
+/** The caption under the bar: both phones count down together. */
+export const COUNTDOWN_CAPTION = "SYNCED TO SERVER CLOCK · BOTH PHONES";
 const EASE = easing.brandOut;
 /** Countdown slam: each numeral (and GO) drops in from this scale... */
 export const SLAM_FROM_SCALE = 1.6;
@@ -42,6 +44,11 @@ interface CountdownProps {
   /** The match's rated weights (from the challenge), lbs. */
   myWeight: number | null;
   opponentWeight: number | null;
+  /**
+   * The caption under the bar (timekeeper mode ARCHITECTURE 2.3). Default
+   * `COUNTDOWN_CAPTION`, the two-athlete one.
+   */
+  caption?: string;
 }
 
 /**
@@ -65,7 +72,15 @@ export function numeralSize(windowHeight: number): number {
  * `LiveStage`). Reduce Motion crossfades the numerals (no slam); the bar
  * still drains and the haptics are kept. Over the camera it is dark in both app themes (ON_MEDIA).
  */
-export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWeight }: CountdownProps) {
+export function Countdown({
+  goAt,
+  recording,
+  me,
+  opponent,
+  myWeight,
+  opponentWeight,
+  caption = COUNTDOWN_CAPTION,
+}: CountdownProps) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const landscape = window.width > window.height;
@@ -205,7 +220,7 @@ export function Countdown({ goAt, recording, me, opponent, myWeight, opponentWei
         </View>
         {/* Landscape has no room under the numeral for the caption or the
             athlete chip; the numeral and the bar carry it there. */}
-        {landscape ? null : <Mono color={ON_MEDIA.text2}>SYNCED TO SERVER CLOCK {"·"} BOTH PHONES</Mono>}
+        {landscape ? null : <Mono color={ON_MEDIA.text2}>{caption}</Mono>}
       </View>
       {landscape ? null : (
         <View testID="countdown-chip" style={{ position: "absolute", left: 16, right: 16, bottom: Math.max(insets.bottom, 16) + 26 }}>

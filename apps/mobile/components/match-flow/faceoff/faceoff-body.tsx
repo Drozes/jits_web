@@ -1,7 +1,8 @@
 import * as React from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { CameraOff } from "lucide-react-native";
-import { useViewerStakes } from "@/lib/match-flow/use-viewer-stakes";
+import { weightDivisionGap } from "@/lib/match-flow/weight-division";
+import { TIMEKEEPER_COPY } from "@/lib/match-flow/timekeeper-copy";
 import { useAiConsentGate } from "@/lib/moderation/use-ai-consent-gate";
 import { AiConsentSheet } from "@/components/moderation/ai-consent-sheet";
 import { useRecordingSpaceWarning } from "@/lib/video/recording-space";
@@ -9,44 +10,62 @@ import { usePalette } from "@/lib/theme/palette";
 import { Switch } from "@/components/ui/switch";
 import { FIGHT_RADIUS } from "../fight/fight-tokens";
 import { TRACKING, typeStep } from "@/lib/typography";
-import { FightButton, Mono, StakesStrip, StatusPlate, shortName } from "../fight/fight-ui";
+import { FightButton, Mono, StatusPlate, shortName } from "../fight/fight-ui";
 import { useFaceoffContext } from "./faceoff-context";
 import { WeightCheckPanel, WeightCheckPlate } from "./faceoff-weight-check";
-import type { FaceoffAthlete } from "./faceoff-top";
+import { MergedReady } from "./merged-ready";
+import { TimekeeperRow } from "./timekeeper-row";
+import type { FaceoffParticipant } from "./faceoff-top";
 
 interface FaceoffBodyProps {
   phase: "weight" | "ready";
-  me: FaceoffAthlete;
-  opponent: FaceoffAthlete;
+  me: FaceoffParticipant;
+  opponent: FaceoffParticipant;
+  /**
+   * This match. Not read since the stakes read went (A11, O1); kept because
+   * the step renderer (slice M1's file) passes it.
+   */
+  matchId?: string | null;
   /** The match length, for the recording's free-space estimate. */
   durationSeconds?: number | null;
 }
 
 /**
  * The face-off below the header (and, on the ready phase, below the camera
- * the wizard renders between the two): stakes and weigh-in status, then the
- * recording opt-in and the ready handshake.
+ * the wizard renders between the two): the weight gap and weigh-in status,
+ * then the recording opt-in and the ready handshake. No rating stakes, in
+ * either mode (timekeeper mode spec 2.3 item 1, A11, O1).
+ *
+ * Timekeeper mode, an athlete (the face-off's `timekeeper` view; spec 4.2
+ * Weigh-in and Ready): the same weigh-in plus the timekeeper's row (TK-F1 to
+ * TK-F3) on both phases; the opponent check moves into the merged ready
+ * (`MergedReady`, TK-F4), and ready is the server's. No "No one is
+ * recording" alert there: the timekeeper always records.
  */
 export function FaceoffBody(props: FaceoffBodyProps) {
   return props.phase === "weight" ? <WeighIn {...props} /> : <ReadyCheck {...props} />;
 }
 
-function WeighIn({ me, opponent }: FaceoffBodyProps) {
+function WeighIn({ opponent }: FaceoffBodyProps) {
   const f = useFaceoffContext();
   const p = usePalette();
-  // Priced on the challenge's rated weights, exactly as record_match_result
-  // will rate it (a missing one means no gap), and only once they are read.
-  const stakes = useViewerStakes(f.weightsRated, me.current_elo, opponent.current_elo, f.myWeight, f.opponentWeight);
-  const gap = stakes?.weight_division_gap ?? 0;
   const both = f.myWeight != null && f.opponentWeight != null;
   const diff = both ? Math.round(Math.abs(f.myWeight! - f.opponentWeight!) * 10) / 10 : null;
-  const division = !stakes ? null : gap > 0 ? `${gap} ${gap > 1 ? "DIVISIONS" : "DIVISION"} APART` : "SAME DIVISION";
+  // The division gap from the two rated (challenge) weights, as
+  // record_match_result rates it (A28): computed here, no server read. None
+  // from profile stand-ins (no division line until the rated weights are
+  // read). A missing rated weight is gap 0, the server's own rule (both
+  // record_match_result and get_rating_stakes set v_gap := 0), so the line
+  // reads SAME DIVISION as it shipped. A reweigh changes the weights and so this.
+  const gap = f.weightsRated ? (both ? weightDivisionGap(f.myWeight!, f.opponentWeight!) : 0) : null;
+  const division = gap === null ? null : gap > 0 ? `${gap} ${gap > 1 ? "DIVISIONS" : "DIVISION"} APART` : "SAME DIVISION";
   const gapLine = [diff != null ? `${diff} LBS APART` : null, division].filter(Boolean).join(" · ");
-  const oppName = shortName(opponent.display_name).toUpperCase();
+  const oppName = shortName(opponent.displayName).toUpperCase();
   const cta = f.myWeight != null ? `Confirm ${Number(f.myWeight.toFixed(1))} lbs` : "Confirm weight";
   // Once my weight is in, the opponent's plate becomes my check of their
-  // weigh-in (board P-Faceoff-Weight), when this match has checks.
-  const checking = f.myWeighed && f.weightCheck.active;
+  // weigh-in (board P-Faceoff-Weight), when this match has checks. In
+  // timekeeper mode that check is the merged ready's, on the ready phase.
+  const checking = !f.timekeeper && f.myWeighed && f.weightCheck.active;
 
   return (
     <View style={{ gap: 20 }}>
@@ -57,12 +76,9 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
           <Mono size="caption">{gapLine}</Mono>
         </View>
       ) : null}
-      {stakes ? (
-        <StakesStrip testID="weight-stakes" win={stakes.challenger_win} draw={stakes.challenger_draw} loss={stakes.challenger_loss} />
-      ) : null}
-      {gap > 0 ? (
+      {gap !== null && gap > 0 ? (
         <Text testID="weight-gap-note" className="font-body" style={[typeStep("body"), { color: p.text2 }]}>
-          The heavier athlete{"’"}s rating is adjusted for the weight gap.
+          {TIMEKEEPER_COPY["TK-WG1"]}
         </Text>
       ) : null}
       <View style={{ flexDirection: "row", gap: 12 }}>
@@ -79,8 +95,9 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
           />
         )}
       </View>
+      {f.timekeeper ? <TimekeeperRow timekeeper={f.timekeeper} /> : null}
       {checking ? (
-        <WeightCheckPanel opponentDisplayName={opponent.display_name} />
+        <WeightCheckPanel opponentDisplayName={opponent.displayName} />
       ) : (
         <FightButton
           testID="weight-confirm"
@@ -97,7 +114,7 @@ function WeighIn({ me, opponent }: FaceoffBodyProps) {
 function ReadyCheck({ opponent, durationSeconds }: FaceoffBodyProps) {
   const f = useFaceoffContext();
   const p = usePalette();
-  const oppName = shortName(opponent.display_name).toUpperCase();
+  const oppName = shortName(opponent.displayName).toUpperCase();
   return (
     <View style={{ gap: 16 }}>
       {f.recording ? null : (
@@ -110,23 +127,32 @@ function ReadyCheck({ opponent, durationSeconds }: FaceoffBodyProps) {
         </View>
       )}
       <RecordingPanel oppName={oppName} durationSeconds={durationSeconds ?? null} />
-      <View style={{ flexDirection: "row", gap: 12 }}>
-        <StatusPlate label={f.myReady ? "YOU · READY" : "YOU · NOT READY"} done={f.myReady} accessibilityLabel={`You, ${f.myReady ? "ready" : "waiting"}`} />
-        {/* The testID and the "Opponent, ready|waiting" label stay fixed: the
-            match-loop harness reads both. */}
-        <StatusPlate
-          testID="ready-panel-opponent"
-          label={`${oppName} · ${f.opponentReady ? "READY" : "NOT READY"}`}
-          done={f.opponentReady}
-          align="right"
-          accessibilityLabel={`Opponent, ${f.opponentReady ? "ready" : "waiting"}`}
-        />
-      </View>
-      {f.weightCheck.active && !f.weightCheck.canStart && !f.starting ? (
+      {/* In timekeeper mode each athlete's ready state is status text in the
+          face-off chip above (FaceoffChip `readiness`, jits-o47s.45): these
+          dashed plates read as buttons. A two-athlete match keeps them, as
+          the flag-OFF golden snapshot pins. */}
+      {f.timekeeper ? null : (
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <StatusPlate label={f.myReady ? "YOU · READY" : "YOU · NOT READY"} done={f.myReady} accessibilityLabel={`You, ${f.myReady ? "ready" : "waiting"}`} />
+          {/* The testID and the "Opponent, ready|waiting" label stay fixed: the
+              match-loop harness reads both. */}
+          <StatusPlate
+            testID="ready-panel-opponent"
+            label={`${oppName} · ${f.opponentReady ? "READY" : "NOT READY"}`}
+            done={f.opponentReady}
+            align="right"
+            accessibilityLabel={`Opponent, ${f.opponentReady ? "ready" : "waiting"}`}
+          />
+        </View>
+      )}
+      {f.timekeeper ? <TimekeeperRow timekeeper={f.timekeeper} /> : null}
+      {f.timekeeper ? (
+        <MergedReady opponentDisplayName={opponent.displayName} timekeeper={f.timekeeper} />
+      ) : f.weightCheck.active && !f.weightCheck.canStart && !f.starting ? (
         // The weight gate (jr_be-ahn.4): a flag or a recheck holds the match,
         // and so does a check still owed while the rollout flag is on.
         <View testID="ready-weight-hold" style={{ gap: 12 }}>
-          <WeightCheckPanel opponentDisplayName={opponent.display_name} />
+          <WeightCheckPanel opponentDisplayName={opponent.displayName} />
           <FightButton testID="ready-button" label="I'm ready" height={72} onPress={f.tapReady} disabled />
           <View style={{ alignItems: "center" }}>
             <Mono>{f.weightCheck.blocked ? "MATCH ON HOLD · WEIGHT CHECK" : "WAITING FOR WEIGHT CHECKS"}</Mono>
@@ -161,7 +187,8 @@ function RecordingPanel({ oppName, durationSeconds }: { oppName: string; duratio
   const lowSpace = useRecordingSpaceWarning(f.recording, durationSeconds);
   // "Before you film" stands in front of the first ON (5.1.2(i)).
   const consent = useAiConsentGate();
-  const nobody = !f.recording && f.opponentRecording === false;
+  // Never in timekeeper mode: the timekeeper always records (TK-K9, D12).
+  const nobody = !f.timekeeper && !f.recording && f.opponentRecording === false;
   const oppLabel =
     f.opponentRecording == null ? `${oppName} · CHOOSING` : f.opponentRecording ? `${oppName} RECORDING` : `${oppName} NOT RECORDING`;
   return (

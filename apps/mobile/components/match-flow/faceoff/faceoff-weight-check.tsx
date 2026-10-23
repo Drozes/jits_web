@@ -36,6 +36,14 @@ export function WeightCheckPlate({ opponentName }: { opponentName: string }) {
  * blocking decision): my verdict on the opponent's weight, my open flag
  * (Withdraw), or the opponent's flag on me (re-weigh). Renders nothing when
  * no action or notice is due.
+ *
+ * "Waiting for {opp} to check your new weight." sits BELOW the actions,
+ * never above them (timekeeper mode PM31 (1)): it goes away when the
+ * opponent re-checks, a change this athlete does not make, and above the
+ * verdict its going moved `Confirm` and `Doesn't look right` up by its own
+ * height, so a tap meant for `Confirm` could land on the flag. Under the
+ * actions it also keeps its slot while they stay (`HeldNotice`, keyed to
+ * them), because content that shrinks below them moves them too on Android.
  */
 export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName: string }) {
   const f = useFaceoffContext();
@@ -55,11 +63,7 @@ export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName:
   const sections: React.ReactNode[] = [];
 
   if (w.mustReweigh) {
-    sections.push(<ReweighPrompt key="reweigh" opp={opp} />);
-  } else if (w.awaitingTheirRecheck) {
-    sections.push(
-      <Notice key="await-recheck" testID="weight-await-recheck" text={`Waiting for ${opp} to check your new weight.`} />,
-    );
+    sections.push(<ReweighPrompt key="reweigh" notice={`${opp} says your weight doesn't look right. Re-weigh to continue.`} />);
   }
 
   if (w.myFlagOpen) {
@@ -108,6 +112,13 @@ export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName:
     );
   }
 
+  // Under the actions, its slot kept while they stay, keyed to them so it goes with them (PM31 (1)).
+  const actions = w.myFlagOpen ? "flag-open" : w.needsMyVerdict ? "verdict" : null;
+  const recheck = !w.mustReweigh && w.awaitingTheirRecheck;
+  if (actions || recheck) {
+    sections.push(<HeldNotice key={`await-recheck-${actions}`} show={recheck} testID="weight-await-recheck" text={`Waiting for ${opp} to check your new weight.`} />);
+  }
+
   if (sections.length === 0 && w.awaitingTheirCheck) {
     sections.push(<Notice key="await" testID="weight-await-check" text={`Waiting for ${opp} to check your weight.`} />);
   }
@@ -115,7 +126,8 @@ export function WeightCheckPanel({ opponentDisplayName }: { opponentDisplayName:
   return <View style={{ gap: 16 }}>{sections}</View>;
 }
 
-function Notice({ text, alert = false, testID }: { text: string; alert?: boolean; testID?: string }) {
+/** An amber attention notice (also the timekeeper-mode merged ready's, `merged-ready.tsx`). */
+export function Notice({ text, alert = false, testID }: { text: string; alert?: boolean; testID?: string }) {
   const p = usePalette();
   return (
     <View
@@ -142,8 +154,41 @@ function Notice({ text, alert = false, testID }: { text: string; alert?: boolean
   );
 }
 
-/** The flagged athlete's re-weigh: a new rated weight for this match only. */
-function ReweighPrompt({ opp }: { opp: string }) {
+/**
+ * A notice whose slot outlives it (timekeeper mode PM31 (1)): once it has
+ * shown, it keeps its place when `show` turns false, the same notice at the
+ * same height but invisible and hidden from screen readers, until this
+ * element unmounts (its section goes, or its key changes). So once shown,
+ * neither its going nor its coming back changes the content's height. A
+ * notice under the face-off's actions needs this: when the scroll content
+ * shrinks, Android's ScrollView clamps its offset (react-native 0.81
+ * `ReactScrollView.onLayoutChange`), so for an athlete scrolled to the end
+ * the actions above a notice that went away moved down by its height. Its
+ * first showing only grows the content under them, which moves nothing.
+ */
+export function HeldNotice({ show, text, testID }: { show: boolean; text: string; testID: string }) {
+  const [shown, setShown] = React.useState(show);
+  if (show && !shown) setShown(true);
+  if (show) return <Notice testID={testID} text={text} />;
+  if (!shown) return null;
+  return (
+    <View
+      testID={`${testID}-held`}
+      style={{ opacity: 0 }}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Notice text={text} />
+    </View>
+  );
+}
+
+/**
+ * The flagged athlete's re-weigh: a new rated weight for this match only.
+ * `notice` says who flagged it (the opponent here; the timekeeper, TK-F7, in
+ * the timekeeper-mode merged ready).
+ */
+export function ReweighPrompt({ notice }: { notice: string }) {
   const f = useFaceoffContext();
   const p = usePalette();
   const [text, setText] = React.useState(f.myWeight != null ? String(f.myWeight) : "");
@@ -151,7 +196,7 @@ function ReweighPrompt({ opp }: { opp: string }) {
   const valid = text.trim() !== "" && isValidReweigh(value);
   return (
     <View testID="weight-reweigh" style={{ gap: 12 }}>
-      <Notice text={`${opp} says your weight doesn't look right. Re-weigh to continue.`} alert />
+      <Notice text={notice} alert />
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
         <TextInput
           testID="weight-reweigh-input"

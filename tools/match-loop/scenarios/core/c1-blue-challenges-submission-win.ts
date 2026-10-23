@@ -25,7 +25,7 @@ const scenario: Scenario = {
     const red = await ctx.bot("red");
     await red.goLive();
     await checkBlueInLobbyBeforeMatch(ctx, red);
-    const stakes = await stakesFor(red);
+    const stakes = await stakesFor(ctx, red);
     const h = await blueChallengesRed(ctx, red);
     const side = await ctx.matchSide(red, h.matchId);
     await blueOnWeight(ctx);
@@ -34,13 +34,13 @@ const scenario: Scenario = {
     await blueEnds(ctx, side);
     await blueRecordsSubmission(ctx, side, ctx.ids.blue, "armbar", "90");
     await bothConfirm(ctx, side);
-    await checkSummary(ctx, "YOU WON", stakes.challenger_win);
+    await checkSummary(ctx, "YOU WON", { matchId: h.matchId, stake: stakes?.challenger_win ?? null });
     await checkDecisiveDb(ctx, {
       handshake: h,
       winner: ctx.ids.blue,
       loser: ctx.ids.red,
-      winnerDelta: stakes.challenger_win,
-      loserDelta: stakes.opponent_loss,
+      winnerDelta: stakes?.challenger_win ?? null,
+      loserDelta: stakes?.opponent_loss ?? null,
       code: "armbar",
       finish: 90,
       confirmations: 2,

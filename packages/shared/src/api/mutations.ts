@@ -17,6 +17,7 @@ import {
   type AdminCard,
   type AdminCardStatus,
 } from "./queries";
+import { mapTimekeeperError } from "./timekeeper";
 
 type Client = SupabaseClient<Database>;
 
@@ -634,9 +635,11 @@ export async function createInSessionMatch(
 }
 
 /**
- * Cancel a still-pending session match (ready-check abort). Marks the match
- * cancelled and releases BOTH session participants back to 'available'. Caller
- * must be one of the two competitors and the match must still be 'pending'.
+ * Cancel a still-pending match: the mobile face-off's Leave (an Arena match)
+ * and web's session ready-check abort. Marks the match cancelled; a session
+ * match also releases BOTH session participants back to 'available' (an
+ * Arena match has none). Caller must be one of the two competitors and the
+ * match must still be 'pending'. The session-era name stays: web shares it.
  */
 export async function cancelSessionMatch(
   supabase: Client,
@@ -752,17 +755,31 @@ export async function endMatch(
   return { ok: true, data: undefined };
 }
 
-/** Confirm the recorded match result. Auto-finalizes when both participants confirm. */
+/**
+ * Confirm the recorded match result. Auto-finalizes when both participants confirm.
+ *
+ * `expectedEditCount` is for timekeeper mode only (jits_web specs/timekeeper-mode
+ * R18, A8; jr_be 024 4.5): the `result_edit_count` of the result this athlete
+ * confirms. The server refuses a stale (or missing) count in a timekeeper-mode
+ * match with RESULT_CHANGED, so a confirm can never land on a result the
+ * timekeeper has since edited. Omitted, the call is exactly the two-athlete
+ * confirm, argument for argument, and its errors map as before (an older
+ * backend without the parameter is never sent it: only a timekeeper-mode
+ * match, which needs the new backend, passes one).
+ */
 export async function confirmMatchResult(
   supabase: Client,
   matchId: string,
+  expectedEditCount?: number,
 ): Promise<Result<void>> {
-  const { data, error } = await supabase.rpc("confirm_match_result", {
-    p_match_id: matchId,
-  });
+  const timekeeperMode = expectedEditCount != null;
+  const { data, error } = await supabase.rpc(
+    "confirm_match_result",
+    timekeeperMode ? { p_match_id: matchId, p_expected_edit_count: expectedEditCount } : { p_match_id: matchId },
+  );
 
   if (error) {
-    return { ok: false, error: mapPostgrestError(error) };
+    return { ok: false, error: timekeeperMode ? mapTimekeeperError(error) : mapPostgrestError(error) };
   }
 
   const response = data as unknown as { success: boolean; error?: string };

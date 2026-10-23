@@ -28,13 +28,22 @@ export async function stepOrNull(ui: Screens, step: string, timeoutMs: number): 
   }
 }
 
-/** Normalise a rendered ELO delta ("▲ +16" / "▼ 8") to a signed number. */
+/**
+ * Normalise a rating delta to a signed number: the rendered chip ("▲ +16" /
+ * "▼ 8"), or the verdict rating card's spoken label ("Rating 1001, up 1" /
+ * "Rating 990, down 10"; `RatingMoment` makes the card one accessible
+ * element, so idb reports the card and not the chip inside it). A card with
+ * no change reads just "Rating N": null, as when no chip renders.
+ */
 export function parseDelta(label: string | null): number | null {
   if (!label) return null;
   // "▲ +14" / "▼ −9" (U+2212, the redesigned verdict) / "▼ 9" (older builds).
   const m = label.match(/([▲▼])\s*[+\u2212-]?(\d+)/);
-  if (!m) return null;
-  return m[1] === "▲" ? Number(m[2]) : -Number(m[2]);
+  if (m) return m[1] === "▲" ? Number(m[2]) : -Number(m[2]);
+  // `spokenDelta` (components/ui/elo-system/delta-chip.tsx).
+  const spoken = label.match(/^Rating -?\d+, (up|down) (\d+)$/);
+  if (spoken) return spoken[1] === "up" ? Number(spoken[2]) : -Number(spoken[2]);
+  return null;
 }
 
 /** A toast seen on screen. `type` is from the BrandToast testID (`toast-<type>`). */

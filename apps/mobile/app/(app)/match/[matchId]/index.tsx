@@ -10,11 +10,15 @@
  * The route is deliberately generic rather than `/arena/match/[matchId]`: a
  * sessionless match is a match, and the only Arena-specific thing about it is
  * where its exits point.
+ *
+ * `/match/<id>` resolves here (`match/[matchId]/index`): the folder also holds
+ * `match/[matchId]/timekeep`, the asked person's sheet in timekeeper mode
+ * (spec 8, `timekeep_href`). The URL, every `exitMatchTo` target and the
+ * push `match_href` are unchanged by the folder.
  */
 import * as React from "react";
 import { ActivityIndicator, View } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
-import { usePreventRemove } from "@react-navigation/native";
 import { useRequireAthlete } from "@/lib/auth/hooks";
 import { useThemedTokens } from "@/lib/theme/use-theme";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
@@ -24,6 +28,7 @@ import type { MatchStep } from "@/lib/match-flow/step-router";
 import { AppHeader } from "@/components/layout/app-header";
 import { ARENA_EXIT_LABEL, ARENA_HREF } from "@/lib/arena/constants";
 import { useArenaMatchScreen } from "@/lib/arena/arena-store";
+import { useMatchExitGuard } from "@/lib/match-flow/use-match-exit-guard";
 
 /**
  * Steps where a live match is in flight and leaving via a back gesture would
@@ -37,12 +42,15 @@ const GUARDED_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>([
 ]);
 
 /**
- * The face-off: no swipe back either (leaving there without cancelling left
- * the match pending with nobody in it, jits-bh2v). Not a preventRemove
- * guard, so the face-off's own exits (Leave, a remote cancel) still
- * navigate; its Leave control and Android back both confirm and cancel.
+ * The face-off, and timekeeper mode's pick before it (`crew`): no swipe back
+ * either (leaving there without cancelling left the match pending with
+ * nobody in it, jits-bh2v). Not a preventRemove guard, so their own exits
+ * (Leave, a remote cancel) still navigate; an athlete's Leave control and
+ * Android back both confirm and cancel (the face-off's `FaceoffTop`, the
+ * crew step's `useCrewLeave`, spec 4.3). The timekeeper's face-off Leave is
+ * a drop-out, not a cancel (TK-K14, slices M3 and M4).
  */
-const NO_SWIPE_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>(["weight", "ready"]);
+const NO_SWIPE_STEPS: ReadonlySet<MatchStep> = new Set<MatchStep>(["crew", "weight", "ready"]);
 
 export default function ArenaMatchScreen() {
   const tokens = useThemedTokens();
@@ -55,9 +63,10 @@ export default function ArenaMatchScreen() {
 
   // No in-app "leave and confirm later" exit (jits-02vo.7): closing the app
   // is allowed, and the backend confirms an undisputed result once its lock
-  // window passes (jr_be-ahn.5).
+  // window passes (jr_be-ahn.5). A timekeeper-mode no contest is the one
+  // exit the guard lets through (`useMatchExitGuard`).
   const guarded = step != null && GUARDED_STEPS.has(step);
-  usePreventRemove(guarded, () => {});
+  useMatchExitGuard(guarded);
   const swipeable = !guarded && !(step != null && NO_SWIPE_STEPS.has(step));
 
   if (authLoading || !athlete) {

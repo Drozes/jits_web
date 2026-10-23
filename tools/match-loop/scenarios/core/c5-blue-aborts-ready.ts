@@ -1,5 +1,5 @@
 import type { Scenario } from "../context";
-import { blueChallengesRed, blueOnWeight, checkAbortDb, checkBlueInLobbyBeforeMatch, checkLiveAfterExit, checkOfflineInMatch, prepare, T } from "../flows";
+import { blueChallengesRed, blueConfirmsWeights, blueOnWeight, checkAbortDb, checkBlueInLobbyBeforeMatch, checkLiveAfterExit, checkOfflineInMatch, prepare, T } from "../flows";
 
 const scenario: Scenario = {
   id: "C5",
@@ -15,10 +15,8 @@ const scenario: Scenario = {
     await blueOnWeight(ctx);
     await checkOfflineInMatch(ctx, red);
     const botReady = side.confirmWeights().then(() => side.readyAndStart(T.handshake));
-    await ctx.step("Blue confirms weights", async () => {
-      await ctx.ui.confirmWeights();
-      await ctx.ui.waitStep("ready", T.step);
-    });
+    botReady.catch(() => undefined); // awaited below; never an unhandled rejection
+    await blueConfirmsWeights(ctx, h.matchId);
     // Cancel only once Red is on the ready step and has readied (the case where
     // Red is still on the weight step is E3B: the weight step's channel).
     await ctx.step("Red is ready (Blue's opponent panel)", async () => {
