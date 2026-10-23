@@ -145,12 +145,18 @@ export async function loadAiConsent(athleteId: string | null): Promise<void> {
 
 /**
  * "Allow and film" on the `text` sheet: record consent on the server (keeping
- * a current consent to the other text), then mirror it.
+ * a current consent to the other text), then mirror it. The version is
+ * composed from a fresh server read, so a consent to the other text given
+ * on another device since this one last read is never dropped; when that
+ * read fails, from the last version this device knows.
  */
 export async function giveAiConsent(text: AiConsentText = "athlete"): Promise<boolean> {
   const athleteId = state.athleteId;
   if (!athleteId) return false;
-  const version = composeConsentVersion(state.version, text);
+  const fresh = await getAiProcessingConsent(moderationClient(), athleteId);
+  if (state.athleteId !== athleteId) return false;
+  const prior = fresh.ok ? (fresh.data.consentAt ? fresh.data.version : null) : state.version;
+  const version = composeConsentVersion(prior, text);
   const res = await recordAiProcessingConsent(moderationClient(), version);
   if (!res.ok) return false;
   if (state.athleteId !== athleteId) return false;

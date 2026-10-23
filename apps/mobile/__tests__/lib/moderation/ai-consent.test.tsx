@@ -219,6 +219,41 @@ describe("per-text consent (jits-o47s.46)", () => {
     expect(mockApi.recordAiProcessingConsent).toHaveBeenLastCalledWith(expect.anything(), `${A}+${T}`);
   });
 
+  it("composes from a fresh server read: a timekeeper consent given on another device is kept", async () => {
+    // This device last read no consent at all.
+    await loadAiConsent("me");
+    expect(hasAnyAiConsentFor("me")).toBe(false);
+    // Meanwhile the timekeeper text was agreed to on another device.
+    given(T);
+    await act(async () => {
+      await giveAiConsent("athlete");
+    });
+    expect(mockApi.recordAiProcessingConsent).toHaveBeenLastCalledWith(expect.anything(), `${A}+${T}`);
+    expect(hasAiConsentFor("me", "athlete")).toBe(true);
+    expect(hasAiConsentFor("me", "timekeeper")).toBe(true);
+  });
+
+  it("a failed fresh read falls back to the version this device knows", async () => {
+    given(A);
+    await loadAiConsent("me");
+    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: false, error: { hint: "unknown", message: "" } });
+    await act(async () => {
+      await giveAiConsent("timekeeper");
+    });
+    expect(mockApi.recordAiProcessingConsent).toHaveBeenLastCalledWith(expect.anything(), `${A}+${T}`);
+  });
+
+  it("a fresh read showing consent withdrawn composes from nothing", async () => {
+    given(A);
+    await loadAiConsent("me");
+    given(null);
+    await act(async () => {
+      await giveAiConsent("timekeeper");
+    });
+    expect(mockApi.recordAiProcessingConsent).toHaveBeenLastCalledWith(expect.anything(), T);
+    expect(hasAiConsentFor("me", "athlete")).toBe(false);
+  });
+
   it("the first consent records only its own text's version", async () => {
     await loadAiConsent("me");
     await act(async () => {
