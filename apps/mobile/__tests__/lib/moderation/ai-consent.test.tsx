@@ -10,16 +10,19 @@ const mockToastInfo = jest.fn();
 jest.mock("@/components/ui/toast", () => ({ toast: { info: (m: string) => mockToastInfo(m), success: jest.fn(), error: jest.fn() } }));
 const mockApi = { getAiProcessingConsent: jest.fn(), recordAiProcessingConsent: jest.fn() };
 jest.mock("@jits/shared/api/moderation", () => ({
-  AI_PROCESSING_CONSENT_VERSION: "2026-10-14",
+  ...jest.requireActual("@jits/shared/api/moderation"),
   getAiProcessingConsent: (...a: unknown[]) => mockApi.getAiProcessingConsent(...a),
   recordAiProcessingConsent: (...a: unknown[]) => mockApi.recordAiProcessingConsent(...a),
 }));
 
+import { AI_PROCESSING_CONSENT_VERSION as A, TIMEKEEPER_CONSENT_VERSION as T } from "@jits/shared/api/moderation";
 import {
   __resetAiConsentForTests,
   aiConsentCacheKey,
   giveAiConsent,
   hasAiConsent,
+  hasAiConsentFor,
+  hasAnyAiConsentFor,
   loadAiConsent,
   useEffectiveRecordingOptIn,
 } from "@/lib/moderation/ai-consent";
@@ -27,7 +30,7 @@ import { useAiConsentGate } from "@/lib/moderation/use-ai-consent-gate";
 import { __resetRecordingOptInForTests, getRecordingOptIn } from "@/lib/match-flow/recording-optin";
 
 const AT = "2026-10-14T12:00:00.000Z";
-const CACHED = JSON.stringify({ at: AT, version: "2026-10-14" });
+const CACHED = JSON.stringify({ at: AT, version: A });
 
 beforeEach(async () => {
   jest.clearAllMocks();
@@ -45,7 +48,7 @@ describe("loadAiConsent", () => {
   });
 
   it("given on the server: consent, cached on the device for the next launch", async () => {
-    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: "2026-10-14" } });
+    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: A } });
     await loadAiConsent("me");
     expect(hasAiConsent()).toBe(true);
     expect(await AsyncStorage.getItem(aiConsentCacheKey("me"))).toBe(CACHED);
@@ -99,7 +102,7 @@ describe("loadAiConsent", () => {
   });
 
   it("signing out clears it", async () => {
-    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: "2026-10-14" } });
+    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: A } });
     await loadAiConsent("me");
     await loadAiConsent(null);
     expect(hasAiConsent()).toBe(false);
@@ -167,7 +170,7 @@ describe("useAiConsentGate (the face-off switch)", () => {
   });
 
   it("with consent already given, the switch passes straight through (no prompt)", async () => {
-    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: "2026-10-14" } });
+    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: AT, version: A } });
     await loadAiConsent("me");
     const { result } = renderHook(() => useAiConsentGate());
     act(() => result.current.onRecordingChange(true));
@@ -175,5 +178,67 @@ describe("useAiConsentGate (the face-off switch)", () => {
     expect(getRecordingOptIn()).toBe(true);
     act(() => result.current.onRecordingChange(false));
     expect(getRecordingOptIn()).toBe(false);
+  });
+});
+
+describe("per-text consent (jits-o47s.46)", () => {
+  const given = (version: string | null) =>
+    mockApi.getAiProcessingConsent.mockResolvedValue({ ok: true, data: { consentAt: version ? AT : null, version } });
+
+  it("athlete consent does not count for the timekeeper text, and the other way round", async () => {
+    given(A);
+    await loadAiConsent("me");
+    expect(hasAiConsentFor("me", "athlete")).toBe(true);
+    expect(hasAiConsentFor("me", "timekeeper")).toBe(false);
+    given(T);
+    __resetAiConsentForTests();
+    await loadAiConsent("me");
+    expect(hasAiConsentFor("me", "athlete")).toBe(false);
+    expect(hasAiConsentFor("me", "timekeeper")).toBe(true);
+    // Uploads go on under either.
+    expect(hasAnyAiConsentFor("me")).toBe(true);
+  });
+
+  it("agreeing to the timekeeper text keeps the athlete consent (combined version), and back", async () => {
+    given(A);
+    await loadAiConsent("me");
+    await act(async () => {
+      await giveAiConsent("timekeeper");
+    });
+    expect(mockApi.recordAiProcessingConsent).toHaveBeenLastCalledWith(expect.anything(), `${A}+${T}`);
+    expect(hasAiConsentFor("me", "athlete")).toBe(true);
+    expect(hasAiConsentFor("me", "timekeeper")).toBe(true);
+    expect(JSON.parse((await AsyncStorage.getItem(aiConsentCacheKey("me"))) ?? "{}").version).toBe(`${A}+${T}`);
+
+    __resetAiConsentForTests();
+    given(T);
+    await loadAiConsent("me");
+    await act(async () => {
+      await giveAiConsent();
+    });
+    expect(mockApi.recordAiProcessingConsent).toHaveBeenLastCalledWith(expect.anything(), `${A}+${T}`);
+  });
+
+  it("the first consent records only its own text's version", async () => {
+    await loadAiConsent("me");
+    await act(async () => {
+      await giveAiConsent("timekeeper");
+    });
+    expect(mockApi.recordAiProcessingConsent).toHaveBeenLastCalledWith(expect.anything(), T);
+    expect(hasAiConsentFor("me", "athlete")).toBe(false);
+  });
+
+  it("withdrawn on the server (NULL) clears both texts and the cache", async () => {
+    await AsyncStorage.setItem(aiConsentCacheKey("me"), JSON.stringify({ at: AT, version: `${A}+${T}` }));
+    given(null);
+    await loadAiConsent("me");
+    expect(hasAnyAiConsentFor("me")).toBe(false);
+    expect(await AsyncStorage.getItem(aiConsentCacheKey("me"))).toBeNull();
+  });
+
+  it("the shipped 2026-10-14 text counts for neither, so everyone is asked again", async () => {
+    given("2026-10-14");
+    await loadAiConsent("me");
+    expect(hasAnyAiConsentFor("me")).toBe(false);
   });
 });

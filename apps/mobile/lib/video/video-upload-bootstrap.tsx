@@ -37,7 +37,8 @@ export function VideoUploadBootstrap() {
   // then shown as Needs your OK) and again once it is given (it uploads).
   const consent = useAiConsent();
   const consentKnown = consent.known && consent.athleteId === athleteId;
-  const consented = consentKnown && consent.consentAt !== null;
+  // Either text: a timekeeper's clip uploads under the timekeeper consent.
+  const consented = consentKnown && (consent.consentAt !== null || consent.timekeeperConsentAt !== null);
 
   // Reported once per launch, and deliberately NOT gated on auth: it is a
   // fact about the binary, and an error raised before sign-in should carry

@@ -129,8 +129,9 @@ describe("AI processing", () => {
     __resetAiConsentForTests({ athleteId: "me", consentAt: null, known: true });
     const s = render(<AiProcessingScreen />);
     expect(s.getByTestId("ai-consent-status").props.children).toBe("Not given");
-    expect(s.getByText(/sent to Google Gemini to find key moments/)).toBeTruthy();
-    expect(s.getByText(/may be sent to OpenAI to make your avatar \(or the video to Google Gemini if OpenAI is unavailable\)/)).toBeTruthy();
+    expect(s.getByText(/may be sent to third-party AI services to find key moments, cut your highlights and make your avatar/)).toBeTruthy();
+    // No vendor names in user-facing copy (jits-o47s.46).
+    expect(s.queryByText(/Gemini|OpenAI|Google/)).toBeNull();
     expect(s.getByTestId("link-/legal/privacy?section=4")).toBeTruthy();
   });
 

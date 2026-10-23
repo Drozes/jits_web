@@ -42,10 +42,11 @@ jest.mock("@jits/shared/api/timekeeper", () => ({
 }));
 const mockConsent = { given: true, giveOk: true };
 const mockGive = jest.fn();
+const mockHasConsent = jest.fn((..._a: unknown[]) => mockConsent.given);
 jest.mock("@/lib/moderation/ai-consent", () => ({
-  hasAiConsentFor: () => mockConsent.given,
-  giveAiConsent: () => {
-    mockGive();
+  hasAiConsentFor: (...a: unknown[]) => mockHasConsent(...a),
+  giveAiConsent: (...a: unknown[]) => {
+    mockGive(...a);
     return Promise.resolve(mockConsent.giveOk);
   },
 }));
@@ -238,7 +239,9 @@ describe("timekeep sheet", () => {
     fireEvent.press(s.getByLabelText("Accept"));
     fireEvent.press(s.getByTestId("ai-consent-allow"));
     await flush();
-    expect(mockGive).toHaveBeenCalled();
+    // The timekeeper text's consent (its own version), asked for the timekeeper text too.
+    expect(mockGive).toHaveBeenCalledWith("timekeeper");
+    expect(mockHasConsent).toHaveBeenCalledWith(expect.anything(), "timekeeper");
     expect(mockRespond).toHaveBeenCalledWith(expect.anything(), Q1, true);
     expect(mockRouter.replace).toHaveBeenCalledWith(`/match/${M1}`);
   });

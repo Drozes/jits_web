@@ -12,7 +12,8 @@
  * - `report_content`: one report of an athlete, a match video or a highlight
  *   reel, reviewed by the team within 24 hours.
  * - `record_ai_processing_consent`: the explicit "Allow and film" before any
- *   match video is sent to Google Gemini (and stills to OpenAI).
+ *   match video is sent to Google Gemini (and stills to OpenAI). The version
+ *   says which consent texts were agreed to (`composeConsentVersion`).
  *
  * Results never throw; a failure is `{ ok: false, error: { hint, message } }`
  * and the caller maps the hint to its own copy.
@@ -35,13 +36,56 @@ export type ReportReason = (typeof REPORT_REASONS)[number];
 export const REPORT_DETAILS_MAX = 1000;
 
 /**
- * The consent text version the app shows (`record_ai_processing_consent.p_version`).
- * Bump it whenever the "Before you film" text changes: consent to any other
- * version reads as no consent, so everyone is asked again. "2026-10-23": the
- * timekeeper's plain-language body (jits-o47s.46). The server only stores the
- * string; its timekeeper backstop checks that consent exists, not its version.
+ * Two consent texts, each with its own version (jits-o47s.46): the athlete's
+ * "Before you film" (the face-off record switch, the upload retry, Settings)
+ * and the timekeeper's (the timekeep sheet, the timekeeper face-off camera).
+ * Bump a text's version whenever its words change: consent to any other
+ * version of that text reads as no consent, so everyone is asked again.
+ * "2026-10-23": both texts in plain language with no vendor names.
+ *
+ * The server keeps one `ai_processing_consent_version` (any string of 1 to
+ * 32 characters; it only checks that consent exists), so a person who agreed
+ * to both texts holds both versions joined by `+`, for example
+ * "2026-10-23+tk-2026-10-23" (24 characters). Use `composeConsentVersion`
+ * to record one and `hasConsentedToText` to read one.
  */
 export const AI_PROCESSING_CONSENT_VERSION = "2026-10-23";
+export const TIMEKEEPER_CONSENT_VERSION = "tk-2026-10-23";
+
+/** Which consent text a gate needs. */
+export type AiConsentText = "athlete" | "timekeeper";
+
+export const AI_CONSENT_TEXT_VERSIONS: Record<AiConsentText, string> = {
+  athlete: AI_PROCESSING_CONSENT_VERSION,
+  timekeeper: TIMEKEEPER_CONSENT_VERSION,
+};
+
+const CONSENT_TEXT_ORDER: readonly AiConsentText[] = ["athlete", "timekeeper"];
+
+/** The versions a stored `ai_processing_consent_version` holds ("a+b" is both). */
+export function consentVersionTokens(version: string | null | undefined): string[] {
+  return (version ?? "")
+    .split("+")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
+/** Whether the stored version includes the CURRENT version of `text`. */
+export function hasConsentedToText(version: string | null | undefined, text: AiConsentText): boolean {
+  return consentVersionTokens(version).includes(AI_CONSENT_TEXT_VERSIONS[text]);
+}
+
+/**
+ * The version to record when the person agrees to `text`: the current
+ * version of every text they already agreed to (stale versions drop out),
+ * plus this one, in a fixed order, so agreeing on one sheet never loses
+ * the other.
+ */
+export function composeConsentVersion(prior: string | null | undefined, text: AiConsentText): string {
+  return CONSENT_TEXT_ORDER.filter((t) => t === text || hasConsentedToText(prior, t))
+    .map((t) => AI_CONSENT_TEXT_VERSIONS[t])
+    .join("+");
+}
 
 export interface BlockedAthlete {
   athlete_id: string;

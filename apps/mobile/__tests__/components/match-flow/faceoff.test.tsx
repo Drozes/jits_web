@@ -77,6 +77,7 @@ import { __resetRecordingOptInForTests, getRecordingOptIn } from "@/lib/match-fl
 import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
 import { __resetRecordingIntentForTests } from "@/lib/match-flow/recording-intent";
 import { ratingStakes } from "../../support/rating-stakes";
+import { AI_CONSENT_COPY } from "@/lib/moderation/moderation-copy";
 
 const ME = { athleteId: "me-1", displayName: "Kai Reyes", currentElo: 1512 };
 const OPP = { athleteId: "opp-1", displayName: "Mina Park", currentElo: 1498 };
@@ -318,6 +319,9 @@ describe("ready check", () => {
     });
     expect(s.getByTestId("ai-consent-sheet")).toBeTruthy();
     expect(s.getByText("Before you film")).toBeTruthy();
+    // The athlete's own body, never the timekeeper's (jits-o47s.46).
+    expect(s.getByTestId("ai-consent-body")).toHaveTextContent(AI_CONSENT_COPY.body);
+    expect(s.queryByText(AI_CONSENT_COPY.timekeeperBody)).toBeNull();
     expect(s.getByText("Allow and film")).toBeTruthy();
     expect(s.getByText("Not now")).toBeTruthy();
     expect(s.getByTestId("faceoff-record-toggle").props.value).toBe(false);

@@ -59,6 +59,11 @@ const mockSend = {
   broadcastWeighedIn: jest.fn(() => Promise.resolve("ok")),
   broadcastReady: jest.fn(() => Promise.resolve("ok")),
 };
+const mockRecordConsent = jest.fn();
+jest.mock("@jits/shared/api/moderation", () => ({
+  ...jest.requireActual("@jits/shared/api/moderation"),
+  recordAiProcessingConsent: (...a: unknown[]) => mockRecordConsent(...a),
+}));
 jest.mock("@jits/shared/hooks/use-session-match-sync", () => ({ useSessionMatchSync: () => mockSend }));
 
 import type { TimekeeperMatchState, TimekeeperStartBlocker } from "@jits/shared/api/timekeeper";
@@ -72,6 +77,8 @@ import { TIMEKEEPER_COPY as C } from "@/lib/match-flow/timekeeper-copy";
 import { CHECK_ECHO_HOLD_MS } from "@/lib/match-flow/use-timekeeper-checks";
 import { SEND_CEILING_MS } from "@/lib/match-flow/send-timing";
 import { __resetAiConsentForTests } from "@/lib/moderation/ai-consent";
+import { AI_CONSENT_COPY } from "@/lib/moderation/moderation-copy";
+import { AI_PROCESSING_CONSENT_VERSION, TIMEKEEPER_CONSENT_VERSION } from "@jits/shared/api/moderation";
 import { CH, OP, TK, timekeeperFaceoffProps, tkFlow, tkState } from "../../support/timekeeper-faceoff";
 
 const mockReconcile = jest.fn();
@@ -302,6 +309,33 @@ describe("Start (TK-K6): the server's blocker order, then the camera", () => {
     const b = render(<Screen state={tkState({ startBlockers: [] })} />);
     await flush();
     expect(textOf(b, "faceoff-start-reason")).toBe(C["TK-K10"]);
+  });
+
+  it("athlete consent alone is not timekeeper consent: the timekeeper sheet opens by itself, Not now leaves TK-T8 and a way back, Allow opens the camera (jits-o47s.46)", async () => {
+    __resetAiConsentForTests({ athleteId: TK, consentAt: "2026-10-14T12:00:00Z", timekeeperConsentAt: null, version: AI_PROCESSING_CONSENT_VERSION, known: true });
+    mockRecordConsent.mockResolvedValue({ ok: true, data: "2026-10-23T12:00:00Z" });
+    const s = render(<Screen state={tkState({ startBlockers: [] })} />);
+    await flush();
+    expect(textOf(s, "faceoff-start-reason")).toBe(C["TK-K10"]);
+    expect(s.getByTestId("ai-consent-body")).toHaveTextContent(AI_CONSENT_COPY.timekeeperBody);
+    fireEvent.press(s.getByTestId("ai-consent-not-now"));
+    expect(s.queryByTestId("ai-consent-sheet")).toBeNull();
+    expect(s.getByTestId("faceoff-consent-refused")).toHaveTextContent(C["TK-T8"]);
+    fireEvent.press(s.getByTestId("faceoff-consent-open"));
+    s.getByTestId("ai-consent-sheet");
+    fireEvent.press(s.getByTestId("ai-consent-allow"));
+    await flush();
+    expect(mockRecordConsent).toHaveBeenCalledWith(expect.anything(), `${AI_PROCESSING_CONSENT_VERSION}+${TIMEKEEPER_CONSENT_VERSION}`);
+    expect(s.queryByTestId("ai-consent-sheet")).toBeNull();
+    expect(s.queryByTestId("faceoff-consent-open")).toBeNull();
+    expect(s.getByTestId("faceoff-start").props.accessibilityState.disabled).toBe(false);
+  });
+
+  it("with timekeeper consent on record, no consent prompt", async () => {
+    const s = render(<Screen state={tkState({ startBlockers: [] })} />);
+    await flush();
+    expect(s.queryByTestId("ai-consent-sheet")).toBeNull();
+    expect(s.queryByTestId("faceoff-consent-open")).toBeNull();
   });
 
   it("camera permission denied for good: TK-K11 and Open Settings (TK-K12)", async () => {

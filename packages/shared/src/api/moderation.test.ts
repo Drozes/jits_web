@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  AI_PROCESSING_CONSENT_VERSION,
+  TIMEKEEPER_CONSENT_VERSION,
   blockAthlete,
+  composeConsentVersion,
+  consentVersionTokens,
+  hasConsentedToText,
   getAiProcessingConsent,
   getMyBlockIds,
   getMyBlockedAthletes,
@@ -96,5 +101,49 @@ describe("moderation RPC wrappers (jr_be-m2s)", () => {
     expect(m.from).toHaveBeenCalledWith("athletes");
     expect(m.select).toHaveBeenCalledWith("ai_processing_consent_at, ai_processing_consent_version");
     expect(m.eq).toHaveBeenCalledWith("id", "me");
+  });
+});
+
+describe("per-text consent versions (jits-o47s.46)", () => {
+  const A = AI_PROCESSING_CONSENT_VERSION;
+  const T = TIMEKEEPER_CONSENT_VERSION;
+
+  it("the two texts have different versions, and both together fit the 32-character column", () => {
+    expect(A).not.toBe(T);
+    expect(`${A}+${T}`.length).toBeLessThanOrEqual(32);
+  });
+
+  it("splits a stored version into its tokens", () => {
+    expect(consentVersionTokens(null)).toEqual([]);
+    expect(consentVersionTokens("")).toEqual([]);
+    expect(consentVersionTokens(A)).toEqual([A]);
+    expect(consentVersionTokens(` ${A} + ${T} `)).toEqual([A, T]);
+  });
+
+  it("each text counts only its own current version", () => {
+    expect(hasConsentedToText(A, "athlete")).toBe(true);
+    expect(hasConsentedToText(A, "timekeeper")).toBe(false);
+    expect(hasConsentedToText(T, "timekeeper")).toBe(true);
+    expect(hasConsentedToText(T, "athlete")).toBe(false);
+    expect(hasConsentedToText(`${A}+${T}`, "athlete")).toBe(true);
+    expect(hasConsentedToText(`${A}+${T}`, "timekeeper")).toBe(true);
+    // The shipped 2026-10-14 text is stale for both.
+    expect(hasConsentedToText("2026-10-14", "athlete")).toBe(false);
+    expect(hasConsentedToText("2026-10-14", "timekeeper")).toBe(false);
+    expect(hasConsentedToText(null, "athlete")).toBe(false);
+  });
+
+  it("agreeing to one text keeps a current consent to the other, in a fixed order", () => {
+    expect(composeConsentVersion(null, "athlete")).toBe(A);
+    expect(composeConsentVersion(null, "timekeeper")).toBe(T);
+    expect(composeConsentVersion(A, "timekeeper")).toBe(`${A}+${T}`);
+    expect(composeConsentVersion(T, "athlete")).toBe(`${A}+${T}`);
+    expect(composeConsentVersion(`${A}+${T}`, "athlete")).toBe(`${A}+${T}`);
+    expect(composeConsentVersion(`${A}+${T}`, "timekeeper")).toBe(`${A}+${T}`);
+  });
+
+  it("a stale version drops out instead of growing the token", () => {
+    expect(composeConsentVersion("2026-10-14", "timekeeper")).toBe(T);
+    expect(composeConsentVersion("2026-10-14+tk-old", "athlete")).toBe(A);
   });
 });

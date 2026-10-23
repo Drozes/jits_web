@@ -213,13 +213,13 @@ export function useTimekeepSheet({ matchId, requestId, athleteId }: Params): Tim
   );
 
   const accept = React.useCallback(() => {
-    if (needsConsent.current || !hasAiConsentFor(athleteId)) setConsent({ visible: true, busy: false, error: null });
+    if (needsConsent.current || !hasAiConsentFor(athleteId, "timekeeper")) setConsent({ visible: true, busy: false, error: null });
     else void respond(true);
   }, [athleteId, respond]);
 
   const onAllow = React.useCallback(async () => {
     setConsent({ visible: true, busy: true, error: null });
-    const ok = await giveAiConsent().catch(() => false);
+    const ok = await giveAiConsent("timekeeper").catch(() => false);
     if (!alive.current) return;
     if (!ok) return setConsent({ visible: true, busy: false, error: AI_CONSENT_COPY.failed });
     setConsent(CONSENT_HIDDEN);
