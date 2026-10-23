@@ -148,3 +148,14 @@ function headingSpans(block: ReturnType<typeof parseLegalMarkdown>[number] | und
   if (!block || block.kind !== "heading") throw new Error("expected a heading");
   return block.spans;
 }
+
+describe("no named service providers (jits-o47s.46)", () => {
+  // The documents are shown in the app; the owner wants providers described
+  // generically. The app stores, sign-in options and Instagram handles are
+  // platforms the user deals with directly and are not on this list.
+  const NAMES = /gemini|openai|chatgpt|anthropic|claude|supabase|vercel|sentry|google cloud|vertex/i;
+
+  it("none of the four documents names one", () => {
+    for (const doc of ALL) expect(doc.markdown).not.toMatch(NAMES);
+  });
+});
