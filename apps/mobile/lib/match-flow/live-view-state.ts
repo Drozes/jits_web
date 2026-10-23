@@ -1,4 +1,5 @@
 import type { RecordingState } from "@/lib/video/use-video-recorder";
+import type { MatchAthleteView } from "./match-roles";
 
 /** How long the End button has to be held down. Same in practice. */
 export const HOLD_TO_END_MS = 1200;
@@ -127,14 +128,10 @@ export function formatAthleteMeta(elo: number | null | undefined, weightLbs: num
   return parts.length ? parts.join(" · ") : null;
 }
 
-/** The participant fields the live screen shows. */
-export interface LiveParticipant {
-  display_name: string;
-  current_elo: number | null;
-  current_weight: number | null;
-}
+/** The athlete fields the live screen shows. */
+export type LiveParticipant = Pick<MatchAthleteView, "displayName" | "currentElo" | "weightLbs">;
 
 /** A participant as the athlete bar shows it: name plus the meta line. */
 export function toLiveAthlete(p: LiveParticipant): { name: string; meta: string | null } {
-  return { name: p.display_name, meta: formatAthleteMeta(p.current_elo, p.current_weight) };
+  return { name: p.displayName, meta: formatAthleteMeta(p.currentElo, p.weightLbs) };
 }

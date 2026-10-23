@@ -2,7 +2,8 @@
  * Result, End and Dispute step colour and copy (jits-feq5 UX-11,
  * jits-sdh3 UX-12), plus the dispute failure haptic (jits-4zp.7).
  *
- * - Draw: default plate (not the red loss plate), amber handshake, honest copy.
+ * - Draw: default plate (not the red loss plate), amber handshake, no points
+ *   note (timekeeper mode A28).
  * - End: default plate (not the green win plate), ink check, "Up next".
  * - Dispute: explains admin review, ratings unchanged until then, amber glyph.
  * - Harness headings/testIDs stay: "Record result", result-record,
@@ -74,8 +75,8 @@ describe("ResultStep draw", () => {
       <ResultStep
         matchId="M1"
         durationSeconds={300}
-        me={{ id: "me-1", displayName: "Me", elo: null, weight: null }}
-        opponent={{ id: "opp-1", displayName: "Demo Red", elo: null, weight: null }}
+        me={{ athleteId: "me-1", displayName: "Me", currentElo: null, weightLbs: null }}
+        opponent={{ athleteId: "opp-1", displayName: "Demo Red", currentElo: null, weightLbs: null }}
         submissionTypes={[]}
         onRecorded={jest.fn()}
       />,
@@ -94,7 +95,10 @@ describe("ResultStep draw", () => {
     const screen = renderResult();
     fireEvent.press(screen.getByText("Draw"));
     screen.getByText("Match ends in a draw");
-    screen.getByText("Draws cost both athletes rating.");
+    // A28: the points note is gone (no rating hints in a match, both modes).
+    expect(screen.queryByText("In a draw the favourite gives up a few points to the underdog.")).toBeNull();
+    expect(screen.queryByText(/points/i)).toBeNull();
+    expect(screen.queryByText(/draws? cost/i)).toBeNull();
     // The draw plate's handshake is amber (pressure), never Signal Red.
     const icon = screen.getAllByTestId("icon-Handshake").at(-1)!;
     expect(icon.props.color).toBe("#F59E0B");

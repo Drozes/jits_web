@@ -9,13 +9,13 @@ const scenario: Scenario = {
     await prepare(ctx);
     const red = await ctx.bot("red");
     await red.goLive();
-    const stakes = await stakesFor(red);
-    const { side } = await openToLive(ctx, red);
+    const stakes = await stakesFor(ctx, red);
+    const { h, side } = await openToLive(ctx, red);
     await ctx.step("Red ends the match", () => side.endMatch());
     await ctx.step("Blue reaches the result step", () => ctx.ui.waitStep("result", T.step));
     await blueRecordsSubmission(ctx, side, ctx.ids.blue, "triangle_choke", "45");
     await bothConfirm(ctx, side);
-    await checkSummary(ctx, "YOU WON", stakes.challenger_win);
+    await checkSummary(ctx, "YOU WON", { matchId: h.matchId, stake: stakes?.challenger_win ?? null });
     await exitToArena(ctx);
   },
 };

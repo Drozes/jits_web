@@ -39,6 +39,7 @@ import {
   setMatchUpload,
 } from "./match-upload-store";
 import type { RecordingTruncation } from "./use-video-recorder";
+import type { MatchVideoCaptureLens, MatchVideoCaptureQuality } from "@jits/shared/api/match-video-upload";
 import {
   classifyByteFailure,
   classifyReserveFailure,
@@ -57,7 +58,7 @@ import {
   trackRunStart,
   trackUploaded,
 } from "./upload-telemetry";
-import { aiConsentGivenAtMs, hasAiConsentFor, isAiConsentKnownFor } from "@/lib/moderation/ai-consent";
+import { aiConsentGivenAtMs, hasAnyAiConsentFor, isAiConsentKnownFor } from "@/lib/moderation/ai-consent";
 
 /**
  * The single retry / resume authority for match-video uploads.
@@ -166,6 +167,9 @@ export interface StartUploadParams {
   recordStartedAt?: number | null;
   /** Recorder-measured clip length in ms; sent with the reservation. */
   recordDurationMs?: number | null;
+  /** What the clip was captured with (spec 13.4); sent with the reservation. */
+  captureQuality?: MatchVideoCaptureQuality | null;
+  captureLens?: MatchVideoCaptureLens | null;
 }
 
 type JobPatch = Partial<Omit<PendingUploadJob, "matchId">>;
@@ -786,6 +790,9 @@ async function reserveRow(
         fileSizeBytes: current.fileSizeBytes,
         recordStartedAt: current.recordStartedAt ?? null,
         recordDurationMs: current.recordDurationMs ?? null,
+        // Only what the recorder knew; an older job has neither (the row keeps NULL).
+        ...(current.captureQuality ? { captureQuality: current.captureQuality } : {}),
+        ...(current.captureLens ? { captureLens: current.captureLens } : {}),
       });
       if (!isCurrent()) return superseded;
       if (row.outcome === "deferred") {
@@ -1452,7 +1459,7 @@ function sweepJob(job: PendingUploadJob): Promise<void> | null {
   // stays on disk and resumes when that athlete signs back in.
   if (!mine) return isJobExpired(job) ? expireJob(job, false) : null;
   // AI processing consent (5.1.2(i), jits-rog5.11), for this owner only.
-  const consented = hasAiConsentFor(owner);
+  const consented = hasAnyAiConsentFor(owner);
   // An otherwise uploadable clip waiting for consent never expires; with
   // consent its window counts from the consent (a clip that waited gets a
   // full week from the OK). A failure that waits for the athlete keeps the
@@ -1571,6 +1578,8 @@ async function prepareAndRun(
       params.recordDurationMs != null && Number.isFinite(params.recordDurationMs) && params.recordDurationMs > 0
         ? Math.round(params.recordDurationMs)
         : null,
+    captureQuality: params.captureQuality ?? null,
+    captureLens: params.captureLens ?? null,
   };
   await saveUploadJob(job);
   if (!isCurrent()) {
@@ -1633,7 +1642,7 @@ export type RetryResult = "started" | "running" | "no_job" | "signed_out" | "oth
 export async function retryMatchVideoUpload(matchId: string): Promise<RetryResult> {
   if (runners.has(matchId)) return "running";
   if (!owner) return "signed_out";
-  if (!hasAiConsentFor(owner)) return "needs_consent";
+  if (!hasAnyAiConsentFor(owner)) return "needs_consent";
   const job = await loadUploadJob(matchId);
   if (!job) return "no_job";
   if (job.uploaderAthleteId !== owner) return "other_athlete";

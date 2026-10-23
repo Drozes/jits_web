@@ -32,7 +32,7 @@ export async function pendingUploadSignOutMessage(
   } catch {
     pending = false;
   }
-  return pending ? signOutUploadMessage(displayName, !hasAiConsent()) : null;
+  return pending ? signOutUploadMessage(displayName, !hasAiConsent("athlete") && !hasAiConsent("timekeeper")) : null;
 }
 
 /**

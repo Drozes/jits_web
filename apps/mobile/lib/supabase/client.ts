@@ -29,8 +29,21 @@ import { SecureStoreAdapter } from "./secure-storage";
  *   `athlete_location_events.platform` (live location fixes 4.4). Native
  *   requests have no CORS preflight, so a custom header is safe here; the
  *   server ignores it where it does not read it.
+ * - `x-elo-client-caps: timekeeper_v1` on every request (timekeeper mode
+ *   slice M8, PM16): this build can run a timekeeper-mode match end to end.
+ *   The backend's `_request_client_caps()` reads it (a comma-separated list,
+ *   jr_be 024 3.3) and stamps the caller's side of the challenge
+ *   (`challenger_tk_capable` / `opponent_tk_capable`) or the inviter's
+ *   invite (`inviter_tk_capable`); a match is timekeeper mode only when the
+ *   `timekeeper_role` flag is on and both sides are capable. It is declared
+ *   here and nowhere else, and only by a build that carries the whole
+ *   timekeeper UI: a partial build must never declare it, or a flag-on pair
+ *   would get a match that build cannot finish. Web sends no capability.
  */
-export const SUPABASE_CLIENT_HEADERS = { "x-elo-platform": Platform.OS } as const;
+export const SUPABASE_CLIENT_HEADERS = {
+  "x-elo-platform": Platform.OS,
+  "x-elo-client-caps": "timekeeper_v1",
+} as const;
 
 export const supabase = createClient<Database>(
   env.supabaseUrl,

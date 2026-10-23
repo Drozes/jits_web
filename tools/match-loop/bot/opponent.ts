@@ -26,11 +26,14 @@ import { EnvError, ExpectationTimeout } from "../lib/util";
 
 export type Client = SupabaseClient<Database>;
 
+/** A harness account: the simulator's (blue), the seeded bots, and the fourth (gold). */
+export type AccountKey = "red" | "green" | "blue" | "gold";
+
 export interface Identity {
   id: string;
   email: string;
   displayName: string;
-  key: "red" | "green" | "blue";
+  key: AccountKey;
 }
 
 export interface ChallengeRow {
@@ -110,11 +113,40 @@ export class ChallengeRefused extends Error {
   }
 }
 
+/**
+ * The client capability header (timekeeper mode, jr_be 024 section 3.3):
+ * the app sends `x-elo-client-caps: timekeeper_v1` on every PostgREST call
+ * once slice M8 switches it on (`apps/mobile/lib/supabase/client.ts`). The
+ * server stamps a challenge side (and an invite) TK-capable only when that
+ * side's own request carried it, and a match is timekeeper mode only when the
+ * flag is on AND both sides were capable.
+ */
+export const CLIENT_CAPS_HEADER = "x-elo-client-caps";
+export const TIMEKEEPER_CAP = "timekeeper_v1";
+
+export interface ClientOptions {
+  /**
+   * Capabilities this client advertises in `x-elo-client-caps`. Empty or
+   * absent (the default): no header at all, exactly the shipped client, so
+   * every flag-OFF scenario's bot is unchanged and any pair it is in
+   * snapshots flag OFF (TEST-PLAN 4.2, "Bots send the capability header").
+   */
+  capabilities?: readonly string[];
+}
+
+/** The global headers for `opts` (pure, for tests): none without capabilities. */
+export function capabilityHeaders(capabilities: readonly string[] | undefined): Record<string, string> {
+  const caps = (capabilities ?? []).map((c) => c.trim()).filter(Boolean);
+  return caps.length ? { [CLIENT_CAPS_HEADER]: caps.join(",") } : {};
+}
+
 /** Build a client exactly as the app configures its realtime socket. */
-export function makeClient(cfg: Config): Client {
+export function makeClient(cfg: Config, opts: ClientOptions = {}): Client {
+  const headers = capabilityHeaders(opts.capabilities);
   return createClient<Database>(cfg.supabaseUrl, cfg.publishableKey, {
     auth: { persistSession: false, autoRefreshToken: true, detectSessionInUrl: false },
     realtime: { heartbeatIntervalMs: 15_000 },
+    ...(Object.keys(headers).length ? { global: { headers } } : {}),
   });
 }
 
@@ -143,8 +175,15 @@ export class MobileOpponent {
     readonly me: Identity,
     private readonly trace: Trace,
     private readonly password: string,
+    /** Capability header for this bot's PostgREST calls (`ClientOptions`); none by default. */
+    readonly clientOptions: ClientOptions = {},
   ) {
-    this.client = makeClient(cfg);
+    this.client = makeClient(cfg, clientOptions);
+  }
+
+  /** Whether this bot advertises the timekeeper capability. */
+  get timekeeperCapable(): boolean {
+    return (this.clientOptions.capabilities ?? []).includes(TIMEKEEPER_CAP);
   }
 
   private get actor() {
@@ -157,7 +196,7 @@ export class MobileOpponent {
       password: this.password,
     });
     if (error) throw new EnvError(`bot sign-in failed for ${this.me.email}: ${error.message}`);
-    this.trace.note(this.actor, "signed_in", { email: this.me.email });
+    this.trace.note(this.actor, "signed_in", { email: this.me.email, capabilities: this.clientOptions.capabilities ?? [] });
     await this.refreshSelf();
     this.startObservers();
   }

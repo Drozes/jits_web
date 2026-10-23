@@ -5,10 +5,11 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Plate } from "@/components/ui/elo-system";
 import { useAuth, useIsAdmin } from "@/lib/auth/hooks";
+import { TIMEKEEPER_REVIEWS_COPY } from "@/lib/admin/timekeeper-reviews-copy";
 
 /**
  * Admin hub. Lists the platform-admin sub-screens (roles, metrics, feature
- * flags, no-match videos, repeat disputers). Self-guards: any non-admin (or signed-out) athlete is bounced to the
+ * flags, no-match videos, repeat disputers, timekeeper reviews). Self-guards: any non-admin (or signed-out) athlete is bounced to the
  * root redirector, mirroring the <Redirect> approach in app/index.tsx. Section
  * visibility in settings/index.tsx already hides the entry point, this guard is
  * the defense-in-depth for a deep link straight to /settings/admin.
@@ -19,7 +20,8 @@ type AdminRoute =
   | "/settings/admin/metrics"
   | "/settings/admin/flags"
   | "/settings/admin/no-match"
-  | "/settings/admin/disputers";
+  | "/settings/admin/disputers"
+  | "/settings/admin/timekeeper-reviews";
 
 const ADMIN_LINKS: { href: AdminRoute; label: string }[] = [
   { href: "/settings/admin/members", label: "MEMBERS" },
@@ -27,6 +29,8 @@ const ADMIN_LINKS: { href: AdminRoute; label: string }[] = [
   { href: "/settings/admin/flags", label: "FEATURE FLAGS" },
   { href: "/settings/admin/no-match", label: "NO-MATCH VIDEOS" },
   { href: "/settings/admin/disputers", label: "REPEAT DISPUTERS" },
+  // TK-AD1, sentence case in source; the row's caps style draws it in caps (A27).
+  { href: "/settings/admin/timekeeper-reviews", label: TIMEKEEPER_REVIEWS_COPY["TK-AD1"] },
 ];
 
 export default function AdminScreen() {

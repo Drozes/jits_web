@@ -1,24 +1,37 @@
 /**
- * Pure mapping from a match's persisted DB status to the initial wizard step
- * the mobile UI should render. Mirrors the web's `computeInitialStep` but
- * collapses the timekeeper variants since the mobile app does not currently
- * surface timekeeper functionality (Phase 5 polish).
+ * The match wizard's steps, and the pure mapping from a match's persisted DB
+ * state to the step the wizard mounts on (timekeeper mode spec 6.2).
  *
- * Steps (8 total), keyed by short slugs that match the spec's vocabulary:
- *   - `wait`    : transient hold while waiting for opponent (currently unused
- *                 by the orchestrator; kept for future timekeeper support).
- *   - `weight`  : both athletes confirm scale weight before going live.
- *   - `ready`   : ready-check; both athletes tap Ready, then `start_match`
- *                 fires and transitions everyone to `live`.
- *   - `live`    : timer running; pause/resume + end-match.
- *   - `end`     : transient — the moment after End Match before result entry.
- *                 Currently advances straight to `result` (see wizard).
- *   - `result`  : record submission/draw + winner + finish time.
- *   - `confirm` : both athletes confirm or one disputes the recorded result.
- *   - `summary` : final outcome card + ELO delta + nav back to lobby.
+ * Steps, in order. The order is also time order: the wizard's own setter
+ * never moves to an earlier step (`use-wizard-sync.ts`), and the reconciler
+ * moves back only where `step-transitions.ts` allows it: the initial
+ * correction both modes have (on the first snapshot it moves an athlete who
+ * has not confirmed from `summary` back to `confirm`, jits-bmei,
+ * `planReconcile` in `reconcile.ts`), and the two timekeeper-mode moves.
+ *   - `crew`    : timekeeper mode only, athletes only: pick a timekeeper
+ *                 (pending, nobody seated). Never reached by a two-athlete match.
+ *   - `weight`  : the face-off weigh-in. Each athlete confirms their own
+ *                 weight, and checks the opponent's where weight checks are on.
+ *                 The timekeeper's one combined face-off screen.
+ *   - `ready`   : the face-off ready check. Two-athlete: each athlete taps
+ *                 Ready; once both are ready each device calls `start_match`
+ *                 (the loser of that race reads the started match) and both
+ *                 move to `live`. Timekeeper mode: ready is server state and
+ *                 the timekeeper starts.
+ *   - `live`    : the countdown, then the clock: pause / resume, hold to end.
+ *   - `end`     : transient, the moment after the end; advances to `result`.
+ *   - `result`  : record a submission (winner, finish, time) or a draw.
+ *   - `confirm` : an athlete confirms or disputes the recorded result.
+ *   - `summary` : the verdict and rating change, then the exit; the
+ *                 timekeeper's done screen.
+ *
+ * The practice match draws its header from its own list (`PRACTICE_STEPS` in
+ * `lib/practice/constants.ts`), so a change here never moves that header.
  */
+import type { MatchMode, ViewerRole } from "./match-roles";
+
 export type MatchStep =
-  | "wait"
+  | "crew"
   | "weight"
   | "ready"
   | "live"
@@ -28,7 +41,7 @@ export type MatchStep =
   | "summary";
 
 export const MATCH_STEPS: readonly MatchStep[] = [
-  "wait",
+  "crew",
   "weight",
   "ready",
   "live",
@@ -38,26 +51,43 @@ export const MATCH_STEPS: readonly MatchStep[] = [
   "summary",
 ] as const;
 
+/** The match fields the routing reads; the timekeeper-mode ones are absent on a two-athlete match. */
 export interface MatchLike {
   status: string;
+  /** The seated timekeeper (timekeeper mode). */
+  timekeeper_id?: string | null;
+  /** The timekeeper ended the clock (timekeeper mode; status stays `in_progress`). */
+  ended_at?: string | null;
+}
+
+/** The part of `MatchRoles` the routing reads. */
+export interface RouteRoles {
+  mode: MatchMode;
+  viewer: ViewerRole;
+  me: { athleteId: string } | null;
+}
+
+/** The part of the timekeeper-mode state (`get_timekeeper_match_state`) the routing reads. */
+export interface RouteTimekeeperState {
+  ready: readonly { athleteId: string }[];
 }
 
 /**
- * Returns the step the wizard should mount in based on persisted match
- * status. Pure / side-effect free so it can be reused in tests.
- *
- * Optional `localSubstate` overrides the inferred step when the local
- * client has progressed past what the DB reflects (e.g. timer ended,
- * waiting for the user to tap submit on result). It must be one of the
- * `MatchStep` values; an unknown value is ignored.
+ * Returns the step the wizard should mount on. Without roles, or for a
+ * two-athlete match, the shipped status mapping (`selfRunStep`), unchanged.
+ * Pure / side-effect free so it can be reused in tests.
  */
 export function getCurrentStep(
   match: MatchLike,
-  localSubstate?: MatchStep,
+  roles?: RouteRoles | null,
+  tkState?: RouteTimekeeperState | null,
 ): MatchStep {
-  if (localSubstate && MATCH_STEPS.includes(localSubstate)) {
-    return localSubstate;
-  }
+  if (roles?.mode === "timekeeper") return timekeeperStep(match, roles, tkState ?? null);
+  return selfRunStep(match);
+}
+
+/** The two-athlete flow: the step from the status alone. */
+function selfRunStep(match: MatchLike): MatchStep {
   switch (match.status) {
     case "pending":
       return "weight";
@@ -79,5 +109,35 @@ export function getCurrentStep(
     default:
       // Includes `cancelled`: the reconciler's first snapshot exits it.
       return "weight";
+  }
+}
+
+/**
+ * Timekeeper mode (spec 6.2). Athletes pick on `crew` until someone is
+ * seated, then the face-off (`ready` once the server has them ready); the
+ * timekeeper has one combined face-off screen. Once the clock has ended
+ * everyone is on `result` (the athletes' waiting view, the timekeeper's
+ * form), and a completed match mounts on `summary` like the two-athlete flow
+ * (the reconciler's initial correction moves an athlete who still owes a
+ * confirmation to `confirm`; the timekeeper's `summary` is the done screen).
+ */
+function timekeeperStep(match: MatchLike, roles: RouteRoles, tkState: RouteTimekeeperState | null): MatchStep {
+  const athlete = roles.viewer !== "timekeeper";
+  switch (match.status) {
+    case "pending": {
+      if (!match.timekeeper_id) return athlete ? "crew" : "weight";
+      const me = roles.me?.athleteId;
+      return athlete && me && tkState?.ready.some((r) => r.athleteId === me) ? "ready" : "weight";
+    }
+    case "in_progress":
+      return match.ended_at ? "result" : "live";
+    case "completed":
+    case "disputed":
+    case "voided":
+      return "summary";
+    default:
+      // Includes `cancelled`: the reconciler's first snapshot exits it with
+      // its reason. A step with no face-off channel, so nothing is sent.
+      return athlete ? "crew" : "weight";
   }
 }

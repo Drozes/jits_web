@@ -44,7 +44,7 @@ const scenario: Scenario = {
     await prepare(ctx);
     const red = await ctx.bot("red");
     await red.goLive();
-    const stakes = await stakesFor(red);
+    const stakes = await stakesFor(ctx, red);
     const h = await blueChallengesRed(ctx, red);
     const side = await ctx.matchSide(red, h.matchId);
     await blueOnWeight(ctx);
@@ -56,8 +56,8 @@ const scenario: Scenario = {
       handshake: h,
       winner: ctx.ids.blue,
       loser: ctx.ids.red,
-      winnerDelta: stakes.challenger_win,
-      loserDelta: stakes.opponent_loss,
+      winnerDelta: stakes?.challenger_win ?? null,
+      loserDelta: stakes?.opponent_loss ?? null,
       code: "armbar",
       finish: 90,
       confirmations: 2,
@@ -129,22 +129,72 @@ async function runHistory(ctx: ScenarioCtx, matchId: string, seeds: SeededVideo[
       }),
     );
 
+  /**
+   * After each entry point the app must not be on its error screen
+   * (`ui:no-app-error-<entry>`; the athlete entry used to land there, app
+   * bug jits-i5ih). When it is, the failure stands (that oracle, and
+   * `logs:metro-clean` for the error Metro logged) and the app is
+   * relaunched and Blue put back live on the Arena (the state history
+   * browsing started from; the error screen unmounts the live owner), so the
+   * remaining entry points and the player still run and report on their own
+   * instead of timing out behind the error screen. The live-state oracles
+   * cannot: once the harness has relaunched the app and put Blue back live
+   * itself, live state no longer reflects history browsing, so they are
+   * skipped (`relaunched`), never recorded as passes.
+   */
+  let relaunched = false;
+  const noAppError = async (slug: string) => {
+    const err = await pages.appError();
+    ctx.eq(`ui:no-app-error-${slug}`, null, err);
+    if (err === null) return;
+    relaunched = true;
+    ctx.trace.note("harness", "relaunch_after_app_error", { entry: slug, error: err });
+    await ctx.step(`relaunch after the app error (${slug})`, async () => {
+      await ctx.simctl.terminate();
+      await ctx.simctl.launch();
+      await ctx.idb.waitFor({ label: "Home", type: "Button" }, 30_000);
+      await ctx.ui.openArena();
+      await ctx.ui.ensureLive();
+    });
+  };
+
+  /**
+   * Back out to a tab root after an entry point. A screen that cannot be
+   * left is recorded by ctx.step (`ui:<step>`, with what was on screen), and
+   * the next entry point still tries on its own (each starts by backing out).
+   */
+  const backOut = (slug: string) =>
+    ctx.step(`Blue backs out after the ${slug} entry`, () => pages.backToTabRoot()).catch((e) => {
+      if (!(e instanceof ExpectationTimeout)) throw e;
+    });
+
   // 1. Home, "Me" scope.
   await entry("ui:detail-from-home", "detail from Home (Me scope)", () => pages.openFromHome(redName));
-  await pages.backToTabRoot();
+  await noAppError("home");
+  await backOut("Home");
 
   // 2. Profile > View Detailed Stats > full history.
   await entry("ui:detail-from-stats", "detail from Stats history", () => pages.openFromStats(redName));
-  await pages.backToTabRoot();
+  await noAppError("stats");
+  await backOut("Stats");
 
-  // 3. Athlete head-to-head, reached on its own (Stats -> detail -> opponent row -> athlete page).
+  // 3. Athlete head-to-head, reached on its own (Stats -> detail -> opponent
+  // row -> athlete page -> head-to-head row). The Stats detail stays mounted
+  // under the athlete page, so this is also the only entry point that puts
+  // two match detail screens for the same match on the stack. Backing out
+  // pops four screens, and the Stats detail under the athlete page is still
+  // scrolled down to its opponent row, its hero's back control above the
+  // screen: `Screens.goBack` scrolls it back into reach before the tap.
   await entry("ui:detail-from-athlete", "detail from Demo Red's head-to-head", () => pages.openFromAthlete(redName));
-  await pages.backToTabRoot();
+  await noAppError("athlete");
+  await backOut("athlete");
 
-  // 4. The Matches tab (pull-to-refresh first), then the player. Profile's
-  // Recent Matches and Film Room preview moved here (spec matches-tab 9).
-  const fromVideos = await entry("ui:detail-from-matches", "detail from the Matches tab", () =>
-    pages.openFromMatches(matchId),
+  // 4. The Film tab (route `matches`, labelled Film since 2026-10-09;
+  // pull-to-refresh first), then the player. Profile's Recent Matches and
+  // Film Room preview moved here (spec matches-tab 9). The oracle keeps the
+  // route's name, so its fingerprint is stable across the relabel.
+  const fromVideos = await entry("ui:detail-from-matches", "detail from the Film tab", () =>
+    pages.openFromFilm(matchId),
   );
 
   if (fromVideos) {
@@ -164,15 +214,25 @@ async function runHistory(ctx: ScenarioCtx, matchId: string, seeds: SeededVideo[
     ctx.eq("ui:player-loaded", "loaded", state);
     ctx.eq("ui:no-error-panel", [], await pages.playerErrorPanels());
   } else {
-    ctx.skip("ui:player-loaded", "the detail screen from the Matches tab did not load, so Watch was not reachable");
-    ctx.skip("ui:no-error-panel", "the detail screen from the Matches tab did not load, so Watch was not reachable");
+    ctx.skip("ui:player-loaded", "the detail screen from the Film tab did not load, so Watch was not reachable");
+    ctx.skip("ui:no-error-panel", "the detail screen from the Film tab did not load, so Watch was not reachable");
   }
+  await noAppError("film");
 
   await ctx.step("Blue backs out to the Arena", async () => {
     await pages.backToTabRoot();
     await ctx.ui.openArena();
   });
   // Browsing history is a plain pushed screen: it must not change live state.
+  // After an app error the harness relaunched the app and went live itself,
+  // so these two would measure the harness, not history browsing.
+  if (relaunched) {
+    const why =
+      "the harness relaunched the app and went live itself after an app error, so live state no longer reflects history browsing";
+    ctx.skip("db:blue-still-live-after-history", why);
+    ctx.skip("ui:live-pill-after-history", why);
+    return;
+  }
   await ctx.expect("db:blue-still-live-after-history", true, () => db.waitLooking(ctx.ids.blue, true, T.db));
   ctx.eq("ui:live-pill-after-history", true, await waitLivePill(ctx.ui, true, 10_000));
 }

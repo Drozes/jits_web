@@ -8,7 +8,7 @@
  */
 import * as React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { render } from "@testing-library/react-native";
+import { render, within } from "@testing-library/react-native";
 import { AA_NORMAL_TEXT, composite, contrast } from "../../support/token-contrast";
 import { libItem, libVideo } from "../../support/film-fixtures";
 
@@ -36,9 +36,9 @@ import { ON_MEDIA, paletteFor, usePalette } from "@/lib/theme/palette";
 import { ForceDarkTheme } from "@/lib/theme/force-dark-theme";
 import { ThemedStatusBar } from "@/lib/theme/themed-status-bar";
 import { darkTokens, lightTokens } from "@/lib/tokens";
-import { FightButton, StakesStrip } from "@/components/match-flow/fight/fight-ui";
+import { FightButton, drawDeltaColor } from "@/components/match-flow/fight/fight-ui";
 import { FilmBadge } from "@/components/film-room/status-badge";
-import { FaceoffChip } from "@/components/match-flow/faceoff/faceoff-top";
+import { FaceoffChip, TOP_BAR_FONT_CAP } from "@/components/match-flow/faceoff/faceoff-top";
 
 function Probe() {
   const p = usePalette();
@@ -46,7 +46,8 @@ function Probe() {
 }
 
 type Styled = { props: { style?: unknown } };
-const flat = (el: Styled) => (StyleSheet.flatten(el.props.style as never) ?? {}) as { color?: string; backgroundColor?: string };
+const flat = (el: Styled) =>
+  (StyleSheet.flatten(el.props.style as never) ?? {}) as { color?: string; backgroundColor?: string; borderWidth?: number; [k: string]: unknown };
 const color = (el: Styled) => flat(el).color;
 const bgOf = (el: Styled) => flat(el).backgroundColor;
 
@@ -132,18 +133,27 @@ describe("shared match-flow pieces render with the active theme", () => {
   it.each([
     ["light", lightTokens],
     ["dark", darkTokens],
-  ] as const)("%s: stakes strip plate and deltas, secondary button label", (scheme, t) => {
+  ] as const)("%s: secondary button label", (scheme, t) => {
+    // The stakes strip this case also rendered is gone in both modes
+    // (timekeeper mode A11, O1).
     mockScheme = scheme;
     const s = render(
       <View>
-        <StakesStrip testID="stakes" win={12} draw={-2} loss={-9} />
         <FightButton testID="btn" variant="secondary" label="Record it myself" onPress={jest.fn()} />
       </View>,
     );
-    expect(bgOf(s.getByTestId("stakes"))).toBe(t.bgElevated);
-    expect(color(s.getByTestId("stakes-win"))).toBe(t.statePositive);
-    expect(color(s.getByTestId("stakes-loss"))).toBe(t.stateNegative);
     expect(color(s.getByText("Record it myself"))).toBe(t.textPrimary);
+  });
+
+  it.each([
+    ["light", lightTokens],
+    ["dark", darkTokens],
+  ] as const)("%s: a draw delta is coloured by its sign (Rating V9: an underdog's draw gains)", (scheme, t) => {
+    // Was the stakes strip's draw cell; the verdict's rating moment keeps it.
+    const p = paletteFor(scheme);
+    expect(drawDeltaColor(4, p)).toBe(t.statePositive);
+    expect(drawDeltaColor(-2, p)).toBe(t.attention);
+    expect(drawDeltaColor(0, p)).toBe(t.textPrimary);
   });
 
   it("chrome over camera or film keeps the fixed on-media colors in the light theme", () => {
@@ -159,8 +169,8 @@ describe("shared match-flow pieces render with the active theme", () => {
 
 describe("FaceoffChip", () => {
   const athletes = {
-    me: { display_name: "Kai Reyes", current_elo: 1512 },
-    opponent: { display_name: "Mina Park", current_elo: 1498 },
+    me: { displayName: "Kai Reyes", currentElo: 1512 },
+    opponent: { displayName: "Mina Park", currentElo: 1498 },
     myWeight: 170,
     opponentWeight: 165,
   };
@@ -177,6 +187,61 @@ describe("FaceoffChip", () => {
     const s = render(<FaceoffChip {...athletes} onMedia />);
     expect(bgOf(s.getByTestId("faceoff-chip"))).toBe(ON_MEDIA.chip);
     expect(color(s.getByText("K. Reyes"))).toBe(ON_MEDIA.ink);
+  });
+
+  it("with no readiness draws no status line (the countdown, the crew step, a two-athlete match)", () => {
+    const s = render(<FaceoffChip {...athletes} />);
+    expect(s.queryByTestId("ready-status-you")).toBeNull();
+    expect(s.queryByTestId("ready-panel-opponent")).toBeNull();
+    expect(flat(s.getByTestId("faceoff-chip") as Styled)).toMatchObject({ height: 64 });
+  });
+
+  it.each(["light", "dark"] as const)(
+    "readiness, pending: an amber dot and NOT READY on each side, left and right, read as not ready (%s, jits-o47s.45)",
+    (scheme) => {
+      mockScheme = scheme;
+      const p = paletteFor(scheme);
+      const s = render(<FaceoffChip {...athletes} readiness={{ me: false, opponent: false }} />);
+      const you = s.getByTestId("ready-status-you");
+      const opp = s.getByTestId("ready-panel-opponent");
+      expect(you.props.accessible).toBe(true);
+      expect(you.props.accessibilityLabel).toBe("You, not ready");
+      expect(opp.props.accessibilityLabel).toBe("Opponent, not ready");
+      for (const side of [you, opp]) {
+        const label = within(side).getByText("NOT READY");
+        expect(color(label)).toBe(p.amber);
+        expect(within(side).queryByText("✓")).toBeNull();
+        // Plain text: no edge that reads as a control.
+        expect(flat(side).borderWidth).toBeUndefined();
+      }
+      expect(flat(opp)).toMatchObject({ justifyContent: "flex-end" });
+      expect(flat(s.getByTestId("faceoff-chip") as Styled)).toMatchObject({ minHeight: 64 });
+      expect(JSON.stringify(s.toJSON())).not.toMatch(/dashed/);
+    },
+  );
+
+  it("readiness: the status text and the check cap Dynamic Type at the top bar's cap", () => {
+    const s = render(<FaceoffChip {...athletes} readiness={{ me: true, opponent: false }} />);
+    expect(within(s.getByTestId("ready-status-you")).getByText("READY").props.maxFontSizeMultiplier).toBe(TOP_BAR_FONT_CAP);
+    expect(within(s.getByTestId("ready-status-you")).getByText("✓").props.maxFontSizeMultiplier).toBe(TOP_BAR_FONT_CAP);
+    expect(within(s.getByTestId("ready-panel-opponent")).getByText("NOT READY").props.maxFontSizeMultiplier).toBe(TOP_BAR_FONT_CAP);
+  });
+
+  it.each(["light", "dark"] as const)("readiness, done: an ink check and READY, never green or red (%s)", (scheme) => {
+    mockScheme = scheme;
+    const p = paletteFor(scheme);
+    const s = render(<FaceoffChip {...athletes} readiness={{ me: true, opponent: false }} />);
+    const you = s.getByTestId("ready-status-you");
+    expect(you.props.accessibilityLabel).toBe("You, ready");
+    expect(color(within(you).getByText("READY"))).toBe(p.text);
+    expect(color(within(you).getByText("✓"))).toBe(p.text);
+    expect(color(within(you).getByText("READY"))).not.toBe(p.win);
+    expect(color(within(you).getByText("READY"))).not.toBe(p.cta);
+    const opp = s.getByTestId("ready-panel-opponent");
+    expect(opp.props.accessibilityLabel).toBe("Opponent, not ready");
+    s.rerender(<FaceoffChip {...athletes} readiness={{ me: true, opponent: true }} />);
+    expect(s.getByTestId("ready-panel-opponent").props.accessibilityLabel).toBe("Opponent, ready");
+    expect(color(within(s.getByTestId("ready-panel-opponent")).getByText("READY"))).toBe(p.text);
   });
 });
 

@@ -211,6 +211,164 @@ describe("reserveMatchVideoUpload", () => {
   });
 });
 
+// Capture quality and lens (timekeeper mode spec 13.4, A21, A22; jr_be
+// 20261021100900): written on the two writes that point the row at a new
+// recording, and never invented.
+describe("reserveMatchVideoUpload capture columns", () => {
+  const CAPTURED = { ...RESERVE, captureQuality: "1080p" as const, captureLens: "ultrawide" as const };
+  const DUP = { data: null, error: { code: "23505", message: "dup", details: "", hint: "" } };
+  const NO_COLUMN = {
+    data: null,
+    error: {
+      code: "PGRST204",
+      message: "Could not find the 'capture_lens' column of 'match_videos' in the schema cache",
+      details: null,
+      hint: null,
+    },
+  };
+
+  it("the INSERT carries capture_quality and capture_lens when given", async () => {
+    const { sb, calls } = client([{ data: ROW, error: null }]);
+    await reserveMatchVideoUpload(sb, CAPTURED);
+    expect(calls.find((c) => c.op === "insert")!.args[0]).toMatchObject({
+      capture_quality: "1080p",
+      capture_lens: "ultrawide",
+    });
+  });
+
+  it("omits them when not given (null or absent), so the row keeps NULL for unknown", async () => {
+    for (const params of [RESERVE, { ...RESERVE, captureQuality: null, captureLens: null }]) {
+      const { sb, calls } = client([{ data: ROW, error: null }]);
+      await reserveMatchVideoUpload(sb, params);
+      const insert = calls.find((c) => c.op === "insert")!.args[0] as Record<string, unknown>;
+      expect(insert).not.toHaveProperty("capture_quality");
+      expect(insert).not.toHaveProperty("capture_lens");
+    }
+  });
+
+  it("sends only the one it has", async () => {
+    const { sb, calls } = client([{ data: ROW, error: null }]);
+    await reserveMatchVideoUpload(sb, { ...RESERVE, captureQuality: "720p" });
+    const insert = calls.find((c) => c.op === "insert")!.args[0] as Record<string, unknown>;
+    expect(insert.capture_quality).toBe("720p");
+    expect(insert).not.toHaveProperty("capture_lens");
+  });
+
+  it("the takeover PATCH (a new recording) carries them too", async () => {
+    const { sb, calls } = client([
+      DUP,
+      { data: { ...ROW, id: "OLD", storage_path: "M/A/0.mp4" }, error: null },
+      { data: { ...ROW, id: "OLD" }, error: null },
+    ]);
+    const res = await reserveMatchVideoUpload(sb, CAPTURED);
+    expect(res.ok && res.data.outcome).toBe("reserved");
+    expect(calls.find((c) => c.op === "update")!.args[0]).toEqual({
+      storage_path: "M/A/1.mp4",
+      status: "uploading",
+      file_size_bytes: 1234,
+      upload_bytes_total: 1234,
+      upload_transport: "tus",
+      capture_quality: "1080p",
+      capture_lens: "ultrawide",
+    });
+  });
+
+  it("a database without the columns (PGRST204): the INSERT is repeated once without them", async () => {
+    const { sb, calls } = client([NO_COLUMN, { data: ROW, error: null }]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const res = await reserveMatchVideoUpload(sb, CAPTURED);
+    warn.mockRestore();
+    expect(res.ok && res.data).toMatchObject({ id: "V1", outcome: "reserved", resumed: false });
+    const inserts = calls.filter((c) => c.op === "insert").map((c) => c.args[0] as Record<string, unknown>);
+    expect(inserts).toHaveLength(2);
+    expect(inserts[0]).toHaveProperty("capture_quality", "1080p");
+    expect(inserts[1]).not.toHaveProperty("capture_quality");
+    expect(inserts[1]).not.toHaveProperty("capture_lens");
+    expect(inserts[1]).toMatchObject({ storage_path: "M/A/1.mp4", status: "uploading", record_duration_ms: 361_000 });
+  });
+
+  it("the takeover PATCH falls back the same way, keeping every guard", async () => {
+    const { sb, calls } = client([
+      DUP,
+      { data: { ...ROW, id: "OLD", storage_path: "M/A/0.mp4" }, error: null },
+      NO_COLUMN,
+      { data: { ...ROW, id: "OLD" }, error: null },
+    ]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const res = await reserveMatchVideoUpload(sb, CAPTURED);
+    warn.mockRestore();
+    expect(res.ok && res.data).toMatchObject({ id: "OLD", outcome: "reserved", previousStoragePath: "M/A/0.mp4" });
+    const updates = calls.filter((c) => c.op === "update").map((c) => c.args[0] as Record<string, unknown>);
+    expect(updates).toHaveLength(2);
+    expect(updates[0]).toHaveProperty("capture_lens", "ultrawide");
+    expect(updates[1]).not.toHaveProperty("capture_lens");
+    // Both PATCHes carry the key and status guard (after the read's two filters).
+    expect(calls.filter((c) => c.op === "eq").map((c) => c.args).slice(2)).toEqual([
+      ["id", "OLD"],
+      ["storage_path", "M/A/0.mp4"],
+      ["status", "uploading"],
+      ["id", "OLD"],
+      ["storage_path", "M/A/0.mp4"],
+      ["status", "uploading"],
+    ]);
+  });
+
+  it("retries on nothing else: not a gate, not a PGRST204 about another column", async () => {
+    const otherColumn = {
+      data: null,
+      error: { ...NO_COLUMN.error, message: "Could not find the 'nope' column of 'match_videos' in the schema cache" },
+    };
+    const gate = { data: null, error: { code: "P0001", message: "limit", details: "", hint: "upload_rate_limited" } };
+    for (const first of [otherColumn, gate]) {
+      const { sb, calls } = client([first, { data: ROW, error: null }]);
+      const res = await reserveMatchVideoUpload(sb, CAPTURED);
+      expect(res.ok).toBe(false);
+      expect(calls.filter((c) => c.op === "insert")).toHaveLength(1);
+    }
+  });
+
+  it("the fallback says so once per process, naming the missing migration", async () => {
+    vi.resetModules();
+    const fresh = await import("./match-video-upload");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      for (let i = 0; i < 2; i++) {
+        const { sb } = client([NO_COLUMN, { data: ROW, error: null }]);
+        const res = await fresh.reserveMatchVideoUpload(sb, CAPTURED);
+        expect(res.ok).toBe(true);
+      }
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("20261021100900");
+      expect(String(warn.mock.calls[0][0])).toContain("capture_lens");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("no warning when the columns exist, nor for another error", async () => {
+    vi.resetModules();
+    const fresh = await import("./match-video-upload");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await fresh.reserveMatchVideoUpload(client([{ data: ROW, error: null }]).sb, CAPTURED);
+      const otherColumn = { data: null, error: { ...NO_COLUMN.error, message: "Could not find the 'nope' column" } };
+      await fresh.reserveMatchVideoUpload(client([otherColumn]).sb, CAPTURED);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("a second PGRST204 after the fallback is reported, never looped on", async () => {
+    const { sb, calls } = client([NO_COLUMN, NO_COLUMN, { data: ROW, error: null }]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const res = await reserveMatchVideoUpload(sb, CAPTURED);
+    warn.mockRestore();
+    expect(!res.ok && res.error.raw?.code).toBe("PGRST204");
+    expect(calls.filter((c) => c.op === "insert")).toHaveLength(2);
+  });
+});
+
 describe("finalizeMatchVideoUpload", () => {
   it("PATCHes to 'ready' filtered on id AND storage_path", async () => {
     const { sb, calls } = client([{ data: { ...ROW, status: "ready" }, error: null }]);

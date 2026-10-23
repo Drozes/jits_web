@@ -60,8 +60,8 @@ function renderStep() {
       matchId="M1"
       durationSeconds={600}
       initialFinishSeconds={377}
-      me={{ id: "me-1", displayName: "Kai Reyes", elo: 1512, weight: 170 }}
-      opponent={{ id: "opp-1", displayName: "Mina Park", elo: 1498, weight: 168 }}
+      me={{ athleteId: "me-1", displayName: "Kai Reyes", currentElo: 1512, weightLbs: 170 }}
+      opponent={{ athleteId: "opp-1", displayName: "Mina Park", currentElo: 1498, weightLbs: 168 }}
       submissionTypes={TYPES}
       onRecorded={jest.fn()}
     />,

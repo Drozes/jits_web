@@ -146,6 +146,12 @@ export interface ChipInput {
   lastLiveWriteFailed: boolean;
   /** Lobby size EXCLUDING self; null while the lobby is unknown. */
   onMat: number | null;
+  /**
+   * The Arena's Online & close rows (jr_be spec 023 section 8.5), null or
+   * absent while unknown or outside nearby mode. Live with nobody else on
+   * the mat and some close, the chip reads `LIVE · N NEARBY`.
+   */
+  nearbyClose?: number | null;
   outgoing: {
     opponentName: string;
     createdAt?: string | null;
@@ -197,6 +203,11 @@ function spokenOnMat(n: number | null): string {
   if (n === null) return "";
   if (n === 0) return " Just you on the mat.";
   return ` ${formatBadgeCount(n)} on the mat.`;
+}
+
+/** Nobody else on my mat, but some in Online & close: the count, else null. */
+function nearbyOnly(onMat: number | null, close: number | null | undefined): number | null {
+  return onMat === 0 && typeof close === "number" && close > 0 ? close : null;
 }
 
 /**
@@ -419,15 +430,28 @@ export function describeHeaderChip(input: ChipInput): ChipModel {
   }
   if (isLive) {
     const n = input.onMat;
+    // Nobody else on my mat but some close (jr_be spec 023 8.5): indoor GPS
+    // often puts athletes on one mat there, so never "just you".
+    const near = nearbyOnly(n, input.nearbyClose);
     return base({
       kind: "live",
       tone: "live",
       glyph: "●",
-      lead: n === null ? "LIVE" : n === 0 ? "LIVE · JUST YOU" : `LIVE · ${formatBadgeCount(n)}`,
+      lead:
+        near !== null
+          ? `LIVE · ${formatBadgeCount(near)} NEARBY`
+          : n === null
+            ? "LIVE"
+            : n === 0
+              ? "LIVE · JUST YOU"
+              : `LIVE · ${formatBadgeCount(n)}`,
       // The live menu (and its Go offline) is always one tap away.
       action: "popover",
       disabled: !input.controllerReady,
-      accessibilityLabel: `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Open live menu`,
+      accessibilityLabel:
+        near !== null
+          ? `${CHIP_LABEL_PREFIX} Nobody else on your mat, ${formatBadgeCount(near)} nearby. Open live menu`
+          : `${CHIP_LABEL_PREFIX}${spokenOnMat(n)} Open live menu`,
     });
   }
   if (input.lastLiveWriteFailed) {

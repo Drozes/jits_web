@@ -12,7 +12,7 @@ interface EndStepProps {
 }
 
 /**
- * Step 5: transient "match ended, hold on" screen. Auto-advances to
+ * The end step: transient "match ended, hold on" screen. Auto-advances to
  * the result step after a short delay. Web folds this into the live
  * step but a separate frame on mobile makes the end -> result transition
  * feel less abrupt and gives haptic / animation room.

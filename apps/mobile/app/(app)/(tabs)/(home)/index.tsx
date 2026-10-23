@@ -15,7 +15,8 @@ import { useDashboardSummary } from "@/lib/dashboard/use-dashboard-summary";
 import { usePullToRefresh, useRefetchOnRefocus } from "@/lib/cache/use-refocus-refetch";
 import { useMatchExitCount } from "@/lib/arena/arena-store";
 import { matchDetailHref } from "@/lib/match-detail/href";
-import { ResumeMatchCard } from "@/components/dashboard/resume-match-card";
+import { HomeResumeCards } from "@/components/dashboard/home-resume-cards";
+import { isTimekeepingActive, useMyTimekeepingMatch } from "@/lib/match-flow/timekeeping-match-store";
 import { PracticeOfferCard } from "@/components/dashboard/practice-offer-card";
 import { InviteHomeCard } from "@/components/invite/invite-home-card";
 import { shouldOfferPracticeMatch } from "@/lib/practice/constants";
@@ -52,6 +53,7 @@ export default function DashboardScreen() {
   // SWR keeps stale data on screen while revalidating; the spinner shows only
   // for a pull, never for the silent refetch when the tab regains focus.
   const { match: activeMatch, refresh: refreshActiveMatch } = useMyActiveMatch(athlete?.id);
+  const timekeepingMatch = useMyTimekeepingMatch(athlete?.id); // A20, refreshed with the one above
   // The Highlights carousel's empty-state copy needs the completed match
   // count: a number once the summary lands (no stats = 0), null if it failed,
   // undefined while it loads.
@@ -117,7 +119,7 @@ export default function DashboardScreen() {
     !practiceDismissed &&
     shouldOfferPracticeMatch({
       athlete,
-      hasActiveMatch: !!activeMatch,
+      hasActiveMatch: !!activeMatch || isTimekeepingActive(timekeepingMatch),
       statsLoaded: !!stats,
       hasMatches,
       hasEverPlayed,
@@ -160,9 +162,9 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* A match the app lost (killed mid-match, jits-r9a) comes first and
-            takes Home's one red CTA (spec matches-tab PM7). */}
-        {activeMatch ? <ResumeMatchCard match={activeMatch} /> : null}
+        {/* A match the app lost comes first and takes Home's one red CTA
+            (spec matches-tab PM7); one this athlete timekeeps sits below. */}
+        <HomeResumeCards activeMatch={activeMatch} timekeepingMatch={timekeepingMatch} />
 
         {/* The ONE Highlights carousel (spec matches-tab 7, C-HM3): own reels
             in phase 1, later friend, nearby and Elo sources in the same row.
@@ -186,7 +188,7 @@ export default function DashboardScreen() {
           <PracticeOfferCard onDismiss={() => setPracticeDismissed(true)} />
         ) : null}
         {/* Invite fallback (jr_be spec 016): never beside a practice offer or a resume prompt. */}
-        {!offerPractice && !activeMatch ? <InviteHomeCard /> : null}
+        {!offerPractice && !activeMatch && !timekeepingMatch ? <InviteHomeCard /> : null}
 
         {isLoading ? (
           <DashboardSkeleton />

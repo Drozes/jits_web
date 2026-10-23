@@ -7,62 +7,120 @@
  */
 import {
   isStatusRegression,
+  matchSnapshot,
   planReconcile,
   pollIntervalFor,
   resultFromOutcome,
+  resultFromRoles,
   targetFor,
+  timekeeperDoneSettled,
   type MatchSnapshot,
 } from "@/lib/match-flow/reconcile";
 import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
+import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
+import type { MatchDetails } from "@jits/shared/api/queries";
 
 const ME = "me-1";
 const OPP = "opp-1";
+
+/** A two-athlete match; `first` is listed first (the challenger until BE-G). */
+function matchOf(first: string, second: string): MatchDetails {
+  const p = (id: string) => ({ athlete_id: id, display_name: id, current_elo: 1500, current_weight: 170, profile_photo_url: null, role: "competitor", outcome: null, elo_before: null, elo_after: null, elo_delta: 0, weight_division_gap: null });
+  return { participants: [p(first), p(second)] } as unknown as MatchDetails;
+}
+
+/** ME's roles in a match ME challenged, as the wizard derives them. */
+const ROLES = deriveMatchRoles(matchOf(ME, OPP), ME)!;
 
 function snap(status: string, confirmedAthleteIds: string[] | null = []): MatchSnapshot {
   return { status, confirmedAthleteIds };
 }
 
 function plan(current: MatchStep, s: MatchSnapshot, initial = false) {
-  return planReconcile({ current, snapshot: s, currentAthleteId: ME, opponentId: OPP, initial });
+  return planReconcile({ current, snapshot: s, roles: ROLES, initial });
 }
 
 describe("targetFor: what each status implies", () => {
   it("cancelled -> exit", () => {
-    expect(targetFor(snap("cancelled"), ME, OPP)).toBe("exit");
+    expect(targetFor(snap("cancelled"), ROLES)).toBe("exit");
   });
   it("voided -> exit (terminal, like cancelled)", () => {
-    expect(targetFor(snap("voided"), ME, OPP)).toBe("exit");
+    expect(targetFor(snap("voided"), ROLES)).toBe("exit");
   });
   it("pending -> no opinion (stay pre-live)", () => {
-    expect(targetFor(snap("pending"), ME, OPP)).toBeNull();
+    expect(targetFor(snap("pending"), ROLES)).toBeNull();
   });
   it("in_progress -> live", () => {
-    expect(targetFor(snap("in_progress"), ME, OPP)).toBe("live");
+    expect(targetFor(snap("in_progress"), ROLES)).toBe("live");
   });
   it("completed with nobody confirmed -> confirm (completed is set at RECORD time)", () => {
-    expect(targetFor(snap("completed", []), ME, OPP)).toBe("confirm");
+    expect(targetFor(snap("completed", []), ROLES)).toBe("confirm");
   });
   it("completed with only one side confirmed -> confirm", () => {
-    expect(targetFor(snap("completed", [ME]), ME, OPP)).toBe("confirm");
-    expect(targetFor(snap("completed", [OPP]), ME, OPP)).toBe("confirm");
+    expect(targetFor(snap("completed", [ME]), ROLES)).toBe("confirm");
+    expect(targetFor(snap("completed", [OPP]), ROLES)).toBe("confirm");
   });
   it("completed with both confirmed -> summary", () => {
-    expect(targetFor(snap("completed", [OPP, ME]), ME, OPP)).toBe("summary");
+    expect(targetFor(snap("completed", [OPP, ME]), ROLES)).toBe("summary");
   });
   it("completed with unknown confirmations -> confirm", () => {
-    expect(targetFor(snap("completed", null), ME, OPP)).toBe("confirm");
+    expect(targetFor(snap("completed", null), ROLES)).toBe("confirm");
   });
   it("disputed -> summary, whoever disputed", () => {
-    expect(targetFor(snap("disputed", []), ME, OPP)).toBe("summary");
+    expect(targetFor(snap("disputed", []), ROLES)).toBe("summary");
   });
   it("an unknown status -> no opinion", () => {
-    expect(targetFor(snap("weird"), ME, OPP)).toBeNull();
+    expect(targetFor(snap("weird"), ROLES)).toBeNull();
+  });
+});
+
+describe("targetFor with roles: one row per (status, confirmations, viewer), today's outputs", () => {
+  const STRANGER = "someone-else";
+  // [status, confirmations, the step today's flow goes to]
+  const ROWS: [string, string[] | null, MatchStep | "exit" | null][] = [
+    ["pending", [], null],
+    ["in_progress", [], "live"],
+    ["completed", [], "confirm"],
+    ["completed", null, "confirm"],
+    ["completed", [ME], "confirm"],
+    ["completed", [OPP], "confirm"],
+    ["completed", [STRANGER, ME], "confirm"],
+    ["completed", [ME, OPP], "summary"],
+    ["completed", [OPP, ME], "summary"],
+    ["disputed", [], "summary"],
+    ["cancelled", [], "exit"],
+    ["voided", [ME, OPP], "exit"],
+    ["weird", [], null],
+  ];
+  const VIEWERS = {
+    challenger: deriveMatchRoles(matchOf(ME, OPP), ME)!,
+    opponent: deriveMatchRoles(matchOf(OPP, ME), ME)!,
+  };
+
+  it("derives the viewer each row runs as", () => {
+    expect(VIEWERS.challenger.viewer).toBe("challenger");
+    expect(VIEWERS.opponent.viewer).toBe("opponent");
+  });
+
+  for (const [viewer, roles] of Object.entries(VIEWERS)) {
+    it.each(ROWS)(`${viewer}: %s with %j -> %s`, (status, confirmed, expected) => {
+      expect(targetFor(snap(status, confirmed), roles)).toBe(expected);
+    });
+  }
+
+  it("the initial summary -> confirm correction reads the viewer's own confirmation, as either athlete", () => {
+    for (const roles of Object.values(VIEWERS)) {
+      const initial = (ids: string[]) =>
+        planReconcile({ current: "summary", snapshot: snap("completed", ids), roles, initial: true });
+      expect(initial([OPP])).toEqual({ type: "goto", step: "confirm" });
+      expect(initial([ME])).toEqual({ type: "none" });
+    }
   });
 });
 
 describe("planReconcile", () => {
   it("exits a cancelled match from any pre-live step (jits-bh2v)", () => {
-    for (const step of ["wait", "weight", "ready"] as const) {
+    for (const step of ["weight", "ready"] as const) {
       expect(plan(step, snap("cancelled"))).toEqual({ type: "exit", reason: "cancelled" });
     }
   });
@@ -178,7 +236,7 @@ describe("pollIntervalFor: poll only where the athlete waits on the other side",
     expect(pollIntervalFor("live")).toBeGreaterThan(pollIntervalFor("confirm")!);
   });
 
-  it.each<MatchStep | null>(["wait", "weight", "end", "summary", null])("%s never polls", (step) => {
+  it.each<MatchStep | null>(["weight", "end", "summary", null])("%s never polls", (step) => {
     expect(pollIntervalFor(step)).toBeNull();
   });
 });
@@ -214,5 +272,275 @@ describe("resultFromOutcome: the verdict when result_submitted was missed", () =
   });
   it("is null before an outcome is stamped", () => {
     expect(resultFromOutcome(null, ME, OPP)).toBeNull();
+  });
+});
+
+// ---- timekeeper mode (spec 6.2, 10; TEST-PLAN 3.2, M1) ----
+
+const TK = "tk-1";
+
+/** A timekeeper-mode match ME challenged, with `extra` (the BE-G keys) on it. */
+function tkMatchOf(extra: Record<string, unknown> = {}): MatchDetails {
+  return { ...matchOf(ME, OPP), requires_timekeeper: true, challenger_id: ME, timekeeper_id: TK, ...extra } as MatchDetails;
+}
+
+const TK_ATHLETE = deriveMatchRoles(tkMatchOf(), ME)!;
+const TK_TIMEKEEPER = deriveMatchRoles(tkMatchOf(), TK)!;
+
+function tkSnap(status: string, extra: Partial<MatchSnapshot> = {}): MatchSnapshot {
+  return { status, confirmedAthleteIds: [], timekeeperId: TK, endedAt: null, cancelReason: null, resultEditCount: 0, ...extra };
+}
+
+describe("targetFor: timekeeper mode, one row per (server state, viewer)", () => {
+  const ENDED = "2026-10-20T10:05:00Z";
+  // [label, snapshot, athlete target, timekeeper target]
+  const ROWS: [string, MatchSnapshot, MatchStep | "exit" | null, MatchStep | "exit" | null][] = [
+    ["pending, no timekeeper", tkSnap("pending", { timekeeperId: null }), "crew", "weight"],
+    ["pending, seated", tkSnap("pending"), "weight", "weight"],
+    ["in_progress, clock running", tkSnap("in_progress"), "live", "live"],
+    ["in_progress, clock ended", tkSnap("in_progress", { endedAt: ENDED }), "result", "result"],
+    ["completed, nobody confirmed", tkSnap("completed"), "confirm", "summary"],
+    ["completed, one confirmed", tkSnap("completed", { confirmedAthleteIds: [OPP] }), "confirm", "summary"],
+    ["completed, confirmations unknown", tkSnap("completed", { confirmedAthleteIds: null }), "confirm", "summary"],
+    ["completed, both confirmed", tkSnap("completed", { confirmedAthleteIds: [ME, OPP] }), "summary", "summary"],
+    ["disputed", tkSnap("disputed"), "summary", "summary"],
+    // An admin's dispute review: the athletes leave, the timekeeper's done screen shows it.
+    ["voided", tkSnap("voided"), "exit", "summary"],
+    ["cancelled", tkSnap("cancelled", { cancelReason: "timekeeper_left" }), "exit", "exit"],
+    ["an unknown status", tkSnap("weird"), null, null],
+  ];
+
+  it.each(ROWS)("%s", (_label, s, athlete, timekeeper) => {
+    expect(targetFor(s, TK_ATHLETE)).toBe(athlete);
+    expect(targetFor(s, TK_TIMEKEEPER)).toBe(timekeeper);
+  });
+
+  it("the two-athlete mapping ignores the timekeeper-mode snapshot keys", () => {
+    for (const [, s] of ROWS) {
+      expect(targetFor(s, ROLES)).toBe(targetFor({ status: s.status, confirmedAthleteIds: s.confirmedAthleteIds }, ROLES));
+    }
+  });
+});
+
+describe("planReconcile: timekeeper mode", () => {
+  const tkPlan = (current: MatchStep, s: MatchSnapshot, roles = TK_ATHLETE, initial = false) =>
+    planReconcile({ current, snapshot: s, roles, initial });
+
+  it("moves picking athletes to the face-off once someone is seated", () => {
+    expect(tkPlan("crew", tkSnap("pending"))).toEqual({ type: "goto", step: "weight" });
+  });
+
+  it("moves face-off athletes back to the picker after a pre-start drop-out (A5)", () => {
+    expect(tkPlan("weight", tkSnap("pending", { timekeeperId: null }))).toEqual({ type: "goto", step: "crew" });
+    expect(tkPlan("ready", tkSnap("pending", { timekeeperId: null }))).toEqual({ type: "goto", step: "crew" });
+  });
+
+  it("moves everyone to result when the timekeeper ends the clock", () => {
+    const ended = tkSnap("in_progress", { endedAt: "2026-10-20T10:05:00Z" });
+    expect(tkPlan("live", ended)).toEqual({ type: "goto", step: "result" });
+    expect(tkPlan("live", ended, TK_TIMEKEEPER)).toEqual({ type: "goto", step: "result" });
+  });
+
+  it("sends the timekeeper to the done screen once they recorded", () => {
+    expect(tkPlan("result", tkSnap("completed"), TK_TIMEKEEPER)).toEqual({ type: "goto", step: "summary" });
+  });
+
+  it("sends a confirmed athlete back to confirm after a result edit reset their confirmation (A8)", () => {
+    const edited = tkSnap("completed", { confirmedAthleteIds: [], resultEditCount: 1, summaryEditCount: 0 });
+    expect(tkPlan("summary", edited)).toEqual({ type: "goto", step: "confirm" });
+  });
+
+  it("does not move a summary athlete back without an edit, or while their confirmation stands", () => {
+    expect(tkPlan("summary", tkSnap("completed", { resultEditCount: 1, summaryEditCount: 1 }))).toEqual({ type: "none" });
+    expect(
+      tkPlan("summary", tkSnap("completed", { confirmedAthleteIds: [ME], resultEditCount: 1, summaryEditCount: 0 })),
+    ).toEqual({ type: "none" });
+  });
+
+  it("an inconclusive read does not use the edit up: the next consistent read still moves back (A8)", () => {
+    // The baseline is the count the verdict was reached on; it does not move with each read.
+    const straddling = tkSnap("completed", { confirmedAthleteIds: [ME], resultEditCount: 1, summaryEditCount: 0 });
+    const unknown = tkSnap("completed", { confirmedAthleteIds: null, resultEditCount: 1, summaryEditCount: 0 });
+    const consistent = tkSnap("completed", { confirmedAthleteIds: [], resultEditCount: 1, summaryEditCount: 0 });
+    expect(tkPlan("summary", straddling)).toEqual({ type: "none" });
+    expect(tkPlan("summary", unknown)).toEqual({ type: "none" });
+    expect(tkPlan("summary", consistent)).toEqual({ type: "goto", step: "confirm" });
+  });
+
+  it("keeps the shipped initial correction (summary -> confirm, jits-bmei) in timekeeper mode too", () => {
+    expect(tkPlan("summary", tkSnap("completed", { confirmedAthleteIds: [OPP] }), TK_ATHLETE, true)).toEqual({
+      type: "goto",
+      step: "confirm",
+    });
+    expect(tkPlan("summary", tkSnap("completed", { confirmedAthleteIds: [ME] }), TK_ATHLETE, true)).toEqual({ type: "none" });
+  });
+
+  it("never moves the timekeeper back", () => {
+    expect(tkPlan("weight", tkSnap("pending", { timekeeperId: null }), TK_TIMEKEEPER)).toEqual({ type: "none" });
+    expect(
+      tkPlan("summary", tkSnap("completed", { resultEditCount: 2, summaryEditCount: 1 }), TK_TIMEKEEPER, true),
+    ).toEqual({ type: "none" });
+  });
+
+  it("exits a cancel with its reason, for the reason-specific toast", () => {
+    for (const reason of ["no_timekeeper", "timekeeper_left", "faceoff_timeout", "admin_void"] as const) {
+      expect(tkPlan("live", tkSnap("cancelled", { cancelReason: reason }))).toEqual({
+        type: "exit",
+        reason: "cancelled",
+        cancelReason: reason,
+      });
+    }
+    expect(tkPlan("crew", tkSnap("cancelled"), TK_ATHLETE)).toEqual({ type: "exit", reason: "cancelled", cancelReason: null });
+    expect(tkPlan("summary", tkSnap("cancelled"))).toEqual({ type: "none" });
+  });
+
+  it("exits a void for the athletes like the two-athlete flow; the timekeeper stays on the done screen (spec 6.2)", () => {
+    expect(tkPlan("summary", tkSnap("voided"))).toEqual({ type: "exit", reason: "voided" });
+    expect(tkPlan("confirm", tkSnap("voided"))).toEqual({ type: "exit", reason: "voided" });
+    expect(tkPlan("summary", tkSnap("voided"), TK_TIMEKEEPER)).toEqual({ type: "none" });
+    expect(tkPlan("summary", tkSnap("voided"), TK_TIMEKEEPER, true)).toEqual({ type: "none" });
+    expect(tkPlan("result", tkSnap("voided"), TK_TIMEKEEPER)).toEqual({ type: "goto", step: "summary" });
+  });
+
+  it("a two-athlete cancel carries no reason key (its exit is unchanged)", () => {
+    expect(plan("weight", snap("cancelled"))).toEqual({ type: "exit", reason: "cancelled" });
+    expect("cancelReason" in plan("weight", tkSnap("cancelled", { cancelReason: "athlete_left" }))).toBe(false);
+  });
+
+  it("only the allowed moves go back, for every status and step", () => {
+    const allowed = new Set(["weight>crew", "ready>crew", "summary>confirm"]);
+    const statuses = ["pending", "in_progress", "completed", "disputed", "cancelled", "voided"];
+    const extras: Partial<MatchSnapshot>[] = [
+      {},
+      { timekeeperId: null },
+      { endedAt: "2026-10-20T10:05:00Z" },
+      { confirmedAthleteIds: [ME, OPP] },
+      { resultEditCount: 1, summaryEditCount: 0 },
+      { confirmedAthleteIds: null, resultEditCount: 1, summaryEditCount: 0 },
+    ];
+    for (const roles of [TK_ATHLETE, TK_TIMEKEEPER]) {
+      for (const current of MATCH_STEPS) {
+        for (const status of statuses) {
+          for (const extra of extras) {
+            for (const initial of [false, true]) {
+              const a = tkPlan(current, tkSnap(status, extra), roles, initial);
+              if (a.type === "goto" && MATCH_STEPS.indexOf(a.step) <= MATCH_STEPS.indexOf(current)) {
+                expect(allowed.has(`${current}>${a.step}`)).toBe(true);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe("pollIntervalFor: timekeeper mode (review tech M7)", () => {
+  it.each<MatchStep>(["crew", "weight"])("%s polls every 4 s for athletes and the timekeeper", (step) => {
+    expect(pollIntervalFor(step, TK_ATHLETE)).toBe(4_000);
+    expect(pollIntervalFor(step, TK_TIMEKEEPER)).toBe(4_000);
+  });
+
+  it("the timekeeper's summary (the done screen) polls every 4 s; an athlete's does not", () => {
+    expect(pollIntervalFor("summary", TK_TIMEKEEPER)).toBe(4_000);
+    expect(pollIntervalFor("summary", TK_ATHLETE)).toBeNull();
+  });
+
+  it("keeps the shipped intervals on every other step", () => {
+    for (const step of ["ready", "live", "end", "result", "confirm", null] as const) {
+      expect(pollIntervalFor(step, TK_ATHLETE)).toBe(pollIntervalFor(step));
+    }
+  });
+
+  it("the two-athlete intervals are unchanged with roles", () => {
+    for (const step of [...MATCH_STEPS, null]) {
+      expect(pollIntervalFor(step, ROLES)).toBe(pollIntervalFor(step));
+      expect(pollIntervalFor(step, null)).toBe(pollIntervalFor(step));
+    }
+    expect(pollIntervalFor("crew")).toBeNull();
+    expect(pollIntervalFor("weight", ROLES)).toBeNull();
+  });
+
+  it("the done screen stops once settled (jits-o47s.44)", () => {
+    expect(pollIntervalFor("summary", TK_TIMEKEEPER, true)).toBeNull();
+    expect(pollIntervalFor("summary", TK_TIMEKEEPER, false)).toBe(4_000);
+  });
+
+  it("settled touches no other step, no athlete and no two-athlete match", () => {
+    for (const step of [...MATCH_STEPS, null]) {
+      expect(pollIntervalFor(step, ROLES, true)).toBe(pollIntervalFor(step));
+      expect(pollIntervalFor(step, null, true)).toBe(pollIntervalFor(step));
+      expect(pollIntervalFor(step, TK_ATHLETE, true)).toBe(pollIntervalFor(step, TK_ATHLETE));
+      if (step !== "summary") expect(pollIntervalFor(step, TK_TIMEKEEPER, true)).toBe(pollIntervalFor(step, TK_TIMEKEEPER));
+    }
+  });
+});
+
+describe("timekeeperDoneSettled: nothing on the done screen can change (jits-o47s.44)", () => {
+  const s = (status: string, confirmedAthleteIds: string[] | null) => ({ status, confirmedAthleteIds });
+
+  it("settles a completed match both athletes confirmed, and a voided one", () => {
+    expect(timekeeperDoneSettled(s("completed", [ME, OPP]), TK_TIMEKEEPER)).toBe(true);
+    expect(timekeeperDoneSettled(s("completed", [OPP, ME, "someone-else"]), TK_TIMEKEEPER)).toBe(true);
+    expect(timekeeperDoneSettled(s("voided", []), TK_TIMEKEEPER)).toBe(true);
+    expect(timekeeperDoneSettled(s("voided", null), TK_TIMEKEEPER)).toBe(true);
+  });
+
+  it("keeps polling while a confirmation is owed or unknown", () => {
+    expect(timekeeperDoneSettled(s("completed", []), TK_TIMEKEEPER)).toBe(false);
+    expect(timekeeperDoneSettled(s("completed", [ME]), TK_TIMEKEEPER)).toBe(false);
+    expect(timekeeperDoneSettled(s("completed", [OPP]), TK_TIMEKEEPER)).toBe(false);
+    expect(timekeeperDoneSettled(s("completed", null), TK_TIMEKEEPER)).toBe(false);
+  });
+
+  it("keeps polling a disputed match (the admin's review is pending) and any status off the done screen", () => {
+    for (const status of ["disputed", "in_progress", "pending", "cancelled", "mystery"]) {
+      expect(timekeeperDoneSettled(s(status, [ME, OPP]), TK_TIMEKEEPER)).toBe(false);
+    }
+  });
+});
+
+describe("matchSnapshot", () => {
+  it("copies the timekeeper-mode keys of the read, missing ones as null / 0", () => {
+    const m = tkMatchOf({ status: "in_progress", ended_at: "E", cancel_reason: null, result_edit_count: 2 });
+    expect(matchSnapshot(m, [ME], 1)).toEqual({
+      status: "in_progress",
+      confirmedAthleteIds: [ME],
+      timekeeperId: TK,
+      endedAt: "E",
+      cancelReason: null,
+      resultEditCount: 2,
+      summaryEditCount: 1,
+    });
+    const old = { ...matchOf(ME, OPP), status: "completed", timekeeper_id: null } as MatchDetails;
+    expect(matchSnapshot(old, null)).toEqual({
+      status: "completed",
+      confirmedAthleteIds: null,
+      timekeeperId: null,
+      endedAt: null,
+      cancelReason: null,
+      resultEditCount: 0,
+      summaryEditCount: undefined,
+    });
+  });
+});
+
+describe("resultFromRoles", () => {
+  const withOutcome = (o: "win" | "loss" | "draw") => {
+    const m = tkMatchOf();
+    m.participants[0] = { ...m.participants[0], outcome: o };
+    m.participants[1] = { ...m.participants[1], outcome: o === "win" ? "loss" : o === "loss" ? "win" : "draw" };
+    return m;
+  };
+
+  it("an athlete rebuilds from their own outcome, as resultFromOutcome", () => {
+    const roles = deriveMatchRoles(withOutcome("loss"), ME)!;
+    expect(resultFromRoles(roles)).toEqual(resultFromOutcome("loss", ME, OPP));
+  });
+
+  it("the timekeeper rebuilds from the challenger's outcome", () => {
+    expect(resultFromRoles(deriveMatchRoles(withOutcome("win"), TK)!)).toEqual({ result: "submission", winnerId: ME });
+    expect(resultFromRoles(deriveMatchRoles(withOutcome("loss"), TK)!)).toEqual({ result: "submission", winnerId: OPP });
+    expect(resultFromRoles(deriveMatchRoles(withOutcome("draw"), TK)!)).toEqual({ result: "draw" });
   });
 });

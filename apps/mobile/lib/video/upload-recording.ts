@@ -16,6 +16,8 @@ import {
   touchMatchVideoUpload,
   type AbandonMatchVideoResult,
   type FinalizeMatchVideoOutcome,
+  type MatchVideoCaptureLens,
+  type MatchVideoCaptureQuality,
   type MatchVideoPreflight,
   type ReservedMatchVideo,
 } from "@jits/shared/api/match-video-upload";
@@ -37,7 +39,8 @@ import {
  * Web records WebM via `MediaRecorder`; native expo-camera produces an MP4
  * container, so the extension differs. The CODEC inside differs by platform:
  * iOS records HEVC (H.265) at 720p, about 4.7 Mbps in prod (the camera has
- * `videoQuality="720p"` and no codec or bitrate set, and AVFoundation's
+ * `videoQuality` 720p, or 1080p once the admin flag `match_capture_1080p` is
+ * on (timekeeper mode spec 13.4), and no codec or bitrate set, and AVFoundation's
  * default on HEVC-capable iPhones is HEVC), so every iOS upload goes through
  * the slicer's normalize transcode to H.264/AAC before broad playback;
  * Android records H.264/AAC. Keeping HEVC 720p is deliberate for now (about
@@ -417,6 +420,9 @@ export interface ReserveRowParams {
   fileSizeBytes: number;
   recordStartedAt: string | null;
   recordDurationMs: number | null;
+  /** What the clip was captured with (spec 13.4); omitted when unknown. */
+  captureQuality?: MatchVideoCaptureQuality | null;
+  captureLens?: MatchVideoCaptureLens | null;
 }
 
 /**

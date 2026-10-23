@@ -53,7 +53,7 @@ import {
   resetMatchUploadStore,
   setMatchUpload,
 } from "@/lib/video/match-upload-store";
-import { useVideoRecorder } from "@/lib/video/use-video-recorder";
+import { useVideoRecorder, type RecordingCapture } from "@/lib/video/use-video-recorder";
 import {
   CAMERA_READY_TIMEOUT_MS,
   STOP_WATCHDOG_MS,
@@ -248,6 +248,51 @@ describe("useVideoRecorder", () => {
     expect(mockStartUpload).toHaveBeenCalledWith(
       expect.objectContaining({ recordStartedAt: 1_791_000_000_000, recordDurationMs: 360_000 }),
     );
+  });
+
+  it("hands the reservation the capture the viewfinder had as the clip started (timekeeper mode spec 13.4)", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const captureRef: { current: RecordingCapture | null } = { current: { quality: "1080p", lens: "ultrawide" } };
+    const { result } = renderHook(() => useVideoRecorder("M", "A", null, { captureRef }));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = result.current.start();
+    });
+    // A later report (a viewfinder remount) never rewrites the clip already running.
+    captureRef.current = { quality: "720p", lens: "default" };
+    await act(async () => {
+      await result.current.stop();
+      await startPromise;
+    });
+
+    await waitFor(() => expect(result.current.state).toBe("uploaded"));
+    expect(mockStartUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ captureQuality: "1080p", captureLens: "ultrawide" }),
+    );
+  });
+
+  it("sends no capture when the viewfinder reported none (the row keeps NULL)", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const { result } = renderHook(() => useVideoRecorder("M", "A", null, { captureRef: { current: null } }));
+    const cam = makeFakeCamera();
+    result.current.cameraRef.current = cam as never;
+    act(() => result.current.markCameraReady());
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = result.current.start();
+    });
+    await act(async () => {
+      await result.current.stop();
+      await startPromise;
+    });
+    await waitFor(() => expect(result.current.state).toBe("uploaded"));
+    const params = mockStartUpload.mock.calls[0][0] as Record<string, unknown>;
+    expect(params).not.toHaveProperty("captureQuality");
+    expect(params).not.toHaveProperty("captureLens");
   });
 
   it("does not retry the upload itself, because the runner owns that", async () => {

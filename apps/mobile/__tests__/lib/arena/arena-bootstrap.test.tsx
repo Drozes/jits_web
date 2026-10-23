@@ -47,9 +47,6 @@ jest.mock("@/lib/theme/use-theme", () => ({
   useThemedTokens: () => ({ bgSecondary: "#13151B", textTertiary: "#8D929D" }),
 }));
 
-// The prompt's stakes strip reads calculate_elo_stakes; not under test here.
-jest.mock("@/lib/match-flow/use-viewer-stakes", () => ({ useViewerStakes: () => null, viewerStakesKey: () => "" }));
-
 let mockAthlete: Record<string, unknown> | null = null;
 const mockRefreshAthleteSoft = jest.fn(() => Promise.resolve());
 jest.mock("@/lib/auth/hooks", () => ({
@@ -132,6 +129,7 @@ jest.mock("@/lib/arena/use-pending-challenge-recovery", () => ({
 }));
 
 import { ArenaBootstrap, RECONNECTING_GRACE_MS } from "@/lib/arena/arena-bootstrap";
+import { __setLatestNearbyForTests } from "@/lib/arena/use-arena-nearby";
 import { Toaster, __resetToastTrackingForTests, toast } from "@/components/ui/toast";
 import { PROMPT_INPUT_GUARD_MS, REOPEN_SURFACE_GRACE_MS } from "@/lib/arena/constants";
 import { renderHook } from "@testing-library/react-native";
@@ -288,6 +286,45 @@ describe("ArenaBootstrap", () => {
     expect(mockAccept).toHaveBeenCalled();
     fireEvent.press(getByLabelText("Decline challenge"));
     expect(mockDecline).toHaveBeenCalled();
+  });
+
+  it("the prompt says Maybe a different mat only for a challenger in my close list (jr_be spec 023 C6)", () => {
+    const view = (onMat: string[], close: [string, number][]) => ({
+      mode: "nearby" as const,
+      onTheMat: new Set(onMat),
+      close: new Map(
+        close.map(([id, m]) => [id, { athleteId: id, band: `under_${m}m` as const, bandMaxM: m, canChallenge: true }]),
+      ),
+      ranges: null,
+    });
+    const plateFor = (snapshot: Parameters<typeof __setLatestNearbyForTests>[0], viewer: string | null, id: string) => {
+      __setLatestNearbyForTests(snapshot, viewer);
+      // A fresh challenge each time: the plate is decided on a challenge's first show.
+      mockIncoming = { ...RIVAL, challengeId: id };
+      const r = render(<ArenaBootstrap />);
+      const shown = r.queryByTestId("challenge-prompt-different-mat") !== null;
+      r.unmount();
+      return shown;
+    };
+    expect(plateFor(view([], [["a-9", 3000]]), "me-1", "ch-a")).toBe(true);
+    // On my mat, someone else close, a fallback read, no read: no plate.
+    expect(plateFor(view(["a-9"], []), "me-1", "ch-b")).toBe(false);
+    expect(plateFor(view([], [["a-1", 1000]]), "me-1", "ch-c")).toBe(false);
+    expect(plateFor({ mode: "fallback" }, "me-1", "ch-d")).toBe(false);
+    expect(plateFor(null, null, "ch-e")).toBe(false);
+    // A read made for another athlete on this device never shows (review: account switch).
+    expect(plateFor(view([], [["a-9", 3000]]), "someone-else", "ch-f")).toBe(false);
+
+    mockIncoming = RIVAL;
+    __setLatestNearbyForTests(view([], [["a-9", 3000]]), "me-1");
+    const r = render(<ArenaBootstrap />);
+    expect(
+      r.getByText("Rival shows up < 3 km away. GPS can be off indoors, so check you're at the same gym."),
+    ).toBeTruthy();
+    // A nearby read landing while the prompt is up never moves the buttons.
+    act(() => __setLatestNearbyForTests(view(["a-9"], []), "me-1"));
+    expect(r.getByTestId("challenge-prompt-different-mat")).toBeTruthy();
+    act(() => __setLatestNearbyForTests(null));
   });
 
   it("keeps a failed Accept's toast on screen after the prompt closes", () => {

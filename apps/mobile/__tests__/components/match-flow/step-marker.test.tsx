@@ -20,6 +20,11 @@ describe("StepMarker", () => {
     expect(el.props.accessible).toBe(true);
   });
 
+  it("dev: the timekeeper-mode crew step reads as Crew (the harness's STEP_BY_LABEL)", () => {
+    const s = render(<StepMarker step="crew" exposed />);
+    expect(s.getByTestId("match-step-crew").props.accessibilityLabel).toBe("Step 1 of 8, Crew");
+  });
+
   it("release: hidden from screen readers, testID kept", () => {
     const s = render(<StepMarker step="live" exposed={false} />);
     const el = s.getByTestId("match-step-live", { includeHiddenElements: true });

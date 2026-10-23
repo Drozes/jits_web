@@ -6,8 +6,10 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AthleteIds, Config } from "../config";
 import { Trace } from "../bot/trace";
-import { MobileOpponent, type Identity } from "../bot/opponent";
+import { MobileOpponent, TIMEKEEPER_CAP, type AccountKey, type ClientOptions, type Identity } from "../bot/opponent";
 import { MatchSide, type Fidelity, type Timing } from "../bot/match-side";
+import { TimekeeperBot, TkAthleteSide } from "../bot/timekeeper";
+import type { MobileSlice } from "./timekeeper/integration";
 import type { Idb } from "../sim/idb";
 import { summarise } from "../sim/idb";
 import type { Simctl } from "../sim/simctl";
@@ -16,12 +18,20 @@ import { MetroLog } from "../oracle/logs";
 import { redactJson } from "../lib/redact";
 import { ExpectationTimeout, log } from "../lib/util";
 
-export type Tier = "core" | "extended";
+/** `timekeeper`: the timekeeper-mode scenarios T1 to T18 (TEST-PLAN 4.2), never part of the flag-OFF guard. */
+export type Tier = "core" | "extended" | "timekeeper";
 
 export interface Scenario {
   id: string;
   tier: Tier;
   title: string;
+  /**
+   * Timekeeper-mode slices the scenario drives on the simulator. Until every
+   * one is integrated in the build (`scenarios/timekeeper/integration.ts`)
+   * the runner records the scenario as `pending` with the reason, without
+   * running it.
+   */
+  needs?: MobileSlice[];
   /** Default status when the scenario fails on a documented hypothesis. */
   expectedFailure?: string;
   /** Broadcast sends are EXPECTED to fail (E8 outage): record, do not fail. */
@@ -59,6 +69,10 @@ export class ScenarioCtx {
   readonly trace: Trace;
   private readonly bots: MobileOpponent[] = [];
   private readonly sides: MatchSide[] = [];
+  private readonly timekeepers: TimekeeperBot[] = [];
+  private readonly tkSides: TkAthleteSide[] = [];
+  /** The fourth account's athlete id, once a timekeeper scenario provisioned it (`ensureFourthAccount`). */
+  fourthId: string | null = null;
   private shot = 0;
   readonly metroStart: number;
   readonly startedAt = new Date().toISOString();
@@ -83,17 +97,40 @@ export class ScenarioCtx {
     this.metroStart = metro.offset();
   }
 
-  identity(key: "red" | "green" | "blue"): Identity {
-    return { id: this.ids[key], email: this.cfg.emails[key], displayName: this.cfg.names[key], key };
+  identity(key: AccountKey): Identity {
+    const id = key === "gold" ? this.fourthId : this.ids[key];
+    if (!id) throw new Error("the fourth account is not provisioned in this scenario (ensureFourthAccount first)");
+    return { id, email: this.cfg.emails[key], displayName: this.cfg.names[key], key };
   }
 
-  /** A signed-in bot whose realtime listeners have joined. Closed by `dispose`. */
-  async bot(key: "red" | "green" = "red"): Promise<MobileOpponent> {
-    const b = new MobileOpponent(this.cfg, this.identity(key), this.trace, this.password);
+  /**
+   * A signed-in bot whose realtime listeners have joined. Closed by
+   * `dispose`. No capability header unless `opts` asks for one, so every
+   * flag-OFF scenario's bot is the shipped client.
+   */
+  async bot(key: Exclude<AccountKey, "blue"> = "red", opts: ClientOptions = {}): Promise<MobileOpponent> {
+    const b = new MobileOpponent(this.cfg, this.identity(key), this.trace, this.password, opts);
     this.bots.push(b);
     await b.signIn();
     await b.ready();
     return b;
+  }
+
+  /** A timekeeper-capable bot that listens for timekeeper requests (`bot/timekeeper.ts`). */
+  async timekeeperBot(key: "green" | "gold"): Promise<TimekeeperBot> {
+    const b = await this.bot(key, { capabilities: [TIMEKEEPER_CAP] });
+    const tk = new TimekeeperBot(this.cfg, b, this.trace);
+    this.timekeepers.push(tk);
+    await tk.listen();
+    return tk;
+  }
+
+  /** The other athlete's (a bot's) side of a timekeeper-mode match. */
+  tkAthleteSide(bot: MobileOpponent, matchId: string, opponentId: string, viewer: "challenger" | "opponent"): TkAthleteSide {
+    const side = new TkAthleteSide(bot.client, this.trace, matchId, bot.me.id, opponentId, viewer, `bot:${bot.me.key}`);
+    this.tkSides.push(side);
+    side.start();
+    return side;
   }
 
   async matchSide(bot: MobileOpponent, matchId: string, opponentId = this.ids.blue): Promise<MatchSide> {
@@ -173,6 +210,8 @@ export class ScenarioCtx {
   }
 
   async dispose(): Promise<void> {
+    for (const t of this.timekeepers) await t.close().catch(() => undefined);
+    for (const s of this.tkSides) await s.close().catch(() => undefined);
     for (const s of this.sides) await s.close().catch(() => undefined);
     for (const b of this.bots) await b.close().catch(() => undefined);
   }

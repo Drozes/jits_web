@@ -41,7 +41,58 @@ export interface ComputedStats {
   winRate: number;
 }
 
-/** ELO stakes returned by calculate_elo_stakes RPC */
+/** One side of a get_rating_stakes response: the display rating and the RD. */
+export interface RatingStakesSide {
+  athlete_id: string;
+  /** Display rating (integer, the same number the app shows everywhere). */
+  rating: number;
+  /** Rating deviation; returned by the server, not shown in the app yet. */
+  rd: number;
+}
+
+/**
+ * Thomas V9 (Glicko-2) stakes returned by `get_rating_stakes(p_opponent_id,
+ * p_match_id)` (jr_be spec 019 section 5.2), from the VIEWER's side. Every
+ * delta is an integer display delta. A draw delta can be positive (the
+ * underdog gains), negative (the favourite gives up points) or 0 (equals).
+ * The `challenger_*` keys are aliases of win/draw/loss for half-migrated
+ * clients; read `win` / `draw` / `loss`.
+ */
+export interface RatingStakes {
+  model: "thomas-v9";
+  viewer: RatingStakesSide;
+  opponent: RatingStakesSide;
+  win: number;
+  draw: number;
+  loss: number;
+  /** The opponent's display deltas: opponent wins, draw, opponent loses. */
+  opponent_win: number;
+  opponent_draw: number;
+  opponent_loss: number;
+  /** Symmetric win probability, viewer side. */
+  win_probability: number;
+  /** The viewer's (asymmetric) Glicko-2 expected score. */
+  expected: number;
+  rematch_weight: number;
+  prior_meetings: number;
+  /** IBJJF division gap, informational only (it changes no number). */
+  weight_division_gap: number;
+  /** Rounded weight offset in rating points, from the viewer's side. */
+  weight_offset: number;
+  /** (heavier / lighter - 1) x 100, one decimal; null without both weights. */
+  weight_ratio_pct: number | null;
+  challenger_win: number;
+  challenger_draw: number;
+  challenger_loss: number;
+  /** Alias of win_probability. */
+  challenger_expected: number;
+}
+
+/**
+ * ELO stakes returned by calculate_elo_stakes RPC. Deprecated by Rating V9:
+ * the server now returns NULL for every input (kept for the web app until
+ * jits-76le.3 moves it to `RatingStakes`).
+ */
 export interface EloStakes {
   challenger_win: number;
   challenger_loss: number;

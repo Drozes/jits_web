@@ -43,6 +43,12 @@ export interface SubmissionDb {
   finish_time_seconds: number | null;
 }
 
+export interface WeightCheckDb {
+  checker_id: string;
+  subject_id: string;
+  status: string;
+}
+
 export interface AthleteDb {
   id: string;
   current_elo: number;
@@ -98,6 +104,13 @@ export const db = {
   disputes: (matchId: string) =>
     queryJson<{ raised_by: string; reason: string | null; status: string }>(
       `select raised_by, reason, status from public.match_disputes where match_id = ${lit(matchId)}`,
+    ),
+
+  /** The face-off weight checks `checker` owes on a match (jr_be-ahn.4). */
+  weightChecksBy: (matchId: string, checker: string) =>
+    queryJson<WeightCheckDb>(
+      `select checker_id, subject_id, status from public.match_weight_checks
+       where match_id = ${lit(matchId)} and checker_id = ${lit(checker)} order by subject_id`,
     ),
 
   athlete: async (id: string) =>

@@ -126,7 +126,15 @@ export class Idb {
   }
 
   async tap(el: AXElement): Promise<void> {
-    await this.tapXY(el.frame.x + el.frame.width / 2, el.frame.y + el.frame.height / 2);
+    const p = tapPoint(el);
+    await this.tapXY(p.x, p.y);
+  }
+
+  /** Press and hold an element's frame centre for `seconds` (idb `ui tap --duration`). */
+  async longPress(el: AXElement, seconds: number): Promise<void> {
+    const x = el.frame.x + el.frame.width / 2;
+    const y = el.frame.y + el.frame.height / 2;
+    await this.idb(["ui", "tap", "--duration", String(seconds), "--udid", this.udid, String(Math.round(x)), String(Math.round(y))]);
   }
 
   /** Wait for an element, then tap its frame centre. */
@@ -145,6 +153,16 @@ export class Idb {
    */
   async typeText(text: string): Promise<void> {
     await this.idb(["ui", "text", "--udid", this.udid, text]);
+  }
+
+  /**
+   * Delete up to `n` characters on each side of the caret in the focused
+   * field (HID Backspace 42, then Delete Forward 76).
+   */
+  async clearFocused(n: number): Promise<void> {
+    if (n <= 0) return;
+    const keys = [...Array(n).fill("42"), ...Array(n).fill("76")];
+    await this.idb(["ui", "key-sequence", "--udid", this.udid, ...keys]);
   }
 
   async swipe(x1: number, y1: number, x2: number, y2: number, durationS = 0.3): Promise<void> {
@@ -247,12 +265,23 @@ export class Idb {
   /**
    * Close the dev-build LogBox toast ("Open debugger to view warnings"): it
    * sits over the tab bar and swallows taps meant for the tabs. Tapping its
-   * right edge hits the close glyph. Returns true when one was closed.
+   * right edge hits the close glyph. A tap that misses the glyph opens the
+   * full-screen LogBox inspector instead, which swallows every tap after it,
+   * so an open inspector is minimised first (back to the toast), then the
+   * toast is closed. Returns true when either was closed.
    */
   async dismissLogBox(els?: AXElement[]): Promise<boolean> {
-    const all = els ?? (await this.describe());
-    const toast = all.find((e) => /open debugger to view/i.test(e.AXLabel ?? ""));
-    if (!toast) return false;
+    let all = els ?? (await this.describe());
+    let closed = false;
+    const minimize = logBoxInspectorMinimize(all);
+    if (minimize) {
+      await this.tap(minimize);
+      closed = true;
+      await new Promise((r) => setTimeout(r, 400));
+      all = await this.describe();
+    }
+    const toast = all.find(isLogBox);
+    if (!toast) return closed;
     await this.tapXY(toast.frame.x + toast.frame.width - 24, toast.frame.y + toast.frame.height / 2);
     return true;
   }
@@ -303,6 +332,110 @@ export class Idb {
     }
     return tapped;
   }
+}
+
+/** A dev-build LogBox toast ("Open debugger to view warnings"). */
+export function isLogBox(e: AXElement): boolean {
+  return /open debugger to view/i.test(e.AXLabel ?? "");
+}
+
+/** Where `Idb.tap` presses an element: its frame's centre. */
+export function tapPoint(e: AXElement): { x: number; y: number } {
+  return { x: e.frame.x + e.frame.width / 2, y: e.frame.y + e.frame.height / 2 };
+}
+
+/** True when the point is inside the element's frame (edges included). */
+export function frameContains(e: AXElement, p: { x: number; y: number }): boolean {
+  const f = e.frame;
+  return p.x >= f.x && p.x <= f.x + f.width && p.y >= f.y && p.y <= f.y + f.height;
+}
+
+/** True when two reads put an element in the same place (every edge within 1 pt). */
+export function sameFrame(a: AXElement, b: AXElement): boolean {
+  const f = a.frame;
+  const g = b.frame;
+  return Math.abs(f.x - g.x) < 1 && Math.abs(f.y - g.y) < 1 && Math.abs(f.width - g.width) < 1 && Math.abs(f.height - g.height) < 1;
+}
+
+/** When `tapWhenStill` taps. Tests shorten all three. */
+export interface StillTiming {
+  /** The element must have kept one frame across reads that started at least this far apart. */
+  stillMs: number;
+  /** Between reads. */
+  gapMs: number;
+  /** Give up, with no tap, when the element has not held still for this long. */
+  timeoutMs: number;
+}
+
+/**
+ * One confirming read after the caller's (a read takes about 200 ms on a
+ * simulator), so a tap waits about a third of a second for the screen to
+ * settle after a bot action moved it.
+ */
+export const STILL_TIMING: StillTiming = { stillMs: 300, gapMs: 150, timeoutMs: 3_000 };
+
+/**
+ * Tap the element `q` finds, but only once the screen holds it still. A tap
+ * goes to a point computed from a read that is already a few hundred ms old
+ * when idb taps, and a bot action can move the screen in between: in the
+ * Wave 3 gate (T10) a notice above TK-F4 went away after the read, the two
+ * buttons moved up, and the tap meant for TK-F4 landed on "Doesn't look
+ * right" and flagged the opponent. So this reads again, right before the
+ * tap, and taps only when the element is still where an earlier read put it
+ * and has stayed there for `stillMs`; then it taps the newest read's frame.
+ *
+ * `first` is the element as the caller's own read found it, with the time
+ * that read started. Returns the element tapped, or undefined with NO tap
+ * when the element went away (or turned disabled, for a query that asks for
+ * enabled), kept moving for `timeoutMs`, or settled outside `Idb.onScreen`'s
+ * band: the caller reads the screen again and decides (off screen, it
+ * scrolls). The band matters because a control can settle somewhere other
+ * than where the caller's on-screen read put it (an edit moves Confirm), and
+ * the dev build's LogBox toast lies in the bottom band: a tap there opens the
+ * LogBox inspector, which swallows every later tap (W3FIX review minor 2).
+ */
+export async function tapWhenStill(
+  idb: Pick<Idb, "describe" | "tap" | "onScreen">,
+  q: Query,
+  first: { el: AXElement; at: number },
+  timing: StillTiming = STILL_TIMING,
+): Promise<AXElement | undefined> {
+  const start = Date.now();
+  let held = first.el;
+  let since = first.at;
+  for (;;) {
+    await new Promise((r) => setTimeout(r, timing.gapMs));
+    const at = Date.now();
+    const cur = (await idb.describe()).find((e) => matches(e, q));
+    if (!cur) return undefined;
+    if (!sameFrame(cur, held)) {
+      held = cur;
+      since = at;
+    } else if (at - since >= timing.stillMs) {
+      if (!idb.onScreen(cur)) return undefined;
+      await idb.tap(cur);
+      return cur;
+    }
+    if (Date.now() - start > timing.timeoutMs) return undefined;
+  }
+}
+
+/** The LogBox toast lying over a point, i.e. the toast that would take a tap there. */
+export function logBoxOver(els: AXElement[], p: { x: number; y: number }): AXElement | undefined {
+  return els.find((e) => isLogBox(e) && frameContains(e, p));
+}
+
+/**
+ * The open LogBox inspector's Minimize button, or undefined when the
+ * inspector is not open. The inspector (react-native
+ * Libraries/LogBox/UI/LogBoxInspectorHeader.js and
+ * LogBoxInspectorFooter.js) has a "Log <n> of <total>" title and Dismiss /
+ * Minimize footer buttons and no testIDs; both the title and Minimize must be
+ * on screen, so no app screen can pass for it (the app has neither label).
+ */
+export function logBoxInspectorMinimize(els: AXElement[]): AXElement | undefined {
+  if (!els.some((e) => /^Log \d+ of \d+$/.test(e.AXLabel ?? ""))) return undefined;
+  return els.find((e) => e.AXLabel === "Minimize" && e.type !== "StaticText") ?? els.find((e) => e.AXLabel === "Minimize");
 }
 
 /** Compact dump of a screen for evidence: type, label, id. */

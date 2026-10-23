@@ -6,10 +6,18 @@
  * reads the stores, ticks while a countdown shows on a focused screen, and
  * routes the tap. Pushed screens get the non-interactive `HeaderLiveDot`
  * instead (decision Q1).
+ *
+ * While the athlete is the seated timekeeper of a `pending` or
+ * `in_progress` match, the chip is `TIMEKEEPING` instead (TK-H6; timekeeper
+ * mode A20, spec 9.1): it takes precedence over every live state, uses the
+ * attention (amber) token and opens that match. Never during the completed
+ * match's edit window, when the chip reports live status again (PM20).
  */
 import * as React from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
+import { Timer } from "lucide-react-native";
+import type { MyTimekeepingMatch } from "@jits/shared/api/timekeeper";
 import { LiveDot, PendingDot } from "@/components/ui/elo-system/live-pill";
 import {
   arenaActions,
@@ -20,16 +28,21 @@ import {
   useLiveSurface,
   useHasArenaController,
   useNeedsLocation,
+  useNearbyCloseCount,
   useIncomingReopenSurface,
   useLiveSwitchDirection,
   useLiveSwitchPhase,
   type LiveSwitchDirection,
   type LiveSwitchPhase,
 } from "@/lib/arena/arena-store";
-import { ARENA_HREF } from "@/lib/arena/constants";
+import { ARENA_HREF, arenaMatchHref } from "@/lib/arena/constants";
 import { openMatchToConfirm } from "@/lib/arena/open-match-to-confirm";
 import { useOnMatCount } from "@/lib/arena/use-lobby-presence";
 import { useMatchToConfirm } from "@/lib/match-flow/active-match-store";
+import { isTimekeepingActive, useMyTimekeepingMatch } from "@/lib/match-flow/timekeeping-match-store";
+import { shortName } from "@/lib/match-flow/short-name";
+import { TIMEKEEPER_COPY } from "@/lib/match-flow/timekeeper-copy";
+import { usePalette } from "@/lib/theme/palette";
 import { cn } from "@/lib/cn";
 import { LiveMenuPopover } from "./live-menu-popover";
 import {
@@ -42,10 +55,12 @@ import {
   HEADER_CHIP_CONFIRM_TEST_ID,
   HEADER_CHIP_TEST_ID,
   LIVE_DOT_PX,
+  NARROW_MIN_TEXT_SCALE,
   SEGMENT_PAD_X,
   chipAccessibilityValue,
   describeHeaderChip,
   effectiveScale,
+  estimateChipWidth,
   layoutChip,
   statusPadRight,
   type ChipTone,
@@ -121,13 +136,108 @@ interface HeaderStatusChipProps {
   onSpareWidth?: (px: number) => void;
 }
 
-export function HeaderStatusChip({ onArena = false, onSpareWidth }: HeaderStatusChipProps = {}) {
+export function HeaderStatusChip(props: HeaderStatusChipProps = {}) {
+  const timekeeping = useMyTimekeepingMatch(useArenaSelfId());
+  if (isTimekeepingActive(timekeeping)) {
+    return <TimekeepingChip match={timekeeping} onSpareWidth={props.onSpareWidth} />;
+  }
+  return <LiveStatusChip {...props} />;
+}
+
+/** How far each fitting step shrinks the TIMEKEEPING copy (as `layoutChip` steps). */
+const TIMEKEEPING_SCALE_STEP = 0.05;
+
+/**
+ * The text scale `TIMEKEEPING` draws at in a slot `slotWidth` wide, fitted the
+ * way `layoutChip` fits the live chip (the tab header rule: the chip runs its
+ * own fit): the system scale capped at 1.3x, stepped down toward 1x, and on a
+ * header narrower than the 160pt cap down to `NARROW_MIN_TEXT_SCALE`, so the
+ * role label shrinks before it ellipsizes. Its width is the live chip's for
+ * the same copy, with the stopwatch (`FONT_PX` wide, unscaled) for the dot.
+ */
+export function timekeepingTextScale(text: string, fontScale: number, slotWidth: number): number {
+  const budget = Math.min(CHIP_MAX_WIDTH, Number.isFinite(slotWidth) && slotWidth > 0 ? slotWidth : CHIP_MAX_WIDTH);
+  const scale = effectiveScale(fontScale);
+  const floor = Math.min(scale, budget < CHIP_MAX_WIDTH ? NARROW_MIN_TEXT_SCALE : 1);
+  const width = (s: number) =>
+    estimateChipWidth({ glyph: "●", lead: text, name: null, tail: null }, s, null) + FONT_PX - LIVE_DOT_PX;
+  let textScale = scale;
+  while (width(textScale) > budget && textScale > floor) {
+    textScale = Math.max(floor, Math.round((textScale - TIMEKEEPING_SCALE_STEP) * 100) / 100);
+  }
+  return textScale;
+}
+
+/**
+ * `TIMEKEEPING` (TK-H6): the whole chip while on duty as a timekeeper. One
+ * segment in the attention token (never Signal Red, never Gain Green), a
+ * stopwatch for its glyph; the label starts `Live status:` like every chip
+ * state and is never `Go live` / `Go offline` (the match-loop harness taps
+ * those). A tap opens the match; it never navigates by itself.
+ */
+function TimekeepingChip({ match, onSpareWidth }: { match: MyTimekeepingMatch; onSpareWidth?: (px: number) => void }) {
+  const router = useRouter();
+  const p = usePalette();
+  const { fontScale } = useWindowDimensions();
+  const [slotWidth, setSlotWidth] = React.useState<number | null>(null);
+  const [rowWidth, setRowWidth] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (onSpareWidth && slotWidth !== null && rowWidth !== null) onSpareWidth(Math.max(0, slotWidth - rowWidth));
+  }, [onSpareWidth, slotWidth, rowWidth]);
+  const [a = "", b = ""] = match.athletes.map((x) => shortName(x.displayName));
+  const copy = TIMEKEEPER_COPY["TK-H6"];
+  // As the live chip draws its fit: React Native ignores a multiplier cap
+  // under 1, so a scale below 1x is reached by shrinking the font size.
+  const textScale = timekeepingTextScale(copy.text, fontScale, slotWidth ?? CHIP_MAX_WIDTH);
+  const textCap = Math.max(1, textScale);
+  const drawnScale = Math.min(effectiveScale(fontScale), textCap);
+  const textStyle = textScale < drawnScale - 1e-6 ? [TEXT_STYLE, { fontSize: (FONT_PX * textScale) / drawnScale }] : [TEXT_STYLE];
+  return (
+    <View
+      testID="header-status-chip-slot"
+      onLayout={(e) => setSlotWidth(Math.floor(e.nativeEvent.layout.width))}
+      className="flex-row items-center justify-end"
+      style={{ flexGrow: 1, flexShrink: 1 }}
+    >
+      <Pressable
+        testID={HEADER_CHIP_TEST_ID}
+        accessibilityRole="button"
+        accessibilityLabel={copy.a11y({ a, b })}
+        // navigate, not push: a double tap must not stack the match twice.
+        onPress={() => router.navigate(arenaMatchHref(match.matchId) as never)}
+        onLayout={(e) => setRowWidth(Math.ceil(e.nativeEvent.layout.width))}
+        className="flex-row items-center active:opacity-70"
+        style={{ height: CHIP_TARGET_HEIGHT, maxWidth: CHIP_MAX_WIDTH, paddingHorizontal: SEGMENT_PAD_X, gap: GLYPH_GAP, flexShrink: 1 }}
+      >
+        <View
+          testID="header-status-chip-frame"
+          pointerEvents="none"
+          className="rounded-xs border border-attention"
+          style={{ position: "absolute", top: (CHIP_TARGET_HEIGHT - CHIP_HEIGHT) / 2, bottom: (CHIP_TARGET_HEIGHT - CHIP_HEIGHT) / 2, left: 0, right: 0 }}
+        />
+        <Timer size={FONT_PX} color={p.amber} />
+        <Text
+          testID="header-status-chip-lead"
+          numberOfLines={1}
+          maxFontSizeMultiplier={textCap}
+          className={cn(TEXT_CLASS, "text-attention")}
+          style={textStyle}
+        >
+          {copy.text}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function LiveStatusChip({ onArena = false, onSpareWidth }: HeaderStatusChipProps) {
   const router = useRouter();
   const arena = useArenaState();
   const phase = useLiveSwitchPhase();
   const direction = useLiveSwitchDirection();
   const selfId = useArenaSelfId();
   const onMat = useOnMatCount(selfId);
+  const nearbyClose = useNearbyCloseCount();
   const toConfirm = useMatchToConfirm(selfId);
   const controllerReady = useHasArenaController();
   // Live as drawn, the overlay and pending: ONE snapshot, shared with the
@@ -160,6 +270,7 @@ export function HeaderStatusChip({ onArena = false, onSpareWidth }: HeaderStatus
     reconnecting: arena.reconnecting,
     lastLiveWriteFailed: arena.lastLiveWriteFailed,
     onMat,
+    nearbyClose,
     outgoing: arena.outgoing,
     incoming: arena.incoming,
     incomingTucked: arena.incomingTucked,

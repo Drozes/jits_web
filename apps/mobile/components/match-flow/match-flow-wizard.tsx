@@ -5,12 +5,16 @@ import { useMatchDetails } from "@/lib/match-flow/use-match-details";
 import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
 import { useWizardSync } from "@/lib/match-flow/use-wizard-sync";
 import { useMatchKeepAwake } from "@/lib/match-flow/use-keep-awake";
+import { useTimekeeperPresence } from "@/lib/match-flow/use-timekeeper-presence";
+import { useLiveEndHold } from "@/lib/match-flow/use-live-end-hold";
 import { MatchSyncProvider } from "@/lib/match-flow/match-sync-context";
-import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { readMatchExtras } from "@/lib/match-flow/match-extras";
-import { useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
-import { useMatchWeights } from "@/lib/match-flow/use-match-weights";
-import { useMatchWeightChecks } from "@/lib/match-flow/use-match-weight-checks";
+import { consentedIn, useAiConsent, useEffectiveRecordingOptIn } from "@/lib/moderation/ai-consent";
+import { deriveMatchRoles } from "@/lib/match-flow/match-roles";
+import { capturePolicyFor } from "@/lib/match-flow/capture-policy";
+import { MatchFlowProvider } from "@/lib/match-flow/match-flow-context";
+import { computeOwnOutcome } from "@/lib/match-flow/compute-own-outcome";
+import { useWizardWeights } from "@/lib/match-flow/use-wizard-weights";
 import { WizardError, WizardLoading } from "./wizard-status";
 import { QueueStatusBanner } from "./queue-status-banner";
 import { MatchStepRenderer } from "./match-step-renderer";
@@ -19,6 +23,7 @@ import { MatchRecorderCamera } from "./match-recorder-surface";
 import { MatchOrientationController, orientationModeFor } from "./match-orientation-controller";
 import { FaceoffProvider } from "./faceoff/faceoff-context";
 import { FaceoffTop } from "./faceoff/faceoff-top";
+import { FaceoffTimekeeperTop } from "./faceoff/faceoff-timekeeper";
 import { usePalette } from "@/lib/theme/palette";
 import { BROADCAST } from "./live/broadcast-tokens";
 import { WizardScrollContext, useWizardScrollSource } from "./wizard-scroll";
@@ -49,8 +54,9 @@ interface MatchFlowWizardProps {
   onStepChange?: (step: MatchStep | null) => void;
 }
 
-export const STEP_LABELS: Record<MatchStep, string> = {
-  wait: "Waiting",
+/** The step names in the step marker label the match-loop harness reads (`StepMarker`). */
+const STEP_LABELS: Record<MatchStep, string> = {
+  crew: "Crew",
   weight: "Weights",
   ready: "Ready",
   live: "Live",
@@ -60,29 +66,16 @@ export const STEP_LABELS: Record<MatchStep, string> = {
   summary: "Summary",
 };
 
-function computeOwnOutcome(
-  rowOutcome: string | null,
-  resultData: BroadcastResult | null,
-  currentAthleteId: string,
-): "win" | "loss" | "draw" | null {
-  if (rowOutcome === "win" || rowOutcome === "loss" || rowOutcome === "draw") {
-    return rowOutcome;
-  }
-  if (!resultData) return null;
-  if (resultData.result === "draw") return "draw";
-  return resultData.winnerId === currentAthleteId ? "win" : "loss";
-}
-
 /**
- * Top-level orchestrator for the 8-step match wizard. Loads the match +
- * submission types, derives the initial step from match.status, and
- * renders one step at a time.
+ * Top-level orchestrator for the match wizard (steps in `step-router.ts`).
+ * Loads the match + submission types, derives the initial step from
+ * match.status, and renders one step at a time.
  *
  * Origin-agnostic: it takes `exitHref` / `exitLabel` rather than a session
  * id, so it mounts unchanged for a match with no session at all.
  *
- * ELO design system: page-tinted surface with a meta-strip progress
- * indicator. The live step keeps the same scroll container
+ * ELO design system: page-tinted surface with no visible step progress (the
+ * harness reads `StepMarker`). The live step keeps the same scroll container
  * but its internal layout is full-bleed within the padding.
  */
 export function MatchFlowWizard({
@@ -101,17 +94,29 @@ export function MatchFlowWizard({
   // The verdict turns its status bar back to the theme once its hero scrolls away.
   const wizardScroll = useWizardScrollSource();
   // "Record from my phone" only counts with AI processing consent (5.1.2(i)).
-  const recording = useEffectiveRecordingOptIn(currentAthleteId);
+  const recordingOptIn = useEffectiveRecordingOptIn(currentAthleteId);
+  const aiConsent = useAiConsent();
   const { match, submissionTypes, isLoading, error, refresh, applyMatch } =
     useMatchDetails(matchId);
-  const isParticipant =
-    !!match &&
-    match.participants.some((p) => p.athlete_id === currentAthleteId) &&
-    match.participants.some((p) => p.athlete_id !== currentAthleteId);
+  // Mode and role, derived once per match in hand (match-roles.ts). Null
+  // while loading, and for a viewer who has no role in it (neither one of
+  // its two athletes nor a timekeeper-mode match's seated timekeeper).
+  const roles = React.useMemo(
+    () => (match ? deriveMatchRoles(match, currentAthleteId) : null),
+    [match, currentAthleteId],
+  );
+  // Whether this phone records the match: the camera warms on it and the
+  // live step arms the recorder. An athlete's own "Record from my phone", as
+  // always. The timekeeper always records (D12, `caps.recordingRequired`),
+  // whatever the device toggle says, but still only with AI processing
+  // consent (5.1.2(i)) to the timekeeper text: without it the timekeeper's
+  // camera gate asks first.
+  const consented = consentedIn(aiConsent, currentAthleteId, "timekeeper");
+  const recording = recordingOptIn || (roles?.caps.recordingRequired === true && consented);
   // Step state + the DB reconciler that keeps it honest when a broadcast is
   // missed (jits-wfpo, -bh2v, -vh7m, -bmei, -mzfu). See use-wizard-sync.ts.
   const {
-    step,
+    step: syncedStep,
     setStep,
     startedAt,
     setStartedAt,
@@ -121,41 +126,52 @@ export function MatchFlowWizard({
     exitCancelled,
     stopRecorderRef,
     syncContext,
+    tkState,
   } = useWizardSync({
     matchId,
     currentAthleteId,
     exitHref,
     match,
-    ready: isParticipant && !error,
+    ready: roles != null && !error,
     applyMatch,
     refresh,
   });
+  // The step on screen: a timekeeper-mode athlete's ended plate stays up for
+  // a moment after the DB moves them to the result (spec 4.2 End,
+  // `useLiveEndHold`); every other phone shows the wizard's step as it is.
+  const step = useLiveEndHold(syncedStep, roles?.caps.endVia === null);
 
   React.useEffect(() => {
     onStepChange?.(step);
   }, [step, onStepChange]);
 
-  // The weights this match is rated on (the challenge's), for the face-off
-  // and the countdown. Read here, above the early returns, for hook order.
-  const challengeWeights = useMatchWeights(
-    match?.challenge_id,
-    currentAthleteId,
-    match?.participants.find((p) => p.athlete_id === currentAthleteId)?.current_weight ?? null,
-    match?.participants.find((p) => p.athlete_id !== currentAthleteId)?.current_weight ?? null,
-  );
-  // The face-off weight checks (jr_be-ahn.4), challenge-backed matches only.
-  // Their weights are the challenge's too, read fresh, so a re-weigh on
-  // either phone shows here (and on the countdown) without a reload.
-  const weightChecks = useMatchWeightChecks(
+  // The weights this match is rated on, for the face-off and the countdown.
+  // Read here, above the early returns, for hook order. The athletes' reads
+  // only: the timekeeper can read neither the challenge row (RLS) nor the
+  // weight checks (participants only), and takes the rated weights and the
+  // checks from the timekeeper-mode state (PM26, `stepSeams`).
+  const { weights, weightChecks } = useWizardWeights({
     matchId,
-    isParticipant && !error && !!match?.challenge_id && (step === "weight" || step === "ready"),
-  );
-  const opponentIdForWeights = match?.participants.find((p) => p.athlete_id !== currentAthleteId)?.athlete_id;
-  const checkedWeights = weightChecks.state?.weights;
-  const weights =
-    checkedWeights && opponentIdForWeights && currentAthleteId in checkedWeights && opponentIdForWeights in checkedWeights
-      ? { mine: checkedWeights[currentAthleteId] ?? null, theirs: checkedWeights[opponentIdForWeights] ?? null, rated: true }
-      : challengeWeights;
+    challengeId: roles != null && roles.me == null ? null : match?.challenge_id,
+    viewerId: currentAthleteId,
+    roles,
+    checksEnabled: roles?.me != null && !error && !!match?.challenge_id && (step === "weight" || step === "ready"),
+  });
+
+  // The step the camera follows. The timekeeper's one face-off screen is the
+  // `weight` step (spec 6.2), and it holds the camera the athletes' ready
+  // step holds (preview, wake-lock, orientation), so the camera is warm
+  // before their Start. While the match is pending or in progress: the match
+  // in hand may turn in_progress a render before the step turns live, and
+  // the capture session must stay up across that ready -> live handoff. Not
+  // for a cancelled (or finished) match, which also mounts on `weight` until
+  // its first snapshot exits it.
+  const timekeeperFaceoff =
+    step === "weight" &&
+    roles != null &&
+    roles.me == null &&
+    (match?.status === "pending" || match?.status === "in_progress");
+  const cameraStep: MatchStep | null = timekeeperFaceoff ? "ready" : step;
 
   // Screen wake-lock for every step the recorder camera is up, not just
   // live. The ready check shows the preview and the phone is typically
@@ -164,7 +180,14 @@ export function MatchFlowWizard({
   // per step: two holders of the one lock tag would release it for each
   // other on the ready -> live handoff. Held on live even when not
   // recording: the clock is on screen for the whole round.
-  useMatchKeepAwake(step === "ready" || step === "live");
+  useMatchKeepAwake(cameraStep === "ready" || cameraStep === "live");
+
+  // The seated timekeeper's 15 s heartbeat, from the seat to the result
+  // (timekeeper mode R23; spec 4.3): once here, so it spans every step.
+  useTimekeeperPresence(
+    matchId,
+    roles?.viewer === "timekeeper" && (match?.status === "pending" || match?.status === "in_progress"),
+  );
 
   // Live shrinks the content to the viewport with scrolling off. Reset any
   // offset left from scrolling the ready step, or every full-screen layer
@@ -244,15 +267,19 @@ export function MatchFlowWizard({
   }
   if ((isLoading && !revalidating) || !match || !step) return <WizardLoading />;
 
-  const me = match.participants.find((p) => p.athlete_id === currentAthleteId);
-  const opponent = match.participants.find((p) => p.athlete_id !== currentAthleteId);
-  if (!me || !opponent) {
+  if (!roles) {
     return (
       <WizardError exitHref={exitHref} exitLabel={exitLabel} title="Not a participant" />
     );
   }
+  // Null for the timekeeper of a timekeeper-mode match, who is in the match
+  // but is neither athlete: no athlete face-off, outcome or verdict.
+  const me = roles.me;
+  const opponent = roles.opponent;
+  // How this viewer records: the orientation, the preview and the lens (A21).
+  const capture = capturePolicyFor(roles);
 
-  const ownOutcome = computeOwnOutcome(me.outcome, resultData, currentAthleteId);
+  const ownOutcome = me ? computeOwnOutcome(me, resultData) : null;
   const extras = readMatchExtras(match);
   // Live is a full-screen broadcast layout over the camera, and the verdict
   // runs its hero edge to edge. The ScrollView and every slot stay in place
@@ -261,104 +288,116 @@ export function MatchFlowWizard({
   const live = step === "live";
   const fullBleed = live || step === "summary";
   const faceoff = step === "weight" || step === "ready";
+  // The athletes' face-off (its channel, ready handshake and auto-start);
+  // the timekeeper's face-off is its own screen.
+  const athleteFaceoff = faceoff && me != null && opponent != null;
 
   return (
-    <WizardScrollContext.Provider value={wizardScroll.value}>
-      <ScrollView
-        ref={scrollRef}
-        onScroll={step === "summary" ? wizardScroll.onScroll : undefined}
-        scrollEventThrottle={32}
-        style={{ flex: 1, backgroundColor: live ? BROADCAST.black : palette.bg }}
-        scrollEnabled={!live}
-        contentContainerStyle={
-          fullBleed
-            ? { flexGrow: 1 }
-            : {
-                padding: 16,
-                paddingTop: insets.top + 8,
-                // Landscape ready check: clear the sensor housing and corners.
-                paddingLeft: Math.max(16, insets.left),
-                paddingRight: Math.max(16, insets.right),
-                paddingBottom: 32 + insets.bottom,
-                gap: 16,
-              }
-        }
-        keyboardShouldPersistTaps="handled"
-      >
-        <MatchRecorderProvider
-          matchId={matchId}
-          uploaderAthleteId={me.athlete_id}
-          matchDurationSeconds={match.duration_seconds}
+    <MatchFlowProvider match={match} roles={roles} tkState={tkState}>
+      <WizardScrollContext.Provider value={wizardScroll.value}>
+        <ScrollView
+          ref={scrollRef}
+          onScroll={step === "summary" ? wizardScroll.onScroll : undefined}
+          scrollEventThrottle={32}
+          style={{ flex: 1, backgroundColor: live ? BROADCAST.black : palette.bg }}
+          scrollEnabled={!live}
+          contentContainerStyle={
+            fullBleed
+              ? { flexGrow: 1 }
+              : {
+                  padding: 16,
+                  paddingTop: insets.top + 8,
+                  // Landscape ready check: clear the sensor housing and corners.
+                  paddingLeft: Math.max(16, insets.left),
+                  paddingRight: Math.max(16, insets.right),
+                  paddingBottom: 32 + insets.bottom,
+                  gap: 16,
+                }
+          }
+          keyboardShouldPersistTaps="handled"
         >
-          <MatchSyncProvider value={syncContext}>
-            <FaceoffProvider
-              active={faceoff}
-              phase={faceoff ? step : null}
-              matchId={matchId}
-              exitHref={exitHref}
-              meId={me.athlete_id}
-              opponentId={opponent.athlete_id}
-              myWeight={weights.mine}
-              opponentWeight={weights.theirs}
-              weightsRated={weights.rated}
-              weightChecks={weightChecks}
-              onWeighedIn={() => setStep("ready")}
-              onStarted={(s) => {
-                setStartedAt(s);
-                setStep("live");
-              }}
-              onCancelledRemotely={exitCancelled}
-            >
-              <RecorderStopBridge stopRef={stopRecorderRef} />
-              {/* Before the step renderer so the live lock lands before recording starts. */}
-              <MatchOrientationController mode={orientationModeFor(step)} />
-              <StepMarker step={step} />
-              {live ? null : <QueueStatusBanner />}
-              {faceoff ? (
-                <FaceoffTop phase={step} me={me} opponent={opponent} />
-              ) : null}
-              <MatchRecorderCamera step={step} optedIn={recording} />
-              <MatchStepRenderer
-                step={step}
-                exitHref={exitHref}
-                exitLabel={exitLabel}
+          <MatchRecorderProvider
+            matchId={matchId}
+            uploaderAthleteId={me?.athleteId ?? currentAthleteId}
+            matchDurationSeconds={match.duration_seconds}
+          >
+            <MatchSyncProvider value={syncContext}>
+              <FaceoffProvider
+                active={athleteFaceoff}
+                phase={athleteFaceoff && faceoff ? step : null}
                 matchId={matchId}
-                matchStatus={match.status}
-                durationSeconds={match.duration_seconds}
-                startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
-                pausedAt={match.paused_at}
-                totalPausedDuration={match.total_paused_duration}
-                me={me}
-                opponent={opponent}
-                submissionTypes={submissionTypes}
-                resultData={resultData}
-                ownOutcome={ownOutcome}
-                confirmedAthleteIds={confirmedAthleteIds}
-                extras={extras}
-                recording={recording}
-                matchWeights={weights}
-                setStep={setStep}
-                setResultData={setResultData}
-                advanceToResult={advanceToResult}
-                initialFinishSeconds={initialFinishSeconds}
-                setFinishSeconds={setFinishSeconds}
-                refresh={refresh}
-              />
-            </FaceoffProvider>
-          </MatchSyncProvider>
-        </MatchRecorderProvider>
-      </ScrollView>
-    </WizardScrollContext.Provider>
+                exitHref={exitHref}
+                meId={me?.athleteId ?? currentAthleteId}
+                opponentId={opponent?.athleteId ?? ""}
+                myWeight={weights.mine}
+                opponentWeight={weights.theirs}
+                weightsRated={weights.rated}
+                weightChecks={weightChecks}
+                onWeighedIn={() => setStep("ready")}
+                onStarted={(s) => {
+                  setStartedAt(s);
+                  setStep("live");
+                }}
+                onCancelledRemotely={exitCancelled}
+                flow={{ match, roles, tkState }}
+              >
+                <RecorderStopBridge stopRef={stopRecorderRef} />
+                {/* Before the step renderer so the live lock lands before recording starts. */}
+                <MatchOrientationController
+                  mode={orientationModeFor(cameraStep)}
+                  recordingOrientation={capture.recordingOrientation}
+                />
+                <StepMarker step={step} />
+                {live ? null : <QueueStatusBanner />}
+                {faceoff ? (
+                  me && opponent ? (
+                    <FaceoffTop phase={step} me={me} opponent={opponent} />
+                  ) : (
+                    <FaceoffTimekeeperTop />
+                  )
+                ) : null}
+                <MatchRecorderCamera step={cameraStep} optedIn={recording} capture={capture} />
+                <MatchStepRenderer
+                  step={step}
+                  exitHref={exitHref}
+                  exitLabel={exitLabel}
+                  matchId={matchId}
+                  matchStatus={match.status}
+                  durationSeconds={match.duration_seconds}
+                  startedAt={startedAt ?? match.started_at ?? new Date().toISOString()}
+                  pausedAt={match.paused_at}
+                  totalPausedDuration={match.total_paused_duration}
+                  submissionTypes={submissionTypes}
+                  resultData={resultData}
+                  ownOutcome={ownOutcome}
+                  confirmedAthleteIds={confirmedAthleteIds}
+                  extras={extras}
+                  recording={recording}
+                  matchWeights={weights}
+                  setStep={setStep}
+                  setResultData={setResultData}
+                  advanceToResult={advanceToResult}
+                  initialFinishSeconds={initialFinishSeconds}
+                  setFinishSeconds={setFinishSeconds}
+                  refresh={refresh}
+                />
+              </FaceoffProvider>
+            </MatchSyncProvider>
+          </MatchRecorderProvider>
+        </ScrollView>
+      </WizardScrollContext.Provider>
+    </MatchFlowProvider>
   );
 }
 
 /**
- * The wizard's step, for the match-loop harness. The visible "STEP N / 8"
+ * The wizard's step, for the match-loop harness. The visible "STEP N / T"
  * header is gone (the redesign has no step progress), but the harness reads
- * the step from this element: PRIMARILY by its accessibility label ("Step N
- * of 8, <Label>"), because idb does not reliably surface a testID
- * (`tools/match-loop/sim/screens.ts` currentStep), with `match-step-<step>`
- * as the fallback. So it cannot simply be hidden from the accessibility tree.
+ * the step from this element: PRIMARILY by the step name in its accessibility
+ * label ("Step N of T, <Label>"), because idb does not reliably surface a
+ * testID (`tools/match-loop/sim/screens.ts` currentStep), with
+ * `match-step-<step>` as the fallback. So it cannot simply be hidden from the
+ * accessibility tree.
  *
  * The harness drives a Metro dev build, so the marker is an accessibility
  * element only in `__DEV__`; release builds hide it (and its label) from
@@ -381,20 +420,23 @@ export function StepMarker({ step, exposed = __DEV__ }: { step: MatchStep; expos
 
 /**
  * Step progress indicator, now used by the practice match only (the real
- * match flow dropped the visible step header; see StepMarker). ELO meta-strip
- * with "STEP N / T" mono label, current-step name, and a row of
- * hairline bars that fill with the CTA color as the athlete advances.
+ * match flow dropped the visible step header; see StepMarker), which passes
+ * its own steps (`PRACTICE_STEPS`). ELO meta-strip with "STEP N / T" mono
+ * label, current-step name, and a row of hairline bars that fill with the
+ * CTA color as the athlete advances.
  */
 export function WizardStepHeader({
   step,
   currentIdx,
+  total,
   label,
 }: {
-  step: MatchStep;
+  /** The step's slug, for the `match-step-<step>` testID. */
+  step: string;
   currentIdx: number;
+  total: number;
   label: string;
 }) {
-  const total = MATCH_STEPS.length;
   return (
     <View className="gap-2">
       <View className="flex-row items-center justify-between">

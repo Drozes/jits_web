@@ -9,6 +9,11 @@ const mockGetMyActiveMatch = jest.fn();
 jest.mock("@jits/shared/api/queries", () => ({
   getMyActiveMatch: (...a: unknown[]) => mockGetMyActiveMatch(...a),
 }));
+// The timekeeping slot's read (timekeeper mode A20): none unless a test says so.
+const mockGetMyTimekeepingMatch = jest.fn();
+jest.mock("@jits/shared/api/timekeeper", () => ({
+  getMyTimekeepingMatch: (...a: unknown[]) => mockGetMyTimekeepingMatch(...a),
+}));
 interface MockChannel {
   topic: string;
   filter: Record<string, string> | null;
@@ -76,6 +81,10 @@ import {
   useMatchToConfirm,
 } from "@/lib/match-flow/active-match-store";
 import {
+  __resetTimekeepingMatchStoreForTests,
+  useMyTimekeepingMatch,
+} from "@/lib/match-flow/timekeeping-match-store";
+import {
   __resetArenaStoreForTests,
   IDLE_ARENA_STATE,
   publishArenaState,
@@ -99,8 +108,10 @@ beforeEach(() => {
   mockChannels.length = 0;
   mockRegistry.clear();
   __resetActiveMatchStoreForTests();
+  __resetTimekeepingMatchStoreForTests();
   __resetArenaStoreForTests();
   mockGetMyActiveMatch.mockResolvedValue({ ok: true, data: null });
+  mockGetMyTimekeepingMatch.mockResolvedValue({ ok: true, data: null });
   appStateHandlers = [];
   appStateHandler = (s) => {
     for (const h of [...appStateHandlers]) h(s);
@@ -448,5 +459,159 @@ describe("active match store", () => {
     const chip = renderHook(() => useMatchToConfirm(ME));
     await waitFor(() => expect(chip.result.current).toEqual(OPEN));
     expect(live.result.current).toBe(false);
+  });
+});
+
+// Timekeeper mode A20 (spec 9.1): the match this athlete TIMEKEEPS, refreshed
+// with the athlete slot, on its own channel; the athlete slot is unchanged.
+describe("the timekeeping slot (A20)", () => {
+  const TK = {
+    matchId: "tk-1",
+    status: "in_progress" as const,
+    startedAt: null,
+    endedAt: null,
+    athletes: [
+      { athleteId: "c-1", displayName: "Mina Reyes" },
+      { athleteId: "o-1", displayName: "Dan Okafor" },
+    ],
+    reviewPending: false,
+    editOpen: false,
+    editClosesAt: null,
+  };
+
+  it("is read at the same moments as the athlete slot: mount, match exit, foreground, any refresh", async () => {
+    mockGetMyTimekeepingMatch.mockResolvedValue({ ok: true, data: TK });
+    renderHook(() => useActiveMatchOwner(ME));
+    const card = renderHook(() => useMyTimekeepingMatch(ME));
+    await waitFor(() => expect(card.result.current).toEqual(TK));
+    expect(mockGetMyTimekeepingMatch).toHaveBeenCalledTimes(1);
+
+    const match = renderHook(() => useArenaMatchScreen("tk-1"));
+    act(() => match.unmount());
+    await act(flush);
+    expect(mockGetMyTimekeepingMatch).toHaveBeenCalledTimes(2);
+
+    act(() => {
+      appStateHandler?.("background");
+      appStateHandler?.("active");
+    });
+    await act(flush);
+    expect(mockGetMyTimekeepingMatch).toHaveBeenCalledTimes(3);
+
+    // Home's focus re-read, collapsed with others in the same tick.
+    act(() => {
+      refreshMyActiveMatch(ME);
+      refreshMyActiveMatch(ME);
+    });
+    await act(flush);
+    expect(mockGetMyTimekeepingMatch).toHaveBeenCalledTimes(4);
+    expect(mockGetMyActiveMatch).toHaveBeenCalledTimes(4);
+  });
+
+  it("never touches the athlete slot, Resume or CONFIRM", async () => {
+    mockGetMyTimekeepingMatch.mockResolvedValue({ ok: true, data: TK });
+    renderHook(() => useActiveMatchOwner(ME));
+    const home = renderHook(() => useActiveMatch(ME));
+    const chip = renderHook(() => useMatchToConfirm(ME));
+    const card = renderHook(() => useMyTimekeepingMatch(ME));
+    await waitFor(() => expect(card.result.current).toEqual(TK));
+    expect(home.result.current).toBeNull();
+    expect(chip.result.current).toBeNull();
+  });
+
+  it("re-reads on the realtime row of the match held there, on its own channel", async () => {
+    mockGetMyTimekeepingMatch.mockResolvedValue({ ok: true, data: TK });
+    renderHook(() => useActiveMatchOwner(ME));
+    const card = renderHook(() => useMyTimekeepingMatch(ME));
+    await waitFor(() => expect(card.result.current).toEqual(TK));
+    const live = mockChannels.filter((c) => c.subscribed);
+    expect(live).toHaveLength(1);
+    expect(live[0].topic).toMatch(/^timekeeping-match:tk-1:/);
+    expect(live[0].filter).toEqual(expect.objectContaining({ event: "UPDATE", table: "matches", filter: "id=eq.tk-1" }));
+
+    // The match ended (recorded, cancelled): the read comes back empty, the card and the channel go.
+    mockGetMyTimekeepingMatch.mockResolvedValue({ ok: true, data: null });
+    act(() => live[0].handler?.());
+    await act(flush);
+    expect(card.result.current).toBeNull();
+    expect(mockRemoveChannel).toHaveBeenCalledWith(live[0].topic);
+  });
+
+  it("an athlete match and a timekeeping match hold one channel each", async () => {
+    mockGetMyActiveMatch.mockResolvedValue({ ok: true, data: OPEN });
+    // Both can exist only once the timekeeping match is completed, inside its
+    // edit window (R2, PM20). The server always sends the close time while the
+    // window is open (jr_be 024 5.3: completed_at + 30 min); without one the
+    // slot offers nothing (`isTimekeepingMatchOffered`, TK-H8).
+    const editClosesAt = new Date(Date.now() + 30 * 60_000).toISOString();
+    mockGetMyTimekeepingMatch.mockResolvedValue({
+      ok: true,
+      data: { ...TK, status: "completed", editOpen: true, editClosesAt },
+    });
+    renderHook(() => useActiveMatchOwner(ME));
+    await act(flush);
+    const topics = mockChannels.filter((c) => c.subscribed).map((c) => c.topic);
+    expect(topics).toHaveLength(2);
+    expect(topics.some((t) => t.startsWith(`active-match:${OPEN.matchId}:`))).toBe(true);
+    expect(topics.some((t) => t.startsWith("timekeeping-match:tk-1:"))).toBe(true);
+  });
+
+  it("holds no channel for a completed match without an edit close time (nothing offered)", async () => {
+    mockGetMyTimekeepingMatch.mockResolvedValue({
+      ok: true,
+      data: { ...TK, status: "completed", editOpen: true, editClosesAt: null },
+    });
+    renderHook(() => useActiveMatchOwner(ME));
+    const card = renderHook(() => useMyTimekeepingMatch(ME));
+    await act(flush);
+    expect(mockGetMyTimekeepingMatch).toHaveBeenCalledTimes(1);
+    expect(card.result.current).toBeNull();
+    expect(mockChannels.filter((c) => c.subscribed)).toHaveLength(0);
+  });
+
+  it("a recorded match leaves the slot and its channel exactly when its edit window closes, with no new read", async () => {
+    // Nothing on the `matches` row changes at the close, so no read or
+    // realtime event drops it: the device's clock must (TK-H8, A24).
+    jest.useFakeTimers({ now: Date.parse("2026-10-20T12:06:00.000Z") });
+    try {
+      const closesAt = Date.now() + 30 * 60_000;
+      mockGetMyTimekeepingMatch.mockResolvedValue({
+        ok: true,
+        data: { ...TK, status: "completed", editOpen: true, editClosesAt: new Date(closesAt).toISOString() },
+      });
+      renderHook(() => useActiveMatchOwner(ME));
+      const card = renderHook(() => useMyTimekeepingMatch(ME));
+      await act(flush);
+      expect(card.result.current?.matchId).toBe("tk-1");
+      const held = mockChannels.find((c) => c.subscribed && c.topic.startsWith("timekeeping-match:tk-1:"));
+      expect(held).toBeDefined();
+
+      // One millisecond before the close: still offered, still held.
+      act(() => {
+        jest.advanceTimersByTime(closesAt - Date.now() - 1);
+      });
+      expect(card.result.current?.matchId).toBe("tk-1");
+      expect(held!.subscribed).toBe(true);
+
+      // At the close: gone from every reader, and the channel is released.
+      act(() => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(card.result.current).toBeNull();
+      expect(mockRemoveChannel).toHaveBeenCalledWith(held!.topic);
+      expect(mockChannels.filter((c) => c.subscribed)).toHaveLength(0);
+      expect(mockGetMyTimekeepingMatch).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("is cleared with the athlete slot when the owner unmounts (sign-out)", async () => {
+    mockGetMyTimekeepingMatch.mockResolvedValue({ ok: true, data: TK });
+    const owner = renderHook(() => useActiveMatchOwner(ME));
+    const card = renderHook(() => useMyTimekeepingMatch(ME));
+    await waitFor(() => expect(card.result.current).toEqual(TK));
+    act(() => owner.unmount());
+    expect(card.result.current).toBeNull();
   });
 });

@@ -90,6 +90,20 @@ type Client = SupabaseClient<Database>;
 const DEBOUNCE_MS = 200;
 
 /**
+ * Makes every subscription's topic unique (jits-i5ih). realtime-js 2.105.4
+ * `RealtimeClient.channel(topic)` hands back the channel already registered
+ * under that topic, and `.on("postgres_changes", ...)` on a joining or joined
+ * channel throws. Two mounts watching the same video (match detail pushed
+ * twice on mobile: match, then the athlete, then the same match again) used
+ * to share `video_progress:<id>`: the second mount threw into the error
+ * boundary, and had it not, the first unmount's `removeChannel` would have
+ * torn down the survivor's realtime too. A postgres_changes topic is private
+ * to this client (the server routes by the join config, not the name), so a
+ * suffix costs nothing. Same defence as use-match-video-status.ts.
+ */
+let channelSeq = 0;
+
+/**
  * Detect the PostgREST "function does not exist" error so we can fall
  * back to Realtime-only mode pre-Round-3. The driver surfaces this as
  * `error.code === '42883'` (Postgres undefined_function) or a 404
@@ -206,7 +220,8 @@ async function fetchVideoProgressViaTables(
  * over `match_videos` + `video_chunks` + `video_chunk_analyses` and
  * sets `rpcMissing=true`.
  *
- * Realtime: subscribes to BE §5 channels —
+ * Realtime: one channel per subscription (`video_progress:<videoId>:<seq>`)
+ * listening to the BE §5 filters:
  *   - `match_videos:id=eq.<videoId>`
  *   - `video_chunks:video_id=eq.<videoId>`
  * On every event, schedules a debounced refresh (≈200 ms) to recompute
@@ -323,8 +338,11 @@ export function useVideoProgress(
     rpcMissingRef.current = false;
     void fetchSnapshot(videoId, myVersion);
 
+    // One topic per subscription (see `channelSeq`), so the cleanup below
+    // removes exactly this run's channel and never another mount's.
+    channelSeq += 1;
     const channel: RealtimeChannel = supabase
-      .channel(`video_progress:${videoId}`)
+      .channel(`video_progress:${videoId}:${channelSeq}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "match_videos", filter: `id=eq.${videoId}` },

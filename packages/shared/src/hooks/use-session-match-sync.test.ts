@@ -542,4 +542,35 @@ describe("useSessionMatchSync: dispute, status and awaited sends", () => {
     const settled = await result.current.broadcastMatchEnded();
     expect(settled).toEqual({ error: expect.any(Error) });
   });
+
+  it("adds actor_id to the clock, end, cancel and result broadcasts only when given (timekeeper mode)", () => {
+    const { result } = renderHook(() =>
+      useSessionMatchSync({
+        supabase: mockSupabase as never,
+        matchId: "m-123",
+      }),
+    );
+
+    act(() => {
+      result.current.broadcastTimerStarted("S", "tk");
+      result.current.broadcastTimerPaused("P", "tk");
+      result.current.broadcastTimerResumed(5, "tk");
+      result.current.broadcastMatchEnded("tk");
+      result.current.broadcastMatchCancelled("a-1");
+      result.current.broadcastResultSubmitted({ result: "draw" }, "tk");
+      result.current.broadcastMatchEnded();
+      result.current.broadcastResultSubmitted({ result: "draw" });
+    });
+
+    expect(mockChannel.sentMessages).toEqual([
+      { event: "timer_started", payload: { started_at: "S", actor_id: "tk" } },
+      { event: "timer_paused", payload: { paused_at: "P", actor_id: "tk" } },
+      { event: "timer_resumed", payload: { total_paused_duration: 5, actor_id: "tk" } },
+      { event: "match_ended", payload: { actor_id: "tk" } },
+      { event: "match_cancelled", payload: { actor_id: "a-1" } },
+      { event: "result_submitted", payload: { result: "draw", actor_id: "tk" } },
+      { event: "match_ended", payload: {} },
+      { event: "result_submitted", payload: { result: "draw" } },
+    ]);
+  });
 });

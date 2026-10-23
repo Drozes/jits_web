@@ -6,7 +6,8 @@ import { HudTagButton } from "@/components/match-flow/live/hud-tag";
 import { useMatchRecorder } from "@/components/match-flow/match-recorder-context";
 import { matchHaptics } from "@/lib/match-flow/use-haptics";
 import { clampFinishSeconds } from "@/lib/match-flow/clamp-finish-seconds";
-import { toLiveAthlete, type LiveParticipant } from "@/lib/match-flow/live-view-state";
+import { formatAthleteMeta } from "@/lib/match-flow/live-view-state";
+import type { AthleteGuardRow } from "@jits/shared/api/queries";
 import { AUTO_END_DELAY_MS } from "@/lib/video/recording-limits";
 import { PRACTICE_BOT_NAME, PRACTICE_DURATION_SECONDS } from "@/lib/practice/constants";
 
@@ -24,7 +25,7 @@ export function PracticeLive({
   onEnd,
   onExit,
 }: {
-  athlete: LiveParticipant;
+  athlete: Pick<AthleteGuardRow, "display_name" | "current_elo" | "current_weight">;
   onEnd: (finishSeconds: number) => void;
   onExit: () => void;
 }) {
@@ -92,7 +93,7 @@ export function PracticeLive({
       <LiveBroadcast
         kindLabel="PRACTICE"
         practice
-        me={toLiveAthlete(athlete)}
+        me={{ name: athlete.display_name, meta: formatAthleteMeta(athlete.current_elo, athlete.current_weight) }}
         opponent={{ name: PRACTICE_BOT_NAME, meta: "NO RATING" }}
         durationSeconds={PRACTICE_DURATION_SECONDS}
         formatted={timer.formatted}

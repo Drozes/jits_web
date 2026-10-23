@@ -18,6 +18,7 @@
  */
 import * as React from "react";
 import { completeHold } from "../../support/complete-hold";
+import type { CapturePolicy } from "@/lib/match-flow/capture-policy";
 import { render, fireEvent, waitFor, act, within } from "@testing-library/react-native";
 
 // ---- native module stubs ----
@@ -334,7 +335,22 @@ jest.mock("@/lib/orientation", () => ({
   lockPortrait: jest.fn(async () => {
     mockCallLog.push("lockPortrait");
   }),
+  lockLandscape: jest.fn(async () => {
+    mockCallLog.push("lockLandscape");
+  }),
 }));
+
+// Every role records portrait (A21). A test can force a landscape capture
+// policy (the spec 13.6 seam) to prove the wizard still locks it.
+const mockForcedCapture: { current: CapturePolicy | null } = { current: null };
+jest.mock("@/lib/match-flow/capture-policy", () => {
+  const actual = jest.requireActual("@/lib/match-flow/capture-policy");
+  return {
+    ...actual,
+    capturePolicyFor: (roles: Parameters<typeof actual.capturePolicyFor>[0]) =>
+      mockForcedCapture.current ?? actual.capturePolicyFor(roles),
+  };
+});
 
 // null = the real window; set to render the wizard in a landscape window.
 const mockWindow: { current: { width: number; height: number } | null } = { current: null };
@@ -432,6 +448,7 @@ beforeEach(() => {
   mockCameraMounts.count = 0;
   mockCameraMounts.unmounts = 0;
   mockCallLog.length = 0;
+  mockForcedCapture.current = null;
   mockWindow.current = null;
   mockSyncParams.current = null;
   // The upload store is module state and outlives a render by design.
@@ -546,25 +563,62 @@ describe("the camera is warm before the match starts (jits-2zpe)", () => {
   });
 });
 
-describe("orientation: rotate at ready, lock at live, portrait after", () => {
+describe("orientation: portrait for every role (A21); a landscape policy still locks at live", () => {
   async function goLive(getByTestId: (t: string) => unknown) {
     fireEvent.press(getByTestId("weight-confirm") as never);
     await act(async () => {
       mockSyncParams.current?.onTimerStarted?.("2026-09-18T12:00:00.000Z");
     });
   }
+  const LANDSCAPE: CapturePolicy = { recordingOrientation: "landscape_locked", captureLens: "default" };
 
-  it("wait/weight portrait, ready rotates with the hint, live locks before recording starts", async () => {
+  it("portrait from wait/weight through ready, live and the stop, with the portrait hint and the 9:16 preview", async () => {
+    let finishClip: ((v: { uri: string }) => void) | null = null;
+    mockCamera.recordAsync.mockImplementation(() => {
+      mockCallLog.push("recordAsync");
+      return new Promise<{ uri: string }>((res) => (finishClip = res));
+    });
+    mockCamera.stopRecording.mockImplementation(() => undefined);
+    const { getByTestId, queryByText } = renderWizard("pending");
+    expect(mockCallLog).toEqual(["lockPortrait"]);
+
+    fireEvent.press(getByTestId("weight-confirm"));
+    expect(mockCallLog).toEqual(["lockPortrait"]);
+    expect(getByTestId("ready-capture-hint").props.children).toBe(
+      "Hold your phone upright and keep both of you in frame.",
+    );
+    expect(queryByText("Turn your phone sideways for a wide shot. It locks when the match starts.")).toBeNull();
+    expect(getByTestId("camera-frame").props.style).toEqual({ aspectRatio: 9 / 16 });
+
+    await act(async () => {
+      mockSyncParams.current?.onTimerStarted?.("2026-09-18T12:00:00.000Z");
+    });
+    getByTestId("live-end");
+    await waitFor(() => expect(mockCallLog).toContain("recordAsync"));
+    await act(async () => {
+      completeHold(getByTestId("live-end"));
+    });
+    await act(async () => {
+      finishClip?.({ uri: "file://clip.mp4" });
+    });
+    await waitFor(() => expect(mockTusCalls).toHaveLength(1));
+    // Never a rotation, never a lock to the current side: portrait throughout.
+    expect(mockCallLog).toEqual(["lockPortrait", "recordAsync"]);
+  });
+
+  it("a landscape capture policy (spec 13.6): landscape on ready, the live lock before recording starts", async () => {
+    mockForcedCapture.current = LANDSCAPE;
     mockCamera.recordAsync.mockImplementation(() => {
       mockCallLog.push("recordAsync");
       return new Promise(() => undefined);
     });
-    const { getByText, getByTestId } = renderWizard("pending");
+    const { getByTestId, queryByTestId } = renderWizard("pending");
     expect(mockCallLog).toEqual(["lockPortrait"]);
 
     fireEvent.press(getByTestId("weight-confirm"));
-    expect(mockCallLog).toEqual(["lockPortrait", "allowRotation"]);
-    getByText("Turn your phone sideways for a wide shot. It locks when the match starts.");
+    expect(mockCallLog).toEqual(["lockPortrait", "lockLandscape"]);
+    // No portrait instruction under a landscape capture (no deck string for one yet).
+    expect(queryByTestId("ready-capture-hint")).toBeNull();
 
     await act(async () => {
       mockSyncParams.current?.onTimerStarted?.("2026-09-18T12:00:00.000Z");
@@ -576,7 +630,8 @@ describe("orientation: rotate at ready, lock at live, portrait after", () => {
     expect(mockCallLog.filter((c) => c === "lockToCurrent")).toHaveLength(1);
   });
 
-  it("holds the live lock while the clip is stopping, then restores portrait", async () => {
+  it("a landscape capture policy holds the live lock while the clip is stopping, then restores portrait", async () => {
+    mockForcedCapture.current = LANDSCAPE;
     let finishClip: ((v: { uri: string }) => void) | null = null;
     mockCamera.recordAsync.mockImplementation(
       () => new Promise<{ uri: string }>((res) => (finishClip = res)),

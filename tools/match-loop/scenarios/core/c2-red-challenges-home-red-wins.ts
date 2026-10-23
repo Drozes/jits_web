@@ -25,7 +25,7 @@ const scenario: Scenario = {
     const red = await ctx.bot("red");
     await red.goLive();
     await checkBlueInLobbyBeforeMatch(ctx, red);
-    const stakes = await stakesFor(red); // Red is the challenger
+    const stakes = await stakesFor(ctx, red); // Red is the challenger
     const challengeId = await redChallengesBlue(ctx, red);
     const h = await blueAccepts(ctx, red, challengeId);
     const side = await ctx.matchSide(red, h.matchId);
@@ -41,13 +41,13 @@ const scenario: Scenario = {
     await ctx.step("Blue is moved to the confirm step", () => ctx.ui.waitStep("confirm", T.step));
     ctx.eq("ui:confirm-verdict", "YOU LOST", (await ctx.ui.readConfirmVerdict())?.toUpperCase() ?? null);
     await bothConfirm(ctx, side);
-    await checkSummary(ctx, "YOU LOST", stakes.opponent_loss);
+    await checkSummary(ctx, "YOU LOST", { matchId: h.matchId, stake: stakes?.opponent_loss ?? null });
     await checkDecisiveDb(ctx, {
       handshake: h,
       winner: ctx.ids.red,
       loser: ctx.ids.blue,
-      winnerDelta: stakes.challenger_win,
-      loserDelta: stakes.opponent_loss,
+      winnerDelta: stakes?.challenger_win ?? null,
+      loserDelta: stakes?.opponent_loss ?? null,
       code: "rear_naked_choke",
       finish: 90,
       confirmations: 2,

@@ -4,7 +4,7 @@
 
 **Effective date:** October 13, 2026
 
-**Last updated:** October 13, 2026
+**Last updated:** October 23, 2026
 
 ## Key points (please read)
 
@@ -15,7 +15,7 @@ This summary is here to help you, but it is not a substitute for the full Terms.
 - **You must be 18 or older (and of age where you live)** to use ELO RATED. There are no exceptions and no parental consent option.
 - **By starting a match you consent to being recorded** (video and audio) by your opponent or a timekeeper, and you cannot stop their device from recording (Section 12).
 - **Deleting your account does not delete shared match records.** Results, ratings and match videos stay attached to a de-identified 'Deleted athlete' record; you can ask us to remove specific footage (Section 21.3).
-- **Your content stays yours, but you give us a broad licence.** You grant us a licence to use match footage, highlight reels, your name, likeness and rating to run and promote ELO RATED, **including on our own social media accounts (for example Instagram)**. **You can opt out** of promotional and social use, and ask us to take down a specific post that features you, by emailing info@elorated.com (or in the app's settings where available). You can also opt out of our use of your footage to train our own AI features (Section 13).
+- **Your content stays yours, but you give us a broad licence.** You grant us a licence to use match footage, highlight reels, your name, likeness and rating to run and promote ELO RATED, **including on our own social media accounts**. **You can opt out** of promotional and social use, and ask us to take down a specific post that features you, by emailing info@elorated.com (or in the app's settings where available). You can also opt out of our use of your footage to train our own AI features (Section 13).
 - **Our liability is limited and the Service is provided "as is"** (Sections 22 and 23; see Section 24 for your consumer rights), and you agree to indemnify us for claims arising from your own conduct (Section 25).
 - **Ontario law applies**, and disputes go to the courts in Toronto, Ontario, except where your local consumer protection law gives you the right to use your own courts or laws (Section 27). There is no arbitration clause and no class action waiver.
 - **Nothing in these Terms takes away rights that the law says cannot be taken away**, including your rights as a consumer under the law where you live.
@@ -99,7 +99,7 @@ The export and sanctions representation in Section 17.2 also applies to every us
 
 4.2 **One person, one account.** You may hold only one account. You must not create an account for anyone else, share your account, let anyone else use it, or use another person's account. Your display name must not impersonate anyone or mislead people about who you are.
 
-4.3 **Security.** You are responsible for keeping your password and sign-in methods (for example, Google Sign-In) secure, and for all activity on your account, including matches confirmed, results submitted and content uploaded from it, unless the activity happened because of our breach of these Terms. Tell us right away at info@elorated.com if you think your account has been used without your permission.
+4.3 **Security.** You are responsible for keeping your password and sign-in methods (for example, an account from another provider that you sign in with) secure, and for all activity on your account, including matches confirmed, results submitted and content uploaded from it, unless the activity happened because of our breach of these Terms. Tell us right away at info@elorated.com if you think your account has been used without your permission.
 
 4.4 **Your device.** You are responsible for your device, operating system, data plan and internet connection, and for any charges from your carrier.
 
@@ -208,7 +208,7 @@ The export and sanctions representation in Section 17.2 also applies to every us
 
 ## 8. Ranked matches, ratings, results and disputes
 
-8.1 **How matches work.** Matches arranged through the Service are ranked and affect ratings (the Service may also offer a one-time practice match that does not). The way matches are started, timed, confirmed, scored and rated is set by the Service and may change. At the time of writing: both athletes are asked to confirm the result; either athlete can dispute it within the dispute period (currently 24 hours); and if an athlete does not dispute within that period, the athlete is treated as having confirmed it and the result locks. A timekeeper who joins a match runs the match clock and may record the match, but cannot change the result.
+8.1 **How matches work.** Matches arranged through the Service are ranked and affect ratings (the Service may also offer a one-time practice match that does not). The way matches are started, timed, confirmed, scored and rated is set by the Service and may change. At the time of writing: both athletes are asked to confirm the result; either athlete can dispute it within the dispute period (currently 24 hours); and if an athlete does not dispute within that period, the athlete is treated as having confirmed it and the result locks. A timekeeper who joins a match runs the match clock, films the match as part of that role and records the result (which the timekeeper may correct for a short time afterwards), and the athletes then confirm it.
 
 8.2 **Ratings are our own system.** ELO RATED ratings are calculated by our own formula, which is based on the Elo rating method, takes weight into account, and may change at any time. Ratings, rankings, records, leaderboards and statistics are provided for recreational interest. They are not an official grading, belt, rank, title or qualification, and they are **not guaranteed to be accurate, complete or fair**. They depend on information users provide, which may be wrong.
 
@@ -267,9 +267,9 @@ The export and sanctions representation in Section 17.2 also applies to every us
 
 ## 12. Recording matches and the people in them
 
-12.1 **Recording is a choice made on each device.** The Service lets athletes and timekeepers record matches. The app shows each athlete whether the opponent has chosen to record at the face-off. A timekeeper who joins the match may also record it. At the time of writing, an athlete cannot stop another participant's device from recording.
+12.1 **Recording by athletes is a choice made on each device.** The Service lets athletes and timekeepers record matches. The app shows each athlete whether the opponent has chosen to record at the face-off. A timekeeper who joins the match films it as part of the timekeeper role. At the time of writing, an athlete cannot stop another participant's device from recording.
 
-12.2 **Consent to being recorded.** By starting a match through the Service, you consent to that match being recorded (video and audio) by your opponent or a timekeeper using the Service, and to the recording being used as described in these Terms, including Section 13 (subject to your opt-out and takedown rights). If you do not want to be recorded, tell your opponent and any timekeeper before the match starts, and do not start the match unless they agree not to record.
+12.2 **Consent to being recorded.** By starting a match through the Service, you consent to that match being recorded (video and audio) by your opponent or a timekeeper using the Service, and to the recording being used as described in these Terms, including Section 13 (subject to your opt-out and takedown rights). If you do not want to be recorded, tell your opponent before the match starts, and do not start the match unless they agree not to record. A match with a timekeeper is always filmed: if you do not want to be recorded, do not start a match with a timekeeper.
 
 12.3 **Your promises when you record or upload.** Each time you record, upload, share or post any footage, photo or audio through the Service, you represent and warrant that:
 
@@ -297,7 +297,7 @@ The export and sanctions representation in Section 17.2 also applies to every us
 - create highlight reels, compilations and other derivative works from it, including works that combine it with footage of other athletes; and
 - display, perform, publish, publicly distribute and make it available,
 
-**in each case to operate, provide, improve and promote ELO RATED, including by posting match footage, highlight reels, names, likenesses and ratings on ELO RATED's own social media accounts (for example Instagram) and in other promotion of ELO RATED in any media.** This licence covers footage in which you appear, whoever recorded it. You also give each other athlete and any timekeeper in a match with you a licence to view, save and share the recordings of that match, and each other athlete a licence to do the same with the highlight reels of that match, in each case using the features of the Service available to them (for example, saving to a photo library or sharing to Instagram). You understand that they may then share it outside the Service.
+**in each case to operate, provide, improve and promote ELO RATED, including by posting match footage, highlight reels, names, likenesses and ratings on ELO RATED's own social media accounts and in other promotion of ELO RATED in any media.** This licence covers footage in which you appear, whoever recorded it. You also give each other athlete and any timekeeper in a match with you a licence to view, save and share the recordings of that match, and each other athlete a licence to do the same with the highlight reels of that match, in each case using the features of the Service available to them (for example, saving to a photo library or sharing to a social network). You understand that they may then share it outside the Service.
 
 13.4 **No payment.** You agree that you will not be paid for any use of Your Content under this licence, and that the use of your name, likeness and rating as described here is not a misappropriation of your personality or image.
 
@@ -348,7 +348,7 @@ Some features may be described as beta, preview, early access, experimental or t
 
 ## 17. Third-party services and the app stores
 
-17.1 **Third-party services.** The Service uses and links to services provided by others, for example Google Sign-In, Instagram and other social networks, your device's share sheet and photo library, push notification services, maps, and AI and hosting providers. Your use of a third-party service is governed by that third party's own terms and privacy policy. We do not control third-party services and are not responsible for them, for their content, availability or security, or for what they do with content you choose to share with them. When you share footage to Instagram or anywhere else, you are responsible for complying with that platform's rules and for having the consents described in Section 12.
+17.1 **Third-party services.** The Service uses and links to services provided by others, for example sign-in providers, social networks, your device's share sheet and photo library, push notification services, maps, and AI and hosting providers. Your use of a third-party service is governed by that third party's own terms and privacy policy. We do not control third-party services and are not responsible for them, for their content, availability or security, or for what they do with content you choose to share with them. When you share footage to a social network or anywhere else, you are responsible for complying with that platform's rules and for having the consents described in Section 12.
 
 17.2 **Apple App Store terms.** If you downloaded the app from the Apple App Store, the following also applies, and prevails over anything else in these Terms to the extent of any conflict:
 

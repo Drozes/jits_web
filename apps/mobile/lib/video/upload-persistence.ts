@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { MatchVideoCaptureLens, MatchVideoCaptureQuality } from "@jits/shared/api/match-video-upload";
 import type { RecordingTruncation } from "./use-video-recorder";
 import type { UploadErrorClass } from "./upload-errors";
 
@@ -98,6 +99,10 @@ export interface PendingUploadJob {
   recordStartedAt?: string | null;
   /** Recorder-measured clip length, sent once with the reservation. */
   recordDurationMs?: number | null;
+  /** The clip's capture quality, sent with the reservation (timekeeper mode spec 13.4). */
+  captureQuality?: MatchVideoCaptureQuality | null;
+  /** The lens the clip was recorded on, sent with the reservation. */
+  captureLens?: MatchVideoCaptureLens | null;
 }
 
 /**
@@ -227,6 +232,8 @@ function normaliseJob(job: PendingUploadJob): PendingUploadJob {
       typeof job.recordDurationMs === "number" && Number.isFinite(job.recordDurationMs) && job.recordDurationMs > 0
         ? job.recordDurationMs
         : null,
+    captureQuality: job.captureQuality === "720p" || job.captureQuality === "1080p" ? job.captureQuality : null,
+    captureLens: job.captureLens === "ultrawide" || job.captureLens === "default" ? job.captureLens : null,
     updatedAt:
       typeof job.updatedAt === "number" && Number.isFinite(job.updatedAt)
         ? job.updatedAt

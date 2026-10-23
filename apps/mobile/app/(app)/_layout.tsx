@@ -35,9 +35,13 @@ export default function AppLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="athlete/[id]" />
             {/* A match with no session behind it: where an Arena challenge lands
-              both parties. Pushes over the tab bar like every other detail
-              screen. */}
-            <Stack.Screen name="match/[matchId]" />
+              both parties (and, in timekeeper mode, the timekeeper). Pushes
+              over the tab bar like every other detail screen. `/match/<id>`
+              resolves to the folder's index. */}
+            <Stack.Screen name="match/[matchId]/index" />
+            {/* Timekeeper mode: the asked person's sheet (`timekeep_href`), a
+              pushed screen, so a push tap is never dropped during a match. */}
+            <Stack.Screen name="match/[matchId]/timekeep" />
             {/* A past match opened from a history row: read-only, never the
               live wizard, so it leaves live state alone. */}
             <Stack.Screen name="match-detail/[matchId]" />
