@@ -87,7 +87,7 @@ describe("moderation RPC wrappers (jr_be-m2s)", () => {
   it("consent: records the shown version and returns the stored time", async () => {
     const m = client({ data: "2026-10-14T12:00:00Z", error: null });
     await expect(recordAiProcessingConsent(m.c)).resolves.toEqual({ ok: true, data: "2026-10-14T12:00:00Z" });
-    expect(m.rpc).toHaveBeenCalledWith("record_ai_processing_consent", { p_version: "2026-10-14" });
+    expect(m.rpc).toHaveBeenCalledWith("record_ai_processing_consent", { p_version: "2026-10-23" });
   });
 
   it("consent read: the owner's two columns, null when never given", async () => {

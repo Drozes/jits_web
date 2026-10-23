@@ -34,8 +34,14 @@ export type ReportReason = (typeof REPORT_REASONS)[number];
 /** `report_content.p_details` is capped at this many characters. */
 export const REPORT_DETAILS_MAX = 1000;
 
-/** The consent text version the app shows (`record_ai_processing_consent.p_version`). */
-export const AI_PROCESSING_CONSENT_VERSION = "2026-10-14";
+/**
+ * The consent text version the app shows (`record_ai_processing_consent.p_version`).
+ * Bump it whenever the "Before you film" text changes: consent to any other
+ * version reads as no consent, so everyone is asked again. "2026-10-23": the
+ * timekeeper's plain-language body (jits-o47s.46). The server only stores the
+ * string; its timekeeper backstop checks that consent exists, not its version.
+ */
+export const AI_PROCESSING_CONSENT_VERSION = "2026-10-23";
 
 export interface BlockedAthlete {
   athlete_id: string;

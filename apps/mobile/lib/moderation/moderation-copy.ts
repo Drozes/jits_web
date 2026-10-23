@@ -82,6 +82,13 @@ export const AI_CONSENT_COPY = {
   title: "Before you film",
   body:
     "Your match video, with your display name, rating and weight division, is sent to Google Gemini to find key moments and cut your highlights. Stills from the video may be sent to OpenAI to make your avatar (or the video to Google Gemini if OpenAI is unavailable). Video and results are stored on our servers.",
+  /**
+   * The timekeeper's body (jits-o47s.46): plain language, the filming duty
+   * first, no vendor names (they live in Privacy Policy 4.2 and 9.1). The
+   * athlete sheet, the upload alert and Settings keep `body`.
+   */
+  timekeeperBody:
+    "As timekeeper, you film this match. The video is uploaded to verify the result, protect against fraud and keep the rankings fair, and to make highlights and promotional content. We may use third-party AI services to analyse it. You can opt out of promotional use.",
   privacyLink: "Read the Privacy Policy",
   allow: "Allow and film",
   uploadTitle: "Before you upload",

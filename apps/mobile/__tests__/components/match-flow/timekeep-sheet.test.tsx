@@ -219,6 +219,11 @@ describe("timekeep sheet", () => {
     const s = await open();
     fireEvent.press(s.getByLabelText("Accept"));
     s.getByTestId("ai-consent-sheet");
+    // The timekeeper's own body (jits-o47s.46), never the athlete's.
+    expect(s.getByTestId("ai-consent-body")).toHaveTextContent(AI_CONSENT_COPY.timekeeperBody);
+    expect(s.getByTestId("ai-consent-body")).toHaveTextContent(/^As timekeeper, you film this match\./);
+    expect(s.queryByText(AI_CONSENT_COPY.body)).toBeNull();
+    s.getByText(AI_CONSENT_COPY.title);
     expect(mockRespond).not.toHaveBeenCalled();
     fireEvent.press(s.getByTestId("ai-consent-not-now"));
     expect(s.queryByTestId("ai-consent-sheet")).toBeNull();

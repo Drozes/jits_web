@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/elo-system/button";
 import { usePalette } from "@/lib/theme/palette";
 import { typeStep } from "@/lib/typography";
 import { TIMEKEEPER_COPY as C } from "@/lib/match-flow/timekeeper-copy";
+import { AI_CONSENT_COPY } from "@/lib/moderation/moderation-copy";
 import { useTimekeepSheetScreen } from "@/lib/match-flow/timekeep-sheet-store";
 import { Mono } from "../fight/fight-ui";
 import { AttentionLine } from "./attention-line";
@@ -69,7 +70,7 @@ export function TimekeepSheet({ matchId, requestId, athleteId }: TimekeepSheetPr
           <ActivityIndicator testID="timekeep-loading" color={p.text3} />
         </View>
       )}
-      <AiConsentSheet {...s.consent} />
+      <AiConsentSheet {...s.consent} body={AI_CONSENT_COPY.timekeeperBody} />
     </View>
   );
 }
