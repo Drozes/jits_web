@@ -44,7 +44,7 @@ import type { Fidelity, Timing } from "./bot/match-side";
 import { holdFlagForRun, putBackFailures, recoverFixtures, timekeeperRoleOffProblem } from "./fixtures/timekeeper";
 import { acquireRunLock } from "./lib/run-lock";
 import { integratedSlices, pendingFails, pendingReason } from "./scenarios/timekeeper/integration";
-import { errorFingerprint, exitCodeFor, oracleFingerprint, pendingResult, type ScenarioResult, type Status } from "./lib/results";
+import { exitCodeFor, pendingResult, scenarioResult, type ScenarioResult, type Status } from "./lib/results";
 
 interface Args {
   tier: "core" | "extended" | "timekeeper" | "all";
@@ -249,37 +249,17 @@ async function runOne(env: Env, s: Scenario, dir: string, known: Map<string, str
     logOracles(ctx);
     status = ctx.oracles.every((o) => o.ok) && !error ? "pass" : "fail";
   }
-  let fingerprints: string[] = [];
-  if (status !== "pass") {
-    fingerprints = ctx.oracles.filter((o) => !o.ok).map((o) => oracleFingerprint(s.id, o));
-    if (fingerprints.length === 0 && errMsg) fingerprints = [errorFingerprint(s.id, errMsg)];
-  }
-  const fp = fingerprints[0] ?? null;
   // A fixture put-back that failed after the scenario had failed: the error
-  // above stays the scenario's own, and the put-back rides alongside it.
+  // above stays the scenario's own, and the put-back rides alongside it. The
+  // fingerprints and the `known` rule are `scenarioResult`'s (lib/results.ts).
   const putBacks = putBackFailures(error);
-  // `known` only when EVERY failure is already filed; one new failure keeps
-  // it `fail`, and so does a failed put-back (no bead files one).
-  if (status === "fail" && putBacks.length === 0 && fingerprints.length > 0 && fingerprints.every((f) => known.has(f))) status = "known";
-  const result: ScenarioResult = {
-    id: s.id,
-    title: s.title,
-    status,
-    attempts: 1,
-    expectedFailure: s.expectedFailure,
-    steps: ctx.steps,
-    oracles: ctx.oracles,
-    artifacts: ctx.artifacts,
-    fingerprint: fp,
-    fingerprints,
-    knownBeads: fingerprints.filter((f) => known.has(f)).map((f) => `${f}=${known.get(f)}`),
-    skippedOracles: ctx.oracles.filter((o) => o.status === "skipped").map((o) => o.id),
-    error: errMsg,
-    ...(putBacks.length ? { putBackFailures: putBacks } : {}),
-    ms: Date.now() - t0,
-  };
+  const result = scenarioResult(
+    { scenario: s, status, steps: ctx.steps, oracles: ctx.oracles, artifacts: ctx.artifacts, error: errMsg, putBacks, ms: Date.now() - t0 },
+    known,
+  );
+  const fp = result.fingerprint;
   writeFileSync(join(dir, "scenario.json"), redactJson(result, 2));
-  log(`== ${s.id}: ${status.toUpperCase()}${fp ? ` (${fp})` : ""} in ${Math.round(result.ms / 1000)}s${errMsg ? ` - ${errMsg}` : ""}`);
+  log(`== ${s.id}: ${result.status.toUpperCase()}${fp ? ` (${fp})` : ""} in ${Math.round(result.ms / 1000)}s${errMsg ? ` - ${errMsg}` : ""}`);
   for (const p of putBacks) log(`   and a put-back failed after it: ${p}`);
   return result;
 }

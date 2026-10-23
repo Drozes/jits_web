@@ -89,6 +89,70 @@ export function pendingResult(s: Pick<Scenario, "id" | "title">, reason: string,
   };
 }
 
+/**
+ * A scenario's status once its failures are fingerprinted: a `fail` is
+ * `known` only when EVERY failure is already filed (one new failure keeps it
+ * `fail`) and no fixture put-back failed after it (no bead files one, and a
+ * leftover flag, window or row must not read as an old app bug). `known`
+ * does not fail the run, so this rule is part of the gate (W3FIX review
+ * minor 3). Every other status is returned as it is.
+ */
+export function finalStatus(
+  status: Status,
+  fingerprints: readonly string[],
+  known: ReadonlyMap<string, string>,
+  putBacks: readonly string[],
+): Status {
+  if (status !== "fail" || putBacks.length > 0 || fingerprints.length === 0) return status;
+  return fingerprints.every((f) => known.has(f)) ? "known" : status;
+}
+
+/** What a scenario's run left behind, before the rules above (`runOne` in `run.ts`). */
+export interface ScenarioRun {
+  scenario: Pick<Scenario, "id" | "title" | "expectedFailure">;
+  /** From the scenario's own error and oracles: `pass`, `fail`, `harness_error` or `env_error`. */
+  status: Status;
+  steps: StepRecord[];
+  oracles: OracleRecord[];
+  artifacts: Record<string, string>;
+  error?: string;
+  /** `putBackFailures` of the scenario's error (`fixtures/timekeeper.ts`). */
+  putBacks: readonly string[];
+  ms: number;
+}
+
+/**
+ * The scenario's recorded result: every failed oracle's fingerprint (or the
+ * error's, when it died with none failed), the status by `finalStatus`, the
+ * beads already filed for it, and the put-backs that failed after it, listed
+ * next to its own error (which stays the scenario's).
+ */
+export function scenarioResult(run: ScenarioRun, known: ReadonlyMap<string, string>): ScenarioResult {
+  const { scenario: s, status, putBacks } = run;
+  let fingerprints: string[] = [];
+  if (status !== "pass") {
+    fingerprints = run.oracles.filter((o) => !o.ok).map((o) => oracleFingerprint(s.id, o));
+    if (fingerprints.length === 0 && run.error) fingerprints = [errorFingerprint(s.id, run.error)];
+  }
+  return {
+    id: s.id,
+    title: s.title,
+    status: finalStatus(status, fingerprints, known, putBacks),
+    attempts: 1,
+    expectedFailure: s.expectedFailure,
+    steps: run.steps,
+    oracles: run.oracles,
+    artifacts: run.artifacts,
+    fingerprint: fingerprints[0] ?? null,
+    fingerprints,
+    knownBeads: fingerprints.filter((f) => known.has(f)).map((f) => `${f}=${known.get(f)}`),
+    skippedOracles: run.oracles.filter((o) => o.status === "skipped").map((o) => o.id),
+    error: run.error,
+    ...(putBacks.length ? { putBackFailures: [...putBacks] } : {}),
+    ms: run.ms,
+  };
+}
+
 /** The statuses that fail a run (`known` and `flake` do not; nor does a `pending` the run may leave). */
 const FAILS_THE_RUN: ReadonlySet<Status> = new Set<Status>(["fail", "harness_error", "env_error"]);
 

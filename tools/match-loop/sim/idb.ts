@@ -387,11 +387,15 @@ export const STILL_TIMING: StillTiming = { stillMs: 300, gapMs: 150, timeoutMs: 
  * `first` is the element as the caller's own read found it, with the time
  * that read started. Returns the element tapped, or undefined with NO tap
  * when the element went away (or turned disabled, for a query that asks for
- * enabled) or kept moving for `timeoutMs`: the caller reads the screen
- * again and decides.
+ * enabled), kept moving for `timeoutMs`, or settled outside `Idb.onScreen`'s
+ * band: the caller reads the screen again and decides (off screen, it
+ * scrolls). The band matters because a control can settle somewhere other
+ * than where the caller's on-screen read put it (an edit moves Confirm), and
+ * the dev build's LogBox toast lies in the bottom band: a tap there opens the
+ * LogBox inspector, which swallows every later tap (W3FIX review minor 2).
  */
 export async function tapWhenStill(
-  idb: Pick<Idb, "describe" | "tap">,
+  idb: Pick<Idb, "describe" | "tap" | "onScreen">,
   q: Query,
   first: { el: AXElement; at: number },
   timing: StillTiming = STILL_TIMING,
@@ -408,6 +412,7 @@ export async function tapWhenStill(
       held = cur;
       since = at;
     } else if (at - since >= timing.stillMs) {
+      if (!idb.onScreen(cur)) return undefined;
       await idb.tap(cur);
       return cur;
     }
