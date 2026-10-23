@@ -108,15 +108,17 @@ const LIVE_POLL_MS = 10_000;
  * `crew` and `weight` (a seat, a drop-out back to the picker, a deadline
  * cancel) and the timekeeper's `summary` (the athletes' confirmations on the
  * done screen), so a missed realtime event never strands a phone (review
- * tech M7).
+ * tech M7). The done screen stops once `doneSettled`
+ * (`timekeeperDoneSettled`, jits-o47s.44).
  */
 export function pollIntervalFor(
   step: MatchStep | null,
   roles?: Pick<ReconcileRoles, "mode" | "viewer"> | null,
+  doneSettled = false,
 ): number | null {
   if (roles?.mode === "timekeeper") {
     if (step === "crew" || step === "weight") return WAITING_POLL_MS;
-    if (step === "summary" && roles.viewer === "timekeeper") return WAITING_POLL_MS;
+    if (step === "summary" && roles.viewer === "timekeeper") return doneSettled ? null : WAITING_POLL_MS;
   }
   if (step === "ready" || step === "result" || step === "confirm") return WAITING_POLL_MS;
   if (step === "live") return LIVE_POLL_MS;
@@ -144,9 +146,32 @@ export function targetFor(snapshot: MatchSnapshot, roles: ReconcileRoles): Match
   }
 }
 
-function allConfirmed(snapshot: MatchSnapshot, roles: ReconcileRoles): boolean {
+function allConfirmed(
+  snapshot: Pick<MatchSnapshot, "confirmedAthleteIds">,
+  roles: Pick<ReconcileRoles, "athletes">,
+): boolean {
   const ids = snapshot.confirmedAthleteIds;
   return !!ids && roles.athletes.every((a) => ids.includes(a.athleteId));
+}
+
+/**
+ * True once nothing on the timekeeper's done screen can change from its
+ * poll's point of view (jits-o47s.44): a voided match (final), or a
+ * completed one both athletes have confirmed. The poll's job there is the
+ * athletes' confirmations (spec 10, M7), and with both in, `edit_match_result`
+ * refuses an edit (edit_closed_confirmed) whatever the 30-minute window says,
+ * so the window opens nothing more; a result-stall review is over once the
+ * result is recorded. A disputed match keeps polling: the admin's review
+ * moves it to completed or voided. Realtime (the `matches` row, the
+ * timekeeper-mode tables) and the foreground re-read still catch a late
+ * change without the poll.
+ */
+export function timekeeperDoneSettled(
+  snapshot: Pick<MatchSnapshot, "status" | "confirmedAthleteIds">,
+  roles: Pick<ReconcileRoles, "athletes">,
+): boolean {
+  if (snapshot.status === "voided") return true;
+  return snapshot.status === "completed" && allConfirmed(snapshot, roles);
 }
 
 /**

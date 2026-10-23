@@ -13,11 +13,17 @@ export const TIMEKEEPER_STATE_POLL_MS = 4_000;
  * The state poll for a step: every step polls but an athlete's verdict
  * (nothing on it reads this state; the reconciler moves an athlete back to
  * confirm after an edit). The timekeeper's `summary` is the done screen,
- * which shows the edit window and the athletes' confirmations.
+ * which shows the edit window and the athletes' confirmations, until
+ * nothing on it can change (`doneSettled`, `timekeeperDoneSettled` in
+ * `reconcile.ts`, jits-o47s.44).
  */
-export function timekeeperStatePollMs(step: MatchStep | null, viewer: ViewerRole | null): number | null {
+export function timekeeperStatePollMs(
+  step: MatchStep | null,
+  viewer: ViewerRole | null,
+  doneSettled = false,
+): number | null {
   if (!step) return null;
-  if (step === "summary" && viewer !== "timekeeper") return null;
+  if (step === "summary" && (viewer !== "timekeeper" || doneSettled)) return null;
   return TIMEKEEPER_STATE_POLL_MS;
 }
 

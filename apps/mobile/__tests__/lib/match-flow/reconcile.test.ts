@@ -13,6 +13,7 @@ import {
   resultFromOutcome,
   resultFromRoles,
   targetFor,
+  timekeeperDoneSettled,
   type MatchSnapshot,
 } from "@/lib/match-flow/reconcile";
 import { MATCH_STEPS, type MatchStep } from "@/lib/match-flow/step-router";
@@ -458,6 +459,44 @@ describe("pollIntervalFor: timekeeper mode (review tech M7)", () => {
     }
     expect(pollIntervalFor("crew")).toBeNull();
     expect(pollIntervalFor("weight", ROLES)).toBeNull();
+  });
+
+  it("the done screen stops once settled (jits-o47s.44)", () => {
+    expect(pollIntervalFor("summary", TK_TIMEKEEPER, true)).toBeNull();
+    expect(pollIntervalFor("summary", TK_TIMEKEEPER, false)).toBe(4_000);
+  });
+
+  it("settled touches no other step, no athlete and no two-athlete match", () => {
+    for (const step of [...MATCH_STEPS, null]) {
+      expect(pollIntervalFor(step, ROLES, true)).toBe(pollIntervalFor(step));
+      expect(pollIntervalFor(step, null, true)).toBe(pollIntervalFor(step));
+      expect(pollIntervalFor(step, TK_ATHLETE, true)).toBe(pollIntervalFor(step, TK_ATHLETE));
+      if (step !== "summary") expect(pollIntervalFor(step, TK_TIMEKEEPER, true)).toBe(pollIntervalFor(step, TK_TIMEKEEPER));
+    }
+  });
+});
+
+describe("timekeeperDoneSettled: nothing on the done screen can change (jits-o47s.44)", () => {
+  const s = (status: string, confirmedAthleteIds: string[] | null) => ({ status, confirmedAthleteIds });
+
+  it("settles a completed match both athletes confirmed, and a voided one", () => {
+    expect(timekeeperDoneSettled(s("completed", [ME, OPP]), TK_TIMEKEEPER)).toBe(true);
+    expect(timekeeperDoneSettled(s("completed", [OPP, ME, "someone-else"]), TK_TIMEKEEPER)).toBe(true);
+    expect(timekeeperDoneSettled(s("voided", []), TK_TIMEKEEPER)).toBe(true);
+    expect(timekeeperDoneSettled(s("voided", null), TK_TIMEKEEPER)).toBe(true);
+  });
+
+  it("keeps polling while a confirmation is owed or unknown", () => {
+    expect(timekeeperDoneSettled(s("completed", []), TK_TIMEKEEPER)).toBe(false);
+    expect(timekeeperDoneSettled(s("completed", [ME]), TK_TIMEKEEPER)).toBe(false);
+    expect(timekeeperDoneSettled(s("completed", [OPP]), TK_TIMEKEEPER)).toBe(false);
+    expect(timekeeperDoneSettled(s("completed", null), TK_TIMEKEEPER)).toBe(false);
+  });
+
+  it("keeps polling a disputed match (the admin's review is pending) and any status off the done screen", () => {
+    for (const status of ["disputed", "in_progress", "pending", "cancelled", "mystery"]) {
+      expect(timekeeperDoneSettled(s(status, [ME, OPP]), TK_TIMEKEEPER)).toBe(false);
+    }
   });
 });
 
