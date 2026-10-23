@@ -34,10 +34,11 @@ jest.mock("@/components/ui/toast", () => ({ toast: { info: jest.fn(), success: j
 
 // The reconciler: the hook's snapshot handler, captured so a test can deliver a snapshot.
 type OnSnapshot = (s: { match: MatchDetails; confirmedAthleteIds: string[] | null }) => void;
-const mockReconciler: { onSnapshot: OnSnapshot | null } = { onSnapshot: null };
+const mockReconciler: { onSnapshot: OnSnapshot | null; doneSettled: boolean | undefined } = { onSnapshot: null, doneSettled: undefined };
 jest.mock("@/lib/match-flow/use-match-reconciler", () => ({
-  useMatchReconciler: (p: { onSnapshot: OnSnapshot }) => {
+  useMatchReconciler: (p: { onSnapshot: OnSnapshot; doneSettled?: boolean }) => {
     mockReconciler.onSnapshot = p.onSnapshot;
+    mockReconciler.doneSettled = p.doneSettled;
     return { reconcileNow: () => undefined, onChannelStatus: () => undefined };
   },
 }));
@@ -45,8 +46,13 @@ jest.mock("@/lib/match-flow/use-match-reconciler", () => ({
 // The timekeeper-mode state: null until a test lands a read.
 const mockTk: { state: { ready: { athleteId: string; readyAt: string }[] } | null } = { state: null };
 const mockTkRefresh = jest.fn();
+/** The last `doneSettled` the wizard passed to the state poll. */
+const mockTkPoll: { doneSettled: boolean | undefined } = { doneSettled: undefined };
 jest.mock("@/lib/match-flow/use-timekeeper-state", () => ({
-  timekeeperStatePollMs: () => null,
+  timekeeperStatePollMs: (_step: unknown, _viewer: unknown, doneSettled?: boolean) => {
+    mockTkPoll.doneSettled = doneSettled;
+    return null;
+  },
   useTimekeeperState: () => ({ state: mockTk.state, lostAccess: false, refresh: mockTkRefresh }),
 }));
 
@@ -151,6 +157,8 @@ function setStep(hook: ReturnType<typeof mount>, next: MatchStep) {
 
 beforeEach(() => {
   mockReconciler.onSnapshot = null;
+  mockReconciler.doneSettled = undefined;
+  mockTkPoll.doneSettled = undefined;
   mockTk.state = null;
   mockPlan.hold = false;
   mockTkRefresh.mockClear();
@@ -406,5 +414,33 @@ describe("a step the reconciler moves re-reads the timekeeper-mode state at once
     snapshot(row("in_progress", { timekeeperMode: false }));
     expect(hook.result.current.step).toBe("live");
     expect(mockTkRefresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("the timekeeper's done screen stops both polls once nothing on it can change (jits-o47s.44)", () => {
+  const settled = () => [mockReconciler.doneSettled, mockTkPoll.doneSettled];
+
+  it("polls while a confirmation is owed, and stops on the snapshot that lists both", () => {
+    mount(TK, row("completed"));
+    expect(settled()).toEqual([false, false]);
+    snapshot(row("completed"), [ME]);
+    expect(settled()).toEqual([false, false]);
+    snapshot(row("completed"), [ME, OPP]);
+    expect(settled()).toEqual([true, true]);
+  });
+
+  it("keeps the last known confirmations through a read that could not list them", () => {
+    mount(TK, row("completed"));
+    snapshot(row("completed"), [ME, OPP]);
+    snapshot(row("completed"), null);
+    expect(settled()).toEqual([true, true]);
+  });
+
+  it("stops on a voided match and keeps polling a disputed one", () => {
+    const hook = mount(TK, row("disputed"));
+    snapshot(row("disputed"), [ME, OPP]);
+    expect(settled()).toEqual([false, false]);
+    hook.rerender({ m: row("voided") });
+    expect(settled()).toEqual([true, true]);
   });
 });

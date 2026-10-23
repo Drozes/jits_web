@@ -5,7 +5,7 @@ import { toast } from "@/components/ui/toast";
 import type { MatchDetails } from "@jits/shared/api/queries";
 import type { BroadcastResult } from "@jits/shared/hooks/use-session-match-sync";
 import { deriveMatchRoles, type MatchRoles } from "./match-roles";
-import { matchSnapshot, planReconcile, resultFromRoles, type MatchSnapshot } from "./reconcile";
+import { matchSnapshot, planReconcile, resultFromRoles, timekeeperDoneSettled, type MatchSnapshot } from "./reconcile";
 import { getCurrentStep, MATCH_STEPS, type MatchStep } from "./step-router";
 import { isAllowedBackward } from "./step-transitions";
 import { useMatchReconciler, type ReconcileSnapshot } from "./use-match-reconciler";
@@ -123,13 +123,18 @@ export function useWizardSync({
   /** The timekeeper's exit held for that name (`exitAfterActor`): run it now, or null. */
   const heldExitRef = React.useRef<(() => void) | null>(null);
 
+  // The timekeeper's done screen stops both of its polls once nothing on it
+  // can change (jits-o47s.44); read only there (`pollIntervalFor`).
+  const doneSettled =
+    match != null && roles != null && timekeeperDoneSettled({ status: match.status, confirmedAthleteIds }, roles);
+
   // Timekeeper mode only: the fast-changing state (ready, checks, request,
   // presence, timeouts, edit window, Start blockers). A two-athlete match
   // never reads it.
   const timekeeper = useTimekeeperState({
     matchId,
     enabled: ready && roles?.mode === "timekeeper",
-    pollMs: timekeeperStatePollMs(step, roles?.viewer ?? null),
+    pollMs: timekeeperStatePollMs(step, roles?.viewer ?? null, doneSettled),
   });
 
   // Mount-time step from the match; the first snapshot may refine it.
@@ -333,6 +338,7 @@ export function useWizardSync({
     step,
     enabled: ready,
     roles,
+    doneSettled,
     onSnapshot,
   });
 

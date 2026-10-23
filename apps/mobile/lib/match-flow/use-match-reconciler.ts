@@ -32,6 +32,11 @@ interface UseMatchReconcilerParams {
    * polls on the two-athlete intervals and reads as an athlete.
    */
   roles?: Pick<ReconcileRoles, "mode" | "viewer"> | null;
+  /**
+   * The timekeeper's done screen can no longer change (`timekeeperDoneSettled`):
+   * its poll stops. Absent or false polls as before.
+   */
+  doneSettled?: boolean;
   /** Called with every snapshot newer than the last one applied. */
   onSnapshot: (snapshot: ReconcileSnapshot) => void;
 }
@@ -74,8 +79,9 @@ async function readSnapshot(
  *       rejoin after an outage (jits-bmei), wired through `reconcileNow`,
  *   (c) a modest poll, only on steps that wait on the other side (ready,
  *       result, confirm) plus a slower one on live, and in timekeeper mode
- *       also on crew, weight and the timekeeper's summary
- *       (`pollIntervalFor`), only while the app is in the foreground,
+ *       also on crew, weight and the timekeeper's summary until nothing
+ *       on it can change (`pollIntervalFor`, `doneSettled`), only while the
+ *       app is in the foreground,
  *   (d) every step change, including the first mount,
  *   (e) a `matches` row UPDATE (below).
  *
@@ -85,7 +91,7 @@ async function readSnapshot(
  * `step-transitions.ts` allows), so a stale read can never undo a newer
  * broadcast-driven step. Nothing here mutates the match.
  */
-export function useMatchReconciler({ matchId, step, enabled, roles, onSnapshot }: UseMatchReconcilerParams) {
+export function useMatchReconciler({ matchId, step, enabled, roles, doneSettled = false, onSnapshot }: UseMatchReconcilerParams) {
   const onSnapshotRef = React.useRef(onSnapshot);
   onSnapshotRef.current = onSnapshot;
   const enabledRef = React.useRef(enabled);
@@ -190,7 +196,7 @@ export function useMatchReconciler({ matchId, step, enabled, roles, onSnapshot }
   }, [reconcileNow]);
 
   // (c) poll, only while waiting on the other side and in the foreground.
-  const interval = pollIntervalFor(step, roles);
+  const interval = pollIntervalFor(step, roles, doneSettled);
   React.useEffect(() => {
     if (!enabled || !appActive || interval == null) return;
     const id = setInterval(reconcileNow, interval);

@@ -691,19 +691,45 @@ describe("timekeeper mode: the timekeeper", () => {
   });
 
   it("the done screen's 4 s poll brings a later confirmation, and an edit's reset", async () => {
-    mockDetailsConfirmations.mockReturnValue([confirmed(OPP)]);
     await mount(TK, tkRow("completed", { outcome: "win" }));
-    expect(doneConfirmed()).toEqual([OPP]);
-    // The other athlete confirms; no row event or broadcast reaches this phone.
-    mockDetailsConfirmations.mockReturnValue([confirmed(OPP), confirmed(ME)]);
+    expect(doneConfirmed()).toEqual([]);
+    // One athlete confirms; no row event or broadcast reaches this phone.
+    mockDetailsConfirmations.mockReturnValue([confirmed(OPP)]);
     await tick(4_000);
-    expect(doneConfirmed()).toEqual([OPP, ME]);
-    // A result edit resets both (A8): the next poll shows nobody.
+    expect(doneConfirmed()).toEqual([OPP]);
+    // A result edit resets it (A8; refused once both confirmed): the next poll shows nobody.
     mockDetailsConfirmations.mockReturnValue([]);
     mockGetMatchDetails.mockResolvedValue({ ...tkRow("completed", { outcome: "loss" }), result_edit_count: 1 });
     await tick(4_000);
     expect(doneConfirmed()).toEqual([]);
+    // Both confirm the new result.
+    mockDetailsConfirmations.mockReturnValue([confirmed(OPP), confirmed(ME)]);
+    await tick(4_000);
+    expect(doneConfirmed()).toEqual([OPP, ME]);
     expect(mockGetMatchConfirmations).not.toHaveBeenCalled();
+  });
+
+  it("the done screen stops both reads once both athletes confirmed (jits-o47s.44)", async () => {
+    mockDetailsConfirmations.mockReturnValue([confirmed(OPP)]);
+    await mount(TK, tkRow("completed", { outcome: "win" }));
+    mockGetMatchDetailsWithConfirmations.mockClear();
+    mockGetTimekeeperState.mockClear();
+    await tick(4_000);
+    // A confirmation is still owed: both reads poll.
+    expect(mockGetMatchDetailsWithConfirmations).toHaveBeenCalledTimes(1);
+    expect(mockGetTimekeeperState).toHaveBeenCalledTimes(1);
+    mockDetailsConfirmations.mockReturnValue([confirmed(OPP), confirmed(ME)]);
+    await tick(4_000);
+    expect(doneConfirmed()).toEqual([OPP, ME]);
+    mockGetMatchDetailsWithConfirmations.mockClear();
+    mockGetTimekeeperState.mockClear();
+    for (let i = 0; i < 15; i++) await tick(4_000);
+    expect(mockGetMatchDetailsWithConfirmations).not.toHaveBeenCalled();
+    expect(mockGetTimekeeperState).not.toHaveBeenCalled();
+    // A row event still re-reads.
+    await act(async () => mockRow.handler?.());
+    await flush();
+    expect(mockGetMatchDetailsWithConfirmations).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the last confirmations it knew when a read carries none (unknown, not nobody)", async () => {

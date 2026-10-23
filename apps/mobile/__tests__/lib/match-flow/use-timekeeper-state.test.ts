@@ -314,4 +314,13 @@ describe("timekeeperStatePollMs", () => {
     expect(timekeeperStatePollMs("summary", "opponent")).toBeNull();
     expect(timekeeperStatePollMs(null, "timekeeper")).toBeNull();
   });
+
+  it("the done screen stops once settled; every other step ignores it (jits-o47s.44)", () => {
+    expect(timekeeperStatePollMs("summary", "timekeeper", true)).toBeNull();
+    expect(timekeeperStatePollMs("summary", "timekeeper", false)).toBe(4_000);
+    for (const step of ["crew", "weight", "ready", "live", "end", "result", "confirm"] as const) {
+      expect(timekeeperStatePollMs(step, "timekeeper", true)).toBe(4_000);
+      expect(timekeeperStatePollMs(step, "challenger", true)).toBe(4_000);
+    }
+  });
 });

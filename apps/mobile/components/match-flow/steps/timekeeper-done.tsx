@@ -31,7 +31,7 @@ export interface TimekeeperDoneProps {
   submissionTypes: SubmissionType[];
   /**
    * The athletes the DB has a positive confirmation for (the progress rows),
-   * re-read on the done screen's 4 s poll. They come from `get_match_details`
+   * re-read on the done screen's 4 s poll until both are in (jits-o47s.44). They come from `get_match_details`
    * (the reconciler's `readSnapshot`): the `match_confirmations` RLS admits
    * participants only, and the timekeeper is never one.
    */

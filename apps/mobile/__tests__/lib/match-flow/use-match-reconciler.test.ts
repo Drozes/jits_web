@@ -80,12 +80,12 @@ async function flush() {
 
 type Roles = Pick<ReconcileRoles, "mode" | "viewer"> | null;
 
-function setup(step: MatchStep | null, enabled = true, roles: Roles = null) {
+function setup(step: MatchStep | null, enabled = true, roles: Roles = null, doneSettled?: boolean) {
   const onSnapshot = jest.fn();
   const hook = renderHook(
-    ({ s, e }: { s: MatchStep | null; e: boolean }) =>
-      useMatchReconciler({ matchId: "M1", step: s, enabled: e, roles, onSnapshot }),
-    { initialProps: { s: step, e: enabled } },
+    ({ s, e, d }: { s: MatchStep | null; e: boolean; d?: boolean }) =>
+      useMatchReconciler({ matchId: "M1", step: s, enabled: e, roles, doneSettled: d, onSnapshot }),
+    { initialProps: { s: step, e: enabled, d: doneSettled } as { s: MatchStep | null; e: boolean; d?: boolean } },
   );
   return { onSnapshot, ...hook };
 }
@@ -456,6 +456,44 @@ describe("useMatchReconciler: timekeeper-mode polls (review tech M7)", () => {
 
   it("a two-athlete weight step still never polls, with or without roles", async () => {
     expect(await pollsIn("weight", { mode: "self_run", viewer: "challenger" }, 20_000)).toBe(0);
+  });
+
+  /** Match reads in `ms` on the timekeeper's done screen. */
+  async function readsIn(ms: number) {
+    mockGetMatchDetailsWithConfirmations.mockClear();
+    act(() => {
+      jest.advanceTimersByTime(ms);
+    });
+    await flush();
+    return mockGetMatchDetailsWithConfirmations.mock.calls.length;
+  }
+
+  it("the done screen stops polling once settled, and keeps the other triggers (jits-o47s.44)", async () => {
+    const { rerender } = setup("summary", true, TIMEKEEPER, false);
+    await flush();
+    expect(await readsIn(4_000)).toBe(1);
+    rerender({ s: "summary", e: true, d: true });
+    await flush();
+    expect(await readsIn(60_000)).toBe(0);
+    // The foreground and the row channel still re-read without the poll.
+    act(() => appStateHandler?.("active"));
+    await flush();
+    act(() => mockRow.handler?.());
+    await flush();
+    expect(mockGetMatchDetailsWithConfirmations).toHaveBeenCalledTimes(2);
+  });
+
+  it("settled never stops a step that waits on the other side", async () => {
+    setup("confirm", true, ATHLETE, true);
+    await flush();
+    mockGetMatchDetails.mockClear();
+    for (let i = 0; i < 3; i++) {
+      act(() => {
+        jest.advanceTimersByTime(4_000);
+      });
+      await flush();
+    }
+    expect(mockGetMatchDetails).toHaveBeenCalledTimes(3);
   });
 });
 
