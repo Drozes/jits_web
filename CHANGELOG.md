@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## OTA "Timekeeper mode" (runtime 1.0), 2026-10-23
+
+Production OTA group `be8bbb9d-28db-47c2-ba06-905cb264077b` (iOS `01a16b85-df00-7d7e-8b82-e906e673dc71`, Android `01a16b85-df00-75ed-a919-4054cc05f9bd`), branch and channel `production`, from jits_web `main` `95ea4841` (release PR #110 of development `c52ce7e6`, feature PR #109). The first OTA on runtime 1.0: it reaches TestFlight builds 27 and 28 (1.0 build 28 is waiting for App Store review), and no 0.5.0 install. JS-only, non-critical (`updateCriticalIndex` unchanged), published with `EXPO_PUBLIC_APP_ENV=staging` to match the binary. Rollback target: the embedded bundle (`eas update:roll-back-to-embedded --branch production --runtime-version 1.0 --platform all`). Shipped after the jr_be prod apply of 2026-10-23 (Rating V9 with 288 rated matches replayed, Arena ranges, and the timekeeper batch `20261021090000` to `20261021101010`; 22 migration versions in all; `push` edge function version 8). Prod flags at publish: `timekeeper_role = false` (turned on only after the App Store approves 1.0), `timekeeper_weight_check = true`, `match_capture_1080p = false`. Every section below shipped in this group; the Sign in with Apple and version 1.0 change (jits-8s9v) is native and ships in the 1.0 binary, not the OTA.
+
 ### Shared: match detail no longer crashes with the same video open twice (jits-i5ih)
 
 JS-only (OTA-eligible), no backend change. Production is exposed too (the same code is on `main`); it ships with the timekeeper release (owner, 2026-10-20).
