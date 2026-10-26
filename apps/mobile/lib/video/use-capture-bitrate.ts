@@ -23,136 +23,62 @@
  * level), the history to [] (the class default), the codec list to null
  * (today's recording on iOS), the kill switch to the last value read
  * (persisted across launches; default: feature on).
+ *
+ * Phase 2 (spec 16.7): the inputs and the background network probe live in
+ * the per-match capture prep (`capture-prep.ts`), keyed by `prepKey` (the
+ * match id). The hook starts it on the first active render, reads it
+ * synchronously (so a prep the timekeeper's sheet already ran is used on
+ * the very first render), stops the probe at the lock (no probe ever runs
+ * during a recording) and releases it on unmount. A probe that lands before
+ * the hold (Android) or the lock (iOS) decides the level; one that lands
+ * later changes nothing for this face-off. The match never waits on it.
  */
 import * as React from "react";
 import { Platform } from "react-native";
-import NetInfo from "@react-native-community/netinfo";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { MatchVideoCaptureQuality } from "@jits/shared/api/match-video-upload";
-import { getFeatureFlag } from "@jits/shared/api/location";
-import { supabase } from "@/lib/supabase/client";
+import { pickCaptureBitrate, unmanagedDecision, type CaptureBitrateDecision } from "./capture-bitrate";
+import { cachedCaptureCodecs } from "./capture-codecs";
+import { __resetCaptureInputsForTests, lastKnownCaptureBitrateOff } from "./capture-inputs";
 import {
-  CAPTURE_BITRATE_OFF_FLAG,
-  CAPTURE_FLAG_TIMEOUT_MS,
-  CAPTURE_NETWORK_TIMEOUT_MS,
-  pickCaptureBitrate,
-  unmanagedDecision,
-  type CaptureBitrateDecision,
-  type CaptureNetworkSnapshot,
-  type ThroughputSample,
-} from "./capture-bitrate";
-import { loadThroughputHistory } from "./capture-bitrate-history";
-import { cachedCaptureCodecs, ensureCaptureCodecs } from "./capture-codecs";
+  getCapturePrepSnapshot,
+  releaseCapturePrep,
+  startCapturePrep,
+  stopCapturePrepProbe,
+  subscribeCapturePrep,
+} from "./capture-prep";
 
-/** Where the last kill switch answer is kept across launches (D9). */
-export const CAPTURE_BITRATE_OFF_KEY = "elo-capture-bitrate-off::v1";
-
-/**
- * The kill switch as last read (D9). Persisted, so a relaunch re-entry into
- * a live match (which reads nothing, D6) still honours a switch an admin
- * flipped before the relaunch. Never read on this install (or not primed yet
- * when the re-entry renders): feature on, as a missing row reads, since the
- * weak level is itself the safe, fast choice.
- */
-let lastKnownOff = false;
-/** A network answer landed in this process; the disk value is older. */
-let readThisProcess = false;
-
-/** The kill switch as last read, synchronously (re-entry cannot wait for a read). */
-export function lastKnownCaptureBitrateOff(): boolean {
-  return lastKnownOff;
-}
-
-/** Load the persisted answer (no network). Called once at app start; never throws. */
-export async function primeCaptureBitrateOff(): Promise<void> {
-  try {
-    const raw = await AsyncStorage.getItem(CAPTURE_BITRATE_OFF_KEY);
-    const parsed = raw ? (JSON.parse(raw) as { off?: unknown } | null) : null;
-    if (!readThisProcess && typeof parsed?.off === "boolean") lastKnownOff = parsed.off;
-  } catch {
-    /* default: feature on */
-  }
-}
-
-/**
- * One read of `match_capture_bitrate_off`, bounded by `CAPTURE_FLAG_TIMEOUT_MS`
- * so a slow answer can never hold the face-off's decision back; a failed or
- * slow read keeps the last value. Never throws.
- */
-export async function readCaptureBitrateOff(): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    const timeout = new Promise<null>((resolve) => {
-      timer = setTimeout(() => resolve(null), CAPTURE_FLAG_TIMEOUT_MS);
-    });
-    const res = await Promise.race([getFeatureFlag(supabase, CAPTURE_BITRATE_OFF_FLAG), timeout]);
-    if (res?.ok) {
-      lastKnownOff = res.data;
-      readThisProcess = true;
-      AsyncStorage.setItem(CAPTURE_BITRATE_OFF_KEY, JSON.stringify({ off: res.data })).catch(() => undefined);
-    }
-  } catch {
-    /* keep the last value read */
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-  return lastKnownOff;
-}
-
-/** NetInfo once, within `CAPTURE_NETWORK_TIMEOUT_MS`; null on a throw or the timeout. */
-export async function readCaptureNetwork(): Promise<CaptureNetworkSnapshot | null> {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    const timeout = new Promise<null>((resolve) => {
-      timer = setTimeout(() => resolve(null), CAPTURE_NETWORK_TIMEOUT_MS);
-    });
-    const state = await Promise.race([NetInfo.fetch(), timeout]);
-    if (!state) return null;
-    const details = state.details as { cellularGeneration?: unknown } | null | undefined;
-    return {
-      type: typeof state.type === "string" ? state.type : null,
-      cellularGeneration: typeof details?.cellularGeneration === "string" ? details.cellularGeneration : null,
-      isInternetReachable: typeof state.isInternetReachable === "boolean" ? state.isInternetReachable : null,
-    };
-  } catch {
-    return null;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-interface CaptureInputs {
-  disabled: boolean;
-  codecs: readonly string[] | null;
-  network: CaptureNetworkSnapshot | null;
-  history: readonly ThroughputSample[];
-  /** When the inputs landed: the history window is measured from here. */
-  now: number;
-}
-
-async function readCaptureInputs(): Promise<CaptureInputs> {
-  const [network, history, codecs, disabled] = await Promise.all([
-    readCaptureNetwork().catch(() => null),
-    loadThroughputHistory().catch((): ThroughputSample[] => []),
-    ensureCaptureCodecs().catch(() => null),
-    readCaptureBitrateOff().catch(() => lastKnownOff),
-  ]);
-  return { network, history, codecs, disabled, now: Date.now() };
-}
+export {
+  CAPTURE_BITRATE_OFF_KEY,
+  lastKnownCaptureBitrateOff,
+  primeCaptureBitrateOff,
+  readCaptureBitrateOff,
+  readCaptureNetwork,
+  readCaptureProbeOff,
+} from "./capture-inputs";
 
 /** The decision for a relaunch re-entry (D6): computed synchronously, nothing read. */
 function reentryDecision(quality: MatchVideoCaptureQuality): CaptureBitrateDecision {
-  return pickCaptureBitrate({
+  const decision = pickCaptureBitrate({
     platform: Platform.OS,
     quality,
-    disabled: lastKnownOff,
+    disabled: lastKnownCaptureBitrateOff(),
     reentry: true,
     codecs: cachedCaptureCodecs(),
     network: null,
     history: [],
+    location: null,
+    probe: null,
     now: Date.now(),
   });
+  return { ...decision, probeOutcome: "reentry" };
 }
+
+let practiceKeys = 0;
+
+/** How long a handed-off prep's viewfinder may stay inactive before its probe is stopped. */
+export const CAPTURE_PREP_INACTIVE_STOP_MS = 2_000;
+
+function noop(): void {}
 
 /**
  * The viewfinder's capture bitrate decision. `pending` (today's recording)
@@ -168,26 +94,25 @@ export function useCaptureBitrate({
   locked,
   quality,
   cameraUp,
+  prepKey = null,
 }: {
   active: boolean;
   locked: boolean;
   quality: MatchVideoCaptureQuality;
   /** The `CameraView` is rendered (mounted and permission granted). */
   cameraUp: boolean;
+  /** The match id (the capture prep's key); null for practice, which never probes. */
+  prepKey?: string | null;
 }): CaptureBitrateDecision {
-  const [inputs, setInputs] = React.useState<CaptureInputs | null>(null);
+  const practiceKeyRef = React.useRef<string | null>(null);
+  if (prepKey === null && practiceKeyRef.current === null) practiceKeyRef.current = `practice:${++practiceKeys}`;
+  const key = prepKey ?? (practiceKeyRef.current as string);
+
   // Latched in the commit, before any answer can land after it.
   const lockedRef = React.useRef(locked);
   React.useLayoutEffect(() => {
     if (locked) lockedRef.current = true;
   }, [locked]);
-  const mountedRef = React.useRef(true);
-  React.useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   // Written during render on purpose (spec 7.5): the re-entry decision and
   // the frozen one must exist on the render that first needs them, before
@@ -200,24 +125,70 @@ export function useCaptureBitrate({
     if (locked || lockedRef.current) reentryRef.current = reentryDecision(quality);
   }
 
-  const askedRef = React.useRef(false);
-  React.useEffect(() => {
-    if (!active || askedRef.current) return;
-    askedRef.current = true;
-    if (lockedRef.current || reentryRef.current) return;
-    void readCaptureInputs().then((next) => {
-      if (!mountedRef.current || lockedRef.current) return;
-      setInputs(next);
-    });
-  }, [active]);
-
-  const live = React.useMemo(
-    () =>
-      inputs
-        ? pickCaptureBitrate({ ...inputs, quality, platform: Platform.OS, reentry: false })
-        : unmanagedDecision(quality, "pending"),
-    [inputs, quality],
+  // A re-entry reads nothing (D6), so it never subscribes to a prep either.
+  const subscribe = React.useCallback(
+    (cb: () => void) => (reentryRef.current ? noop : subscribeCapturePrep(key, cb)),
+    [key],
   );
+  const getSnapshot = React.useCallback(
+    () => (reentryRef.current ? null : getCapturePrepSnapshot(key)),
+    [key],
+  );
+  const snapshot = React.useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+
+  // Started on the first active render that is not a re-entry and not
+  // locked yet; idempotent per key, so the timekeeper sheet's prep is
+  // claimed as it is and a later active render reads nothing again.
+  // Released (aborting a running probe) only on unmount, by which time the
+  // decision is frozen or no longer used.
+  const startedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!active || reentryRef.current) return;
+    if (!startedRef.current) {
+      if (lockedRef.current) return;
+      startedRef.current = true;
+    }
+    startCapturePrep(key, { matchId: prepKey });
+  }, [active, key, prepKey]);
+  React.useEffect(() => () => releaseCapturePrep(key), [key]);
+
+  // A prep someone else started (the timekeeper sheet's, handed off) for a
+  // viewfinder that does not record would still spend the probe's data.
+  // Stopped once the viewfinder has stayed inactive for a grace period, so
+  // a timekeeper whose opt-in settles a little late (the match roles and
+  // consent loading) still gets it. A prep this hook starts is never
+  // affected: it only exists once the hook was active.
+  const handedOffRef = React.useRef<boolean | null>(null);
+  if (handedOffRef.current === null) handedOffRef.current = prepKey !== null && getCapturePrepSnapshot(key) !== null;
+  React.useEffect(() => {
+    if (active || !handedOffRef.current || startedRef.current) return;
+    const timer = setTimeout(() => stopCapturePrepProbe(key), CAPTURE_PREP_INACTIVE_STOP_MS);
+    return () => clearTimeout(timer);
+  }, [active, key]);
+
+  // No probe ever runs during a recording: stopped at the lock.
+  React.useLayoutEffect(() => {
+    if (locked) stopCapturePrepProbe(key);
+  }, [locked, key]);
+
+  const live = React.useMemo(() => {
+    if (!snapshot?.inputs) return { ...unmanagedDecision(quality, "pending"), probeOutcome: "pending" } as CaptureBitrateDecision;
+    const decided = pickCaptureBitrate({
+      ...snapshot.inputs,
+      probe: snapshot.probe,
+      quality,
+      platform: Platform.OS,
+      reentry: false,
+      // The decision's clock is now, not when the inputs landed: a probe's
+      // age (CAPTURE_PROBE_MAX_AGE_MS) is measured when it is used.
+      now: Math.max(snapshot.inputs.now, Date.now()),
+    });
+    // The picker's word on a landed probe (applied, stale, ignored) wins;
+    // otherwise the prep's state (pending, failed, off, ...).
+    const probeOutcome =
+      decided.probeOutcome !== "not_needed" ? decided.probeOutcome : snapshot.probe ? "ignored" : snapshot.probeOutcome;
+    return { ...decided, probeOutcome } as CaptureBitrateDecision;
+  }, [snapshot, quality]);
 
   const frozenRef = React.useRef<CaptureBitrateDecision | null>(null);
   const heldRef = React.useRef<CaptureBitrateDecision | null>(null);
@@ -238,6 +209,5 @@ export function useCaptureBitrate({
 
 /** Test-only reset of the module state. */
 export function __resetCaptureBitrateHookForTests(): void {
-  lastKnownOff = false;
-  readThisProcess = false;
+  __resetCaptureInputsForTests();
 }

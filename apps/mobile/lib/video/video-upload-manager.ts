@@ -32,6 +32,7 @@ import {
   patchUploadJob,
   removeUploadJob,
   saveUploadJob,
+  toCaptureGeoCell,
   toPersistedCaptureBitrate,
 } from "./upload-persistence";
 import {
@@ -41,6 +42,7 @@ import {
   setMatchUpload,
 } from "./match-upload-store";
 import type { RecordingTruncation } from "./use-video-recorder";
+import type { CaptureGeoCell } from "./capture-bitrate";
 import type { MatchVideoCaptureLens, MatchVideoCaptureQuality } from "@jits/shared/api/match-video-upload";
 import {
   classifyByteFailure,
@@ -178,6 +180,8 @@ export interface StartUploadParams {
    * `CaptureBitrateDecision` is accepted and narrowed.
    */
   captureBitrate?: PersistedCaptureBitrate | null;
+  /** The face-off's coarse cell (phase 2, E13): device-only, for this upload's throughput sample. */
+  captureGeoCell?: CaptureGeoCell | null;
 }
 
 type JobPatch = Partial<Omit<PendingUploadJob, "matchId">>;
@@ -1341,6 +1345,7 @@ async function runJob(
     fileSizeBytes: current.fileSizeBytes,
     createdAt: current.createdAt,
     captureBitrate: current.captureBitrate ?? null,
+    captureGeoCell: current.captureGeoCell ?? null,
   });
   return { ok: true, videoId };
 }
@@ -1590,6 +1595,7 @@ async function prepareAndRun(
     captureQuality: params.captureQuality ?? null,
     captureLens: params.captureLens ?? null,
     captureBitrate: toPersistedCaptureBitrate(params.captureBitrate),
+    captureGeoCell: toCaptureGeoCell(params.captureGeoCell),
   };
   await saveUploadJob(job);
   if (!isCurrent()) {

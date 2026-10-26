@@ -10,6 +10,9 @@
  *
  * Renders the REAL AuthProvider and the REAL Index route.
  */
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { CAPTURE_HISTORY_KEY } from "@/lib/video/capture-bitrate-history";
+import { loadUploadJob, saveUploadJob } from "@/lib/video/upload-persistence";
 import * as React from "react";
 import { Text } from "react-native";
 import { act, fireEvent, render } from "@testing-library/react-native";
@@ -56,6 +59,10 @@ jest.mock("@/lib/location/device-location-store", () => ({
   loadDeviceLocation: (id: string) => mockLoadLocation(id),
 }));
 const mockResetNearby = jest.fn();
+const mockReleasePreps = jest.fn();
+jest.mock("@/lib/video/capture-prep", () => ({
+  releaseAllCapturePreps: () => mockReleasePreps(),
+}));
 jest.mock("@/lib/arena/nearby-snapshot", () => ({
   resetLatestNearby: () => mockResetNearby(),
 }));
@@ -288,6 +295,93 @@ describe("cold-start athlete load", () => {
     expect(mockResetLocationFlags).toHaveBeenCalledTimes(1);
     // The last Arena nearby read goes too (jr_be spec 023, review: account switch).
     expect(mockResetNearby).toHaveBeenCalled();
+  });
+
+  // Dynamic capture bitrate 16.3 E14: the throughput history records where
+  // matches happened (coarse cells), so it never outlives the session.
+  it("removes the capture throughput history and releases capture preps on sign-out", async () => {
+    await AsyncStorage.setItem(CAPTURE_HISTORY_KEY, "[]");
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    mockReleasePreps.mockClear();
+    await act(async () => {
+      await signOut!();
+    });
+    await flush();
+    expect(mockReleasePreps).toHaveBeenCalled();
+    expect(await AsyncStorage.getItem(CAPTURE_HISTORY_KEY)).toBeNull();
+  });
+
+  it("strips the face-off cell from pending upload jobs on sign-out, keeping the jobs", async () => {
+    const JOB = {
+      matchId: "MJ",
+      uploaderAthleteId: "A1",
+      fileUri: "file:///x.mp4",
+      storagePath: "MJ/A1/1.mp4",
+      ext: "mp4",
+      fileSizeBytes: 10,
+      uploadUrl: null,
+      bytesUploaded: 0,
+      phase: "bytes" as const,
+      attempt: 0,
+      truncation: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      captureGeoCell: { lat: 43.65, lng: -79.38 },
+    };
+    await saveUploadJob(JOB as never);
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    await act(async () => {
+      await signOut!();
+    });
+    await flush();
+    const job = await loadUploadJob("MJ");
+    expect(job).toMatchObject({ matchId: "MJ", phase: "bytes" });
+    expect(job?.captureGeoCell).toBeNull();
+  });
+
+  it("an involuntary sign-out strips the cell from pending jobs too", async () => {
+    await saveUploadJob({
+      matchId: "MK",
+      uploaderAthleteId: "A1",
+      fileUri: "file:///x.mp4",
+      storagePath: "MK/A1/1.mp4",
+      ext: "mp4",
+      fileSizeBytes: 10,
+      uploadUrl: null,
+      bytesUploaded: 0,
+      phase: "bytes",
+      attempt: 0,
+      truncation: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      captureGeoCell: { lat: 43.65, lng: -79.38 },
+    } as never);
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    await act(async () => {
+      mockAuthCallback?.("SIGNED_OUT", null);
+    });
+    await flush();
+    expect((await loadUploadJob("MK"))?.captureGeoCell).toBeNull();
+  });
+
+  it("an involuntary sign-out removes the capture history and releases preps too", async () => {
+    mockRead.mockResolvedValue(OK(ACTIVE));
+    render(<App />);
+    await flush();
+    await AsyncStorage.setItem(CAPTURE_HISTORY_KEY, "[]");
+    mockReleasePreps.mockClear();
+    await act(async () => {
+      mockAuthCallback?.("SIGNED_OUT", null);
+    });
+    await flush();
+    expect(mockReleasePreps).toHaveBeenCalled();
+    expect(await AsyncStorage.getItem(CAPTURE_HISTORY_KEY)).toBeNull();
   });
 
   it("S1: the stored tag is read as soon as the athlete row loads", async () => {

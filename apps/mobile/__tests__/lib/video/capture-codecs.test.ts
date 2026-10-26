@@ -6,8 +6,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 const mockQuery = jest.fn<Promise<unknown>, []>();
+const mockPermission = jest.fn<Promise<unknown>, []>();
+const mockRequestPermission = jest.fn();
 jest.mock("expo-camera", () => ({
   CameraView: { getAvailableVideoCodecsAsync: () => mockQuery() },
+  Camera: {
+    getCameraPermissionsAsync: () => mockPermission(),
+    requestCameraPermissionsAsync: () => mockRequestPermission(),
+  },
 }));
 
 import {
@@ -28,11 +34,14 @@ function onPlatform(os: "ios" | "android") {
 beforeEach(async () => {
   __resetCaptureCodecsForTests();
   mockQuery.mockReset();
+  mockPermission.mockReset().mockResolvedValue({ granted: true, status: "granted" });
+  mockRequestPermission.mockReset();
   await AsyncStorage.clear();
   onPlatform("ios");
 });
 
 afterEach(() => {
+  expect(mockRequestPermission).not.toHaveBeenCalled();
   restoreOs?.restore();
   restoreOs = null;
   jest.useRealTimers();
@@ -151,5 +160,43 @@ describe("primeCaptureCodecCache (iOS)", () => {
     (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error("disk"));
     await expect(primeCaptureCodecCache()).resolves.toBeUndefined();
     expect(cachedCaptureCodecs()).toBeNull();
+  });
+});
+
+// Phase 2 review (MAJOR 2): the capture prep reads the codecs before the
+// camera screen, and the native helper can raise the camera prompt while the
+// permission is undetermined, so it only runs under an existing grant.
+describe("camera permission gate", () => {
+  it.each([
+    ["undetermined", { granted: false, status: "undetermined", canAskAgain: true }],
+    ["denied", { granted: false, status: "denied", canAskAgain: false }],
+  ])("%s: no codec query, no permission request, null, nothing cached", async (_name, permission) => {
+    mockPermission.mockResolvedValue(permission);
+    await expect(ensureCaptureCodecs()).resolves.toBeNull();
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(cachedCaptureCodecs()).toBeNull();
+    await expect(AsyncStorage.getItem(CAPTURE_CODECS_KEY)).resolves.toBeNull();
+  });
+
+  it("a later read after the grant asks and caches", async () => {
+    mockPermission.mockResolvedValueOnce({ granted: false, status: "undetermined" });
+    await expect(ensureCaptureCodecs()).resolves.toBeNull();
+    mockQuery.mockResolvedValue(["hvc1"]);
+    await expect(ensureCaptureCodecs()).resolves.toEqual(["hvc1"]);
+    expect(cachedCaptureCodecs()).toEqual(["hvc1"]);
+  });
+
+  it("a permission read that throws: null, no query", async () => {
+    mockPermission.mockRejectedValue(new Error("native"));
+    await expect(ensureCaptureCodecs()).resolves.toBeNull();
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("a cached list needs no permission read", async () => {
+    mockQuery.mockResolvedValue(["hvc1"]);
+    await ensureCaptureCodecs();
+    mockPermission.mockClear();
+    await ensureCaptureCodecs();
+    expect(mockPermission).not.toHaveBeenCalled();
   });
 });

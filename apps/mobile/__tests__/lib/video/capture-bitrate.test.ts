@@ -5,6 +5,17 @@
  */
 import {
   CAPTURE_BITRATE_LEVELS,
+  CAPTURE_HISTORY_MAX_SAMPLES,
+  CAPTURE_LOCATION_GRID_DEG,
+  CAPTURE_LOCATION_MATCH_M,
+  CAPTURE_PROBE_MAX_AGE_MS,
+  CAPTURE_PROBE_OFF_FLAG,
+  captureProbeNeeded,
+  coarseGeoCell,
+  geoCellDistanceM,
+  isSameArea,
+  type CaptureGeoCell,
+  type CaptureProbeInput,
   CAPTURE_BITRATE_OFF_FLAG,
   CAPTURE_HISTORY_MAX_AGE_MS,
   CAPTURE_NORMAL_MIN_MBPS,
@@ -25,7 +36,7 @@ const WIFI: CaptureNetworkSnapshot = { type: "wifi", cellularGeneration: null, i
 const cell = (gen: string | null): CaptureNetworkSnapshot => ({ type: "cellular", cellularGeneration: gen, isInternetReachable: true });
 
 function sample(network: ThroughputSample["network"], mbps: number, ageMs = DAY): ThroughputSample {
-  return { ts: NOW - ageMs, network, cellularGeneration: null, mbps };
+  return { ts: NOW - ageMs, network, cellularGeneration: null, mbps, cell: null, source: "upload" };
 }
 
 function input(overrides: Partial<CaptureBitrateInput> = {}): CaptureBitrateInput {
@@ -37,12 +48,23 @@ function input(overrides: Partial<CaptureBitrateInput> = {}): CaptureBitrateInpu
     codecs: ["hvc1", "avc1"],
     network: WIFI,
     history: [],
+    location: null,
+    probe: null,
     now: NOW,
     ...overrides,
   };
 }
 
 const pick = (o: Partial<CaptureBitrateInput> = {}) => pickCaptureBitrate(input(o));
+
+/** A Toronto gym's cell, and one sample there (phase 2). */
+const HERE: CaptureGeoCell = { lat: 43.65, lng: -79.38 };
+const LOCATIONS: (CaptureGeoCell | null)[] = [null, HERE];
+const PROBES: (CaptureProbeInput | null)[] = [
+  null,
+  { mbps: 0.5, network: "wifi", at: NOW },
+  { mbps: 50, network: "cellular", at: NOW },
+];
 
 describe("constants", () => {
   it("the kill switch key and the threshold", () => {
@@ -261,8 +283,10 @@ describe("the value table (spec section 3)", () => {
         for (const network of networks)
           for (const history of histories)
             for (const codecs of codecLists)
-              for (const reentry of [false, true]) {
-                const d: CaptureBitrateDecision = pick({ platform, quality, network, history, codecs, reentry });
+              for (const reentry of [false, true])
+                for (const location of LOCATIONS)
+                  for (const probe of PROBES) {
+                const d: CaptureBitrateDecision = pick({ platform, quality, network, history, codecs, reentry, location, probe });
                 if (!d.managed) {
                   expect(d.bitrateBps).toBeNull();
                   continue;
@@ -334,6 +358,11 @@ describe("helpers", () => {
       cellularGeneration: null,
       historyMedianMbps: null,
       historySamples: 0,
+      locationKnown: false,
+      historyMatchedLocation: false,
+      probeMbps: null,
+      probeOutcome: "not_needed",
+      geoCell: null,
     });
   });
 
@@ -355,5 +384,267 @@ describe("helpers", () => {
     expect(medianMbps([sample("wifi", 5)])).toBe(5);
     expect(medianMbps([sample("wifi", 9), sample("wifi", 1), sample("wifi", 4)])).toBe(4);
     expect(medianMbps([sample("wifi", 1), sample("wifi", 3)])).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2 (spec 16): location-aware history and the background probe.
+// ---------------------------------------------------------------------------
+
+/** About `m` metres north of `c` (1 degree of latitude = 111,195 m on R = 6,371 km). */
+const north = (c: CaptureGeoCell, m: number): CaptureGeoCell => ({ lat: c.lat + m / 111_195, lng: c.lng });
+const at = (s: ThroughputSample, cellAt: CaptureGeoCell | null): ThroughputSample => ({ ...s, cell: cellAt });
+const probe = (mbps: number, network: CaptureProbeInput["network"] = "wifi", ageMs = 0): CaptureProbeInput => ({
+  mbps,
+  network,
+  at: NOW - ageMs,
+});
+
+describe("phase 2 constants", () => {
+  it("the probe switch, the cap, the radius and the grid", () => {
+    expect(CAPTURE_PROBE_OFF_FLAG).toBe("match_capture_probe_off");
+    expect(CAPTURE_HISTORY_MAX_SAMPLES).toBe(20);
+    expect(CAPTURE_LOCATION_MATCH_M).toBe(1_600);
+    expect(CAPTURE_LOCATION_GRID_DEG).toBe(0.01);
+    expect(CAPTURE_PROBE_MAX_AGE_MS).toBe(10 * 60 * 1000);
+  });
+});
+
+describe("coarseGeoCell, geoCellDistanceM, isSameArea (E1, E2)", () => {
+  it("rounds to 2 decimals", () => {
+    expect(coarseGeoCell(43.65432, -79.38765)).toEqual({ lat: 43.65, lng: -79.39 });
+    expect(coarseGeoCell(43.6449, -79.3851)).toEqual({ lat: 43.64, lng: -79.39 });
+  });
+
+  it("normalises -0 to 0", () => {
+    const c = coarseGeoCell(-0.001, -0.004)!;
+    expect(Object.is(c.lat, 0)).toBe(true);
+    expect(Object.is(c.lng, 0)).toBe(true);
+  });
+
+  it.each([
+    ["NaN", Number.NaN, 0],
+    ["Infinity", 0, Number.POSITIVE_INFINITY],
+    ["lat > 90", 90.01, 0],
+    ["lat < -90", -91, 0],
+    ["lng > 180", 0, 180.5],
+    ["lng < -180", 0, -181],
+  ])("rejects %s", (_name, lat, lng) => {
+    expect(coarseGeoCell(lat, lng)).toBeNull();
+  });
+
+  it("accepts the range edges", () => {
+    expect(coarseGeoCell(90, 180)).toEqual({ lat: 90, lng: 180 });
+    expect(coarseGeoCell(-90, -180)).toEqual({ lat: -90, lng: -180 });
+  });
+
+  it("haversine against two reference distances (within 1 percent)", () => {
+    // 0.01 degree of latitude: R * 0.01 * pi / 180 = 1,111.95 m.
+    expect(geoCellDistanceM({ lat: 43.65, lng: -79.38 }, { lat: 43.66, lng: -79.38 })).toBeCloseTo(1111.95, 0);
+    // London to Paris: 343.56 km.
+    const lp = geoCellDistanceM({ lat: 51.5074, lng: -0.1278 }, { lat: 48.8566, lng: 2.3522 });
+    expect(Math.abs(lp - 343_560) / 343_560).toBeLessThan(0.01);
+    expect(geoCellDistanceM(HERE, HERE)).toBe(0);
+  });
+
+  it("isSameArea: both known and within 1,600 m", () => {
+    expect(isSameArea(HERE, north(HERE, 1_590))).toBe(true);
+    expect(isSameArea(HERE, north(HERE, 1_700))).toBe(false);
+    expect(isSameArea(null, HERE)).toBe(false);
+    expect(isSameArea(HERE, null)).toBe(false);
+    expect(isSameArea(null, null)).toBe(false);
+  });
+
+  it("two readings 50 m apart that round to adjacent cells still match (also diagonally)", () => {
+    const a = coarseGeoCell(43.65495, -79.38495)!;
+    const b = coarseGeoCell(43.65505 + 0.0004, -79.38505 - 0.0002)!;
+    expect(a).toEqual({ lat: 43.65, lng: -79.38 });
+    expect(b).toEqual({ lat: 43.66, lng: -79.39 });
+    expect(isSameArea(a, b)).toBe(true);
+  });
+});
+
+describe("step 8 with a location (E4)", () => {
+  it("2 same-class samples within 1,600 m decide, location-matched", () => {
+    const d = pick({ location: HERE, history: [at(sample("wifi", 20), HERE), at(sample("wifi", 30), north(HERE, 1_500))] });
+    expect(d).toEqual(
+      expect.objectContaining({ reason: "history_good", historyMatchedLocation: true, locationKnown: true, historySamples: 2, geoCell: HERE }),
+    );
+  });
+
+  it("weak history here decides weak", () => {
+    const d = pick({ location: HERE, history: [at(sample("wifi", 2), HERE), at(sample("wifi", 3), HERE)] });
+    expect(d).toEqual(expect.objectContaining({ reason: "history_weak", level: "weak", historyMatchedLocation: true }));
+  });
+
+  it("samples 1,700 m away are ignored: wifi falls to the first-time rule (normal), even with far samples", () => {
+    const far = north(HERE, 1_700);
+    const d = pick({ location: HERE, history: [at(sample("wifi", 1), far), at(sample("wifi", 1), far), at(sample("wifi", 1), far)] });
+    expect(d).toEqual(
+      expect.objectContaining({ reason: "no_history_wifi", level: "normal", historyMatchedLocation: false, historySamples: 0 }),
+    );
+  });
+
+  it("cellular with only far samples: no_history_cellular (weak), even when the far ones are good", () => {
+    const far = north(HERE, 1_700);
+    const d = pick({
+      location: HERE,
+      network: cell("5g"),
+      history: [at(sample("cellular", 40), far), at(sample("cellular", 50), far)],
+    });
+    expect(d).toEqual(expect.objectContaining({ reason: "no_history_cellular", level: "weak", historyMatchedLocation: false }));
+  });
+
+  it("a sample with no cell never matches a known cell", () => {
+    const d = pick({ location: HERE, history: [sample("wifi", 1), sample("wifi", 1)] });
+    expect(d).toEqual(expect.objectContaining({ reason: "no_history_wifi", historyMatchedLocation: false, historySamples: 0 }));
+  });
+
+  it("one sample here plus far ones: unknown here (no fallback to other places)", () => {
+    const far = north(HERE, 5_000);
+    const d = pick({
+      location: HERE,
+      history: [at(sample("wifi", 1), HERE), at(sample("wifi", 1), far), at(sample("wifi", 1), far)],
+    });
+    expect(d).toEqual(expect.objectContaining({ reason: "no_history_wifi", historySamples: 1, historyMatchedLocation: false }));
+  });
+
+  it("location unknown: class-level history across every place, exactly as phase 1", () => {
+    const far = north(HERE, 50_000);
+    const history = [at(sample("wifi", 1), HERE), at(sample("wifi", 2), far)];
+    const d = pick({ location: null, history });
+    expect(d).toEqual(
+      expect.objectContaining({ reason: "history_weak", locationKnown: false, historyMatchedLocation: false, historySamples: 2, geoCell: null }),
+    );
+    // Same answer as with the cells stripped (phase 1 samples).
+    const phase1 = pick({ location: null, history: history.map((s) => at(s, null)) });
+    expect({ ...phase1, geoCell: null }).toEqual(d);
+  });
+});
+
+describe("step 7b: the probe (E7, E10)", () => {
+  it("8.0 Mbps: probe_normal; 7.99: probe_weak", () => {
+    expect(pick({ probe: probe(8) })).toEqual(
+      expect.objectContaining({ reason: "probe_normal", level: "normal", probeMbps: 8, probeOutcome: "applied" }),
+    );
+    expect(pick({ probe: probe(7.99) })).toEqual(
+      expect.objectContaining({ reason: "probe_weak", level: "weak", probeMbps: 7.99, probeOutcome: "applied" }),
+    );
+  });
+
+  it("overrides good and weak location-matched history, still reporting the history fields", () => {
+    const good = [at(sample("wifi", 30), HERE), at(sample("wifi", 40), HERE)];
+    const weak = [at(sample("wifi", 1), HERE), at(sample("wifi", 2), HERE)];
+    expect(pick({ location: HERE, history: good, probe: probe(2) })).toEqual(
+      expect.objectContaining({ reason: "probe_weak", historyMatchedLocation: true, historyMedianMbps: 35, historySamples: 2 }),
+    );
+    expect(pick({ location: HERE, history: weak, probe: probe(20) })).toEqual(
+      expect.objectContaining({ reason: "probe_normal", historyMatchedLocation: true, historyMedianMbps: 1.5 }),
+    );
+  });
+
+  it("overrides class-level history (no location)", () => {
+    const d = pick({ history: [sample("wifi", 30), sample("wifi", 40)], probe: probe(1) });
+    expect(d).toEqual(expect.objectContaining({ reason: "probe_weak", historyMedianMbps: 35, historyMatchedLocation: false }));
+  });
+
+  it("overrides the first-time rule on cellular", () => {
+    expect(pick({ network: cell("4g"), probe: probe(20, "cellular") })).toEqual(
+      expect.objectContaining({ reason: "probe_normal", level: "normal" }),
+    );
+  });
+
+  it.each<[string, Partial<CaptureBitrateInput>, string]>([
+    ["disabled", { disabled: true }, "disabled"],
+    ["iOS codec unknown", { codecs: null }, "ios_codec_unknown"],
+    ["reentry", { reentry: true }, "reentry"],
+    ["network unknown", { network: null }, "network_unknown"],
+    ["offline", { network: { type: "none", cellularGeneration: null, isInternetReachable: false } }, "offline"],
+    ["no internet", { network: { ...WIFI, isInternetReachable: false } }, "no_internet"],
+    ["cellular 3g", { network: cell("3g") }, "cellular_slow_gen"],
+  ])("does not override %s", (_name, overrides, reason) => {
+    const network = overrides.network === undefined ? WIFI : overrides.network;
+    const cls = captureNetworkClassOf(network);
+    const d = pick({ ...overrides, probe: probe(50, cls) });
+    expect(d.reason).toBe(reason);
+    expect(d.probeMbps).toBeNull();
+    expect(d.probeOutcome).toBe("not_needed");
+  });
+
+  it("a probe on another class (the network changed) is ignored, with outcome ignored", () => {
+    expect(pick({ probe: probe(50, "cellular") })).toEqual(
+      expect.objectContaining({ reason: "no_history_wifi", probeMbps: null, probeOutcome: "ignored" }),
+    );
+  });
+
+  it("a probe older than 10 minutes is stale (outcome stale); exactly 10 minutes still counts", () => {
+    expect(pick({ probe: probe(1, "wifi", CAPTURE_PROBE_MAX_AGE_MS + 1) })).toEqual(
+      expect.objectContaining({ reason: "no_history_wifi", probeMbps: null, probeOutcome: "stale" }),
+    );
+    expect(pick({ probe: probe(1, "wifi", CAPTURE_PROBE_MAX_AGE_MS) }).reason).toBe("probe_weak");
+  });
+
+  it("a probe stamped after now is fresh (it ends after the inputs were read): no future check", () => {
+    expect(pick({ probe: probe(1, "wifi", -61_000) })).toEqual(expect.objectContaining({ reason: "probe_weak", probeOutcome: "applied" }));
+    expect(pick({ probe: probe(20, "wifi", -15 * 60_000) }).reason).toBe("probe_normal");
+  });
+
+  it("a non-positive or non-finite probe is ignored", () => {
+    for (const mbps of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(pick({ probe: probe(mbps) }).reason).toBe("no_history_wifi");
+    }
+  });
+
+  it("probeMbps and probeOutcome applied only when the probe decided", () => {
+    const d = pick({ history: [sample("wifi", 30), sample("wifi", 40)] });
+    expect(d).toEqual(expect.objectContaining({ reason: "history_good", probeMbps: null, probeOutcome: "not_needed" }));
+  });
+});
+
+describe("captureProbeNeeded (E6, the input-only part)", () => {
+  const needed = (o: Partial<CaptureBitrateInput> = {}) => {
+    const { probe: _probe, ...rest } = input(o);
+    return captureProbeNeeded(rest);
+  };
+  const here2 = [at(sample("wifi", 30), HERE), at(sample("wifi", 40), HERE)];
+
+  it.each(["4g", "5g", null])("cellular %s: true, with or without location-matched history", (gen) => {
+    expect(needed({ network: cell(gen) })).toBe(true);
+    const cellHere = [at(sample("cellular", 30), HERE), at(sample("cellular", 40), HERE)];
+    expect(needed({ network: cell(gen), location: HERE, history: cellHere })).toBe(true);
+  });
+
+  it("wifi, ethernet and other without location-matched history: true", () => {
+    for (const type of ["wifi", "ethernet", "vpn"]) {
+      const network = { type, cellularGeneration: null, isInternetReachable: true };
+      expect(needed({ network })).toBe(true);
+      expect(needed({ network, location: HERE })).toBe(true);
+      // One sample here is not "known here".
+      expect(needed({ network, location: HERE, history: [at(sample("wifi", 30), HERE)] })).toBe(true);
+    }
+    // Class-level history without a location does not count as "here".
+    expect(needed({ history: [sample("wifi", 30), sample("wifi", 40)] })).toBe(true);
+  });
+
+  it("wifi with 2 samples here: false", () => {
+    expect(needed({ location: HERE, history: here2 })).toBe(false);
+  });
+
+  it.each<[string, Partial<CaptureBitrateInput>]>([
+    ["disabled", { disabled: true }],
+    ["reentry", { reentry: true }],
+    ["network unknown", { network: null }],
+    ["offline", { network: { type: "none", cellularGeneration: null, isInternetReachable: false } }],
+    ["no internet", { network: { ...WIFI, isInternetReachable: false } }],
+    ["cellular 2g", { network: cell("2g") }],
+    ["cellular 3g", { network: cell("3g") }],
+    ["iOS codecs null", { codecs: null }],
+    ["iOS no supported codec", { codecs: [] }],
+  ])("false when %s", (_name, overrides) => {
+    expect(needed(overrides)).toBe(false);
+  });
+
+  it("Android ignores the codec list", () => {
+    expect(needed({ platform: "android", codecs: null })).toBe(true);
   });
 });

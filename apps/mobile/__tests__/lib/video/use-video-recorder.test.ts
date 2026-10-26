@@ -1368,8 +1368,21 @@ describe("capture bitrate", () => {
     await waitFor(() => expect(hook.result.current.state).toBe("uploaded"));
     expect(cam.recordAsync).toHaveBeenCalledWith(expect.objectContaining({ codec: "hvc1" }));
     expect(mockStartUpload).toHaveBeenCalledWith(expect.objectContaining({ captureQuality: "720p", captureBitrate: HEVC }));
+    // Phase 2: the decision's device-only cell rides along for the upload sample (E13).
+    expect(mockStartUpload).toHaveBeenCalledWith(expect.objectContaining({ captureGeoCell: HEVC.geoCell ?? null }));
     expect(mockTrackCaptureBitrate).toHaveBeenCalledTimes(1);
     expect(mockTrackCaptureBitrate).toHaveBeenCalledWith(HEVC);
+  });
+
+  it("the face-off cell reaches the upload as captureGeoCell, and survives a codec rejection (phase 2, E13)", async () => {
+    const HERE = { lat: 43.65, lng: -79.38 };
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const cam = makeRejectingCamera([CODEC_ERROR]);
+    const hook = await record({ current: capture({ ...HEVC, geoCell: HERE, locationKnown: true }) }, cam);
+    await waitFor(() => expect(hook.result.current.state).toBe("uploaded"));
+    const sent = mockStartUpload.mock.calls[0][0] as { captureGeoCell: unknown; captureBitrate: CaptureBitrateDecision };
+    expect(sent.captureGeoCell).toEqual(HERE);
+    expect(sent.captureBitrate).toEqual(expect.objectContaining({ reason: "codec_rejected", locationKnown: true, geoCell: HERE }));
   });
 
   it("the decision is taken at recordAsync time and never re-read", async () => {

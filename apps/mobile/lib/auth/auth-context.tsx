@@ -23,6 +23,9 @@ import { resetInvitesEnabledCache } from "../invites/use-invites-enabled";
 import { resetMatchLocationRequired } from "../arena/match-location-flag";
 import { resetLocationFlags } from "../arena/location-flags";
 import { clearAllDeviceLocations, loadDeviceLocation } from "../location/device-location-store";
+import { clearThroughputHistory } from "../video/capture-bitrate-history";
+import { releaseAllCapturePreps } from "../video/capture-prep";
+import { stripCaptureGeoCells } from "../video/upload-persistence";
 import { resetLatestNearby } from "../arena/nearby-snapshot";
 import { readLocationPermission } from "../location/permission-cache";
 import { cancelLocationSheet } from "../arena/go-live-location";
@@ -162,6 +165,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // flags never outlive the session either (review round 1, S4), nor
         // does any go-live overlay (a stale OFFLINE · RETRY, review round 3).
         clearAllDeviceLocations();
+        // Nor does the capture throughput history, which records where
+        // matches happened (dynamic capture bitrate 16.3 E14), or a prep.
+        void clearThroughputHistory();
+        void stripCaptureGeoCells();
+        releaseAllCapturePreps();
         // Nor does the last Arena nearby read (jr_be spec 023 8.4).
         resetLatestNearby();
         resetLocationFlags();
@@ -378,6 +386,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // The athlete's last accepted location never outlives the session
     // (instant go-live 4.1): the next account on this device starts clean.
     clearAllDeviceLocations();
+    // Nor does the capture history (coarse match places, E14) or any prep.
+    void clearThroughputHistory();
+    void stripCaptureGeoCells();
+    releaseAllCapturePreps();
     // Nor does the last Arena nearby read: the next account must never see
     // a "Maybe a different mat" plate from this one's proximity.
     resetLatestNearby();

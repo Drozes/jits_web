@@ -409,6 +409,8 @@ export function useVideoRecorder(
             captureQuality: recordCaptureRef.current.quality,
             captureLens: recordCaptureRef.current.lens,
             captureBitrate: recordCaptureRef.current.bitrate ?? null,
+            // Device-only (phase 2, E13): the sample's cell, never sent.
+            captureGeoCell: recordCaptureRef.current.bitrate?.geoCell ?? null,
           }
         : {}),
     });
@@ -617,6 +619,12 @@ export function useVideoRecorder(
                 cellularGeneration: original?.cellularGeneration ?? null,
                 historyMedianMbps: original?.historyMedianMbps ?? null,
                 historySamples: original?.historySamples ?? 0,
+                // Phase 2: what the face-off knew (the cell stays device-only).
+                locationKnown: original?.locationKnown ?? false,
+                historyMatchedLocation: original?.historyMatchedLocation ?? false,
+                probeMbps: original?.probeMbps ?? null,
+                probeOutcome: original?.probeOutcome ?? "not_needed",
+                geoCell: original?.geoCell ?? null,
               },
             };
             console.warn(`[video] ${logTag} codec ${codec} rejected (${msg}); retrying without codec or bitrate`);

@@ -2,8 +2,8 @@ import { AppState, type AppStateStatus } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import * as tracking from "@/lib/error-tracking/sentry";
 import { httpClassOf, type UploadErrorClass } from "./upload-errors";
-import type { CaptureBitrateDecision } from "./capture-bitrate";
-import { recordThroughputSample, throughputSampleFromRun } from "./capture-bitrate-history";
+import { captureNetworkClassOf, type CaptureBitrateDecision, type CaptureGeoCell } from "./capture-bitrate";
+import { recordThroughputSample, throughputHistoryGeneration, throughputSampleFromRun } from "./capture-bitrate-history";
 import type { PersistedCaptureBitrate } from "./upload-persistence";
 
 /**
@@ -47,6 +47,8 @@ interface RunStats {
   backgroundedCount: number;
   backgroundedMs: number;
   backgroundedAt: number | null;
+  /** The throughput history generation at the run's start (a sign-out since drops its sample). */
+  historyGeneration: number;
 }
 
 const runs = new Map<string, RunStats>();
@@ -132,6 +134,7 @@ export function trackRunStart(info: RunInfo): void {
     backgroundedCount: 0,
     backgroundedMs: 0,
     backgroundedAt: AppState.currentState === "background" ? Date.now() : null,
+    historyGeneration: throughputHistoryGeneration(),
   });
   crumb(`upload ${info.trigger}`, {
     matchId: info.matchId,
@@ -237,8 +240,17 @@ export function trackCaptureBitrate(decision: CaptureBitrateDecision): void {
       reason: decision.reason,
       network: decision.network,
       historyMedianMbps: decision.historyMedianMbps,
+      // Phase 2 (16.10): booleans and the probe's outcome only, never the cell.
+      locationKnown: decision.locationKnown ?? null,
+      historyMatchedLocation: decision.historyMatchedLocation ?? null,
+      probeOutcome: decision.probeOutcome ?? null,
+      probeMbps: roundTenth(decision.probeMbps),
     },
   });
+}
+
+function roundTenth(n: number | null | undefined): number | null {
+  return typeof n === "number" && Number.isFinite(n) ? Math.round(n * 10) / 10 : null;
 }
 
 /** The capture fields on the uploaded event (spec section 10); all null when absent. */
@@ -251,6 +263,10 @@ function captureExtra(c: PersistedCaptureBitrate | null | undefined) {
     captureReason: c?.reason ?? null,
     captureNetwork: c?.network ?? null,
     captureHistoryMedianMbps: c?.historyMedianMbps ?? null,
+    captureLocationKnown: c?.locationKnown ?? null,
+    captureHistoryMatchedLocation: c?.historyMatchedLocation ?? null,
+    captureProbeOutcome: c?.probeOutcome ?? null,
+    captureProbeMbps: roundTenth(c?.probeMbps),
   };
 }
 
@@ -264,6 +280,8 @@ export async function trackUploaded(info: {
   createdAt: number;
   /** The decision the clip was recorded with (dynamic capture bitrate). */
   captureBitrate?: PersistedCaptureBitrate | null;
+  /** The face-off's coarse cell (E13): only for the throughput sample, never in the event. */
+  captureGeoCell?: CaptureGeoCell | null;
 }): Promise<void> {
   const done = finish(info.matchId);
   let networkType: string | null = null;
@@ -285,6 +303,7 @@ export async function trackUploaded(info: {
       "video.upload.outcome": "uploaded",
       "video.upload.network": networkType ?? "unknown",
       "video.capture.level": capture ? (capture.level ?? "unmanaged") : "unknown",
+      "video.capture.probe": capture?.probeOutcome ?? "unknown",
     },
     extra: {
       matchId: info.matchId,
@@ -307,6 +326,11 @@ export async function trackUploaded(info: {
     // also holds the failed attempts and the backoff sleeps between them,
     // which would read as a slow link (the manager does not time them
     // separately). Time in the background is excluded by the sample itself.
+    // The face-off's cell only when the upload ran on the class the clip was
+    // decided on (E13): an upload finished elsewhere says nothing about the gym.
+    const sameClass =
+      capture != null &&
+      capture.network === captureNetworkClassOf({ type: networkType, cellularGeneration, isInternetReachable: null });
     const sample =
       done && sent != null && done.attempts === 0
         ? throughputSampleFromRun({
@@ -316,10 +340,11 @@ export async function trackUploaded(info: {
             backgroundedMs: done.backgroundedMs,
             networkType,
             cellularGeneration,
+            cell: sameClass ? (info.captureGeoCell ?? null) : null,
           })
         : null;
     // Fire and forget: the event above has already gone.
-    if (sample) recordThroughputSample(sample).catch(() => undefined);
+    if (sample && done) recordThroughputSample(sample, done.historyGeneration).catch(() => undefined);
   } catch {
     /* telemetry is never allowed to fail an upload */
   }

@@ -33,7 +33,9 @@ jest.mock("expo-camera", () => {
     return null;
   });
   CameraView.getAvailableVideoCodecsAsync = async () => mockCodecs.current;
-  return { CameraView };
+  // The codec query needs the camera permission already granted (phase 2 review).
+  const Camera = { getCameraPermissionsAsync: async () => ({ granted: mockRecorder.permission?.granted ?? false }) };
+  return { CameraView, Camera };
 });
 
 const mockRecorder = {
@@ -59,7 +61,11 @@ const mockGetFeatureFlag = jest.fn(async () => mockFlag.current);
 const mockGetOffFlag = jest.fn(async () => mockOffFlag.current);
 jest.mock("@jits/shared/api/location", () => ({
   getFeatureFlag: (_client: unknown, key: string) =>
-    key === "match_capture_bitrate_off" ? mockGetOffFlag() : mockGetFeatureFlag(),
+    key === "match_capture_bitrate_off"
+      ? mockGetOffFlag()
+      : key === "match_capture_probe_off"
+        ? Promise.resolve({ ok: true, data: false })
+        : mockGetFeatureFlag(),
 }));
 
 const mockWindow = { width: 390, height: 844 };
@@ -453,5 +459,18 @@ describe("where the hint shows", () => {
     await settle();
     expect(s.hint()).toBeNull();
     expect(s.getByTestId("camera-frame").props.style).toEqual({ aspectRatio: 16 / 9 });
+  });
+});
+
+// Dynamic capture bitrate 16.7: the match id keys the capture prep (and so
+// the probe); practice passes none. The rendered output is unchanged (M12).
+describe("the capture prep key", () => {
+  it("a match id keys the prep; unmount releases it", async () => {
+    const { getCapturePrepSnapshot } = jest.requireActual("@/lib/video/capture-prep");
+    const s = render(<MatchRecorderCamera step="weight" capture={ATHLETE} matchId="M-prep" />);
+    await settle();
+    expect(getCapturePrepSnapshot("M-prep")).not.toBeNull();
+    s.unmount();
+    expect(getCapturePrepSnapshot("M-prep")).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import { CameraView } from "expo-camera";
+import { Camera, CameraView } from "expo-camera";
 import { CAPTURE_CODEC_QUERY_TIMEOUT_MS } from "./capture-bitrate";
 
 /**
@@ -18,6 +18,13 @@ import { CAPTURE_CODEC_QUERY_TIMEOUT_MS } from "./capture-bitrate";
  * An empty answer is never cached: the native helper opens the FRONT camera
  * on a throwaway session and returns `[]` when it cannot, which says nothing
  * about the back camera that records.
+ *
+ * Asked only with camera permission ALREADY granted (phase 2 review): the
+ * helper creates a capture device input, which can raise the iOS camera
+ * prompt while the permission is undetermined, and the capture prep now
+ * reads this before the camera screen (the timekeeper's request sheet).
+ * Without a grant the answer is null and nothing is cached, so the first
+ * read after the grant still asks.
  */
 
 export const CAPTURE_CODECS_KEY = "elo-capture-codecs::v1";
@@ -65,6 +72,18 @@ async function store(answer: unknown): Promise<string[] | null> {
   return answer;
 }
 
+/** Camera permission already granted; reads the state only (never prompts). */
+async function cameraGranted(): Promise<boolean> {
+  try {
+    const read = Camera?.getCameraPermissionsAsync;
+    if (typeof read !== "function") return false;
+    const p = await read.call(Camera);
+    return Boolean(p?.granted);
+  } catch {
+    return false;
+  }
+}
+
 async function queryCodecs(): Promise<string[] | null> {
   let timer: ReturnType<typeof setTimeout> | null = null;
   try {
@@ -72,7 +91,10 @@ async function queryCodecs(): Promise<string[] | null> {
     if (typeof query !== "function") return null;
     // The answer is cached whenever it arrives: one that misses this
     // face-off's timeout still serves the next face-off and a re-entry.
-    const answered = Promise.resolve(query.call(CameraView)).then(store, () => null);
+    // The permission read is inside the same bound.
+    const answered = cameraGranted().then((granted) =>
+      granted ? Promise.resolve(query.call(CameraView)).then(store, () => null) : null,
+    );
     const timeout = new Promise<null>((resolve) => {
       timer = setTimeout(() => resolve(null), CAPTURE_CODEC_QUERY_TIMEOUT_MS);
     });

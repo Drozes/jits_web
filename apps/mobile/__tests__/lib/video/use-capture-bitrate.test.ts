@@ -17,6 +17,7 @@ jest.mock("@/lib/supabase/client", () => ({ supabase: { tag: "client" } }));
 
 const mockLoadHistory = jest.fn();
 jest.mock("@/lib/video/capture-bitrate-history", () => ({
+  throughputHistoryGeneration: () => 0,
   loadThroughputHistory: (...args: unknown[]) => mockLoadHistory(...args),
 }));
 const mockEnsureCodecs = jest.fn();
@@ -293,7 +294,11 @@ describe("useCaptureBitrate", () => {
     rerender({ active: true, locked: false, quality: "720p" });
     await settle();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(mockGetFeatureFlag).toHaveBeenCalledTimes(1);
+    // One read of each kill switch (phase 2 adds the probe switch).
+    expect(mockGetFeatureFlag.mock.calls.map((c) => c[1]).sort()).toEqual([
+      "match_capture_bitrate_off",
+      "match_capture_probe_off",
+    ]);
   });
 
   it("an unmount before the inputs land is quiet", async () => {

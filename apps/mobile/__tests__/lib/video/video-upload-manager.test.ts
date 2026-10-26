@@ -1592,6 +1592,11 @@ describe("upload telemetry (jits-n2im.7)", () => {
       reason: "history_good",
       network: "wifi",
       historyMedianMbps: 12.5,
+      // A phase 1 shaped decision: the phase 2 fields read as null.
+      locationKnown: null,
+      historyMatchedLocation: null,
+      probeOutcome: null,
+      probeMbps: null,
     });
     const landed = mockCaptureMessage.mock.calls.filter((c) => c[0] === "Match video uploaded");
     expect(landed).toHaveLength(1);
@@ -1607,6 +1612,43 @@ describe("upload telemetry (jits-n2im.7)", () => {
         captureHistoryMedianMbps: 12.5,
       }),
     );
+  });
+
+  it("the face-off cell rides on the job (device-only) and never into the uploaded event (phase 2, E13)", async () => {
+    const HERE = { lat: 43.65, lng: -79.38 };
+    let persistedCell: unknown = undefined;
+    const gate: { release: (() => void) | null } = { release: null };
+    mockUploadFileResumable.mockImplementationOnce(
+      () =>
+        new Promise<void>((res) => {
+          gate.release = () => res();
+        }),
+    );
+    const done = startMatchVideoUpload({ ...START, captureGeoCell: HERE });
+    await flush();
+    persistedCell = (await loadUploadJob("M1"))?.captureGeoCell;
+    gate.release?.();
+    await done;
+    await flush();
+    expect(persistedCell).toEqual(HERE);
+    const landed = mockCaptureMessage.mock.calls.filter((c) => c[0] === "Match video uploaded");
+    expect(landed).toHaveLength(1);
+    expect(JSON.stringify(landed)).not.toMatch(/43\.65|79\.38|"cell"|"lat"|"lng"|GeoCell/);
+  });
+
+  it("a malformed face-off cell is stored as null and the upload still runs", async () => {
+    const gate: { release: (() => void) | null } = { release: null };
+    mockUploadFileResumable.mockImplementationOnce(
+      () =>
+        new Promise<void>((res) => {
+          gate.release = () => res();
+        }),
+    );
+    const done = startMatchVideoUpload({ ...START, captureGeoCell: { lat: 999, lng: 0 } });
+    await flush();
+    expect((await loadUploadJob("M1"))?.captureGeoCell).toBeNull();
+    gate.release?.();
+    await expect(done).resolves.toEqual(expect.objectContaining({ ok: true }));
   });
 
   it("no capture bitrate decision: the fields are null and the level tag reads unknown", async () => {

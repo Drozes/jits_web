@@ -49,6 +49,7 @@ export function MatchRecorderCamera({
   step,
   optedIn = true,
   capture,
+  matchId = null,
 }: {
   /** The wizard's step; null before any match step (practice's lobby and wait). */
   step: MatchStep | null;
@@ -60,6 +61,8 @@ export function MatchRecorderCamera({
   optedIn?: boolean;
   /** This viewer's capture policy (`capturePolicyFor`, or `PRACTICE_CAPTURE`). */
   capture: CapturePolicy;
+  /** The match (the capture prep's key, dynamic capture bitrate 16.7); null for practice, which never probes. */
+  matchId?: string | null;
 }) {
   const recorder = useMatchRecorder();
   const warming = step === "ready";
@@ -77,6 +80,7 @@ export function MatchRecorderCamera({
   const { viewfinder, lens, onCameraReady } = useViewfinderCapture(recorder, capture, step, {
     optedIn,
     cameraUp: mounted && granted,
+    matchId,
   });
 
   // The recorder outlives this view now, so readiness and the pending
@@ -160,7 +164,7 @@ function useViewfinderCapture(
   recorder: ReturnType<typeof useMatchRecorder>,
   capture: CapturePolicy,
   step: MatchStep | null,
-  { optedIn, cameraUp }: { optedIn: boolean; cameraUp: boolean },
+  { optedIn, cameraUp, matchId }: { optedIn: boolean; cameraUp: boolean; matchId: string | null },
 ) {
   const window = useWindowDimensions();
   const locked = step === "live" || recorder.state === "recording" || recorder.state === "stopping";
@@ -169,7 +173,13 @@ function useViewfinderCapture(
   // Frozen at the same lock as the quality (dynamic capture bitrate, spec
   // 7.5), and on Android already from the camera's mount: a new bitrate
   // recreates the Android camera.
-  const bitrate = useCaptureBitrate({ active: faceoff && optedIn, locked, quality: videoQuality, cameraUp });
+  const bitrate = useCaptureBitrate({
+    active: faceoff && optedIn,
+    locked,
+    quality: videoQuality,
+    cameraUp,
+    prepKey: matchId ?? null,
+  });
   const lens = useCaptureLens(capture.captureLens, recorder.cameraRef, cameraUp, locked);
 
   const captureRef = useMatchRecordingCapture();
