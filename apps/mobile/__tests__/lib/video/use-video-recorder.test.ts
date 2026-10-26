@@ -29,6 +29,12 @@ jest.mock("@/lib/video/video-upload-manager", () => ({
   startMatchVideoUpload: (...args: unknown[]) => mockStartUpload(...args),
 }));
 
+// The capture bitrate breadcrumb (dynamic capture bitrate, spec 7.4).
+const mockTrackCaptureBitrate = jest.fn();
+jest.mock("@/lib/video/upload-telemetry", () => ({
+  trackCaptureBitrate: (...args: unknown[]) => mockTrackCaptureBitrate(...args),
+}));
+
 const mockGetCameraPermission = jest.fn(async () => ({ granted: true, canAskAgain: true }));
 const mockGetMicPermission = jest.fn(async () => ({ granted: true, canAskAgain: true }));
 
@@ -54,6 +60,7 @@ import {
   setMatchUpload,
 } from "@/lib/video/match-upload-store";
 import { useVideoRecorder, type RecordingCapture } from "@/lib/video/use-video-recorder";
+import { unmanagedDecision, type CaptureBitrateDecision } from "@/lib/video/capture-bitrate";
 import {
   CAMERA_READY_TIMEOUT_MS,
   STOP_WATCHDOG_MS,
@@ -252,7 +259,7 @@ describe("useVideoRecorder", () => {
 
   it("hands the reservation the capture the viewfinder had as the clip started (timekeeper mode spec 13.4)", async () => {
     mockStartUpload.mockImplementationOnce(uploadSucceeds);
-    const captureRef: { current: RecordingCapture | null } = { current: { quality: "1080p", lens: "ultrawide" } };
+    const captureRef: { current: RecordingCapture | null } = { current: { quality: "1080p", lens: "ultrawide", bitrate: null } };
     const { result } = renderHook(() => useVideoRecorder("M", "A", null, { captureRef }));
     const cam = makeFakeCamera();
     result.current.cameraRef.current = cam as never;
@@ -263,7 +270,7 @@ describe("useVideoRecorder", () => {
       startPromise = result.current.start();
     });
     // A later report (a viewfinder remount) never rewrites the clip already running.
-    captureRef.current = { quality: "720p", lens: "default" };
+    captureRef.current = { quality: "720p", lens: "default", bitrate: null };
     await act(async () => {
       await result.current.stop();
       await startPromise;
@@ -1288,5 +1295,218 @@ describe("useVideoRecorder render purity", () => {
     }
 
     expect(writesDuringRender).toBe(0);
+  });
+});
+
+// Dynamic capture bitrate (specs/dynamic-capture-bitrate 7.4, AC 7 and 8): the
+// codec goes to recordAsync only when the frozen decision has one, an iOS codec
+// rejection retries once at once without it, and the decision rides to the
+// upload job.
+describe("capture bitrate", () => {
+  const HEVC: CaptureBitrateDecision = {
+    ...unmanagedDecision("720p", "no_history_wifi"),
+    managed: true,
+    bitrateBps: 3_000_000,
+    codec: "hvc1",
+    level: "normal",
+    ladder: "hevc",
+    network: "wifi",
+    historySamples: 1,
+  };
+  const ANDROID: CaptureBitrateDecision = { ...HEVC, codec: null, ladder: "h264", bitrateBps: 4_000_000 };
+  const capture = (bitrate: CaptureBitrateDecision | null): RecordingCapture => ({ quality: "720p", lens: "default", bitrate });
+  const CODEC_ERROR = "Video Codec 'hvc1' is not supported on this device";
+
+  /** recordAsync rejects with each message in turn, then records normally. */
+  function makeRejectingCamera(messages: string[], uri = "file://clip.mp4"): FakeCamera {
+    let resolveRecord: ((v: { uri: string } | undefined) => void) | null = null;
+    const queue = [...messages];
+    const recordAsync = jest.fn(() => {
+      const next = queue.shift();
+      if (next) return Promise.reject(new Error(next));
+      return new Promise<{ uri: string } | undefined>((res) => {
+        resolveRecord = res;
+      });
+    });
+    const stopRecording = jest.fn(() => resolveRecord?.({ uri }));
+    return { recordAsync, stopRecording };
+  }
+
+  async function record(captureRef: { current: RecordingCapture | null }, cam: FakeCamera, between?: () => void) {
+    const hook = renderHook(() => useVideoRecorder("M", "A", null, { captureRef }));
+    hook.result.current.cameraRef.current = cam as never;
+    act(() => hook.result.current.markCameraReady());
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = hook.result.current.start();
+    });
+    await waitFor(() => expect(hook.result.current.state).toBe("recording"));
+    between?.();
+    await act(async () => {
+      await hook.result.current.stop();
+      await startPromise;
+    });
+    return hook;
+  }
+
+  it.each([
+    ["no decision", null],
+    ["Android (no codec in the decision)", ANDROID],
+    ["unmanaged", unmanagedDecision("720p", "disabled")],
+    ["pending", unmanagedDecision("720p", "pending")],
+  ])("%s: no codec option", async (_name, bitrate) => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const cam = makeFakeCamera();
+    await record({ current: capture(bitrate) }, cam);
+    expect(cam.recordAsync.mock.calls[0][0]).not.toHaveProperty("codec");
+  });
+
+  it("codec hvc1 passed when decided, and the decision reaches the upload as captureBitrate", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const cam = makeFakeCamera();
+    const hook = await record({ current: capture(HEVC) }, cam);
+    await waitFor(() => expect(hook.result.current.state).toBe("uploaded"));
+    expect(cam.recordAsync).toHaveBeenCalledWith(expect.objectContaining({ codec: "hvc1" }));
+    expect(mockStartUpload).toHaveBeenCalledWith(expect.objectContaining({ captureQuality: "720p", captureBitrate: HEVC }));
+    expect(mockTrackCaptureBitrate).toHaveBeenCalledTimes(1);
+    expect(mockTrackCaptureBitrate).toHaveBeenCalledWith(HEVC);
+  });
+
+  it("the decision is taken at recordAsync time and never re-read", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const cam = makeFakeCamera();
+    const captureRef = { current: capture(HEVC) as RecordingCapture | null };
+    await record(captureRef, cam, () => {
+      captureRef.current = capture({ ...HEVC, codec: "avc1", bitrateBps: 9 });
+    });
+    expect(cam.recordAsync).toHaveBeenCalledTimes(1);
+    expect(mockStartUpload).toHaveBeenCalledWith(expect.objectContaining({ captureBitrate: HEVC }));
+  });
+
+  it("a codec rejection retries once at once without codec, and uploads with reason codec_rejected", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const cam = makeRejectingCamera([CODEC_ERROR]);
+    const hook = await record({ current: capture(HEVC) }, cam);
+    await waitFor(() => expect(hook.result.current.state).toBe("uploaded"));
+    expect(cam.recordAsync).toHaveBeenCalledTimes(2);
+    expect(cam.recordAsync.mock.calls[0][0]).toEqual(expect.objectContaining({ codec: "hvc1" }));
+    expect(cam.recordAsync.mock.calls[1][0]).not.toHaveProperty("codec");
+    const sent = mockStartUpload.mock.calls[0][0] as { captureBitrate: CaptureBitrateDecision };
+    expect(sent.captureBitrate).toEqual(
+      expect.objectContaining({ managed: false, bitrateBps: null, codec: null, reason: "codec_rejected", network: "wifi", historySamples: 1 }),
+    );
+    // One breadcrumb for each decision the recorder actually used.
+    expect(mockTrackCaptureBitrate.mock.calls.map((c) => (c[0] as CaptureBitrateDecision).reason)).toEqual([
+      "no_history_wifi",
+      "codec_rejected",
+    ]);
+  });
+
+  it("the codec retry does not wait for the not-ready interval", async () => {
+    jest.useFakeTimers();
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const cam = makeRejectingCamera([CODEC_ERROR]);
+    const hook = renderHook(() => useVideoRecorder("M", "A", null, { captureRef: { current: capture(HEVC) } }));
+    hook.result.current.cameraRef.current = cam as never;
+    act(() => hook.result.current.markCameraReady());
+    await act(async () => {
+      void hook.result.current.start();
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+    });
+    // No timer advanced: the second attempt is already issued.
+    expect(cam.recordAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it("a second rejection surfaces today's error", async () => {
+    const cam = makeRejectingCamera([CODEC_ERROR, CODEC_ERROR]);
+    const hook = await record({ current: capture(HEVC) }, cam);
+    await waitFor(() => expect(hook.result.current.state).toBe("error"));
+    expect(cam.recordAsync).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.error).toBe(`Recording failed: ${CODEC_ERROR}`);
+    expect(mockStartUpload).not.toHaveBeenCalled();
+  });
+
+  it("a codec message with no codec passed is not retried (today's error)", async () => {
+    const cam = makeRejectingCamera([CODEC_ERROR]);
+    const hook = await record({ current: capture(ANDROID) }, cam);
+    await waitFor(() => expect(hook.result.current.state).toBe("error"));
+    expect(cam.recordAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("a not-ready rejection keeps today's retry, still with the codec", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const cam = makeRejectingCamera(["Camera is not ready yet. Wait for 'onCameraReady' callback"]);
+    const hook = renderHook(() => useVideoRecorder("M", "A", null, { captureRef: { current: capture(HEVC) } }));
+    hook.result.current.cameraRef.current = cam as never;
+    act(() => hook.result.current.markCameraReady());
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = hook.result.current.start();
+    });
+    await waitFor(() => expect(cam.recordAsync).toHaveBeenCalledTimes(2), { timeout: 4000 });
+    await act(async () => {
+      await hook.result.current.stop();
+      await startPromise;
+    });
+    await waitFor(() => expect(hook.result.current.state).toBe("uploaded"));
+    expect(cam.recordAsync.mock.calls.map((c) => (c[0] as { codec?: string }).codec)).toEqual(["hvc1", "hvc1"]);
+    expect(mockStartUpload).toHaveBeenCalledWith(expect.objectContaining({ captureBitrate: HEVC }));
+    // The same frozen decision on both attempts: one breadcrumb.
+    expect(mockTrackCaptureBitrate).toHaveBeenCalledTimes(1);
+  });
+
+  it("a stop already requested when the codec is rejected (a very short match): the retry still records and is stopped, so the clip uploads", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    let reject: (e: Error) => void = () => undefined;
+    let resolveRecord: ((v: { uri: string }) => void) | null = null;
+    const recordAsync = jest
+      .fn()
+      .mockImplementationOnce(() => new Promise((_res, rej) => (reject = rej)))
+      .mockImplementation(() => new Promise((res) => (resolveRecord = res)));
+    const stopRecording = jest.fn(() => resolveRecord?.({ uri: "file://clip.mp4" }));
+    const cam = { recordAsync, stopRecording };
+    const hook = renderHook(() => useVideoRecorder("M", "A", null, { captureRef: { current: capture(HEVC) } }));
+    hook.result.current.cameraRef.current = cam as never;
+    act(() => hook.result.current.markCameraReady());
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = hook.result.current.start();
+    });
+    await act(async () => {
+      await hook.result.current.stop();
+      reject(new Error(CODEC_ERROR));
+    });
+    // The pending stop is re-issued against the retry once it is live.
+    await waitFor(() => expect(hook.result.current.state).toBe("uploaded"), { timeout: 4000 });
+    await act(async () => {
+      await startPromise;
+    });
+    expect(recordAsync).toHaveBeenCalledTimes(2);
+    expect(recordAsync.mock.calls[1][0]).not.toHaveProperty("codec");
+    expect(mockStartUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ captureBitrate: expect.objectContaining({ reason: "codec_rejected" }) }),
+    );
+  });
+
+  it("a stop requested before start() reached the camera, then a codec rejection: the retry records and is stopped", async () => {
+    mockStartUpload.mockImplementationOnce(uploadSucceeds);
+    const cam = makeRejectingCamera([CODEC_ERROR]);
+    const hook = renderHook(() => useVideoRecorder("M", "A", null, { captureRef: { current: capture(HEVC) } }));
+    hook.result.current.cameraRef.current = cam as never;
+    act(() => hook.result.current.markCameraReady());
+    // End fires while the recorder is still idle: a pending stop.
+    await act(async () => {
+      await hook.result.current.stop();
+    });
+    let startPromise: Promise<void>;
+    act(() => {
+      startPromise = hook.result.current.start();
+    });
+    await waitFor(() => expect(hook.result.current.state).toBe("uploaded"), { timeout: 4000 });
+    await act(async () => {
+      await startPromise;
+    });
+    expect(cam.recordAsync).toHaveBeenCalledTimes(2);
+    expect(cam.stopRecording).toHaveBeenCalled();
   });
 });

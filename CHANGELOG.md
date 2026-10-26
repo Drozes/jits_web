@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Mobile: dynamic capture bitrate (jits-n2im.33.1)
+
+JS-only (OTA-eligible on runtime 1.0), no backend change, no UI or copy change. Spec `specs/dynamic-capture-bitrate/spec.md`. Before each match recording the app picks the recording bitrate from the network at the face-off and this phone's recent upload throughput, within fixed per-platform levels that never go below the floor, and freezes it with the capture quality so it never changes mid-recording. Device verification is `jits-n2im.33.2`.
+
+**Added**
+- `apps/mobile/lib/video/capture-bitrate.ts`: the pure picker `pickCaptureBitrate` and the owner's level table (720p: iOS HEVC 3.0 / 2.5 Mbps, floor 2.0; Android and the iOS `avc1` fallback H.264 4.0 / 3.0, floor 3.0. 1080p: HEVC 4.5 / 4.0, floor 3.5; H.264 6.0 / 5.0, floor 5.0). Normal when the median of at least 2 recent samples on the same network class is 8 Mbps or more (or Wi-Fi/ethernet with no history), weak otherwise, on cellular 2G/3G, offline, unreachable, unknown network or a relaunch re-entry.
+- `apps/mobile/lib/video/capture-bitrate-history.ts`: the last 5 upload throughput samples (14 days, AsyncStorage `elo-capture-throughput::v1`, self-healing, serialised writes); a sample needs 8 MiB and 5 s of foreground time.
+- `apps/mobile/lib/video/capture-codecs.ts`: the iOS recordable-codec list (`CameraView.getAvailableVideoCodecsAsync`, 2 s timeout, cached per OS version in `elo-capture-codecs::v1`, a late answer still cached); never called on Android.
+- `apps/mobile/lib/video/capture-bitrate-bootstrap.tsx`: mounted once in `app/(app)/_layout.tsx`; primes the codec cache and the persisted kill switch at app start, then reads the switch once.
+- `apps/mobile/lib/video/use-capture-bitrate.ts`: the viewfinder hook (reads NetInfo, the history, the codec list and the kill switch once per face-off; frozen at the lock with the quality).
+- Kill switch `match_capture_bitrate_off` (inverted: a missing row or `false` keeps the feature on; `select admin_set_feature_flag('match_capture_bitrate_off', true);` restores today's recording at the next face-off, no migration). The read is bounded to 1.5 s and the last answer is persisted (`elo-capture-bitrate-off::v1`, primed and refreshed at app start), so a relaunch re-entry honours it too.
+- Android hold: once the camera is up, Android never changes `videoBitrate` on its own (a prop change recreates the CameraX camera and can race `recordAsync`); a decision that lands after the mount records as today, and only a quality change (which recreates the camera anyway) replaces it. iOS still applies a late decision up to the lock.
+
+**Changed**
+- `components/match-flow/match-recorder-surface.tsx`, `camera-overlay.tsx`: the `CameraView` gets `videoBitrate` from the frozen decision, and the decision is reported to the recorder with the quality and lens.
+- `lib/video/use-video-recorder.ts`: passes `codec` to `recordAsync` only when the decision has one (iOS); if iOS rejects the codec, retries once at once without codec or bitrate (reason `codec_rejected`), so no clip is lost to it; one `video.capture` breadcrumb per decision used.
+- `lib/video/upload-persistence.ts`, `video-upload-manager.ts`, `upload-telemetry.ts`: the decision rides on the upload job (`captureBitrate`, malformed values read as null, the job is kept) to the "Match video uploaded" event (`captureBitrateBps`, `captureCodec`, `captureLevel`, `captureLadder`, `captureReason`, `captureNetwork`, `captureHistoryMedianMbps`, tag `video.capture.level`), which also appends the run's throughput sample to the history.
+
+**Tests**
+- New: `__tests__/lib/video/capture-bitrate.test.ts`, `capture-bitrate-history.test.ts`, `capture-codecs.test.ts`, `use-capture-bitrate.test.ts`, `upload-telemetry-capture.test.ts`, `capture-bitrate-bootstrap.test.tsx`; `__tests__/app/highlight-route.test.tsx` mocks the new bootstrap like the other app bootstraps. Extended: `use-video-recorder.test.ts` (codec option, rejection retry), `match-recorder-surface.test.tsx` (freeze through the recording, re-entry, kill switch, Android), `camera-overlay.test.tsx`, `upload-persistence.test.ts`, `video-upload-manager.test.ts`.
+
 ## OTA "Timekeeper mode" (runtime 1.0), 2026-10-23
 
 Production OTA group `be8bbb9d-28db-47c2-ba06-905cb264077b` (iOS `01a16b85-df00-7d7e-8b82-e906e673dc71`, Android `01a16b85-df00-75ed-a919-4054cc05f9bd`), branch and channel `production`, from jits_web `main` `95ea4841` (release PR #110 of development `c52ce7e6`, feature PR #109). The first OTA on runtime 1.0: it reaches TestFlight builds 27 and 28 (1.0 build 28 is waiting for App Store review), and no 0.5.0 install. JS-only, non-critical (`updateCriticalIndex` unchanged), published with `EXPO_PUBLIC_APP_ENV=staging` to match the binary. Rollback target: the embedded bundle (`eas update:roll-back-to-embedded --branch production --runtime-version 1.0 --platform all`). Shipped after the jr_be prod apply of 2026-10-23 (Rating V9 with 288 rated matches replayed, Arena ranges, and the timekeeper batch `20261021090000` to `20261021101010`; 22 migration versions in all; `push` edge function version 8). Prod flags at publish: `timekeeper_role = false` (turned on only after the App Store approves 1.0), `timekeeper_weight_check = true`, `match_capture_1080p = false`. Every section below shipped in this group; the Sign in with Apple and version 1.0 change (jits-8s9v) is native and ships in the 1.0 binary, not the OTA.

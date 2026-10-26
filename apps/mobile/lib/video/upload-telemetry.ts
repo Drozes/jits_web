@@ -2,6 +2,9 @@ import { AppState, type AppStateStatus } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import * as tracking from "@/lib/error-tracking/sentry";
 import { httpClassOf, type UploadErrorClass } from "./upload-errors";
+import type { CaptureBitrateDecision } from "./capture-bitrate";
+import { recordThroughputSample, throughputSampleFromRun } from "./capture-bitrate-history";
+import type { PersistedCaptureBitrate } from "./upload-persistence";
 
 /**
  * Match-video upload telemetry (jits-n2im.7).
@@ -217,24 +220,72 @@ export function trackParked(info: {
   }
 }
 
-/** The run landed: bytes and row. The run's single event. */
+/**
+ * The recording started with this bitrate decision (dynamic capture bitrate,
+ * spec 7.4): one breadcrumb, so a later event shows what the clip was made with.
+ */
+export function trackCaptureBitrate(decision: CaptureBitrateDecision): void {
+  call("addBreadcrumb", {
+    category: "video.capture",
+    message: "capture bitrate",
+    level: "info",
+    data: {
+      bitrateBps: decision.bitrateBps,
+      codec: decision.codec,
+      level: decision.level,
+      ladder: decision.ladder,
+      reason: decision.reason,
+      network: decision.network,
+      historyMedianMbps: decision.historyMedianMbps,
+    },
+  });
+}
+
+/** The capture fields on the uploaded event (spec section 10); all null when absent. */
+function captureExtra(c: PersistedCaptureBitrate | null | undefined) {
+  return {
+    captureBitrateBps: c?.bitrateBps ?? null,
+    captureCodec: c?.codec ?? null,
+    captureLevel: c?.level ?? null,
+    captureLadder: c?.ladder ?? null,
+    captureReason: c?.reason ?? null,
+    captureNetwork: c?.network ?? null,
+    captureHistoryMedianMbps: c?.historyMedianMbps ?? null,
+  };
+}
+
+/**
+ * The run landed: bytes and row. The run's single event. It also feeds this
+ * phone's throughput history, the capture bitrate picker's input (D3, D12).
+ */
 export async function trackUploaded(info: {
   matchId: string;
   fileSizeBytes: number;
   createdAt: number;
+  /** The decision the clip was recorded with (dynamic capture bitrate). */
+  captureBitrate?: PersistedCaptureBitrate | null;
 }): Promise<void> {
   const done = finish(info.matchId);
   let networkType: string | null = null;
+  let cellularGeneration: string | null = null;
   try {
-    networkType = (await NetInfo.fetch()).type ?? null;
+    const state = await NetInfo.fetch();
+    networkType = state.type ?? null;
+    const generation = (state.details as { cellularGeneration?: unknown } | null | undefined)?.cellularGeneration;
+    cellularGeneration = typeof generation === "string" ? generation : null;
   } catch {
     networkType = null;
   }
   const sent = done ? Math.max(0, info.fileSizeBytes - done.startOffset) : null;
   const seconds = done ? done.durationMs / 1000 : null;
+  const capture = info.captureBitrate ?? null;
   call("captureMessage", "Match video uploaded", {
     level: "info",
-    tags: { "video.upload.outcome": "uploaded", "video.upload.network": networkType ?? "unknown" },
+    tags: {
+      "video.upload.outcome": "uploaded",
+      "video.upload.network": networkType ?? "unknown",
+      "video.capture.level": capture ? (capture.level ?? "unmanaged") : "unknown",
+    },
     extra: {
       matchId: info.matchId,
       bytes: info.fileSizeBytes,
@@ -248,8 +299,30 @@ export async function trackUploaded(info: {
       // the end-to-end lag the backend grace window has to cover.
       sinceRecordingEndMs: Date.now() - info.createdAt,
       networkType,
+      ...captureExtra(capture),
     },
   });
+  try {
+    // Only a run with no failed attempt is a sample: the run's duration
+    // also holds the failed attempts and the backoff sleeps between them,
+    // which would read as a slow link (the manager does not time them
+    // separately). Time in the background is excluded by the sample itself.
+    const sample =
+      done && sent != null && done.attempts === 0
+        ? throughputSampleFromRun({
+            landedAt: Date.now(),
+            bytesThisRun: sent,
+            durationMs: done.durationMs,
+            backgroundedMs: done.backgroundedMs,
+            networkType,
+            cellularGeneration,
+          })
+        : null;
+    // Fire and forget: the event above has already gone.
+    if (sample) recordThroughputSample(sample).catch(() => undefined);
+  } catch {
+    /* telemetry is never allowed to fail an upload */
+  }
 }
 
 /** A run that was superseded, stopped by sign-out, or abandoned: forget it quietly. */

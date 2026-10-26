@@ -341,3 +341,52 @@ describe("capture fields (timekeeper mode spec 13.4)", () => {
     expect(await loadUploadJob("M1")).toMatchObject({ phase: "bytes", captureQuality: null, captureLens: null });
   });
 });
+
+describe("capture bitrate (dynamic capture bitrate, D8)", () => {
+  const BITRATE = {
+    bitrateBps: 2_500_000,
+    codec: "hvc1" as const,
+    level: "weak" as const,
+    ladder: "hevc" as const,
+    reason: "no_history_cellular",
+    network: "cellular",
+    historyMedianMbps: null,
+  };
+
+  it("round-trips through save and load", async () => {
+    await saveUploadJob(job({ protocol: 2, captureBitrate: BITRATE }));
+    expect((await loadUploadJob("M1"))?.captureBitrate).toEqual(BITRATE);
+  });
+
+  it("an unmanaged decision round-trips with its nulls", async () => {
+    const unmanaged = { bitrateBps: null, codec: null, level: null, ladder: null, reason: "codec_rejected", network: "wifi", historyMedianMbps: 9 };
+    await saveUploadJob(job({ protocol: 2, captureBitrate: unmanaged }));
+    expect((await loadUploadJob("M1"))?.captureBitrate).toEqual(unmanaged);
+  });
+
+  it("an older record without it reads as null", async () => {
+    await saveUploadJob(job({ protocol: 2 }));
+    expect((await loadUploadJob("M1"))?.captureBitrate).toBeNull();
+  });
+
+  it.each([
+    ["a string", "3000000"],
+    ["a bad codec", { ...BITRATE, codec: "vp9" }],
+    ["a bad level", { ...BITRATE, level: "high" }],
+    ["a bad ladder", { ...BITRATE, ladder: "av1" }],
+    ["a non-number bitrate", { ...BITRATE, bitrateBps: "3m" }],
+    ["a non-number median", { ...BITRATE, historyMedianMbps: "fast" }],
+    ["no reason", { ...BITRATE, reason: undefined }],
+    ["a numeric network", { ...BITRATE, network: 4 }],
+  ])("a malformed value (%s) loads as null and the job is kept", async (_name, value) => {
+    await saveUploadJob(job({ protocol: 2, captureBitrate: value as never }));
+    const loaded = await loadUploadJob("M1");
+    expect(loaded).toMatchObject({ matchId: "M1", phase: "bytes", storagePath: "M1/A1/1700000000000.mp4" });
+    expect(loaded?.captureBitrate).toBeNull();
+  });
+
+  it("keeps only the persisted fields", async () => {
+    await saveUploadJob(job({ protocol: 2, captureBitrate: { ...BITRATE, managed: true, clamped: false } as never }));
+    expect((await loadUploadJob("M1"))?.captureBitrate).toEqual(BITRATE);
+  });
+});

@@ -103,6 +103,57 @@ export interface PendingUploadJob {
   captureQuality?: MatchVideoCaptureQuality | null;
   /** The lens the clip was recorded on, sent with the reservation. */
   captureLens?: MatchVideoCaptureLens | null;
+  /**
+   * The bitrate decision the clip was recorded with (dynamic capture
+   * bitrate, D8), for the uploaded event only. Older bundles spread `...job`
+   * and ignore it, so an OTA rollback is safe.
+   */
+  captureBitrate?: PersistedCaptureBitrate | null;
+}
+
+/** The capture bitrate fields kept on a job (`CaptureBitrateDecision` minus the derivable ones). */
+export interface PersistedCaptureBitrate {
+  bitrateBps: number | null;
+  codec: "hvc1" | "avc1" | null;
+  level: "normal" | "weak" | null;
+  ladder: "hevc" | "h264" | null;
+  reason: string;
+  network: string;
+  historyMedianMbps: number | null;
+}
+
+function isNumberOrNull(v: unknown): v is number | null {
+  return v === null || (typeof v === "number" && Number.isFinite(v));
+}
+
+/**
+ * The persisted shape of a decision, or null when the value is not one. Picks
+ * only the persisted fields, so a full `CaptureBitrateDecision` can be passed.
+ * Never throws: a bad value only loses telemetry, never the job.
+ */
+export function toPersistedCaptureBitrate(value: unknown): PersistedCaptureBitrate | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (
+    !isNumberOrNull(v.bitrateBps) ||
+    !(v.codec === null || v.codec === "hvc1" || v.codec === "avc1") ||
+    !(v.level === null || v.level === "normal" || v.level === "weak") ||
+    !(v.ladder === null || v.ladder === "hevc" || v.ladder === "h264") ||
+    typeof v.reason !== "string" ||
+    typeof v.network !== "string" ||
+    !isNumberOrNull(v.historyMedianMbps)
+  ) {
+    return null;
+  }
+  return {
+    bitrateBps: v.bitrateBps,
+    codec: v.codec,
+    level: v.level,
+    ladder: v.ladder,
+    reason: v.reason,
+    network: v.network,
+    historyMedianMbps: v.historyMedianMbps,
+  };
 }
 
 /**
@@ -234,6 +285,7 @@ function normaliseJob(job: PendingUploadJob): PendingUploadJob {
         : null,
     captureQuality: job.captureQuality === "720p" || job.captureQuality === "1080p" ? job.captureQuality : null,
     captureLens: job.captureLens === "ultrawide" || job.captureLens === "default" ? job.captureLens : null,
+    captureBitrate: toPersistedCaptureBitrate(job.captureBitrate),
     updatedAt:
       typeof job.updatedAt === "number" && Number.isFinite(job.updatedAt)
         ? job.updatedAt

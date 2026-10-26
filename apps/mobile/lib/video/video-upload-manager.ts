@@ -21,6 +21,7 @@ import { releaseRecording, retainRecording } from "./recording-file";
 import {
   type PendingAbandon,
   type PendingUploadJob,
+  type PersistedCaptureBitrate,
   UPLOAD_JOB_MAX_AGE_MS,
   isJobExpired,
   loadPendingAbandons,
@@ -31,6 +32,7 @@ import {
   patchUploadJob,
   removeUploadJob,
   saveUploadJob,
+  toPersistedCaptureBitrate,
 } from "./upload-persistence";
 import {
   clearMatchUpload,
@@ -170,6 +172,12 @@ export interface StartUploadParams {
   /** What the clip was captured with (spec 13.4); sent with the reservation. */
   captureQuality?: MatchVideoCaptureQuality | null;
   captureLens?: MatchVideoCaptureLens | null;
+  /**
+   * The bitrate decision the clip was recorded with (dynamic capture
+   * bitrate); persisted on the job for the uploaded event. A full
+   * `CaptureBitrateDecision` is accepted and narrowed.
+   */
+  captureBitrate?: PersistedCaptureBitrate | null;
 }
 
 type JobPatch = Partial<Omit<PendingUploadJob, "matchId">>;
@@ -1332,6 +1340,7 @@ async function runJob(
     matchId: current.matchId,
     fileSizeBytes: current.fileSizeBytes,
     createdAt: current.createdAt,
+    captureBitrate: current.captureBitrate ?? null,
   });
   return { ok: true, videoId };
 }
@@ -1580,6 +1589,7 @@ async function prepareAndRun(
         : null,
     captureQuality: params.captureQuality ?? null,
     captureLens: params.captureLens ?? null,
+    captureBitrate: toPersistedCaptureBitrate(params.captureBitrate),
   };
   await saveUploadJob(job);
   if (!isCurrent()) {

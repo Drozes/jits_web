@@ -1554,6 +1554,71 @@ describe("upload telemetry (jits-n2im.7)", () => {
     expect(landed[0][1].extra).toHaveProperty("networkType");
   });
 
+  it("carries the capture bitrate decision from the recording to the uploaded event (dynamic capture bitrate)", async () => {
+    const decision = {
+      managed: true,
+      bitrateBps: 3_000_000,
+      codec: "hvc1" as const,
+      level: "normal" as const,
+      ladder: "hevc" as const,
+      quality: "720p" as const,
+      reason: "history_good" as const,
+      clamped: false,
+      network: "wifi" as const,
+      cellularGeneration: null,
+      historyMedianMbps: 12.5,
+      historySamples: 3,
+    };
+    let persisted: unknown = undefined;
+    const gate: { release: (() => void) | null } = { release: null };
+    mockUploadFileResumable.mockImplementationOnce(
+      () =>
+        new Promise<void>((res) => {
+          gate.release = () => res();
+        }),
+    );
+    const done = startMatchVideoUpload({ ...START, captureBitrate: decision });
+    await flush();
+    persisted = (await loadUploadJob("M1"))?.captureBitrate;
+    gate.release?.();
+    await done;
+    await flush();
+    // Only the persisted fields ride on the job.
+    expect(persisted).toEqual({
+      bitrateBps: 3_000_000,
+      codec: "hvc1",
+      level: "normal",
+      ladder: "hevc",
+      reason: "history_good",
+      network: "wifi",
+      historyMedianMbps: 12.5,
+    });
+    const landed = mockCaptureMessage.mock.calls.filter((c) => c[0] === "Match video uploaded");
+    expect(landed).toHaveLength(1);
+    expect(landed[0][1].tags).toEqual(expect.objectContaining({ "video.capture.level": "normal" }));
+    expect(landed[0][1].extra).toEqual(
+      expect.objectContaining({
+        captureBitrateBps: 3_000_000,
+        captureCodec: "hvc1",
+        captureLevel: "normal",
+        captureLadder: "hevc",
+        captureReason: "history_good",
+        captureNetwork: "wifi",
+        captureHistoryMedianMbps: 12.5,
+      }),
+    );
+  });
+
+  it("no capture bitrate decision: the fields are null and the level tag reads unknown", async () => {
+    await startMatchVideoUpload(START);
+    await flush();
+    const landed = mockCaptureMessage.mock.calls.filter((c) => c[0] === "Match video uploaded");
+    expect(landed[0][1].tags).toEqual(expect.objectContaining({ "video.capture.level": "unknown" }));
+    expect(landed[0][1].extra).toEqual(
+      expect.objectContaining({ captureBitrateBps: null, captureCodec: null, captureLevel: null, captureReason: null }),
+    );
+  });
+
   it("a paused park is a breadcrumb with its reason and HTTP class, not an event", async () => {
     mockUploadFileResumable.mockRejectedValue(httpError(502));
     await startMatchVideoUpload(START);
