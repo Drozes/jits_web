@@ -56,6 +56,7 @@ function viewfinder(shape: ReadyPreviewShape = "recorded", overrides: Partial<Vi
   return {
     card: readyPreviewBox(mockWindow.width, mockWindow.height, shape),
     videoQuality: "720p",
+    videoBitrate: undefined,
     selectedLens: undefined,
     wideLens: false,
     ...overrides,
@@ -270,6 +271,13 @@ describe("CameraOverlay capture policy", () => {
     expect(mockCameraProps.current).toEqual(
       expect.objectContaining({ videoQuality: "1080p", selectedLens: "Back Ultra Wide Camera" }),
     );
+  });
+
+  it("the camera gets the bitrate it is given (dynamic capture bitrate), and none when undecided", () => {
+    renderCapture({}, { videoBitrate: 3_000_000 });
+    expect(mockCameraProps.current).toEqual(expect.objectContaining({ videoBitrate: 3_000_000 }));
+    renderCapture();
+    expect(mockCameraProps.current?.videoBitrate).toBeUndefined();
   });
 
   it("TK-REC3: WIDE LENS on the ready card while the ultrawide is selected, on the badge fill", () => {

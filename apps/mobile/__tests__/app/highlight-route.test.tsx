@@ -29,6 +29,7 @@ jest.mock("@/lib/theme/use-theme", () => ({ useThemedTokens: () => ({}) }));
 jest.mock("@/lib/arena/arena-bootstrap", () => ({ ArenaBootstrap: () => null }));
 jest.mock("@/components/notifications/bell-bootstrap", () => ({ BellBootstrap: () => null }));
 jest.mock("@/lib/moderation/moderation-bootstrap", () => ({ ModerationBootstrap: () => null }));
+jest.mock("@/lib/video/capture-bitrate-bootstrap", () => ({ CaptureBitrateBootstrap: () => null }));
 const mockViewer = jest.fn((_p: unknown) => null);
 jest.mock("@/components/highlight-viewer/viewer-screen", () => ({
   ViewerScreen: (p: unknown) => mockViewer(p),

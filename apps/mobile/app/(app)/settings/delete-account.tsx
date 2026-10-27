@@ -12,6 +12,9 @@ import { typeSize } from "@/lib/typography";
 import { supabase } from "@/lib/supabase/client";
 import { DELETE_CONFIRM_WORD, deleteAccount, isDeleteConfirmed } from "@/lib/account/delete-account";
 import { clearAllDeviceLocations } from "@/lib/location/device-location-store";
+import { clearThroughputHistory } from "@/lib/video/capture-bitrate-history";
+import { releaseAllCapturePreps } from "@/lib/video/capture-prep";
+import { stripCaptureGeoCells } from "@/lib/video/upload-persistence";
 import { clearAllPersistedLiveIntents } from "@/lib/arena/live-intent-persist";
 
 const FAILED = "We couldn't delete your account. Check your connection and try again.";
@@ -54,6 +57,10 @@ export default function DeleteAccountScreen() {
     // The deleted athlete's last location goes before anything else does
     // (instant go-live 4.1); sign-out clears it too.
     clearAllDeviceLocations();
+    // And where their matches happened (capture history, E14).
+    void clearThroughputHistory();
+    void stripCaptureGeoCells();
+    releaseAllCapturePreps();
     await signOut();
     // The deleted athlete's last live choice too (round 4). After sign-out,
     // which records one; nothing is recorded for them again.

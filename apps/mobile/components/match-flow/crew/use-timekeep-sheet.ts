@@ -17,6 +17,7 @@ import { HOME_HREF } from "@/lib/deep-links/retired-routes";
 import { subscribeIncomingTimekeeperRequests } from "@/lib/match-flow/use-incoming-timekeeper-requests";
 import { useScreenFocused } from "@/lib/navigation/use-screen-focused";
 import { TIMEKEEPER_COPY as C } from "@/lib/match-flow/timekeeper-copy";
+import { releaseCapturePrep, startCapturePrep } from "@/lib/video/capture-prep";
 import { useSecondsLeft } from "./use-seconds-left";
 
 /** How often an open sheet re-reads its request (a missed realtime row cannot leave it up). */
@@ -88,6 +89,11 @@ export function useTimekeepSheet({ matchId, requestId, athleteId }: Params): Tim
   const focusedRef = React.useRef(focused);
   focusedRef.current = focused;
   const onTopAgain = React.useRef<"over" | "accepted" | null>(null);
+  // The capture prep (dynamic capture bitrate 16.3 E11): started while the
+  // asked person reads the sheet, so the timekeeper's camera mounts with a
+  // decided bitrate. Kept past a handoff to the match (Accept, or already
+  // seated), whose viewfinder claims it; released otherwise.
+  const handedOffRef = React.useRef(false);
 
   /** Leave the sheet: back where the asked person was, or Home from a cold start. */
   const leave = React.useCallback((to?: string) => {
@@ -100,13 +106,14 @@ export function useTimekeepSheet({ matchId, requestId, athleteId }: Params): Tim
   /** Over without an answer from here: TK-T6, unless this sheet is answering it right now. */
   const over = React.useCallback(() => {
     if (closed.current || answeringRef.current || !alive.current) return;
+    releaseCapturePrep(matchId);
     if (!focusedRef.current) {
       onTopAgain.current = "over";
       return;
     }
     toast.info(C["TK-T6"]);
     leave();
-  }, [leave]);
+  }, [leave, matchId]);
   /**
    * Accepted, not by this sheet's answer: by this person on another device,
    * or before the app was killed. Still seated: on to the match (the wizard
@@ -126,6 +133,7 @@ export function useTimekeepSheet({ matchId, requestId, athleteId }: Params): Tim
       onTopAgain.current = "accepted";
       return;
     }
+    handedOffRef.current = true;
     leave(arenaMatchHref(matchId));
   }, [matchId, leave, over]);
   React.useEffect(() => {
@@ -196,7 +204,11 @@ export function useTimekeepSheet({ matchId, requestId, athleteId }: Params): Tim
       try {
         const res = await respondTimekeeperRequest(supabase, req.requestId, accept);
         if (!alive.current) return;
-        if (res.ok) return leave(accept ? arenaMatchHref(res.data.matchId) : undefined);
+        if (res.ok) {
+          if (accept) handedOffRef.current = true;
+          else releaseCapturePrep(matchId);
+          return leave(accept ? arenaMatchHref(res.data.matchId) : undefined);
+        }
         answeringRef.current = false;
         setAnswering(null);
         if (res.error.code === "CONSENT_REQUIRED") {
@@ -209,7 +221,20 @@ export function useTimekeepSheet({ matchId, requestId, athleteId }: Params): Tim
         if (alive.current) setAnswering(null);
       }
     },
-    [leave, over],
+    [leave, over, matchId],
+  );
+
+  // Started once a pending request is shown; never on a consent refusal's
+  // release (Accept stays available, TK-T8).
+  const prepRequested = request !== null;
+  React.useEffect(() => {
+    if (prepRequested && isUuid(matchId)) startCapturePrep(matchId, { matchId });
+  }, [prepRequested, matchId]);
+  React.useEffect(
+    () => () => {
+      if (!handedOffRef.current) releaseCapturePrep(matchId);
+    },
+    [matchId],
   );
 
   const accept = React.useCallback(() => {

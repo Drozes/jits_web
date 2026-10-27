@@ -6,6 +6,7 @@ import { CAPTURE_COPY, readyHintFor, type ReadyHintId } from "@/lib/video/captur
 import { readyPreviewBox } from "@/lib/video/recorded-frame";
 import { useCaptureLens } from "@/lib/video/select-capture-lens";
 import { useCaptureQuality } from "@/lib/video/use-capture-quality";
+import { useCaptureBitrate } from "@/lib/video/use-capture-bitrate";
 import { CameraOverlay, type Viewfinder } from "./camera-overlay";
 import { useMatchRecorder, useMatchRecordingCapture } from "./match-recorder-context";
 
@@ -48,6 +49,7 @@ export function MatchRecorderCamera({
   step,
   optedIn = true,
   capture,
+  matchId = null,
 }: {
   /** The wizard's step; null before any match step (practice's lobby and wait). */
   step: MatchStep | null;
@@ -59,6 +61,8 @@ export function MatchRecorderCamera({
   optedIn?: boolean;
   /** This viewer's capture policy (`capturePolicyFor`, or `PRACTICE_CAPTURE`). */
   capture: CapturePolicy;
+  /** The match (the capture prep's key, dynamic capture bitrate 16.7); null for practice, which never probes. */
+  matchId?: string | null;
 }) {
   const recorder = useMatchRecorder();
   const warming = step === "ready";
@@ -76,6 +80,7 @@ export function MatchRecorderCamera({
   const { viewfinder, lens, onCameraReady } = useViewfinderCapture(recorder, capture, step, {
     optedIn,
     cameraUp: mounted && granted,
+    matchId,
   });
 
   // The recorder outlives this view now, so readiness and the pending
@@ -148,28 +153,39 @@ function ReadyNotes({ hint, beside }: { hint: ReadyHintId | null; beside: boolea
 }
 
 /**
- * The quality and lens this viewfinder records with, reported to the
- * recorder for the video row, and the ready card it draws. Both settle during
- * the face-off and freeze from the live step (or a clip in progress) on:
- * either change reconfigures the capture session, which must never happen
- * under a recording. The flag is read only for a viewer who records.
+ * The quality, lens and bitrate this viewfinder records with, reported to
+ * the recorder for the video row, and the ready card it draws. All three
+ * settle during the face-off and freeze from the live step (or a clip in
+ * progress) on: any change reconfigures the capture session (a new bitrate
+ * recreates the Android camera), which must never happen under a recording.
+ * The flags are read only for a viewer who records.
  */
 function useViewfinderCapture(
   recorder: ReturnType<typeof useMatchRecorder>,
   capture: CapturePolicy,
   step: MatchStep | null,
-  { optedIn, cameraUp }: { optedIn: boolean; cameraUp: boolean },
+  { optedIn, cameraUp, matchId }: { optedIn: boolean; cameraUp: boolean; matchId: string | null },
 ) {
   const window = useWindowDimensions();
   const locked = step === "live" || recorder.state === "recording" || recorder.state === "stopping";
   const faceoff = step === "weight" || step === "ready" || step === "live";
   const videoQuality = useCaptureQuality(faceoff && optedIn, locked);
+  // Frozen at the same lock as the quality (dynamic capture bitrate, spec
+  // 7.5), and on Android already from the camera's mount: a new bitrate
+  // recreates the Android camera.
+  const bitrate = useCaptureBitrate({
+    active: faceoff && optedIn,
+    locked,
+    quality: videoQuality,
+    cameraUp,
+    prepKey: matchId ?? null,
+  });
   const lens = useCaptureLens(capture.captureLens, recorder.cameraRef, cameraUp, locked);
 
   const captureRef = useMatchRecordingCapture();
   React.useEffect(() => {
-    captureRef.current = { quality: videoQuality, lens: lens.lens };
-  }, [captureRef, videoQuality, lens.lens]);
+    captureRef.current = { quality: videoQuality, lens: lens.lens, bitrate };
+  }, [captureRef, videoQuality, lens.lens, bitrate]);
 
   // The recorder's readiness first (a deferred start resumes there), then
   // the lens lookup, which needs the native view registered.
@@ -183,6 +199,7 @@ function useViewfinderCapture(
   const viewfinder: Viewfinder = {
     card: readyPreviewBox(window.width, window.height, readyPreviewShapeFor(capture.recordingOrientation)),
     videoQuality,
+    videoBitrate: bitrate.bitrateBps ?? undefined,
     selectedLens: lens.selectedLens,
     wideLens: lens.lens === "ultrawide",
   };

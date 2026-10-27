@@ -356,7 +356,7 @@ export function MatchFlowWizard({
                     <FaceoffTimekeeperTop />
                   )
                 ) : null}
-                <MatchRecorderCamera step={cameraStep} optedIn={recording} capture={capture} />
+                <MatchRecorderCamera step={cameraStep} optedIn={recording} capture={capture} matchId={matchId} />
                 <MatchStepRenderer
                   step={step}
                   exitHref={exitHref}

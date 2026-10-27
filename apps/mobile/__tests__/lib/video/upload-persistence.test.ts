@@ -38,6 +38,8 @@ import {
   loadUploadJob,
   loadUploadJobs,
   patchUploadJob,
+  stripCaptureGeoCells,
+  toPersistedCaptureBitrate,
   removeUploadJob,
   saveUploadJob,
 } from "@/lib/video/upload-persistence";
@@ -339,5 +341,146 @@ describe("capture fields (timekeeper mode spec 13.4)", () => {
   it("an unknown value reads as unknown instead of dropping the clip", async () => {
     await saveUploadJob(job({ protocol: 2, captureQuality: "4k" as never, captureLens: 3 as never }));
     expect(await loadUploadJob("M1")).toMatchObject({ phase: "bytes", captureQuality: null, captureLens: null });
+  });
+});
+
+describe("capture bitrate (dynamic capture bitrate, D8)", () => {
+  const BITRATE = {
+    bitrateBps: 2_500_000,
+    codec: "hvc1" as const,
+    level: "weak" as const,
+    ladder: "hevc" as const,
+    reason: "no_history_cellular",
+    network: "cellular",
+    historyMedianMbps: null,
+  };
+  /** Phase 2 fields, null on a job written before them. */
+  const PHASE2_NULL = { locationKnown: null, historyMatchedLocation: null, probeOutcome: null, probeMbps: null };
+
+  it("round-trips through save and load", async () => {
+    await saveUploadJob(job({ protocol: 2, captureBitrate: BITRATE }));
+    expect((await loadUploadJob("M1"))?.captureBitrate).toEqual({ ...BITRATE, ...PHASE2_NULL });
+  });
+
+  it("an unmanaged decision round-trips with its nulls", async () => {
+    const unmanaged = { bitrateBps: null, codec: null, level: null, ladder: null, reason: "codec_rejected", network: "wifi", historyMedianMbps: 9 };
+    await saveUploadJob(job({ protocol: 2, captureBitrate: unmanaged }));
+    expect((await loadUploadJob("M1"))?.captureBitrate).toEqual({ ...unmanaged, ...PHASE2_NULL });
+  });
+
+  it("an older record without it reads as null", async () => {
+    await saveUploadJob(job({ protocol: 2 }));
+    expect((await loadUploadJob("M1"))?.captureBitrate).toBeNull();
+  });
+
+  it.each([
+    ["a string", "3000000"],
+    ["a bad codec", { ...BITRATE, codec: "vp9" }],
+    ["a bad level", { ...BITRATE, level: "high" }],
+    ["a bad ladder", { ...BITRATE, ladder: "av1" }],
+    ["a non-number bitrate", { ...BITRATE, bitrateBps: "3m" }],
+    ["a non-number median", { ...BITRATE, historyMedianMbps: "fast" }],
+    ["no reason", { ...BITRATE, reason: undefined }],
+    ["a numeric network", { ...BITRATE, network: 4 }],
+  ])("a malformed value (%s) loads as null and the job is kept", async (_name, value) => {
+    await saveUploadJob(job({ protocol: 2, captureBitrate: value as never }));
+    const loaded = await loadUploadJob("M1");
+    expect(loaded).toMatchObject({ matchId: "M1", phase: "bytes", storagePath: "M1/A1/1700000000000.mp4" });
+    expect(loaded?.captureBitrate).toBeNull();
+  });
+
+  it("keeps only the persisted fields", async () => {
+    await saveUploadJob(job({ protocol: 2, captureBitrate: { ...BITRATE, managed: true, clamped: false } as never }));
+    expect((await loadUploadJob("M1"))?.captureBitrate).toEqual({ ...BITRATE, ...PHASE2_NULL });
+  });
+});
+
+describe("phase 2: the face-off cell and the new decision fields (dynamic capture bitrate 16.8 #3, E13, E14)", () => {
+  const HERE = { lat: 43.65, lng: -79.38 };
+
+  it("captureGeoCell round-trips through the job", async () => {
+    await saveUploadJob(job({ protocol: 2, captureGeoCell: HERE }));
+    expect((await loadUploadJob("M1"))?.captureGeoCell).toEqual(HERE);
+  });
+
+  it.each([
+    ["a string", "43.65,-79.38"],
+    ["out of range", { lat: 120, lng: 0 }],
+    ["missing lng", { lat: 43.65 }],
+    ["absent (an older job)", undefined],
+  ])("a malformed cell (%s) loads as null without dropping the job", async (_name, value) => {
+    await saveUploadJob(job({ protocol: 2, captureGeoCell: value as never }));
+    const loaded = await loadUploadJob("M1");
+    expect(loaded).toMatchObject({ matchId: "M1", phase: "bytes" });
+    expect(loaded?.captureGeoCell).toBeNull();
+  });
+
+  it("the phase 2 fields persist; a full decision never carries its geoCell into the persisted shape", () => {
+    const persisted = toPersistedCaptureBitrate({
+      bitrateBps: 3_000_000,
+      codec: "hvc1",
+      level: "normal",
+      ladder: "hevc",
+      reason: "probe_normal",
+      network: "wifi",
+      historyMedianMbps: null,
+      locationKnown: true,
+      historyMatchedLocation: false,
+      probeOutcome: "applied",
+      probeMbps: 21.37,
+      geoCell: HERE,
+      managed: true,
+    });
+    expect(persisted).toEqual({
+      bitrateBps: 3_000_000,
+      codec: "hvc1",
+      level: "normal",
+      ladder: "hevc",
+      reason: "probe_normal",
+      network: "wifi",
+      historyMedianMbps: null,
+      locationKnown: true,
+      historyMatchedLocation: false,
+      probeOutcome: "applied",
+      probeMbps: 21.37,
+    });
+    expect(persisted).not.toHaveProperty("geoCell");
+  });
+
+  it("malformed phase 2 fields read as null, the rest is kept", () => {
+    const persisted = toPersistedCaptureBitrate({
+      bitrateBps: null,
+      codec: null,
+      level: null,
+      ladder: null,
+      reason: "pending",
+      network: "unknown",
+      historyMedianMbps: null,
+      locationKnown: "yes",
+      historyMatchedLocation: 1,
+      probeOutcome: 5,
+      probeMbps: "fast",
+    });
+    expect(persisted).toEqual(
+      expect.objectContaining({ reason: "pending", locationKnown: null, historyMatchedLocation: null, probeOutcome: null, probeMbps: null }),
+    );
+  });
+});
+
+describe("stripCaptureGeoCells (sign-out and account deletion, E14)", () => {
+  it("removes every job's cell and keeps the jobs", async () => {
+    const HERE = { lat: 43.65, lng: -79.38 };
+    await saveUploadJob(job({ protocol: 2, captureGeoCell: HERE }));
+    await saveUploadJob(job({ matchId: "M2", storagePath: "M2/A1/1700000000000.mp4", protocol: 2, captureGeoCell: HERE }));
+    await saveUploadJob(job({ matchId: "M3", storagePath: "M3/A1/1700000000000.mp4", protocol: 2 }));
+    await stripCaptureGeoCells();
+    const jobs = await loadUploadJobs();
+    expect(jobs.map((j) => j.matchId).sort()).toEqual(["M1", "M2", "M3"]);
+    for (const j of jobs) expect(j.captureGeoCell).toBeNull();
+    expect(jobs.find((j) => j.matchId === "M1")).toMatchObject({ phase: "bytes", storagePath: "M1/A1/1700000000000.mp4" });
+  });
+
+  it("never throws", async () => {
+    await expect(stripCaptureGeoCells()).resolves.toBeUndefined();
   });
 });
