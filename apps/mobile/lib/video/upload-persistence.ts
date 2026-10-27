@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { MatchVideoCaptureLens, MatchVideoCaptureQuality } from "@jits/shared/api/match-video-upload";
 import type { RecordingTruncation } from "./use-video-recorder";
 import type { UploadErrorClass } from "./upload-errors";
+import { coarseGeoCell, type CaptureGeoCell } from "./capture-bitrate";
 
 /**
  * Disk-backed record of a match-video upload that has not finished yet
@@ -103,6 +104,84 @@ export interface PendingUploadJob {
   captureQuality?: MatchVideoCaptureQuality | null;
   /** The lens the clip was recorded on, sent with the reservation. */
   captureLens?: MatchVideoCaptureLens | null;
+  /**
+   * The bitrate decision the clip was recorded with (dynamic capture
+   * bitrate, D8), for the uploaded event only. Older bundles spread `...job`
+   * and ignore it, so an OTA rollback is safe.
+   */
+  captureBitrate?: PersistedCaptureBitrate | null;
+  /**
+   * The face-off's coarse cell (dynamic capture bitrate phase 2, E13), for
+   * this upload's throughput sample only. DEVICE-ONLY: never sent with the
+   * reservation, never in telemetry.
+   */
+  captureGeoCell?: CaptureGeoCell | null;
+}
+
+/** The capture bitrate fields kept on a job (`CaptureBitrateDecision` minus the derivable ones). */
+export interface PersistedCaptureBitrate {
+  bitrateBps: number | null;
+  codec: "hvc1" | "avc1" | null;
+  level: "normal" | "weak" | null;
+  ladder: "hevc" | "h264" | null;
+  reason: string;
+  network: string;
+  historyMedianMbps: number | null;
+  /** Phase 2 (16.10); absent or null on jobs written before it. */
+  locationKnown?: boolean | null;
+  historyMatchedLocation?: boolean | null;
+  probeOutcome?: string | null;
+  probeMbps?: number | null;
+}
+
+function isBoolOrNull(v: unknown): v is boolean | null | undefined {
+  return v === undefined || v === null || typeof v === "boolean";
+}
+
+/** A stored cell, re-validated (E13); anything malformed is null and the job is kept. */
+export function toCaptureGeoCell(value: unknown): CaptureGeoCell | null {
+  if (typeof value !== "object" || value === null) return null;
+  const c = value as Record<string, unknown>;
+  return typeof c.lat === "number" && typeof c.lng === "number" ? coarseGeoCell(c.lat, c.lng) : null;
+}
+
+function isNumberOrNull(v: unknown): v is number | null {
+  return v === null || (typeof v === "number" && Number.isFinite(v));
+}
+
+/**
+ * The persisted shape of a decision, or null when the value is not one. Picks
+ * only the persisted fields, so a full `CaptureBitrateDecision` can be passed.
+ * Never throws: a bad value only loses telemetry, never the job.
+ */
+export function toPersistedCaptureBitrate(value: unknown): PersistedCaptureBitrate | null {
+  if (typeof value !== "object" || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (
+    !isNumberOrNull(v.bitrateBps) ||
+    !(v.codec === null || v.codec === "hvc1" || v.codec === "avc1") ||
+    !(v.level === null || v.level === "normal" || v.level === "weak") ||
+    !(v.ladder === null || v.ladder === "hevc" || v.ladder === "h264") ||
+    typeof v.reason !== "string" ||
+    typeof v.network !== "string" ||
+    !isNumberOrNull(v.historyMedianMbps)
+  ) {
+    return null;
+  }
+  // Phase 2 fields: absent on older jobs (null); never `geoCell` (E14).
+  return {
+    bitrateBps: v.bitrateBps,
+    codec: v.codec,
+    level: v.level,
+    ladder: v.ladder,
+    reason: v.reason,
+    network: v.network,
+    historyMedianMbps: v.historyMedianMbps,
+    locationKnown: isBoolOrNull(v.locationKnown) ? (v.locationKnown ?? null) : null,
+    historyMatchedLocation: isBoolOrNull(v.historyMatchedLocation) ? (v.historyMatchedLocation ?? null) : null,
+    probeOutcome: typeof v.probeOutcome === "string" ? v.probeOutcome : null,
+    probeMbps: typeof v.probeMbps === "number" && Number.isFinite(v.probeMbps) ? v.probeMbps : null,
+  };
 }
 
 /**
@@ -234,6 +313,8 @@ function normaliseJob(job: PendingUploadJob): PendingUploadJob {
         : null,
     captureQuality: job.captureQuality === "720p" || job.captureQuality === "1080p" ? job.captureQuality : null,
     captureLens: job.captureLens === "ultrawide" || job.captureLens === "default" ? job.captureLens : null,
+    captureBitrate: toPersistedCaptureBitrate(job.captureBitrate),
+    captureGeoCell: toCaptureGeoCell(job.captureGeoCell),
     updatedAt:
       typeof job.updatedAt === "number" && Number.isFinite(job.updatedAt)
         ? job.updatedAt
@@ -301,6 +382,22 @@ export async function loadUploadJobs(): Promise<PendingUploadJob[]> {
     if (job) jobs.push(job);
   }
   return jobs.sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/**
+ * Drop the face-off cell from every persisted job, keeping the jobs (sign-out
+ * and account deletion, dynamic capture bitrate E14): the clip still uploads,
+ * its throughput sample simply carries no place. Never throws.
+ */
+export async function stripCaptureGeoCells(): Promise<void> {
+  try {
+    const jobs = await loadUploadJobs();
+    await Promise.all(
+      jobs.filter((j) => j.captureGeoCell != null).map((j) => patchUploadJob(j.matchId, { captureGeoCell: null })),
+    );
+  } catch {
+    /* the cell is only a sample's place; the session clear drops samples anyway */
+  }
 }
 
 export async function removeUploadJob(matchId: string): Promise<void> {

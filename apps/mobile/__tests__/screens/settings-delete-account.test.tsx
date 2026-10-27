@@ -27,6 +27,20 @@ const mockClearLocations = jest.fn();
 jest.mock("@/lib/location/device-location-store", () => ({
   clearAllDeviceLocations: () => mockClearLocations(),
 }));
+const mockClearHistory = jest.fn(() => Promise.resolve());
+jest.mock("@/lib/video/capture-bitrate-history", () => ({
+  throughputHistoryGeneration: () => 0,
+  clearThroughputHistory: () => mockClearHistory(),
+}));
+const mockStripCells = jest.fn(() => Promise.resolve());
+jest.mock("@/lib/video/upload-persistence", () => ({
+  ...jest.requireActual("@/lib/video/upload-persistence"),
+  stripCaptureGeoCells: () => mockStripCells(),
+}));
+const mockReleasePreps = jest.fn();
+jest.mock("@/lib/video/capture-prep", () => ({
+  releaseAllCapturePreps: () => mockReleasePreps(),
+}));
 const mockClearIntents = jest.fn(() => Promise.resolve());
 jest.mock("@/lib/arena/live-intent-persist", () => ({
   clearAllPersistedLiveIntents: () => mockClearIntents(),
@@ -69,6 +83,11 @@ it("signs out and returns to login on success", async () => {
   // The stored last location goes before sign-out (instant go-live 4.1).
   expect(mockClearLocations).toHaveBeenCalled();
   expect(mockClearLocations.mock.invocationCallOrder[0]).toBeLessThan(mockSignOut.mock.invocationCallOrder[0]);
+  // Where their matches happened goes too (dynamic capture bitrate E14).
+  expect(mockClearHistory).toHaveBeenCalledTimes(1);
+  expect(mockReleasePreps).toHaveBeenCalledTimes(1);
+  // The pending upload jobs are kept, without the face-off cell.
+  expect(mockStripCells).toHaveBeenCalledTimes(1);
   // The persisted live choice goes too, after the sign-out that records one.
   expect(mockClearIntents).toHaveBeenCalledTimes(1);
   expect(mockClearIntents.mock.invocationCallOrder[0]).toBeGreaterThan(mockSignOut.mock.invocationCallOrder[0]);
@@ -81,6 +100,7 @@ it("a failed deletion keeps the stored location (the account still exists)", asy
   fireEvent.press(s.getByTestId("delete-submit"));
   await waitFor(() => expect(mockToast.error).toHaveBeenCalled());
   expect(mockClearLocations).not.toHaveBeenCalled();
+  expect(mockClearHistory).not.toHaveBeenCalled();
 });
 
 it("keeps the account and explains a failure", async () => {

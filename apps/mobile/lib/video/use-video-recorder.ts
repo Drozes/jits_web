@@ -19,6 +19,8 @@ import {
   useMatchUpload,
 } from "./match-upload-store";
 import { discardLocalClip } from "./recording-file";
+import { unmanagedDecision, type CaptureBitrateDecision } from "./capture-bitrate";
+import { trackCaptureBitrate } from "./upload-telemetry";
 import type { MatchVideoCaptureLens, MatchVideoCaptureQuality } from "@jits/shared/api/match-video-upload";
 
 /**
@@ -78,14 +80,20 @@ export type RecordingTruncation = "limit" | "interrupted";
 
 /**
  * What the viewfinder records with: the capture quality and the lens
- * (timekeeper mode spec 13.4). `MatchRecorderCamera` keeps it current; the
- * recorder takes it as the clip starts and the reservation stamps it on the
- * `match_videos` row.
+ * (timekeeper mode spec 13.4), and the bitrate decision (dynamic capture
+ * bitrate, spec 7.4). `MatchRecorderCamera` keeps it current; the recorder
+ * takes it as the clip starts, the reservation stamps quality and lens on the
+ * `match_videos` row, and the bitrate rides on the upload job to telemetry.
  */
 export interface RecordingCapture {
   quality: MatchVideoCaptureQuality;
   lens: MatchVideoCaptureLens;
+  /** Null when the viewfinder had no decision (older callers, tests). */
+  bitrate: CaptureBitrateDecision | null;
 }
+
+/** iOS: `recordAsync` rejects a codec the movie output cannot record (expo-camera `CameraRecordingException`). */
+const CODEC_REJECTED = /video codec .* not supported/i;
 
 /** When the recorder started (epoch ms) and how long the clip ran. */
 interface RecordTiming {
@@ -397,7 +405,13 @@ export function useVideoRecorder(
       recordStartedAt: timing?.startedAt ?? null,
       recordDurationMs: timing?.durationMs ?? null,
       ...(recordCaptureRef.current
-        ? { captureQuality: recordCaptureRef.current.quality, captureLens: recordCaptureRef.current.lens }
+        ? {
+            captureQuality: recordCaptureRef.current.quality,
+            captureLens: recordCaptureRef.current.lens,
+            captureBitrate: recordCaptureRef.current.bitrate ?? null,
+            // Device-only (phase 2, E13): the sample's cell, never sent.
+            captureGeoCell: recordCaptureRef.current.bitrate?.geoCell ?? null,
+          }
         : {}),
     });
     if (outcome.ok) transition("uploaded");
@@ -478,6 +492,14 @@ export function useVideoRecorder(
       // cannot start. "Camera is not ready yet" rejections are retried on
       // an interval: onCameraReady firing is no guarantee the session can
       // record yet (observed live on iOS 26).
+      //
+      // The capture (with its bitrate decision) is taken from the viewfinder
+      // as each attempt is issued and never read again for that attempt. Once
+      // iOS has rejected the decided codec, every later attempt of this
+      // start() records without codec or bitrate (spec 7.4): the clip is
+      // never lost to a codec mismatch.
+      let codecFallback: RecordingCapture | null = null;
+      let crumbed: CaptureBitrateDecision | null = null;
       for (let attempt = 1; ; attempt++) {
         console.log(
           `[video] ${logTag} recordAsync attempt ${attempt} (cam perm=${cameraPermission?.granted}, mic perm=${micPermission?.granted})`,
@@ -488,8 +510,15 @@ export function useVideoRecorder(
         // backend's default duration_seconds, so it fired before the match
         // ended on every full-length match (jits-2zpe).
         recordStartedAtRef.current = Date.now();
-        recordCaptureRef.current = captureSource?.current ?? null;
-        const promise = cam.recordAsync({ maxDuration: maxDurationSeconds });
+        recordCaptureRef.current = codecFallback ?? captureSource?.current ?? null;
+        const bitrate = recordCaptureRef.current?.bitrate ?? null;
+        // Android never has a codec in its decision, so the option is iOS only.
+        const codec = bitrate?.codec ?? null;
+        if (bitrate && bitrate !== crumbed) {
+          crumbed = bitrate;
+          trackCaptureBitrate(bitrate);
+        }
+        const promise = cam.recordAsync({ maxDuration: maxDurationSeconds, ...(codec ? { codec } : {}) });
         recordPromiseRef.current = promise;
         // A stop requested while start() was still spinning up must not be
         // dropped; honor it as soon as the native recorder is live so very
@@ -554,6 +583,54 @@ export function useVideoRecorder(
           return;
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
+          const captured: RecordingCapture | null = recordCaptureRef.current;
+          if (codec && captured && !codecFallback && CODEC_REJECTED.test(msg)) {
+            if (!mountedRef.current) {
+              stoppingRef.current = false;
+              pendingStopRef.current = false;
+              console.warn(`[video] ${logTag} recorder gone before the codec retry; no clip`);
+              transition("idle");
+              return;
+            }
+            // A stop that already arrived (a very short match) is handed to
+            // the retry as a pending stop: the retry records, then is stopped
+            // by issuePendingStop, so the match still gets its clip.
+            if (stoppingRef.current || pendingStopRef.current) {
+              stoppingRef.current = false;
+              pendingStopRef.current = true;
+            }
+            // Retry at once without codec or bitrate (today's recording),
+            // keeping the network and history fields for telemetry. It does
+            // not spend a not-ready attempt.
+            //
+            // iOS caveat: expo-camera applies the codec and bitrate with
+            // setOutputSettings on the movie output's connection, and those
+            // settings stay on that connection for later recordings in the
+            // same CameraView. A recording without a codec after one with a
+            // codec in the same session may keep the earlier settings. One
+            // viewfinder records one clip per match, so this only matters
+            // for a retry within one start().
+            const original: CaptureBitrateDecision | null = captured.bitrate;
+            codecFallback = {
+              ...captured,
+              bitrate: {
+                ...unmanagedDecision(captured.quality, "codec_rejected"),
+                network: original?.network ?? "unknown",
+                cellularGeneration: original?.cellularGeneration ?? null,
+                historyMedianMbps: original?.historyMedianMbps ?? null,
+                historySamples: original?.historySamples ?? 0,
+                // Phase 2: what the face-off knew (the cell stays device-only).
+                locationKnown: original?.locationKnown ?? false,
+                historyMatchedLocation: original?.historyMatchedLocation ?? false,
+                probeMbps: original?.probeMbps ?? null,
+                probeOutcome: original?.probeOutcome ?? "not_needed",
+                geoCell: original?.geoCell ?? null,
+              },
+            };
+            console.warn(`[video] ${logTag} codec ${codec} rejected (${msg}); retrying without codec or bitrate`);
+            attempt -= 1;
+            continue;
+          }
           const notReady = /not ready/i.test(msg);
           if (
             notReady &&

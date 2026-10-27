@@ -6,6 +6,7 @@ import { BellBootstrap } from "@/components/notifications/bell-bootstrap";
 import { AppStackTopTracker } from "@/lib/deep-links/tab-root-route";
 import { StackStripFrame } from "@/components/video-status/upload-strip-slots";
 import { ModerationBootstrap } from "@/lib/moderation/moderation-bootstrap";
+import { CaptureBitrateBootstrap } from "@/lib/video/capture-bitrate-bootstrap";
 
 // Anchor the tab navigator beneath the pushed detail screens (athlete/[id],
 // match/[matchId], video/[id], highlight/[id], settings). Deep links / reloads into those routes otherwise land with an
@@ -78,6 +79,9 @@ export default function AppLayout() {
       {/* Blocked athletes and AI processing consent for the signed-in athlete
         (App Review 1.2 and 5.1.2(i)), read once per session. */}
       <ModerationBootstrap />
+      {/* The iOS codec list and the capture bitrate kill switch, primed from
+        disk at app start so a relaunch re-entry can decide on its first render. */}
+      <CaptureBitrateBootstrap />
     </>
   );
 }

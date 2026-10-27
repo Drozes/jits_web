@@ -63,6 +63,13 @@ jest.mock("@/lib/match-flow/use-incoming-timekeeper-requests", () => ({
   },
 }));
 
+const mockStartPrep = jest.fn();
+const mockReleasePrep = jest.fn();
+jest.mock("@/lib/video/capture-prep", () => ({
+  startCapturePrep: (...a: unknown[]) => mockStartPrep(...a),
+  releaseCapturePrep: (...a: unknown[]) => mockReleasePrep(...a),
+}));
+
 import { TimekeepSheet } from "@/components/match-flow/crew/timekeep-sheet";
 import { TIMEKEEP_SHEET_POLL_MS } from "@/components/match-flow/crew/use-timekeep-sheet";
 import { __resetIncomingTimekeeperRequestsForTests } from "@/lib/match-flow/use-incoming-timekeeper-requests";
@@ -544,5 +551,78 @@ describe("timekeep sheet", () => {
     expect(isInArenaMatch()).toBe(false);
     s.unmount();
     expect(isInArenaMatch()).toBe(false);
+  });
+
+  // Dynamic capture bitrate 16.3 E11 (jits-n2im.33.6, bitrate half): the
+  // capture prep starts while the asked person reads the sheet, and is kept
+  // only when the sheet hands off to the match.
+  describe("capture prep", () => {
+    it("starts when a pending request is shown, keyed by the match", async () => {
+      await open();
+      expect(mockStartPrep).toHaveBeenCalledWith(M1, { matchId: M1 });
+      expect(mockReleasePrep).not.toHaveBeenCalled();
+    });
+
+    it("not before a request is shown", async () => {
+      mockGetRequest.mockReturnValue(new Promise(() => undefined));
+      await open();
+      expect(mockStartPrep).not.toHaveBeenCalled();
+    });
+
+    it("Decline releases it", async () => {
+      const s = await open();
+      fireEvent.press(s.getByLabelText("Decline"));
+      await flush();
+      expect(mockReleasePrep).toHaveBeenCalledWith(M1);
+    });
+
+    it("a lapsed or withdrawn request (over) releases it", async () => {
+      await open();
+      act(() => mockRowListener?.({ id: Q1, matchId: M1, status: "cancelled", expiresAt: REQUEST.expiresAt }));
+      expect(mockReleasePrep).toHaveBeenCalledWith(M1);
+    });
+
+    it("an unmount without a handoff releases it", async () => {
+      const s = await open();
+      s.unmount();
+      expect(mockReleasePrep).toHaveBeenCalledWith(M1);
+    });
+
+    it("an accepted answer hands it off: not released, even on unmount", async () => {
+      const s = await open();
+      fireEvent.press(s.getByLabelText("Accept"));
+      await flush();
+      expect(mockRouter.replace).toHaveBeenCalledWith(`/match/${M1}`);
+      s.unmount();
+      expect(mockReleasePrep).not.toHaveBeenCalled();
+    });
+
+    it("accepted elsewhere and still seated (on to the match) hands it off too", async () => {
+      mockSeat.mockResolvedValue(seatedOn(M1));
+      const s = await open();
+      act(() => mockRowListener?.({ id: Q1, matchId: M1, status: "accepted", expiresAt: REQUEST.expiresAt }));
+      await flush();
+      expect(mockRouter.replace).toHaveBeenCalledWith(`/match/${M1}`);
+      s.unmount();
+      expect(mockReleasePrep).not.toHaveBeenCalled();
+    });
+
+    it("a consent refusal does not release it (Accept stays available)", async () => {
+      mockConsent.given = false;
+      const s = await open();
+      fireEvent.press(s.getByLabelText("Accept"));
+      fireEvent.press(s.getByTestId("ai-consent-not-now"));
+      s.getByTestId("timekeep-consent-refused");
+      expect(mockReleasePrep).not.toHaveBeenCalled();
+    });
+
+    it("the server's consent_required answer does not release it", async () => {
+      mockRespond.mockResolvedValueOnce({ ok: false, error: { code: "CONSENT_REQUIRED", message: "x" } });
+      const s = await open();
+      fireEvent.press(s.getByLabelText("Accept"));
+      await flush();
+      s.getByTestId("timekeep-consent-refused");
+      expect(mockReleasePrep).not.toHaveBeenCalled();
+    });
   });
 });

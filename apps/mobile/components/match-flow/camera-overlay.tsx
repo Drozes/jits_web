@@ -42,6 +42,12 @@ export interface Viewfinder {
   card: ReadyPreviewBox;
   /** The capture quality (`use-capture-quality.ts`, the admin flag). */
   videoQuality: MatchVideoCaptureQuality;
+  /**
+   * The recording bitrate in bits per second (`use-capture-bitrate.ts`);
+   * undefined is the platform default. Frozen with the quality: a change
+   * recreates the Android camera.
+   */
+  videoBitrate: number | undefined;
   /** The back lens by name (`select-capture-lens.ts`, iOS); undefined is the default lens. */
   selectedLens: string | undefined;
   /** Tag the card TK-REC3 `WIDE LENS` (the ultrawide is selected). */
@@ -127,6 +133,7 @@ export function CameraOverlay({
           facing="back"
           style={{ flex: 1 }}
           videoQuality={viewfinder.videoQuality}
+          videoBitrate={viewfinder.videoBitrate}
           selectedLens={viewfinder.selectedLens}
           onCameraReady={onCameraReady}
         />
